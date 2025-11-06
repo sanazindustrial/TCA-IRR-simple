@@ -51,10 +51,7 @@ const nextConfig: NextConfig = {
     ]
   },
 
-  // This allows requests from the Firebase Studio environment.
-  allowedDevOrigins: [
-    'https://*.cluster-cxy3ise3prdrmx53pigwexthgs.cloudworkstations.dev',
-  ],
+
   serverExternalPackages: ['@opentelemetry/context-async-hooks'],
 
   // Build configuration

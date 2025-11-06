@@ -1,5 +1,6 @@
 // Configuration management utilities for analysis modules
 import * as React from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { UserRole, ReportType, Framework } from '@/components/analysis/module-configuration';
 
 export interface ModuleConfig {

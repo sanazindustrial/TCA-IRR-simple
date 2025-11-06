@@ -1,9 +1,6 @@
-/**
- * Browser Console Test for API Connection
- * Simple HTML page to test API connection from browser
- */
-
 <!DOCTYPE html>
+<!-- Browser Console Test for API Connection -->
+<!-- Simple HTML page to test API connection from browser -->
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -80,10 +77,17 @@
                 log(`Response status: ${response.status} ${response.statusText}`);
                 
                 if (response.ok) {
-                    const data = await response.json();
-                    log(`Success! Data: ${JSON.stringify(data, null, 2)}`);
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await response.json();
+                        log(`Success! Data: ${JSON.stringify(data, null, 2)}`);
+                    } else {
+                        const text = await response.text();
+                        log(`Success! Response (non-JSON): ${text}`);
+                    }
                 } else {
-                    log(`Error: HTTP ${response.status}`, true);
+                    const errorText = await response.text();
+                    log(`Error: HTTP ${response.status} - ${errorText}`, true);
                 }
             } catch (error) {
                 log(`Fetch error: ${error.message}`, true);
@@ -104,16 +108,23 @@
                     method: 'GET',
                     mode: 'cors',
                     headers: {
-                        'Content-Type': 'application/json',
-                    },
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
                 });
                 
-                log(`Response received: ${response.status} ${response.statusText}`);
-                log(`Response headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`);
+                log(`Response status: ${response.status} ${response.statusText}`);
+                log(`Response headers: ${JSON.stringify([...response.headers.entries()])}`);
                 
                 if (response.ok) {
-                    const data = await response.json();
-                    log(`Success! Response data: ${JSON.stringify(data, null, 2)}`);
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await response.json();
+                        log(`Success! Response data: ${JSON.stringify(data, null, 2)}`);
+                    } else {
+                        const text = await response.text();
+                        log(`Success! Response (non-JSON): ${text}`);
+                    }
                 } else {
                     const errorText = await response.text();
                     log(`Error response body: ${errorText}`, true);
