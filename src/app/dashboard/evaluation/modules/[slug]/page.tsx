@@ -265,7 +265,7 @@ export default function ModuleControlDeck() {
                     <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="flex-1">
                         <Import className="mr-2"/> Import JSON
                     </Button>
-                    <input type="file" ref={fileInputRef} onChange={handleFileImport} className="hidden" accept=".json" aria-label="Import module configuration from JSON file" />
+                    <input type="file" ref={fileInputRef} onChange={handleFileImport} className="hidden" accept=".json" aria-label="Import module JSON file" />
                 </div>
             </div>
             {addModuleError && <p className="text-sm text-destructive mt-2">{addModuleError}</p>}

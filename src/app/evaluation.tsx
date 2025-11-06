@@ -66,14 +66,14 @@ export default function AnalysisPage({ runAnalysisAction }: AnalysisPageProps) {
   useEffect(() => {
     const storedUser = localStorage.getItem('loggedInUser');
     if (storedUser) {
-        try {
-            const user = JSON.parse(storedUser);
-            setRole(user.role?.toLowerCase() || 'user');
-        } catch (e) {
-            setRole('user');
-        }
-    } else {
+      try {
+        const user = JSON.parse(storedUser);
+        setRole(user.role?.toLowerCase() || 'user');
+      } catch (e) {
         setRole('user');
+      }
+    } else {
+      setRole('user');
     }
   }, []);
 
@@ -89,16 +89,16 @@ export default function AnalysisPage({ runAnalysisAction }: AnalysisPageProps) {
       const comprehensiveData = await runAnalysisAction(framework);
       const endTime = Date.now();
       const duration = (endTime - startTime) / 1000;
-      
+
       localStorage.setItem('analysisResult', JSON.stringify(comprehensiveData));
       localStorage.setItem('analysisDuration', duration.toString());
       localStorage.setItem('analysisFramework', framework);
-      
+
       router.push('/analysis/result');
 
     } catch (error) {
       console.error('Failed to run analysis:', error);
-       toast({
+      toast({
         variant: 'destructive',
         title: 'Analysis Failed',
         description: error instanceof Error ? error.message : 'An unknown error occurred.',
@@ -106,7 +106,7 @@ export default function AnalysisPage({ runAnalysisAction }: AnalysisPageProps) {
       setIsLoading(false);
     }
   };
-  
+
   const isPrivilegedUser = role === 'admin' || role === 'reviewer';
 
 
