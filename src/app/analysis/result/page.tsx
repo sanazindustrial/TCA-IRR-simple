@@ -1,7 +1,6 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -130,20 +129,18 @@ export default function AnalysisResultPage({
 }) {
     const { toast } = useToast();
     const router = useRouter();
-
-    const [isLoading, setIsLoading] = useState(true);
-    const [role, setRole] = useState<UserRole>('user');
-    const [reportType, setReportType] = useState<ReportType>('triage');
-    const [framework, setFramework] = useState<'general' | 'medtech'>('general');
-    const [visibleSections, setVisibleSections] = useState<ReportSection[]>([]);
-
+    const [isLoading, setIsLoading] = React.useState(true);
+    const [role, setRole] = React.useState<UserRole>('user');
+    const [reportType, setReportType] = React.useState<ReportType>('triage');
+    const [framework, setFramework] = React.useState<'general' | 'medtech'>('general');
+    const [visibleSections, setVisibleSections] = React.useState<ReportSection[]>([]);
     const isPreview = searchParams.preview === 'true';
     const analysisDuration = 45.32; // Sample duration
     const analysisData = sampleAnalysisData;
 
     // Load user role and configuration
-    useEffect(() => {
-        const loadUserAndConfig = async () => {
+    React.useEffect(() => {
+        const loadUserAndConfig = () => {
             setIsLoading(true);
 
             // Load user role
@@ -171,7 +168,7 @@ export default function AnalysisResultPage({
     }, [searchParams.type]);
 
     // Load configuration based on role and report type
-    useEffect(() => {
+    React.useEffect(() => {
         if (isPreview) {
             // In preview mode, show all possible sections
             const allSections = allReportComponents.map(comp => ({
