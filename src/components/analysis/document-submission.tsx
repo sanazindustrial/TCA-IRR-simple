@@ -18,7 +18,7 @@ import {
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
-import React, { useState, useRef, ChangeEvent } from 'react';
+import { useState, useRef } from 'react';
 import { Badge } from '../ui/badge';
 
 export type UploadedFile = {
@@ -47,9 +47,9 @@ export function DocumentSubmission({
   const [textInput, setTextInput] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
-      const newFiles = Array.from(event.target.files).map((file: File) => ({
+      const newFiles = Array.from(event.target.files).map((file) => ({
         name: file.name,
         size: file.size,
       }));
@@ -148,7 +148,9 @@ export function DocumentSubmission({
                       <div className="flex items-center gap-2">
                         <FileText className="size-5 text-primary" />
                         <span className="font-medium">{file.name}</span>
-                        <Badge variant="secondary" text={formatBytes(file.size)} />
+                        <Badge variant="secondary">
+                          {formatBytes(file.size)}
+                        </Badge>
                       </div>
                       <Button
                         variant="ghost"

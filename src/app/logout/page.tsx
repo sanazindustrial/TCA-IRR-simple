@@ -5,11 +5,14 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 
+// Force dynamic rendering to prevent SSR issues
+export const dynamic = 'force-dynamic';
+
 function LoadingSpinner() {
     return (
         <div className="flex items-center justify-center min-h-screen bg-background">
             <div className="w-full max-w-md p-8 space-y-4">
-                 <div className="flex justify-center">
+                <div className="flex justify-center">
                     <div className="size-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
                 </div>
                 <h2 className="text-center text-xl font-semibold">Logging Out...</h2>
@@ -27,13 +30,15 @@ export default function LogoutPage() {
 
     useEffect(() => {
         // Clear the logged-in user from localStorage
-        localStorage.removeItem('loggedInUser');
-        
+        if (typeof window !== 'undefined') {
+            localStorage.removeItem('loggedInUser');
+        }
+
         toast({
             title: 'Logging Out',
             description: 'You have been successfully logged out.',
         });
-        
+
         // Redirect to the welcome page after a short delay
         const timer = setTimeout(() => {
             router.push('/');
@@ -42,5 +47,5 @@ export default function LogoutPage() {
         return () => clearTimeout(timer);
     }, [router, toast]);
 
-  return <LoadingSpinner />;
+    return <LoadingSpinner />;
 }

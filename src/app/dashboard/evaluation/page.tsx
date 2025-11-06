@@ -5,7 +5,7 @@ import * as React from 'react';
 import type { ComprehensiveAnalysisOutput } from '@/ai/flows/schemas';
 import { CompanyInformation } from '@/components/analysis/company-information';
 import { DocumentSubmission, type UploadedFile } from '@/components/analysis/document-submission';
-import ModuleConfiguration from '@/components/analysis/module-configuration';
+import { ModuleConfiguration } from '@/components/analysis/module-configuration';
 import { Button } from '@/components/ui/button';
 import Loading from '../../loading';
 import { useToast } from '@/hooks/use-toast';

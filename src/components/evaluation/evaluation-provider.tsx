@@ -1,9 +1,9 @@
 
 'use client';
 
+import React, { createContext, useContext, useMemo, useState } from 'react';
 import type { ReportType, UserRole } from '@/app/analysis/result/page';
 import type { UploadedFile } from '@/components/analysis/document-submission';
-import { createContext, useContext, useMemo, useState } from 'react';
 
 type EvaluationContextType = {
     role: UserRole;
@@ -11,16 +11,16 @@ type EvaluationContextType = {
     isPrivilegedUser: boolean;
     isEditable: boolean;
     framework: 'general' | 'medtech';
-    onFrameworkChange: (value: 'general' | 'medtech') => void;
-    setReportType: (value: ReportType) => void;
+    onFrameworkChangeAction: (value: 'general' | 'medtech') => void;
+    setReportTypeAction: (value: ReportType) => void;
     isLoading: boolean;
-    handleRunAnalysis: () => void;
+    handleRunAnalysisAction: () => void;
     uploadedFiles?: UploadedFile[];
-    setUploadedFiles?: React.Dispatch<React.SetStateAction<UploadedFile[]>>;
+    setUploadedFilesAction?: React.Dispatch<React.SetStateAction<UploadedFile[]>>;
     importedUrls?: string[];
-    setImportedUrls?: React.Dispatch<React.SetStateAction<string[]>>;
+    setImportedUrlsAction?: React.Dispatch<React.SetStateAction<string[]>>;
     submittedTexts?: string[];
-    setSubmittedTexts?: React.Dispatch<React.SetStateAction<string[]>>;
+    setSubmittedTextsAction?: React.Dispatch<React.SetStateAction<string[]>>;
 };
 
 const EvaluationContext = createContext<EvaluationContextType | null>(null);
@@ -38,28 +38,53 @@ type EvaluationProviderProps = {
     role: UserRole;
     reportType: ReportType;
     framework: 'general' | 'medtech';
-    onFrameworkChange: (value: 'general' | 'medtech') => void;
-    setReportType: (value: ReportType) => void;
+    onFrameworkChangeAction: (value: 'general' | 'medtech') => void;
+    setReportTypeAction: (value: ReportType) => void;
     isLoading: boolean;
-    handleRunAnalysis: () => void;
+    handleRunAnalysisAction: () => void;
     uploadedFiles?: UploadedFile[];
-    setUploadedFiles?: React.Dispatch<React.SetStateAction<UploadedFile[]>>;
+    setUploadedFilesAction?: React.Dispatch<React.SetStateAction<UploadedFile[]>>;
     importedUrls?: string[];
-    setImportedUrls?: React.Dispatch<React.SetStateAction<string[]>>;
+    setImportedUrlsAction?: React.Dispatch<React.SetStateAction<string[]>>;
     submittedTexts?: string[];
-    setSubmittedTexts?: React.Dispatch<React.SetStateAction<string[]>>;
+    setSubmittedTextsAction?: React.Dispatch<React.SetStateAction<string[]>>;
 };
 
-export function EvaluationProvider({ children, role, reportType, ...props }: EvaluationProviderProps) {
+export function EvaluationProvider({
+    children,
+    role,
+    reportType,
+    framework,
+    onFrameworkChangeAction,
+    setReportTypeAction,
+    isLoading,
+    handleRunAnalysisAction,
+    uploadedFiles,
+    setUploadedFilesAction,
+    importedUrls,
+    setImportedUrlsAction,
+    submittedTexts,
+    setSubmittedTextsAction,
+}: EvaluationProviderProps) {
     const isPrivilegedUser = useMemo(() => role === 'admin' || role === 'reviewer', [role]);
     const isEditable = useMemo(() => isPrivilegedUser, [isPrivilegedUser]);
-    
-    const value = {
+
+    const value: EvaluationContextType = {
         role,
         reportType,
         isPrivilegedUser,
         isEditable,
-        ...props,
+        framework,
+        onFrameworkChangeAction,
+        setReportTypeAction,
+        isLoading,
+        handleRunAnalysisAction,
+        uploadedFiles,
+        setUploadedFilesAction,
+        importedUrls,
+        setImportedUrlsAction,
+        submittedTexts,
+        setSubmittedTextsAction,
     };
 
     return (

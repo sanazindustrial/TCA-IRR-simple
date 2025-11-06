@@ -1,0 +1,95 @@
+/* Backend Test Component Styles */
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.testCard {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  background: white;
+}
+
+.testHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.testTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.statusIndicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.statusSuccess {
+  background-color: #10b981;
+}
+
+.statusError {
+  background-color: #ef4444;
+}
+
+.statusLoading {
+  background-color: #f59e0b;
+  animation: pulse 2s infinite;
+}
+
+.testButton {
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.testButton:hover {
+  background-color: #2563eb;
+}
+
+.testButton:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.resultSection {
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 14px;
+}
+
+.resultSuccess {
+  background-color: #f0f9ff;
+  border: 1px solid #0ea5e9;
+  color: #0c4a6e;
+}
+
+.resultError {
+  background-color: #fef2f2;
+  border: 1px solid #ef4444;
+  color: #7f1d1d;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}

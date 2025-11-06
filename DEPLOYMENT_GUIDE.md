@@ -3,12 +3,13 @@
 ## 🚀 Current Status - VERIFIED WORKING ✅
 
 ### Local Development Status
-- ✅ **Frontend (Next.js)**: Running on http://localhost:3000
-- ✅ **Backend (FastAPI)**: Running on http://localhost:8000 (port 8000)
+
+- ✅ **Frontend (Next.js)**: Running on <http://localhost:3000>
+- ✅ **Backend (FastAPI)**: Running on <http://localhost:8000> (port 8000)
 - ✅ **Python Dependencies**: All installed via requirements.txt
 - ✅ **Node Dependencies**: All installed via package.json
 - ✅ **Production Build**: Successfully compiled 65 pages
-- ✅ **GitHub Repository**: https://github.com/sanazindustrial/TCA-IRR-simple
+- ✅ **GitHub Repository**: <https://github.com/sanazindustrial/TCA-IRR-simple>
 
 ## 🏗️ Architecture Overview
 
@@ -36,12 +37,14 @@ TCA-IRR Application Stack:
 ### Option 1: Azure App Service (Recommended)
 
 #### Prerequisites
+
 - Azure CLI installed: `az --version`
-- Azure Developer CLI installed: `azd --version` 
+- Azure Developer CLI installed: `azd --version`
 - Node.js 18+ installed: `node --version`
 - Python 3.12+ installed: `py --version`
 
 #### Quick Deploy
+
 ```bash
 # 1. Clone and setup
 git clone https://github.com/sanazindustrial/TCA-IRR-simple.git
@@ -58,23 +61,27 @@ py -m pip install -r requirements.txt
 #### Manual Azure Deployment
 
 1. **Login to Azure**
+
    ```bash
    az login
    azd auth login
    ```
 
 2. **Set Environment Variables**
+
    ```bash
    $env:AZURE_ENV_NAME = "tca-irr-prod"
    $env:AZURE_LOCATION = "eastus2"
    ```
 
 3. **Build Application**
+
    ```bash
    npm run build
    ```
 
 4. **Deploy Infrastructure**
+
    ```bash
    azd provision
    azd up
@@ -83,6 +90,7 @@ py -m pip install -r requirements.txt
 ### Option 2: Docker Deployment (Alternative)
 
 #### Frontend Dockerfile
+
 ```dockerfile
 FROM node:18-alpine AS base
 WORKDIR /app
@@ -108,6 +116,7 @@ CMD ["npm", "start"]
 ```
 
 #### Backend Dockerfile
+
 ```dockerfile
 FROM python:3.12-slim
 WORKDIR /app
@@ -122,6 +131,7 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
 #### Docker Compose
+
 ```yaml
 version: '3.8'
 services:
@@ -178,6 +188,7 @@ npm run dev
 ### 2. Environment Configuration
 
 Create `.env.local`:
+
 ```env
 # Database Configuration
 DATABASE_URL=postgresql://tcairrserver:Tc@1rr53rv5r@tca-irr-server.postgres.database.azure.com:5432/tca_platform?sslmode=require
@@ -206,6 +217,7 @@ py test_connection.py
 ## 📋 Deployment Checklist
 
 ### Pre-Deployment
+
 - [ ] Frontend builds successfully (`npm run build`)
 - [ ] Backend starts without errors (`py main.py`)
 - [ ] All tests pass (`npm test`)
@@ -214,6 +226,7 @@ py test_connection.py
 - [ ] Security settings reviewed
 
 ### Azure Deployment
+
 - [ ] Azure CLI authenticated (`az login`)
 - [ ] Resource group exists
 - [ ] Bicep templates validated
@@ -222,6 +235,7 @@ py test_connection.py
 - [ ] Domain/DNS configured (if custom domain)
 
 ### Post-Deployment
+
 - [ ] Application accessible via URL
 - [ ] API endpoints responding
 - [ ] Database connectivity verified
@@ -231,18 +245,21 @@ py test_connection.py
 ## 🔧 Configuration Management
 
 ### Frontend Configuration
+
 - **Build Output**: `.next/` directory
 - **Environment**: Production optimized
 - **Routing**: App Router (Next.js 15)
 - **Styling**: Tailwind CSS + Shadcn/UI
 
 ### Backend Configuration  
+
 - **Framework**: FastAPI with Uvicorn
 - **Database**: Azure PostgreSQL with asyncpg
 - **Authentication**: JWT tokens with bcrypt
 - **Monitoring**: Azure Application Insights
 
 ### Azure Resources Created
+
 ```
 Resource Group: tca-irr-rg-{unique-id}
 ├── App Service Plan (B1): tc-asp-{unique-id}
@@ -259,6 +276,7 @@ Resource Group: tca-irr-rg-{unique-id}
 ### Common Issues
 
 1. **Build Failures**
+
    ```bash
    # Clear Next.js cache
    rm -rf .next
@@ -266,6 +284,7 @@ Resource Group: tca-irr-rg-{unique-id}
    ```
 
 2. **Backend Connection Issues**
+
    ```bash
    # Check Python dependencies
    py -m pip list | grep fastapi
@@ -275,6 +294,7 @@ Resource Group: tca-irr-rg-{unique-id}
    ```
 
 3. **Azure Deployment Errors**
+
    ```bash
    # Check Azure CLI version
    az --version
@@ -292,29 +312,33 @@ Database Health: Check via backend `/health` endpoint
 ## 📊 Monitoring & Maintenance
 
 ### Application Insights
+
 - Performance monitoring enabled
 - Custom telemetry for business metrics
 - Error tracking and alerts
 
 ### Logging
+
 - Structured logging via Azure Monitor
 - Application logs in Log Analytics
 - Performance counters tracked
 
 ### Backup Strategy
+
 - Database: Automated daily backups
 - Code: Git repository on GitHub
 - Configuration: Azure Key Vault backup
 
 ---
 
-## 🎉 Deployment Success!
+## 🎉 Deployment Success
 
 After successful deployment:
+
 1. **Frontend URL**: `https://tc-web-{unique-id}.azurewebsites.net`
 2. **Backend URL**: `https://tc-func-{unique-id}.azurewebsites.net`
 3. **Monitor**: Azure Application Insights dashboard
 4. **Logs**: Azure Log Analytics workspace
 
-**Repository**: https://github.com/sanazindustrial/TCA-IRR-simple  
+**Repository**: <https://github.com/sanazindustrial/TCA-IRR-simple>  
 **Status**: ✅ Ready for production deployment
