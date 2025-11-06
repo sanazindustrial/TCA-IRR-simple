@@ -1,0 +1,140 @@
+/**
+ * Browser Console Test for API Connection
+ * Simple HTML page to test API connection from browser
+ */
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Connection Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .result {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .error {
+            background: #ffe6e6;
+            color: #cc0000;
+        }
+        .success {
+            background: #e6f7e6;
+            color: #006600;
+        }
+        button {
+            background: #007cba;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #005a87;
+        }
+    </style>
+</head>
+<body>
+    <h1>API Connection Test</h1>
+    <p>This page tests the API connection using vanilla JavaScript fetch.</p>
+    
+    <div>
+        <button onclick="testApi()">Test API Connection</button>
+        <button onclick="testApiWithLogging()">Test with Detailed Logging</button>
+        <button onclick="clearResults()">Clear Results</button>
+    </div>
+    
+    <div id="results"></div>
+
+    <script>
+        function log(message, isError = false) {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `result ${isError ? 'error' : 'success'}`;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            results.appendChild(div);
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        async function testApi() {
+            clearResults();
+            log('Starting basic API test...');
+            
+            try {
+                const response = await fetch('http://localhost:8000/api/');
+                log(`Response status: ${response.status} ${response.statusText}`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log(`Success! Data: ${JSON.stringify(data, null, 2)}`);
+                } else {
+                    log(`Error: HTTP ${response.status}`, true);
+                }
+            } catch (error) {
+                log(`Fetch error: ${error.message}`, true);
+                log(`Error type: ${error.constructor.name}`, true);
+            }
+        }
+
+        async function testApiWithLogging() {
+            clearResults();
+            log('Starting detailed API test...');
+            log(`Current page URL: ${window.location.href}`);
+            log(`Target API URL: http://localhost:8000/api/`);
+            
+            try {
+                log('Making fetch request...');
+                
+                const response = await fetch('http://localhost:8000/api/', {
+                    method: 'GET',
+                    mode: 'cors',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                });
+                
+                log(`Response received: ${response.status} ${response.statusText}`);
+                log(`Response headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log(`Success! Response data: ${JSON.stringify(data, null, 2)}`);
+                } else {
+                    const errorText = await response.text();
+                    log(`Error response body: ${errorText}`, true);
+                }
+            } catch (error) {
+                log(`Fetch error: ${error.message}`, true);
+                log(`Error type: ${error.constructor.name}`, true);
+                log(`Error stack: ${error.stack}`, true);
+                
+                // Additional network diagnostics
+                log('Network diagnostics:');
+                log(`- Origin: ${window.location.origin}`);
+                log(`- Protocol: ${window.location.protocol}`);
+                log(`- User agent: ${navigator.userAgent}`);
+            }
+        }
+
+        // Test on page load
+        window.addEventListener('load', () => {
+            log('Page loaded. Ready to test API connection.');
+        });
+    </script>
+</body>
+</html>

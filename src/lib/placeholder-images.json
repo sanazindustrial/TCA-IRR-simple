@@ -1,0 +1,22 @@
+{
+  "placeholderImages": [
+    {
+      "id": "avatar1",
+      "description": "Abstract avatar 1",
+      "imageUrl": "https://images.unsplash.com/photo-1513279922550-250c2ce8a813?ixlib=rb-4.0.3&q=80&fm=jpg&crop=entropy&cs=tinysrgb&w=1080&fit=max&ixid=eyJhcHBfaWQiOjM3NDE5OH0",
+      "imageHint": "abstract pattern"
+    },
+    {
+      "id": "avatar2",
+      "description": "Abstract avatar 2",
+      "imageUrl": "https://images.unsplash.com/photo-1557672172-298e090bd0f1?ixlib=rb-4.0.3&q=80&fm=jpg&crop=entropy&cs=tinysrgb&w=1080&fit=max&ixid=eyJhcHBfaWQiOjM3NDE5OH0",
+      "imageHint": "colorful gradient"
+    },
+    {
+      "id": "avatar3",
+      "description": "Abstract avatar 3",
+      "imageUrl": "https://images.unsplash.com/photo-1502675133332-10a53b53a512?ixlib=rb-4.0.3&q=80&fm=jpg&crop=entropy&cs=tinysrgb&w=1080&fit=max&ixid=eyJhcHBfaWQiOjM3NDE5OH0",
+      "imageHint": "geometric lines"
+    }
+  ]
+}
