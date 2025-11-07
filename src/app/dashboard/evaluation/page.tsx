@@ -132,7 +132,18 @@ export default function EvaluationPage() {
                 description: `Processed real data from your inputs in ${duration.toFixed(1)}s`,
             });
 
-            router.push('/analysis/what-if');
+            // Role-based navigation:
+            // - Admin/Reviewer: Must go to what-if to review and adjust 9 module scores
+            // - Standard user: Skip what-if, go directly to result page for triage report
+            if (role === 'admin' || role === 'reviewer') {
+                toast({
+                    title: 'Redirecting to Score Review',
+                    description: 'As an admin/reviewer, please review and adjust scores from 9 modules before generating the report.',
+                });
+                router.push('/analysis/what-if');
+            } else {
+                router.push('/analysis/result');
+            }
 
         } catch (error) {
             console.error('Failed to run analysis:', error);
@@ -173,7 +184,7 @@ export default function EvaluationPage() {
                                 <Switch
                                     id="role-switcher"
                                     checked={isPrivilegedUser}
-                                    onCheckedChange={(checked: boolean) => {
+                                    onCheckedChange={(checked) => {
                                         const newRole = checked ? 'admin' : 'user';
                                         setRole(newRole);
                                         if (newRole === 'user') {

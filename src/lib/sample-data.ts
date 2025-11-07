@@ -23,7 +23,7 @@ export type ComprehensiveAnalysisOutput = {
         riskSummary: string;
         riskFlags: Array<{
             domain: string;
-            flag: string;
+            flag: 'green' | 'yellow' | 'red';
             trigger: string;
             description: string;
             impact: string;

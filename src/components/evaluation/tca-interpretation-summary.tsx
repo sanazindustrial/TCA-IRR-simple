@@ -364,7 +364,7 @@ export function TcaInterpretationSummary({ data = sampleTcaInterpretation }: Tca
                         Immediate Action Priorities
                     </h3>
                     <div className="space-y-3">
-                        {data.actionPriorities.map((action, index) => (
+                        {tcaData.actionPriorities.map((action, index) => (
                             <div key={index} className="p-4 border rounded-lg">
                                 <div className="flex items-start justify-between mb-2">
                                     <div className="flex items-center gap-2">
@@ -394,7 +394,7 @@ export function TcaInterpretationSummary({ data = sampleTcaInterpretation }: Tca
                     <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
                         <h4 className="font-semibold text-primary mb-3">Next Steps for Due Diligence</h4>
                         <ul className="space-y-2">
-                            {data.triageOutcome.nextSteps.map((step, index) => (
+                            {tcaData.triageOutcome.nextSteps.map((step, index) => (
                                 <li key={index} className="flex items-start gap-2">
                                     <CheckCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
                                     <span className="text-sm">{step}</span>

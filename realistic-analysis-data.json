@@ -1,0 +1,251 @@
+{
+    "analysis_id": "real_20241107_133500",
+    "company_name": "TechCorp Solutions",
+    "executive_summary": {
+        "overall_score": 73.5,
+        "recommendation": "INVEST - Solid opportunity with acceptable risk profile",
+        "key_strengths": ["Strong technical team", "Good market positioning", "Proven revenue model"],
+        "key_concerns": ["Competition intensity", "Funding runway", "Market expansion challenges"]
+    },
+    "tcaData": {
+        "categories": [{
+                "category": "Leadership",
+                "rawScore": 8.2,
+                "weight": 20,
+                "weightedScore": 1.64,
+                "flag": "green",
+                "description": "Evaluation of leadership performance",
+                "strengths": "Experienced founder with previous exits",
+                "concerns": "Limited C-suite experience",
+                "interpretation": "Strong leadership performance - key competitive advantage",
+                "aiRecommendation": "Leverage strong leadership in investment narrative"
+            },
+            {
+                "category": "Product-Market Fit",
+                "rawScore": 7.8,
+                "weight": 20,
+                "weightedScore": 1.56,
+                "flag": "yellow",
+                "description": "Evaluation of product-market fit performance",
+                "strengths": "Strong customer validation and growing user base",
+                "concerns": "Market penetration still developing",
+                "interpretation": "Good product-market fit showing - meets investment criteria",
+                "aiRecommendation": "Continue building on product-market fit foundation"
+            },
+            {
+                "category": "Team Strength",
+                "rawScore": 8.0,
+                "weight": 10,
+                "weightedScore": 0.8,
+                "flag": "green",
+                "description": "Evaluation of team strength performance",
+                "strengths": "Technical team with domain expertise",
+                "concerns": "Limited sales experience",
+                "interpretation": "Excellent team strength performance - key competitive advantage",
+                "aiRecommendation": "Leverage strong team strength in investment narrative"
+            },
+            {
+                "category": "Technology & IP",
+                "rawScore": 7.5,
+                "weight": 10,
+                "weightedScore": 0.75,
+                "flag": "yellow",
+                "description": "Evaluation of technology & ip performance",
+                "strengths": "Solid technical infrastructure and some IP protection",
+                "concerns": "Limited patent portfolio",
+                "interpretation": "Good technology & ip showing - meets investment criteria",
+                "aiRecommendation": "Continue building on technology & ip foundation"
+            },
+            {
+                "category": "Business Model & Financials",
+                "rawScore": 7.2,
+                "weight": 10,
+                "weightedScore": 0.72,
+                "flag": "yellow",
+                "description": "Evaluation of business model & financials performance",
+                "strengths": "Clear revenue model with recurring income",
+                "concerns": "Unit economics need improvement",
+                "interpretation": "Good business model & financials showing - meets investment criteria",
+                "aiRecommendation": "Continue building on business model & financials foundation"
+            },
+            {
+                "category": "Go-to-Market Strategy",
+                "rawScore": 6.8,
+                "weight": 10,
+                "weightedScore": 0.68,
+                "flag": "yellow",
+                "description": "Evaluation of go-to-market strategy performance",
+                "strengths": "Multi-channel approach with digital focus",
+                "concerns": "Customer acquisition cost optimization needed",
+                "interpretation": "Good go-to-market strategy showing - meets investment criteria",
+                "aiRecommendation": "Continue building on go-to-market strategy foundation"
+            },
+            {
+                "category": "Competition & Moat",
+                "rawScore": 6.5,
+                "weight": 5,
+                "weightedScore": 0.325,
+                "flag": "yellow",
+                "description": "Evaluation of competition & moat performance",
+                "strengths": "Some competitive differentiation",
+                "concerns": "Moat not yet established",
+                "interpretation": "Good competition & moat showing - meets investment criteria",
+                "aiRecommendation": "Continue building on competition & moat foundation"
+            },
+            {
+                "category": "Market Potential",
+                "rawScore": 8.5,
+                "weight": 5,
+                "weightedScore": 0.425,
+                "flag": "green",
+                "description": "Evaluation of market potential performance",
+                "strengths": "Large addressable market with high growth potential",
+                "concerns": "Market timing competitive",
+                "interpretation": "Excellent market potential performance - key competitive advantage",
+                "aiRecommendation": "Leverage strong market potential in investment narrative"
+            },
+            {
+                "category": "Traction",
+                "rawScore": 7.0,
+                "weight": 5,
+                "weightedScore": 0.35,
+                "flag": "yellow",
+                "description": "Evaluation of traction performance",
+                "strengths": "Growing revenue and customer base",
+                "concerns": "Growth rate could be accelerated",
+                "interpretation": "Good traction showing - meets investment criteria",
+                "aiRecommendation": "Continue building on traction foundation"
+            },
+            {
+                "category": "Scalability",
+                "rawScore": 7.3,
+                "weight": 2.5,
+                "weightedScore": 0.1825,
+                "flag": "yellow",
+                "description": "Evaluation of scalability performance",
+                "strengths": "Technology platform designed for scale",
+                "concerns": "Operational scalability needs work",
+                "interpretation": "Good scalability showing - meets investment criteria",
+                "aiRecommendation": "Continue building on scalability foundation"
+            },
+            {
+                "category": "Risk Assessment",
+                "rawScore": 6.9,
+                "weight": 2.5,
+                "weightedScore": 0.1725,
+                "flag": "yellow",
+                "description": "Evaluation of risk assessment performance",
+                "strengths": "Identified and documented risk mitigation strategies",
+                "concerns": "Some high-impact risks present",
+                "interpretation": "Good risk assessment showing - meets investment criteria",
+                "aiRecommendation": "Continue building on risk assessment foundation"
+            },
+            {
+                "category": "Exit Potential",
+                "rawScore": 7.8,
+                "weight": 0,
+                "weightedScore": 0,
+                "flag": "yellow",
+                "description": "Evaluation of exit potential performance",
+                "strengths": "Clear acquisition targets and IPO pathway",
+                "concerns": "Timeline to exit uncertain",
+                "interpretation": "Good exit potential showing - meets investment criteria",
+                "aiRecommendation": "Continue building on exit potential foundation"
+            }
+        ],
+        "compositeScore": 73.5,
+        "summary": "TCA Analysis: 73.5/100 - Tier 2 recommendation. INVEST - Solid opportunity with acceptable risk profile"
+    },
+    "riskData": {
+        "riskLevel": "MEDIUM",
+        "riskFlags": [{
+                "domain": "Market Risk",
+                "category": "Market Risk",
+                "flag": "yellow",
+                "severity": "medium",
+                "description": "Competitive market environment with established players",
+                "mitigation": "Strengthen differentiation strategy and focus on niche markets"
+            },
+            {
+                "domain": "Financial Risk",
+                "category": "Financial Risk",
+                "flag": "yellow",
+                "severity": "medium",
+                "description": "Current burn rate provides 12-18 months runway",
+                "mitigation": "Secure additional funding or optimize operational efficiency"
+            },
+            {
+                "domain": "Technology Risk",
+                "category": "Technology Risk",
+                "flag": "green",
+                "severity": "low",
+                "description": "Strong technical foundation with minimal technical debt",
+                "mitigation": "Continue investing in R&D and security measures"
+            }
+        ],
+        "totalRisks": 3,
+        "highSeverityRisks": 0,
+        "mediumSeverityRisks": 2,
+        "summary": "Identified 3 risk factors with medium overall risk level"
+    },
+    "macroData": {
+        "pestelDashboard": {
+            "political": 7.2,
+            "economic": 6.8,
+            "social": 8.1,
+            "technological": 8.7,
+            "environmental": 7.0,
+            "legal": 6.9
+        }
+    },
+    "benchmarkData": {
+        "revenue_growth": 7.8,
+        "customer_acquisition_cost": 6.5,
+        "lifetime_value": 8.2,
+        "market_share": 6.0
+    },
+    "growthData": {
+        "growthTier": 7.5
+    },
+    "gapData": {
+        "heatmap": [{
+                "category": "Sales & Marketing",
+                "gap": 2.5
+            },
+            {
+                "category": "Product Development",
+                "gap": 1.2
+            },
+            {
+                "category": "Operations",
+                "gap": 3.0
+            }
+        ]
+    },
+    "founderFitData": {
+        "readinessScore": 78
+    },
+    "teamData": {
+        "teamScore": 8.1,
+        "members": [{
+                "id": "founder-1",
+                "name": "CEO & Founder",
+                "role": "Chief Executive Officer"
+            },
+            {
+                "id": "founder-2",
+                "name": "CTO & Co-Founder",
+                "role": "Chief Technology Officer"
+            }
+        ]
+    },
+    "strategicFitData": {
+        "strategic_alignment": 7.5,
+        "market_positioning": 8.0,
+        "competitive_advantage": 7.3,
+        "value_proposition": 8.1
+    },
+    "status": "completed",
+    "created_at": "2025-11-07T13:35:00Z",
+    "ai_powered": false
+}

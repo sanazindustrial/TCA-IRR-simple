@@ -1,60 +1,10 @@
 
 import type { NextConfig } from 'next';
 
-const securityHeaders = [
-  {
-    key: 'Content-Security-Policy',
-    value: "default-src 'self' *.google.com picsum.photos images.unsplash.com; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline' fonts.googleapis.com; img-src * 'self' data:; font-src 'self' fonts.gstatic.com;".replace(/\s{2,}/g, ' ').trim()
-  },
-  {
-    key: 'Strict-Transport-Security',
-    value: 'max-age=63072000; includeSubDomains; preload'
-  },
-  {
-    key: 'X-Frame-Options',
-    value: 'SAMEORIGIN'
-  },
-  {
-    key: 'X-Content-Type-Options',
-    value: 'nosniff'
-  },
-  {
-    key: 'Referrer-Policy',
-    value: 'origin-when-cross-origin'
-  },
-  {
-    key: 'Permissions-Policy',
-    value: "camera=(), microphone=(), geolocation=(), browsing-topics=()"
-  }
-];
-
 const nextConfig: NextConfig = {
-  /* config options here */
-  experimental: {
-  },
+  // Production configuration for Azure App Service
 
-  // Configure for Azure App Service deployment (dynamic)
-  // Remove static export configuration for dynamic deployment
-  // output: 'export',  // Commented out for dynamic deployment
-  // trailingSlash: true,  // Commented out for dynamic deployment
-  // skipTrailingSlashRedirect: true,  // Commented out for dynamic deployment
-  // distDir: 'out',  // Commented out for dynamic deployment
-
-  // Security headers for production
-  async headers() {
-    return [
-      {
-        // Apply these headers to all routes in your application.
-        source: '/:path*',
-        headers: securityHeaders,
-      },
-    ]
-  },
-
-
-  serverExternalPackages: ['@opentelemetry/context-async-hooks'],
-
-  // Build configuration
+  // Build configuration for production
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -62,7 +12,28 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
 
-  // Image configuration for dynamic deployment
+  serverExternalPackages: ['@opentelemetry/context-async-hooks'],
+
+  // Security headers for production
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'X-Frame-Options',
+            value: 'SAMEORIGIN'
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff'
+          },
+        ],
+      },
+    ]
+  },
+
+  // Image optimization
   images: {
     remotePatterns: [
       {
@@ -85,4 +56,10 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-}; export default nextConfig;
+
+  // Performance optimizations
+  compress: true,
+  poweredByHeader: false,
+};
+
+export default nextConfig;

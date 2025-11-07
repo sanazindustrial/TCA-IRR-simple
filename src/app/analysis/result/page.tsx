@@ -264,8 +264,14 @@ function ReportView({
                         <Component initialData={getComponentData(id, analysisData)} />
                     ) : id === 'tca-ai-table' ? (
                         <Component data={getComponentData(id, analysisData)} />
+                    ) : id === 'tca-interpretation-summary' ? (
+                        <Component tcaData={getComponentData(id, analysisData)} />
+                    ) : id === 'risk-flag-summary-table' ? (
+                        <Component data={analysisData.riskData} />
+                    ) : id === 'flag-analysis-narrative' ? (
+                        <Component riskData={analysisData.riskData} tcaData={analysisData.tcaData} />
                     ) : (
-                        <Component data={getComponentData(id, analysisData)} />
+                        <Component initialData={getComponentData(id, analysisData)} />
                     )}
                 </div>
             ))}
