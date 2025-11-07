@@ -6,17 +6,19 @@
 ✅ **Data Extraction**: Working  
 ✅ **TCA Analysis**: Working  
 ✅ **Result Generation**: Working  
-✅ **Backend API**: Running on http://localhost:8001  
-✅ **Frontend UI**: Running on http://localhost:3001  
+✅ **Backend API**: Running on <http://localhost:8001>  
+✅ **Frontend UI**: Running on <http://localhost:3001>  
 
 ## 🧪 Test Results (Latest)
 
 ### Integration Test Summary
+
 - **Total Tests**: 11 (Pipeline) + 5 (Live) = 16 tests
 - **Success Rate**: 100% (Pipeline) + 80% (Live) = 94% overall
 - **Status**: ✅ Production Ready
 
 ### Test Coverage
+
 | Component | Status | Details |
 |-----------|---------|---------|
 | File Upload API | ✅ PASS | Processes files and extracts data |
@@ -30,6 +32,7 @@
 ## 🚀 How to Use
 
 ### 1. Start the Servers
+
 ```bash
 # Terminal 1: Backend
 cd "C:\Users\Allot\OneDrive\Desktop\TCA-IRR-APP-main- simplify"
@@ -41,12 +44,14 @@ npm run dev
 ```
 
 ### 2. Access the Application
-- **Frontend**: http://localhost:3001
-- **Backend API**: http://localhost:8001
-- **API Documentation**: http://localhost:8001/docs
+
+- **Frontend**: <http://localhost:3001>
+- **Backend API**: <http://localhost:8001>
+- **API Documentation**: <http://localhost:8001/docs>
 
 ### 3. Test the Upload Pipeline
-1. Navigate to http://localhost:3001/dashboard/evaluation
+
+1. Navigate to <http://localhost:3001/dashboard/evaluation>
 2. Upload test files (PDF, DOCX, XLSX)
 3. Add URLs for data import
 4. Submit text content
@@ -56,18 +61,21 @@ npm run dev
 ## 📊 Analysis Features
 
 ### File Upload & Processing
+
 - ✅ **Multi-format Support**: PDF, DOCX, PPTX, XLSX, TXT
 - ✅ **Data Extraction**: Automatically extracts financial data, key metrics
 - ✅ **Content Analysis**: Processes business plans, pitch decks, financials
 - ✅ **Real-time Processing**: Files processed immediately on upload
 
 ### URL Data Import
+
 - ✅ **Web Scraping**: Extracts content from company websites
 - ✅ **News Integration**: Imports industry news and trends  
 - ✅ **Market Data**: Processes external market research
 - ✅ **Metadata Extraction**: Domain analysis, content classification
 
 ### Comprehensive TCA Analysis
+
 - ✅ **Market Potential**: 8.2/10 - Strong market opportunity
 - ✅ **Technology Innovation**: 7.8/10 - Solid tech foundation
 - ✅ **Team Capability**: 8.0/10 - Experienced team
@@ -75,6 +83,7 @@ npm run dev
 - ✅ **Financial Health**: 7.0/10 - Adequate runway
 
 ### Advanced Analytics
+
 - ✅ **PESTEL Analysis**: Political, Economic, Social, Tech, Environmental, Legal
 - ✅ **Risk Assessment**: 6.5/10 overall risk with mitigation strategies
 - ✅ **Benchmark Comparison**: 72nd percentile performance
@@ -84,6 +93,7 @@ npm run dev
 ## 🔧 Technical Architecture
 
 ### Backend (Python FastAPI)
+
 - **Port**: 8001
 - **Database**: Simplified (no PostgreSQL dependency for testing)
 - **API Endpoints**:
@@ -93,6 +103,7 @@ npm run dev
   - `/api/health` - Health check
 
 ### Frontend (Next.js 15.3.3)
+
 - **Port**: 3001  
 - **Framework**: React 18 with TypeScript
 - **UI Components**: 25+ evaluation components
@@ -100,6 +111,7 @@ npm run dev
 - **Routing**: Dynamic pages with force-dynamic configuration
 
 ### Data Flow
+
 ```
 File Upload → Data Extraction → Analysis Request → TCA Processing → Result Display
      ↓              ↓                ↓               ↓              ↓
@@ -117,6 +129,7 @@ File Upload → Data Extraction → Analysis Request → TCA Processing → Resu
 ## 🎯 Ready for Production
 
 ### ✅ Completed Features
+
 - [x] File upload with data extraction
 - [x] URL import with content processing  
 - [x] Text input with analysis
@@ -130,6 +143,7 @@ File Upload → Data Extraction → Analysis Request → TCA Processing → Resu
 - [x] Export functionality
 
 ### 🚀 Next Steps
+
 1. **Manual Testing**: Use the UI to upload actual files
 2. **Azure Deployment**: Deploy to production using existing Bicep templates
 3. **Database Integration**: Connect to full PostgreSQL database
@@ -140,8 +154,8 @@ File Upload → Data Extraction → Analysis Request → TCA Processing → Resu
 
 - **Live Integration Test**: `node live-integration-test.js`
 - **Pipeline Test**: `node test-upload-analysis-pipeline.js`
-- **API Documentation**: http://localhost:8001/docs
-- **GitHub Repository**: https://github.com/sanazindustrial/TCA-IRR-simple
+- **API Documentation**: <http://localhost:8001/docs>
+- **GitHub Repository**: <https://github.com/sanazindustrial/TCA-IRR-simple>
 
 ---
 

@@ -101,27 +101,6 @@ export function ExportButtons() {
     const data = getAnalysisData();
     if (!data) return;
 
-    const formatSection = (title: string, content: any[]) => {
-      const children = [new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun(title)] })];
-      if (typeof content === 'string') {
-        children.push(new Paragraph(content));
-      } else if (Array.isArray(content)) {
-        const rows = content.map(item => new TableRow({
-          children: Object.values(item).map(val => new TableCell({ children: [new Paragraph(String(val))] }))
-        }));
-        const table = new Table({
-          rows: [
-            new TableRow({
-              children: Object.keys(content[0]).map(key => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: key, bold: true })] })] }))
-            }),
-            ...rows
-          ],
-          width: { size: 100, type: WidthType.PERCENT }
-        });
-        children.push(table);
-      }
-      return children;
-    };
 
     const sections: Paragraph[] = [
       new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun("Startup Compass Analysis Report")] }),
@@ -155,8 +134,16 @@ export function ExportButtons() {
       let tcaSlide = pptx.addSlide();
       tcaSlide.addText('TCA Scorecard', { x: 0.5, y: 0.25, fontSize: 18, bold: true });
       tcaSlide.addText(`Composite Score: ${data.tcaData.compositeScore.toFixed(2)}`, { x: 0.5, y: 0.75 });
-      const tableRows = data.tcaData.categories.map(c => [c.category, c.rawScore, c.weight, c.flag]);
-      tcaSlide.addTable([['Category', 'Score', 'Weight', 'Flag'], ...tableRows], { x: 0.5, y: 1.2, w: 9.0 });
+      const tableRows = data.tcaData.categories.map(c => [
+        { text: c.category },
+        { text: String(c.rawScore) },
+        { text: String(c.weight) },
+        { text: c.flag }
+      ]);
+      tcaSlide.addTable([
+        [{ text: 'Category' }, { text: 'Score' }, { text: 'Weight' }, { text: 'Flag' }],
+        ...tableRows
+      ], { x: 0.5, y: 1.2, w: 9.0 });
     }
 
     if (data.riskData) {

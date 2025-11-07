@@ -8,10 +8,26 @@ import {
   CardDescription
 } from '@/components/ui/card';
 import { Settings, ChevronRight, PlusCircle, MessageSquareQuote, SlidersHorizontal } from 'lucide-react';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
+
+// Export types for use in other files
+export type UserRole = 'user' | 'admin' | 'reviewer';
+export type ReportType = 'triage' | 'dd';
+export type Framework = 'general' | 'medtech';
+
+export interface ModuleConfig {
+  id: string;
+  name: string;
+  description: string;
+  status: 'active' | 'inactive';
+  category?: string;
+  requiredRole?: UserRole[];
+  reportTypes?: ReportType[];
+  frameworks?: Framework[];
+}
 
 type Module = {
   id: string;
@@ -65,7 +81,7 @@ export function ModuleConfiguration({ framework }: ModuleConfigurationProps) {
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {modules.map((mod) => (
+          {modules.map((mod: Module) => (
             <Link
               href={`/analysis/modules/${mod.id}`}
               key={mod.id}

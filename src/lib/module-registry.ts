@@ -9,209 +9,191 @@ export const MODULE_REGISTRY: ModuleConfig[] = [
     // Core Modules - Essential for all reports
     {
         id: 'quick-summary',
-        title: 'Quick Summary',
+        name: 'Quick Summary',
         description: 'Executive overview with key findings and recommendations',
         category: 'core',
         requiredRole: ['user', 'admin', 'reviewer'],
         reportTypes: ['triage', 'dd'],
         frameworks: ['general', 'medtech'],
-        active: true,
-        priority: 1
+        status: 'active'
     },
     {
         id: 'executive-summary',
-        title: 'Executive Summary',
+        name: 'Executive Summary',
         description: 'Comprehensive executive-level analysis with detailed insights',
         category: 'core',
         requiredRole: ['admin', 'reviewer'],
         reportTypes: ['triage', 'dd'],
         frameworks: ['general', 'medtech'],
-        active: true,
-        priority: 2
+        status: 'active'
     },
     {
         id: 'tca-scorecard',
-        title: 'TCA Scorecard',
+        name: 'TCA Scorecard',
         description: 'Technology Commercialization Assessment with weighted scores',
         category: 'core',
         requiredRole: ['user', 'admin', 'reviewer'],
         reportTypes: ['triage', 'dd'],
         frameworks: ['general', 'medtech'],
-        active: true,
-        priority: 3
+        status: 'active'
     },
 
     // Analysis Modules - Deep analytical components
     {
         id: 'risk-flags',
-        title: 'Risk Flags & Mitigation',
+        name: 'Risk Flags & Mitigation',
         description: 'Comprehensive risk assessment with mitigation strategies',
         category: 'analysis',
         requiredRole: ['user', 'admin', 'reviewer'],
         reportTypes: ['triage', 'dd'],
         frameworks: ['general', 'medtech'],
-        active: true,
-        priority: 4
+        status: 'active'
     },
     {
         id: 'macro-trend-alignment',
-        title: 'Macro Trend Alignment',
+        name: 'Macro Trend Alignment',
         description: 'PESTEL analysis and alignment with macro market trends',
         category: 'analysis',
         requiredRole: ['admin', 'reviewer'],
         reportTypes: ['triage', 'dd'],
         frameworks: ['general', 'medtech'],
-        active: true,
-        priority: 5
+        status: 'active'
     },
     {
         id: 'benchmark-comparison',
-        title: 'Benchmark Comparison',
+        name: 'Benchmark Comparison',
         description: 'Industry benchmarks and competitive positioning analysis',
         category: 'analysis',
         requiredRole: ['admin', 'reviewer'],
         reportTypes: ['dd'],
         frameworks: ['general', 'medtech'],
-        active: true,
-        priority: 6
+        status: 'active'
     },
     {
         id: 'growth-classifier',
-        title: 'Growth Classifier',
+        name: 'Growth Classifier',
         description: 'AI-powered growth potential classification and scenarios',
         category: 'analysis',
         requiredRole: ['admin', 'reviewer'],
         reportTypes: ['dd'],
         frameworks: ['general', 'medtech'],
-        active: true,
-        priority: 7
+        status: 'active'
     },
     {
         id: 'gap-analysis',
-        title: 'Gap Analysis',
+        name: 'Gap Analysis',
         description: 'Identify performance gaps and improvement roadmap',
         category: 'analysis',
         requiredRole: ['admin', 'reviewer'],
         reportTypes: ['dd'],
         frameworks: ['general', 'medtech'],
-        active: true,
-        priority: 8
+        status: 'active'
     },
 
     // Strategic Modules - High-level strategic insights
     {
         id: 'team-assessment',
-        title: 'Team Assessment',
+        name: 'Team Assessment',
         description: 'Founding team analysis and organizational capabilities',
         category: 'strategic',
         requiredRole: ['admin', 'reviewer'],
         reportTypes: ['dd'],
         frameworks: ['general', 'medtech'],
-        active: true,
-        priority: 9
+        status: 'active'
     },
     {
         id: 'funder-fit-analysis',
-        title: 'Funder Fit Analysis',
+        name: 'Funder Fit Analysis',
         description: 'Investment readiness and funder matching analysis',
         category: 'strategic',
         requiredRole: ['admin', 'reviewer'],
         reportTypes: ['dd'],
         frameworks: ['general', 'medtech'],
-        active: true,
-        priority: 10
+        status: 'active'
     },
     {
         id: 'strategic-fit-matrix',
-        title: 'Strategic Fit Matrix',
+        name: 'Strategic Fit Matrix',
         description: 'Strategic alignment and partnership fit analysis',
         category: 'strategic',
         requiredRole: ['admin', 'reviewer'],
         reportTypes: ['dd'],
         frameworks: ['general', 'medtech'],
-        active: true,
-        priority: 11
+        status: 'active'
     },
 
     // Compliance Modules - Regulatory and compliance-focused (MedTech specific)
     {
         id: 'regulatory-compliance',
-        title: 'Regulatory Compliance Review',
+        name: 'Regulatory Compliance Review',
         description: 'FDA and international regulatory compliance assessment',
         category: 'compliance',
         requiredRole: ['admin', 'reviewer'],
         reportTypes: ['dd'],
         frameworks: ['medtech'],
-        active: true,
-        priority: 12
+        status: 'active'
     },
     {
         id: 'clinical-pathway',
-        title: 'Clinical Pathway Analysis',
+        name: 'Clinical Pathway Analysis',
         description: 'Clinical trial pathway and regulatory roadmap analysis',
         category: 'compliance',
         requiredRole: ['admin', 'reviewer'],
         reportTypes: ['dd'],
         frameworks: ['medtech'],
-        active: true,
-        priority: 13
+        status: 'active'
     },
 
     // Extended Analysis Modules (Additional detailed analysis)
     {
         id: 'competitive-landscape',
-        title: 'Competitive Landscape',
+        name: 'Competitive Landscape',
         description: 'Detailed competitive analysis and positioning',
         category: 'analysis',
         requiredRole: ['admin', 'reviewer'],
         reportTypes: ['dd'],
         frameworks: ['general', 'medtech'],
-        active: false,
-        priority: 14
+        status: 'inactive'
     },
     {
         id: 'ip-technology-review',
-        title: 'IP & Technology Review',
+        name: 'IP & Technology Review',
         description: 'Intellectual property and technology stack analysis',
         category: 'analysis',
         requiredRole: ['admin', 'reviewer'],
         reportTypes: ['dd'],
         frameworks: ['general', 'medtech'],
-        active: false,
-        priority: 15
+        status: 'inactive'
     },
     {
         id: 'financials-burn-rate',
-        title: 'Financial Analysis & Burn Rate',
+        name: 'Financial Analysis & Burn Rate',
         description: 'Financial health and runway analysis',
         category: 'analysis',
         requiredRole: ['admin', 'reviewer'],
         reportTypes: ['dd'],
         frameworks: ['general', 'medtech'],
-        active: false,
-        priority: 16
+        status: 'inactive'
     },
     {
         id: 'gtm-strategy',
-        title: 'Go-to-Market Strategy',
+        name: 'Go-to-Market Strategy',
         description: 'GTM strategy evaluation and recommendations',
         category: 'strategic',
         requiredRole: ['admin', 'reviewer'],
         reportTypes: ['dd'],
         frameworks: ['general', 'medtech'],
-        active: false,
-        priority: 17
+        status: 'inactive'
     },
     {
         id: 'exit-strategy-roadmap',
-        title: 'Exit Strategy & Roadmap',
+        name: 'Exit Strategy & Roadmap',
         description: 'Exit potential and strategic roadmap analysis',
         category: 'strategic',
         requiredRole: ['admin', 'reviewer'],
         reportTypes: ['dd'],
         frameworks: ['general', 'medtech'],
-        active: false,
-        priority: 18
+        status: 'inactive'
     }
 ];
 
@@ -228,17 +210,17 @@ export class ModuleRegistry {
         framework: Framework
     ): ModuleConfig[] {
         return MODULE_REGISTRY.filter(module =>
-            module.requiredRole.includes(role) &&
-            module.reportTypes.includes(reportType) &&
-            module.frameworks.includes(framework)
-        ).sort((a, b) => a.priority - b.priority);
+            module.requiredRole && module.requiredRole.includes(role) &&
+            module.reportTypes && module.reportTypes.includes(reportType) &&
+            module.frameworks && module.frameworks.includes(framework)
+        );
     }
 
     /**
      * Get modules by category
      */
     static getModulesByCategory(
-        category: ModuleConfig['category'],
+        category: string,
         role?: UserRole,
         reportType?: ReportType,
         framework?: Framework
@@ -246,17 +228,17 @@ export class ModuleRegistry {
         let modules = MODULE_REGISTRY.filter(module => module.category === category);
 
         // Apply additional filters if provided
-        if (role) {
-            modules = modules.filter(module => module.requiredRole.includes(role));
+        if (role && modules.length > 0) {
+            modules = modules.filter(module => module.requiredRole && module.requiredRole.includes(role));
         }
-        if (reportType) {
-            modules = modules.filter(module => module.reportTypes.includes(reportType));
+        if (reportType && modules.length > 0) {
+            modules = modules.filter(module => module.reportTypes && module.reportTypes.includes(reportType));
         }
-        if (framework) {
-            modules = modules.filter(module => module.frameworks.includes(framework));
+        if (framework && modules.length > 0) {
+            modules = modules.filter(module => module.frameworks && module.frameworks.includes(framework));
         }
 
-        return modules.sort((a, b) => a.priority - b.priority);
+        return modules;
     }
 
     /**
@@ -278,9 +260,9 @@ export class ModuleRegistry {
         const module = this.getModuleById(moduleId);
         if (!module) return false;
 
-        return module.requiredRole.includes(role) &&
-            module.reportTypes.includes(reportType) &&
-            module.frameworks.includes(framework);
+        return (!module.requiredRole || module.requiredRole.includes(role)) &&
+            (!module.reportTypes || module.reportTypes.includes(reportType)) &&
+            (!module.frameworks || module.frameworks.includes(framework));
     }
 
     /**
@@ -359,17 +341,23 @@ export class ModuleRegistry {
 
         MODULE_REGISTRY.forEach(module => {
             // Count by category
-            stats.modulesByCategory[module.category] = (stats.modulesByCategory[module.category] || 0) + 1;
+            if (module.category) {
+                stats.modulesByCategory[module.category] = (stats.modulesByCategory[module.category] || 0) + 1;
+            }
 
             // Count by framework
-            module.frameworks.forEach((framework: Framework) => {
-                stats.modulesByFramework[framework] = (stats.modulesByFramework[framework] || 0) + 1;
-            });
+            if (module.frameworks) {
+                module.frameworks.forEach((framework: Framework) => {
+                    stats.modulesByFramework[framework] = (stats.modulesByFramework[framework] || 0) + 1;
+                });
+            }
 
             // Count by report type
-            module.reportTypes.forEach((reportType: ReportType) => {
-                stats.modulesByReportType[reportType] = (stats.modulesByReportType[reportType] || 0) + 1;
-            });
+            if (module.reportTypes) {
+                module.reportTypes.forEach((reportType: ReportType) => {
+                    stats.modulesByReportType[reportType] = (stats.modulesByReportType[reportType] || 0) + 1;
+                });
+            }
         });
 
         return stats;

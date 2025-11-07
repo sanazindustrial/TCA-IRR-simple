@@ -173,7 +173,7 @@ export default function EvaluationPage() {
                                 <Switch
                                     id="role-switcher"
                                     checked={isPrivilegedUser}
-                                    onCheckedChange={(checked) => {
+                                    onCheckedChange={(checked: boolean) => {
                                         const newRole = checked ? 'admin' : 'user';
                                         setRole(newRole);
                                         if (newRole === 'user') {

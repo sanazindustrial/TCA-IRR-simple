@@ -1,4 +1,5 @@
 'use client';
+import { useState, useRef } from 'react';
 import {
   Card,
   CardContent,
@@ -18,7 +19,6 @@ import {
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
-import { useState, useRef } from 'react';
 import { Badge } from '../ui/badge';
 
 export type UploadedFile = {
@@ -66,7 +66,7 @@ export function DocumentSubmission({
           type: file.type
         }));
 
-        const response = await fetch('http://localhost:8001/api/files/upload', {
+        const response = await fetch('http://localhost:8000/api/files/upload', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ files: fileData })
@@ -108,7 +108,7 @@ export function DocumentSubmission({
 
       // Process URLs with backend (if available)
       try {
-        const response = await fetch('http://localhost:8001/api/urls/fetch', {
+        const response = await fetch('http://localhost:8000/api/urls/fetch', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ urls })
@@ -206,12 +206,13 @@ export function DocumentSubmission({
                 Drop your file here or click to browse
               </h3>
               <p className="mt-1 text-sm text-muted-foreground">
-                Supported: PDF, DOCX, PPTX, XLSX, TXT (Max 30MB)
+                Supported: PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, TXT, CSV, JSON, RTF, ODT (Max 30MB)
               </p>
               <Input
                 type="file"
                 ref={fileInputRef}
                 className="hidden"
+                accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.csv,.json,.rtf,.odt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,text/csv,application/json,application/rtf,application/vnd.oasis.opendocument.text"
                 onChange={handleFileChange}
                 multiple
               />
@@ -231,7 +232,7 @@ export function DocumentSubmission({
                         <FileText className="size-5 text-primary" />
                         <span className="font-medium">{file.name}</span>
                         <Badge variant="secondary">
-                          {formatBytes(file.size)}
+                          <span>{formatBytes(file.size)}</span>
                         </Badge>
                       </div>
                       <Button
@@ -257,7 +258,7 @@ export function DocumentSubmission({
                 placeholder="https://example.com/pitch-deck.pdf\nhttps://medium.com/my-startup/our-vision"
                 rows={5}
                 value={urlInput}
-                onChange={(e) => setUrlInput(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setUrlInput(e.target.value)}
               />
               <Button onClick={handleImportUrls}>Import from URLs</Button>
             </div>
@@ -300,7 +301,7 @@ export function DocumentSubmission({
                 placeholder="Paste your content here..."
                 rows={8}
                 value={textInput}
-                onChange={(e) => setTextInput(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setTextInput(e.target.value)}
               />
               <Button onClick={handleSubmitText}>Submit Text</Button>
             </div>

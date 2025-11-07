@@ -269,14 +269,26 @@ export class SessionSecurity {
 // ===== FILE UPLOAD SECURITY =====
 export class FileUploadSecurity {
     private static readonly ALLOWED_MIME_TYPES = [
+        // PDF
         'application/pdf',
+        // Word documents
         'application/msword',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        // PowerPoint presentations
+        'application/vnd.ms-powerpoint',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        // Excel spreadsheets
         'application/vnd.ms-excel',
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        // Text files
         'text/plain',
         'text/csv',
         'application/json',
+        'application/rtf',
+        // OpenDocument formats
+        'application/vnd.oasis.opendocument.text',
+        'application/vnd.oasis.opendocument.presentation',
+        'application/vnd.oasis.opendocument.spreadsheet',
     ];
 
     private static readonly MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -321,9 +333,9 @@ export function securityMiddleware(request: NextRequest): NextResponse {
     });
 
     // Rate limiting
-    const clientIP = request.headers.get('x-forwarded-for')?.split(',')[0] || 
-                     request.headers.get('x-real-ip') || 
-                     'unknown';
+    const clientIP = request.headers.get('x-forwarded-for')?.split(',')[0] ||
+        request.headers.get('x-real-ip') ||
+        'unknown';
     if (!RateLimiter.checkLimit(clientIP, 100, 60000)) {
         return new NextResponse('Too Many Requests', {
             status: 429,

@@ -129,6 +129,13 @@ export function middleware(request: NextRequest) {
         }
     }
 
+    // Protect DD reports (admin/reviewer only)
+    if (pathname === '/analysis/result' && url.searchParams.get('type') === 'dd') {
+        // In a real app, check user role from session/JWT
+        // For now, this will be handled client-side
+        console.log('[SECURITY] DD report access attempted');
+    }
+
     // ===== API ROUTE SECURITY =====
     if (isAPIRoute) {
         // Add API-specific security headers

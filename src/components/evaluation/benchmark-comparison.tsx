@@ -18,6 +18,8 @@ import { Textarea } from '../ui/textarea';
 import { useEvaluationContext } from './evaluation-provider';
 import type { GenerateBenchmarkComparisonOutput } from '@/ai/flows/schemas';
 
+export type { GenerateBenchmarkComparisonOutput };
+
 const getDeviationColor = (deviation: number) => {
   if (deviation > 0) return 'text-success';
   if (deviation < 0) return 'text-destructive';
@@ -43,7 +45,7 @@ export function BenchmarkComparison({ initialData }: BenchmarkComparisonProps) {
   }
 
   const handleInterpretationChange = (value: string) => {
-    setBenchmarkData(prev => ({...prev, performanceSummary: value}));
+    setBenchmarkData(prev => ({ ...prev, performanceSummary: value }));
   }
 
   return (
@@ -91,12 +93,12 @@ export function BenchmarkComparison({ initialData }: BenchmarkComparisonProps) {
         </div>
         <Separator />
         <div>
-            <h4 className="text-sm font-semibold mb-2 text-muted-foreground">AI Interpretation</h4>
-            {isEditable ? (
-                <Textarea value={benchmarkData.performanceSummary} onChange={(e) => handleInterpretationChange(e.target.value)} rows={4} className="text-base"/>
-            ) : (
-                <p className="text-sm text-muted-foreground">{benchmarkData.performanceSummary}</p>
-            )}
+          <h4 className="text-sm font-semibold mb-2 text-muted-foreground">AI Interpretation</h4>
+          {isEditable ? (
+            <Textarea value={benchmarkData.performanceSummary} onChange={(e) => handleInterpretationChange(e.target.value)} rows={4} className="text-base" />
+          ) : (
+            <p className="text-sm text-muted-foreground">{benchmarkData.performanceSummary}</p>
+          )}
         </div>
       </div>
     </DashboardCard>

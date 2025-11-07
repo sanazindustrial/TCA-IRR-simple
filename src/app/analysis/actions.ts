@@ -1,12 +1,11 @@
-
 'use server';
 
 import type { ComprehensiveAnalysisOutput } from '@/ai/flows/schemas';
 
 // Try different backend URLs based on environment
 const BACKEND_API_URL = process.env.NODE_ENV === 'development'
-  ? 'http://127.0.0.1:8001'  // Development
-  : process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8001'; // Production fallback
+  ? 'http://localhost:8000'  // Development (use localhost for consistency)
+  : process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'; // Production fallback
 
 console.log('Backend API URL:', BACKEND_API_URL);
 console.log('Environment:', process.env.NODE_ENV);
@@ -54,14 +53,14 @@ export async function runAnalysis(
       console.error('Health check failed, but continuing with analysis attempt:', healthError);
       // Don't throw error here, just log and continue
     }
-    // Load processed data from localStorage
-    const processedFiles = JSON.parse(localStorage.getItem('processedFiles') || '[]');
-    const processedUrls = JSON.parse(localStorage.getItem('processedUrls') || '[]');
-    const processedTexts = JSON.parse(localStorage.getItem('processedTexts') || '[]');
+    // Use userData if provided, otherwise use empty arrays (localStorage not available in server actions)
+    const processedFiles = userData?.uploadedFiles || [];
+    const processedUrls = userData?.importedUrls || [];
+    const processedTexts = userData?.submittedTexts || [];
 
     // Extract financial data from processed files
-    const extractedFinancials = processedFiles.reduce((acc: any, file: any) => {
-      const financialData = file.extracted_data?.financial_data || {};
+    const extractedFinancials = (processedFiles as any[]).reduce((acc: any, file: any) => {
+      const financialData = (typeof file === 'object' && file !== null) ? (file.extracted_data?.financial_data || {}) : {};
       return {
         revenue: acc.revenue + (financialData.revenue || 0),
         burn_rate: acc.burn_rate + (financialData.burn_rate || 0),
@@ -79,7 +78,9 @@ export async function runAnalysis(
       // Company data structure - Use real user data if provided
       company_data: {
         name: userData?.companyName || 'Sample Company',
-        description: userData?.companyDescription || processedTexts[0]?.content?.slice(0, 200) || 'AI-powered startup using machine learning for optimization',
+        description: userData?.companyDescription ||
+          (processedTexts[0] ? (typeof processedTexts[0] === 'string' ? processedTexts[0] : String(processedTexts[0])) : '').slice(0, 200) ||
+          'AI-powered startup using machine learning for optimization',
         stage: 'seed',
         sector: backendSectorMap[framework],
         framework: framework,
@@ -93,7 +94,9 @@ export async function runAnalysis(
 
       // TCA Input structure - Use real user data if provided
       tcaInput: {
-        founderQuestionnaire: userData?.submittedTexts?.[0] || processedTexts[0]?.content || 'Our team has extensive experience in AI and SaaS. We are solving a major pain point in the market.',
+        founderQuestionnaire: userData?.submittedTexts?.[0] ||
+          (processedTexts[0] ? (typeof processedTexts[0] === 'string' ? processedTexts[0] : String(processedTexts[0])) : '') ||
+          'Our team has extensive experience in AI and SaaS. We are solving a major pain point in the market.',
         uploadedPitchDecks: userData?.uploadedFiles?.map(f => f.name).join(', ') || processedFiles.map((f: any) => f.name).join(', ') || 'Pitch deck contains market analysis, product roadmap, and financial projections.',
         financials: userData?.submittedTexts?.[1] || `Revenue: $${extractedFinancials.revenue}, Burn: $${extractedFinancials.burn_rate}/month, Runway: ${extractedFinancials.runway_months} months` || 'We have secured $500k in pre-seed funding and have a 12-month runway.',
         framework: framework,

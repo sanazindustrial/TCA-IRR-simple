@@ -90,13 +90,13 @@ export function ApiConnectionTest() {
     const getStatusBadge = (status: ApiTestResult['status']) => {
         switch (status) {
             case 'success':
-                return <Badge variant="default" className="bg-green-500" children="Success" />;
+                return <Badge variant="default" className="bg-green-500">Success</Badge>;
             case 'error':
-                return <Badge variant="destructive" children="Error" />;
+                return <Badge variant="destructive">Error</Badge>;
             case 'loading':
-                return <Badge variant="secondary" children="Testing..." />;
+                return <Badge variant="secondary">Testing...</Badge>;
             default:
-                return <Badge variant="outline" children="Unknown" />;
+                return <Badge variant="outline">Unknown</Badge>;
         }
     };
 

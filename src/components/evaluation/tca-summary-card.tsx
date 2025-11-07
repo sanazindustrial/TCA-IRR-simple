@@ -32,8 +32,10 @@ export function TcaSummaryCard({ initialData }: TcaSummaryCardProps) {
 
   if (!data) return null;
 
-  const scoreTier = getTier(data.compositeScore);
-  const scoreAvg = data.compositeScore * 0.98; // Mocked
+  // Convert scores from 100-scale to 10-scale
+  const normalizedScore = data.compositeScore / 10;
+  const scoreTier = getTier(normalizedScore);
+  const scoreAvg = normalizedScore * 0.98; // Mocked
   const stdDev = 0.25; // Mocked
   const confidenceInterval = [scoreAvg - stdDev, scoreAvg + stdDev];
 
@@ -55,13 +57,13 @@ export function TcaSummaryCard({ initialData }: TcaSummaryCardProps) {
           <div className="score-display">
             <p className="text-sm text-muted-foreground mb-2">Total Score</p>
             <div className="flex items-baseline justify-center gap-1">
-              <span className={cn('score-large', getScoreColor(data.compositeScore))}>
-                {data.compositeScore.toFixed(2)}
+              <span className={cn('score-large', getScoreColor(normalizedScore))}>
+                {normalizedScore.toFixed(2)}
               </span>
               <span className="text-2xl text-muted-foreground">/10</span>
             </div>
             <p className="score-subtitle">
-              Average (30 runs): <span className="font-semibold text-foreground/80">{scoreAvg.toFixed(2)}/10</span>
+              Average (30 runs): <span className="font-semibold text-foreground/80">{scoreAvg.toFixed(3)}/10</span>
             </p>
           </div>
 
@@ -85,7 +87,7 @@ export function TcaSummaryCard({ initialData }: TcaSummaryCardProps) {
                     Confidence Interval
                   </p>
                   <p className='text-lg font-bold text-foreground'>
-                    [{confidenceInterval[0].toFixed(2)} - {confidenceInterval[1].toFixed(2)}]
+                    [{confidenceInterval[0].toFixed(3)} - {confidenceInterval[1].toFixed(3)}]
                   </p>
                 </div>
               </div>

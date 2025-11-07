@@ -130,27 +130,71 @@ export default function WhatIfAnalysisPage() {
 
       const initialScores: Record<string, ScoreRow[]> = {};
 
-      // Module 1: TCA Scorecard
+      // Module 1: TCA Scorecard (12 Categories)
       if (data.tcaData?.categories) {
         initialScores['tca'] = data.tcaData.categories.map(c => ({ id: c.category, category: c.category, score: c.rawScore }));
+      } else {
+        // Default 12 TCA categories if no data
+        initialScores['tca'] = [
+          { id: 'leadership', category: 'Leadership', score: 8.5 },
+          { id: 'regulatory', category: 'Regulatory/Compliance', score: 7.0 },
+          { id: 'product-market-fit', category: 'Product-Market Fit', score: 9.0 },
+          { id: 'team-strength', category: 'Team Strength', score: 7.5 },
+          { id: 'technology-ip', category: 'Technology & IP', score: 8.0 },
+          { id: 'business-model', category: 'Business Model & Financials', score: 7.0 },
+          { id: 'go-to-market', category: 'Go-to-Market Strategy', score: 6.5 },
+          { id: 'competition-moat', category: 'Competition & Moat', score: 7.8 },
+          { id: 'market-potential', category: 'Market Potential', score: 8.8 },
+          { id: 'traction', category: 'Traction', score: 7.2 },
+          { id: 'scalability', category: 'Scalability', score: 6.8 },
+          { id: 'risk-assessment', category: 'Risk Assessment', score: 7.5 }
+        ];
       }
 
-      // Module 2: Risk Assessment
+      // Module 2: Risk Assessment (14 Domains)
       if (data.riskData?.riskFlags) {
         initialScores['risk'] = data.riskData.riskFlags.map(r => ({
           id: r.domain,
           category: r.domain,
           score: r.flag === 'green' ? 8 : r.flag === 'yellow' ? 6 : 4
         }));
+      } else {
+        // Default 14 risk domains if no data
+        initialScores['risk'] = [
+          { id: 'technology', category: 'Technology Risk', score: 7.5 },
+          { id: 'market', category: 'Market Risk', score: 6.8 },
+          { id: 'competition', category: 'Competition Risk', score: 7.2 },
+          { id: 'financial', category: 'Financial Risk', score: 6.5 },
+          { id: 'regulatory', category: 'Regulatory Risk', score: 7.8 },
+          { id: 'team', category: 'Team Risk', score: 8.0 },
+          { id: 'execution', category: 'Execution Risk', score: 6.2 },
+          { id: 'legal', category: 'Legal Risk', score: 7.5 },
+          { id: 'strategic', category: 'Strategic Risk', score: 7.0 },
+          { id: 'customer', category: 'Customer Risk', score: 6.9 },
+          { id: 'operational', category: 'Operational Risk', score: 7.3 },
+          { id: 'esg', category: 'ESG Risk', score: 8.2 },
+          { id: 'ip', category: 'IP Risk', score: 7.7 },
+          { id: 'exit', category: 'Exit Risk', score: 6.6 }
+        ];
       }
 
-      // Module 3: Macro Trend Analysis
+      // Module 3: Macro Trend Analysis (PESTEL - 6 factors)
       if (data.macroData?.pestelDashboard) {
         initialScores['macro'] = Object.entries(data.macroData.pestelDashboard).map(([k, v]) => ({
           id: k,
           category: k.charAt(0).toUpperCase() + k.slice(1),
           score: v
         }));
+      } else {
+        // Default PESTEL factors if no data
+        initialScores['macro'] = [
+          { id: 'political', category: 'Political', score: 7.2 },
+          { id: 'economic', category: 'Economic', score: 6.8 },
+          { id: 'social', category: 'Social', score: 8.1 },
+          { id: 'technological', category: 'Technological', score: 8.5 },
+          { id: 'environmental', category: 'Environmental', score: 7.0 },
+          { id: 'legal', category: 'Legal', score: 7.3 }
+        ];
       }
 
       // Module 4: Benchmark Comparison
@@ -160,11 +204,26 @@ export default function WhatIfAnalysisPage() {
           category: b.category,
           score: b.score / 10
         }));
+      } else {
+        // Default benchmark categories if no data
+        initialScores['benchmark'] = [
+          { id: 'revenue-growth', category: 'Revenue Growth', score: 7.8 },
+          { id: 'market-share', category: 'Market Share', score: 6.5 },
+          { id: 'customer-acquisition', category: 'Customer Acquisition', score: 7.2 },
+          { id: 'operational-efficiency', category: 'Operational Efficiency', score: 6.9 }
+        ];
       }
 
       // Module 5: Growth Classification
       if (data.growthData && Object.keys(data.growthData).length > 0) {
         initialScores['growth'] = [{ id: 'growth-tier', category: 'Growth Tier', score: 8 }];
+      } else {
+        // Default growth metrics if no data
+        initialScores['growth'] = [
+          { id: 'growth-tier', category: 'Growth Tier', score: 7.5 },
+          { id: 'scalability', category: 'Scalability Potential', score: 8.2 },
+          { id: 'market-expansion', category: 'Market Expansion', score: 7.0 }
+        ];
       }
 
       // Module 6: Gap Analysis
@@ -174,6 +233,14 @@ export default function WhatIfAnalysisPage() {
           category: g.category,
           score: Math.max(0, 10 - (g.gap / 5))
         }));
+      } else {
+        // Default gap analysis categories if no data
+        initialScores['gap'] = [
+          { id: 'technology-gap', category: 'Technology Gap', score: 7.8 },
+          { id: 'market-gap', category: 'Market Gap', score: 6.5 },
+          { id: 'capability-gap', category: 'Capability Gap', score: 7.2 },
+          { id: 'resource-gap', category: 'Resource Gap', score: 6.8 }
+        ];
       }
 
       // Module 7: Founder Fit Analysis
@@ -183,6 +250,13 @@ export default function WhatIfAnalysisPage() {
           category: 'Funding Readiness',
           score: data.founderFitData.readinessScore / 10
         }];
+      } else {
+        // Default founder fit metrics if no data
+        initialScores['founderFit'] = [
+          { id: 'readiness', category: 'Funding Readiness', score: 7.5 },
+          { id: 'market-timing', category: 'Market Timing', score: 8.0 },
+          { id: 'execution-capability', category: 'Execution Capability', score: 7.2 }
+        ];
       }
 
       // Module 8: Team Assessment
@@ -192,6 +266,14 @@ export default function WhatIfAnalysisPage() {
           category: m.name || `Team Member ${idx + 1}`,
           score: 8.5
         }));
+      } else {
+        // Default team assessment categories if no data
+        initialScores['team'] = [
+          { id: 'leadership', category: 'Leadership Quality', score: 8.2 },
+          { id: 'technical-expertise', category: 'Technical Expertise', score: 7.8 },
+          { id: 'industry-experience', category: 'Industry Experience', score: 7.5 },
+          { id: 'team-cohesion', category: 'Team Cohesion', score: 8.0 }
+        ];
       }
 
       // Module 9: Strategic Fit Matrix
@@ -199,6 +281,14 @@ export default function WhatIfAnalysisPage() {
         initialScores['strategicFit'] = [
           { id: 'strategic-1', category: 'Strategic Alignment', score: 7.5 },
           { id: 'strategic-2', category: 'Market Positioning', score: 8.0 }
+        ];
+      } else {
+        // Default strategic fit metrics if no data
+        initialScores['strategicFit'] = [
+          { id: 'strategic-alignment', category: 'Strategic Alignment', score: 7.5 },
+          { id: 'market-positioning', category: 'Market Positioning', score: 8.0 },
+          { id: 'competitive-advantage', category: 'Competitive Advantage', score: 7.3 },
+          { id: 'value-proposition', category: 'Value Proposition', score: 8.1 }
         ];
       }
 

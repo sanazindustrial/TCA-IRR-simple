@@ -12,6 +12,7 @@ import { Timer, Eye } from 'lucide-react';
 
 // Hooks and Utils
 import { useToast } from '@/hooks/use-toast';
+import { saveAnalysisReport, reportStorage } from '@/lib/report-storage';
 
 // Evaluation Components
 import { BenchmarkComparison } from '@/components/evaluation/benchmark-comparison';
@@ -42,6 +43,10 @@ import { ExitStrategyRoadmap } from '@/components/evaluation/exit-strategy-roadm
 import { TermSheetTriggerAnalysis } from '@/components/evaluation/term-sheet-trigger-analysis';
 import { Appendix } from '@/components/evaluation/appendix';
 import { CEOQuestions } from '@/components/evaluation/ceo-questions';
+import { TcaAiTable } from '@/components/evaluation/tca-ai-table';
+import { RiskFlagSummaryTable } from '@/components/evaluation/risk-flag-summary-table';
+import { TcaInterpretationSummary } from '@/components/evaluation/tca-interpretation-summary';
+import { FlagAnalysisNarrative } from '@/components/evaluation/flag-analysis-narrative';
 
 // Loading Component
 import Loading from '../../loading';
@@ -63,9 +68,13 @@ const allReportComponents = [
     { id: 'executive-summary', title: 'Executive Summary', component: ExecutiveSummary, category: 'core' },
     { id: 'tca-scorecard', title: 'TCA Scorecard', component: TcaScorecard, category: 'core' },
     { id: 'tca-summary-card', title: 'TCA Summary Card', component: TcaSummaryCard, category: 'core' },
+    { id: 'tca-ai-table', title: 'TCA AI Analysis Table', component: TcaAiTable, category: 'core' },
+    { id: 'tca-interpretation-summary', title: 'TCA AI Interpretation Summary', component: TcaInterpretationSummary, category: 'core' },
+    { id: 'flag-analysis-narrative', title: 'Flag Analysis Narrative', component: FlagAnalysisNarrative, category: 'core' },
 
     // Risk & Assessment Components
     { id: 'risk-flags', title: 'Risk Flags & Mitigation', component: RiskFlags, category: 'assessment' },
+    { id: 'risk-flag-summary-table', title: 'Risk Flag Summary Table', component: RiskFlagSummaryTable, category: 'assessment' },
     { id: 'gap-analysis', title: 'Gap Analysis', component: GapAnalysis, category: 'assessment' },
     { id: 'consistency-check', title: 'Consistency Check', component: ConsistencyCheck, category: 'assessment' },
     { id: 'weighted-score-breakdown', title: 'Weighted Score Breakdown', component: WeightedScoreBreakdown, category: 'assessment' },
@@ -99,23 +108,31 @@ const allReportComponents = [
     { id: 'appendix', title: 'Appendix', component: Appendix, category: 'review' }
 ];
 
-// Triage Report Configuration (Standard User)
+// Triage Report Configuration (Standard User) - 5-7 pages
 const triageStandardConfig = [
     { id: 'quick-summary', title: 'Quick Summary', active: true },
     { id: 'tca-scorecard', title: 'TCA Scorecard', active: true },
-    { id: 'risk-flags', title: 'Risk Flags & Mitigation', active: true },
+    { id: 'tca-ai-table', title: 'TCA AI Analysis Table', active: true },
+    { id: 'tca-interpretation-summary', title: 'TCA AI Interpretation Summary', active: true },
+    { id: 'weighted-score-breakdown', title: 'Weighted Score Breakdown', active: true },
+    { id: 'risk-flag-summary-table', title: 'Risk Flag Summary Table', active: true },
+    { id: 'flag-analysis-narrative', title: 'Flag Analysis Narrative', active: true },
     { id: 'ceo-questions', title: 'CEO Questions', active: true },
     { id: 'growth-classifier', title: 'Growth Classifier', active: true },
     { id: 'benchmark-comparison', title: 'Benchmark Comparison', active: true },
     { id: 'final-recommendation', title: 'Final Recommendation', active: true }
 ];
 
-// Triage Report Configuration (Admin/Reviewer)
+// Triage Report Configuration (Admin/Reviewer) - Enhanced 5-7 pages
 const triageAdminConfig = [
     { id: 'executive-summary', title: 'Executive Summary', active: true },
     { id: 'tca-scorecard', title: 'TCA Scorecard', active: true },
     { id: 'tca-summary-card', title: 'TCA Summary Card', active: true },
-    { id: 'risk-flags', title: 'Risk Flags & Mitigation', active: true },
+    { id: 'tca-ai-table', title: 'TCA AI Analysis Table', active: true },
+    { id: 'tca-interpretation-summary', title: 'TCA AI Interpretation Summary', active: true },
+    { id: 'weighted-score-breakdown', title: 'Weighted Score Breakdown', active: true },
+    { id: 'risk-flag-summary-table', title: 'Risk Flag Summary Table', active: true },
+    { id: 'flag-analysis-narrative', title: 'Flag Analysis Narrative', active: true },
     { id: 'ceo-questions', title: 'CEO Questions', active: true },
     { id: 'gap-analysis', title: 'Gap Analysis', active: true },
     { id: 'macro-trend-alignment', title: 'Macro Trend Alignment', active: true },
@@ -127,13 +144,17 @@ const triageAdminConfig = [
     { id: 'final-recommendation', title: 'Final Recommendation', active: true }
 ];
 
-// Due Diligence (DD) Report Configuration - Complete Analysis
+// Due Diligence (DD) Report Configuration - Complete Analysis (25-100 pages)
 const ddReportConfig = [
     { id: 'executive-summary', title: 'Executive Summary', active: true },
     { id: 'tca-scorecard', title: 'TCA Scorecard', active: true },
     { id: 'tca-summary-card', title: 'TCA Summary Card', active: true },
+    { id: 'tca-ai-table', title: 'TCA AI Analysis Table', active: true },
+    { id: 'tca-interpretation-summary', title: 'TCA AI Interpretation Summary', active: true },
     { id: 'weighted-score-breakdown', title: 'Weighted Score Breakdown', active: true },
     { id: 'risk-flags', title: 'Risk Flags & Mitigation', active: true },
+    { id: 'risk-flag-summary-table', title: 'Risk Flag Summary Table', active: true },
+    { id: 'flag-analysis-narrative', title: 'Flag Analysis Narrative', active: true },
     { id: 'gap-analysis', title: 'Gap Analysis', active: true },
     { id: 'macro-trend-alignment', title: 'Macro Trend Alignment', active: true },
     { id: 'benchmark-comparison', title: 'Benchmark Comparison', active: true },
@@ -148,6 +169,7 @@ const ddReportConfig = [
     { id: 'regulatory-compliance', title: 'Regulatory Compliance Review', active: true },
     { id: 'exit-strategy-roadmap', title: 'Exit Strategy Roadmap', active: true },
     { id: 'term-sheet-trigger', title: 'Term Sheet Trigger Analysis', active: true },
+    { id: 'ceo-questions', title: 'CEO Questions', active: true },
     { id: 'consistency-check', title: 'Consistency Check', active: true },
     { id: 'reviewer-comments', title: 'Reviewer Comments', active: true },
     { id: 'reviewer-ai-deviation', title: 'Reviewer AI Deviation', active: true },
@@ -164,6 +186,8 @@ function getComponentData(componentId: string, analysisData: ComprehensiveAnalys
             return analysisData;
         case 'tca-summary-card':
         case 'tca-scorecard':
+        case 'tca-ai-table':
+        case 'tca-interpretation-summary':
             return analysisData.tcaData;
 
         // Risk & Assessment
@@ -238,6 +262,8 @@ function ReportView({
                 <div key={id} id={id}>
                     {id === 'tca-summary-card' ? (
                         <Component initialData={getComponentData(id, analysisData)} />
+                    ) : id === 'tca-ai-table' ? (
+                        <Component data={getComponentData(id, analysisData)} />
                     ) : (
                         <Component data={getComponentData(id, analysisData)} />
                     )}
@@ -325,15 +351,36 @@ export default function AnalysisResultPage({
                     setFramework(storedFramework);
                 }
 
-                // Set report type from URL params or localStorage
+                // Set report type from URL params or localStorage with access control
                 if (params.type === 'dd') {
-                    setReportType('dd');
+                    // Check if user has permission for DD reports
+                    const isPrivileged = role === 'admin' || role === 'reviewer';
+                    if (isPrivileged) {
+                        setReportType('dd');
+                    } else {
+                        // Redirect standard users away from DD reports
+                        console.log('Standard user attempted to access DD report, redirecting to triage');
+                        setReportType('triage');
+                        // Show a toast notification about access restriction
+                        setTimeout(() => {
+                            toast({
+                                variant: 'destructive',
+                                title: 'Access Restricted',
+                                description: 'Due Diligence reports are only available for admin and reviewer accounts.',
+                            });
+                        }, 1000);
+                    }
                 } else if (params.type === 'triage') {
                     setReportType('triage');
                 } else {
                     // Try to load from localStorage or default to triage
                     const savedReportType = localStorage.getItem('currentReportType') as ReportType;
-                    setReportType(savedReportType || 'triage');
+                    // Ensure standard users can't access DD even from localStorage
+                    if (savedReportType === 'dd' && !(role === 'admin' || role === 'reviewer')) {
+                        setReportType('triage');
+                    } else {
+                        setReportType(savedReportType || 'triage');
+                    }
                 }
 
             } catch (error) {
@@ -378,8 +425,26 @@ export default function AnalysisResultPage({
                     defaultConfig = triageStandardConfig;
                 }
             } else if (reportType === 'dd') {
-                configKey = 'report-config-dd';
-                defaultConfig = ddReportConfig;
+                // STRICT: Only admin/reviewer can access DD reports
+                if (isPrivileged) {
+                    configKey = 'report-config-dd';
+                    defaultConfig = ddReportConfig;
+                } else {
+                    // Force standard users back to triage with notification
+                    console.warn('SECURITY: Standard user blocked from DD report access');
+                    setReportType('triage');
+                    configKey = 'report-config-triage-standard';
+                    defaultConfig = triageStandardConfig;
+
+                    // Show access denied notification
+                    setTimeout(() => {
+                        toast({
+                            variant: 'destructive',
+                            title: 'Access Denied',
+                            description: 'Due Diligence reports are restricted to admin and reviewer accounts only.',
+                        });
+                    }, 500);
+                }
             } else {
                 // Fallback for any other report type
                 defaultConfig = triageStandardConfig;
@@ -429,6 +494,40 @@ export default function AnalysisResultPage({
         });
         router.push('/dashboard/evaluation');
     };
+
+    // Auto-save analysis when data is loaded
+    useEffect(() => {
+        const autoSaveAnalysis = async () => {
+            if (!analysisData || !role || isPreview) return;
+
+            try {
+                const user = localStorage.getItem('loggedInUser') || localStorage.getItem('user');
+                if (!user) return;
+
+                const userData = JSON.parse(user);
+                const userId = userData.id || userData.email || 'anonymous';
+                const companyName = (analysisData as any).companyName || 'Analysis Report';
+
+                // Auto-save the current analysis
+                const reportId = await saveAnalysisReport(analysisData, {
+                    reportType,
+                    framework,
+                    userId,
+                    companyName,
+                    analysisDuration,
+                    tags: [reportType, framework]
+                });
+
+                console.log(`Analysis auto-saved with ID: ${reportId}`);
+            } catch (error) {
+                console.error('Auto-save failed:', error);
+            }
+        };
+
+        // Delay auto-save to ensure all data is loaded
+        const saveTimeout = setTimeout(autoSaveAnalysis, 2000);
+        return () => clearTimeout(saveTimeout);
+    }, [analysisData, reportType, framework, role, analysisDuration, isPreview]);
 
     if (isLoading) {
         return <Loading />;
@@ -490,7 +589,7 @@ export default function AnalysisResultPage({
                                                     localStorage.setItem('currentReportType', 'dd');
                                                 }}
                                             >
-                                                DD Report
+                                                DD Report (Admin Only)
                                             </Button>
                                         )}
                                         <Button asChild variant="outline" size="sm">

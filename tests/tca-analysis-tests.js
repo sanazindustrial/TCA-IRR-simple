@@ -1,13 +1,12 @@
 // TCA Score Calculation Test Suite
 // Tests for TCA scoring logic, what-if analysis, and result page functionality
 
-import {
-    sampleAnalysisData,
-    type ComprehensiveAnalysisOutput
-} from '../src/lib/sample-data';
+const {
+    sampleAnalysisData
+} = require('../src/lib/sample-data');
 
 // Test TCA Score Calculation
-export function testTCAScoreCalculation() {
+function testTCAScoreCalculation() {
     console.log('🧮 Testing TCA Score Calculation...');
 
     const tests = [];
@@ -87,7 +86,7 @@ export function testTCAScoreCalculation() {
 }
 
 // Test What-If Analysis Functionality
-export function testWhatIfAnalysis() {
+function testWhatIfAnalysis() {
     console.log('🔄 Testing What-If Analysis...');
 
     const tests = [];
@@ -208,7 +207,7 @@ export function testWhatIfAnalysis() {
 }
 
 // Test Result Page Loading
-export function testResultPageLoading() {
+function testResultPageLoading() {
     console.log('📄 Testing Result Page Loading...');
 
     const tests = [];
@@ -377,7 +376,7 @@ export function testResultPageLoading() {
 }
 
 // Run All Tests
-export function runAllTests() {
+function runAllTests() {
     console.log('🚀 TCA-IRR Application Test Suite');
     console.log('====================================\n');
 
