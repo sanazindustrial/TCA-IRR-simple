@@ -1,6 +1,6 @@
 'use client';
 
-import * as React from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -55,42 +55,159 @@ type ReportSection = { id: string; title: string; active: boolean; };
 
 
 
-// Report Components Configuration
+// Report Components Configuration - Complete list of all available components
 const allReportComponents = [
-    { id: 'quick-summary', title: 'Quick Summary', component: QuickSummary },
-    { id: 'executive-summary', title: 'Executive Summary', component: ExecutiveSummary },
-    { id: 'tca-scorecard', title: 'TCA Scorecard', component: TcaScorecard },
-    { id: 'risk-flags', title: 'Risk Flags & Mitigation', component: RiskFlags },
-    { id: 'macro-trend-alignment', title: 'Macro Trend Alignment', component: MacroTrendAlignment },
-    { id: 'benchmark-comparison', title: 'Benchmark Comparison', component: BenchmarkComparison },
-    { id: 'growth-classifier', title: 'Growth Classifier', component: GrowthClassifier },
-    { id: 'gap-analysis', title: 'Gap Analysis', component: GapAnalysis },
-    { id: 'funder-fit-analysis', title: 'Funder Fit Analysis', component: FunderFitAnalysis },
-    { id: 'team-assessment', title: 'Team Assessment', component: TeamAssessment },
-    { id: 'strategic-fit-matrix', title: 'Strategic Fit Matrix', component: StrategicFitMatrix }
+    // Core Analysis Components
+    { id: 'quick-summary', title: 'Quick Summary', component: QuickSummary, category: 'core' },
+    { id: 'executive-summary', title: 'Executive Summary', component: ExecutiveSummary, category: 'core' },
+    { id: 'tca-scorecard', title: 'TCA Scorecard', component: TcaScorecard, category: 'core' },
+    { id: 'tca-summary-card', title: 'TCA Summary Card', component: TcaSummaryCard, category: 'core' },
+
+    // Risk & Assessment Components
+    { id: 'risk-flags', title: 'Risk Flags & Mitigation', component: RiskFlags, category: 'assessment' },
+    { id: 'gap-analysis', title: 'Gap Analysis', component: GapAnalysis, category: 'assessment' },
+    { id: 'consistency-check', title: 'Consistency Check', component: ConsistencyCheck, category: 'assessment' },
+    { id: 'weighted-score-breakdown', title: 'Weighted Score Breakdown', component: WeightedScoreBreakdown, category: 'assessment' },
+
+    // Market & Strategy Components
+    { id: 'macro-trend-alignment', title: 'Macro Trend Alignment', component: MacroTrendAlignment, category: 'market' },
+    { id: 'benchmark-comparison', title: 'Benchmark Comparison', component: BenchmarkComparison, category: 'market' },
+    { id: 'competitive-landscape', title: 'Competitive Landscape', component: CompetitiveLandscape, category: 'market' },
+    { id: 'gtm-strategy', title: 'Go-to-Market Strategy', component: GtmStrategy, category: 'market' },
+
+    // Growth & Financial Components  
+    { id: 'growth-classifier', title: 'Growth Classifier', component: GrowthClassifier, category: 'financial' },
+    { id: 'financials-burn-rate', title: 'Financials & Burn Rate', component: FinancialsBurnRate, category: 'financial' },
+    { id: 'exit-strategy-roadmap', title: 'Exit Strategy Roadmap', component: ExitStrategyRoadmap, category: 'financial' },
+    { id: 'term-sheet-trigger', title: 'Term Sheet Trigger Analysis', component: TermSheetTriggerAnalysis, category: 'financial' },
+
+    // Team & Fit Components
+    { id: 'funder-fit-analysis', title: 'Funder Fit Analysis', component: FunderFitAnalysis, category: 'team' },
+    { id: 'team-assessment', title: 'Team Assessment', component: TeamAssessment, category: 'team' },
+    { id: 'strategic-fit-matrix', title: 'Strategic Fit Matrix', component: StrategicFitMatrix, category: 'team' },
+
+    // Technology & IP Components
+    { id: 'ip-technology-review', title: 'IP & Technology Review', component: IpTechnologyReview, category: 'technology' },
+    { id: 'regulatory-compliance', title: 'Regulatory Compliance Review', component: RegulatoryComplianceReview, category: 'technology' },
+
+    // Review & Final Components
+    { id: 'reviewer-comments', title: 'Reviewer Comments', component: ReviewerComments, category: 'review' },
+    { id: 'reviewer-ai-deviation', title: 'Reviewer AI Deviation', component: ReviewerAIDeviation, category: 'review' },
+    { id: 'final-recommendation', title: 'Final Recommendation', component: FinalRecommendation, category: 'review' },
+    { id: 'appendix', title: 'Appendix', component: Appendix, category: 'review' }
+];
+
+// Triage Report Configuration (Standard User)
+const triageStandardConfig = [
+    { id: 'quick-summary', title: 'Quick Summary', active: true },
+    { id: 'tca-scorecard', title: 'TCA Scorecard', active: true },
+    { id: 'risk-flags', title: 'Risk Flags & Mitigation', active: true },
+    { id: 'growth-classifier', title: 'Growth Classifier', active: true },
+    { id: 'benchmark-comparison', title: 'Benchmark Comparison', active: true },
+    { id: 'final-recommendation', title: 'Final Recommendation', active: true }
+];
+
+// Triage Report Configuration (Admin/Reviewer)
+const triageAdminConfig = [
+    { id: 'executive-summary', title: 'Executive Summary', active: true },
+    { id: 'tca-scorecard', title: 'TCA Scorecard', active: true },
+    { id: 'tca-summary-card', title: 'TCA Summary Card', active: true },
+    { id: 'risk-flags', title: 'Risk Flags & Mitigation', active: true },
+    { id: 'gap-analysis', title: 'Gap Analysis', active: true },
+    { id: 'macro-trend-alignment', title: 'Macro Trend Alignment', active: true },
+    { id: 'benchmark-comparison', title: 'Benchmark Comparison', active: true },
+    { id: 'growth-classifier', title: 'Growth Classifier', active: true },
+    { id: 'team-assessment', title: 'Team Assessment', active: true },
+    { id: 'consistency-check', title: 'Consistency Check', active: true },
+    { id: 'reviewer-comments', title: 'Reviewer Comments', active: true },
+    { id: 'final-recommendation', title: 'Final Recommendation', active: true }
+];
+
+// Due Diligence (DD) Report Configuration - Complete Analysis
+const ddReportConfig = [
+    { id: 'executive-summary', title: 'Executive Summary', active: true },
+    { id: 'tca-scorecard', title: 'TCA Scorecard', active: true },
+    { id: 'tca-summary-card', title: 'TCA Summary Card', active: true },
+    { id: 'weighted-score-breakdown', title: 'Weighted Score Breakdown', active: true },
+    { id: 'risk-flags', title: 'Risk Flags & Mitigation', active: true },
+    { id: 'gap-analysis', title: 'Gap Analysis', active: true },
+    { id: 'macro-trend-alignment', title: 'Macro Trend Alignment', active: true },
+    { id: 'benchmark-comparison', title: 'Benchmark Comparison', active: true },
+    { id: 'competitive-landscape', title: 'Competitive Landscape', active: true },
+    { id: 'growth-classifier', title: 'Growth Classifier', active: true },
+    { id: 'financials-burn-rate', title: 'Financials & Burn Rate', active: true },
+    { id: 'gtm-strategy', title: 'Go-to-Market Strategy', active: true },
+    { id: 'funder-fit-analysis', title: 'Funder Fit Analysis', active: true },
+    { id: 'team-assessment', title: 'Team Assessment', active: true },
+    { id: 'strategic-fit-matrix', title: 'Strategic Fit Matrix', active: true },
+    { id: 'ip-technology-review', title: 'IP & Technology Review', active: true },
+    { id: 'regulatory-compliance', title: 'Regulatory Compliance Review', active: true },
+    { id: 'exit-strategy-roadmap', title: 'Exit Strategy Roadmap', active: true },
+    { id: 'term-sheet-trigger', title: 'Term Sheet Trigger Analysis', active: true },
+    { id: 'consistency-check', title: 'Consistency Check', active: true },
+    { id: 'reviewer-comments', title: 'Reviewer Comments', active: true },
+    { id: 'reviewer-ai-deviation', title: 'Reviewer AI Deviation', active: true },
+    { id: 'final-recommendation', title: 'Final Recommendation', active: true },
+    { id: 'appendix', title: 'Appendix', active: true }
 ];
 
 // Helper function to extract the correct data for each component
 function getComponentData(componentId: string, analysisData: ComprehensiveAnalysisOutput) {
     switch (componentId) {
+        // Core Components
+        case 'quick-summary':
+        case 'executive-summary':
+        case 'tca-summary-card':
+            return analysisData;
+        case 'tca-scorecard':
+            return analysisData.tcaData;
+
+        // Risk & Assessment
+        case 'risk-flags':
+            return analysisData.riskData;
+        case 'gap-analysis':
+            return analysisData.gapData;
+        case 'consistency-check':
+        case 'weighted-score-breakdown':
+            return analysisData;
+
+        // Market & Strategy
         case 'macro-trend-alignment':
             return analysisData.macroData;
         case 'benchmark-comparison':
             return analysisData.benchmarkData;
+        case 'competitive-landscape':
+        case 'gtm-strategy':
+            return analysisData;
+
+        // Growth & Financial
         case 'growth-classifier':
             return analysisData.growthData;
-        case 'gap-analysis':
-            return analysisData.gapData;
+        case 'financials-burn-rate':
+        case 'exit-strategy-roadmap':
+        case 'term-sheet-trigger':
+            return analysisData;
+
+        // Team & Fit
         case 'funder-fit-analysis':
             return analysisData.founderFitData;
         case 'team-assessment':
             return analysisData.teamData;
-        case 'tca-scorecard':
-            return analysisData.tcaData;
-        case 'risk-flags':
-            return analysisData.riskData;
         case 'strategic-fit-matrix':
             return analysisData.strategicFitData;
+
+        // Technology & IP
+        case 'ip-technology-review':
+        case 'regulatory-compliance':
+            return analysisData;
+
+        // Review & Final
+        case 'reviewer-comments':
+        case 'reviewer-ai-deviation':
+        case 'final-recommendation':
+        case 'appendix':
+            return analysisData;
+
         default:
             return analysisData;
     }
@@ -122,6 +239,9 @@ function ReportView({
 }
 
 // Main Page Component
+// Mark this page as dynamic
+export const dynamic = 'force-dynamic';
+
 export default function AnalysisResultPage({
     searchParams
 }: {
@@ -129,45 +249,90 @@ export default function AnalysisResultPage({
 }) {
     const { toast } = useToast();
     const router = useRouter();
-    const [isLoading, setIsLoading] = React.useState(true);
-    const [role, setRole] = React.useState<UserRole>('user');
-    const [reportType, setReportType] = React.useState<ReportType>('triage');
-    const [framework, setFramework] = React.useState<'general' | 'medtech'>('general');
-    const [visibleSections, setVisibleSections] = React.useState<ReportSection[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [role, setRole] = useState<UserRole>('user');
+    const [reportType, setReportType] = useState<ReportType>('triage');
+    const [framework, setFramework] = useState<'general' | 'medtech'>('general');
+    const [visibleSections, setVisibleSections] = useState<ReportSection[]>([]);
+    const [analysisData, setAnalysisData] = useState<ComprehensiveAnalysisOutput>(sampleAnalysisData);
+    const [analysisDuration, setAnalysisDuration] = useState<number | null>(null);
     const isPreview = searchParams.preview === 'true';
-    const analysisDuration = 45.32; // Sample duration
-    const analysisData = sampleAnalysisData;
 
-    // Load user role and configuration
+    // Load user role and analysis data - Dynamic Data Loading
     React.useEffect(() => {
         const loadUserAndConfig = () => {
             setIsLoading(true);
 
-            // Load user role
-            const storedUser = localStorage.getItem('user');
-            if (storedUser) {
-                try {
-                    const user = JSON.parse(storedUser);
-                    const userRole = user.role?.toLowerCase() || 'user';
-                    setRole(userRole as UserRole);
-                } catch (e) {
-                    console.error('Failed to parse user data:', e);
+            try {
+                // Load user role from localStorage
+                const storedUser = localStorage.getItem('loggedInUser') || localStorage.getItem('user');
+                if (storedUser) {
+                    try {
+                        const user = JSON.parse(storedUser);
+                        const userRole = user.role?.toLowerCase() || 'user';
+                        setRole(userRole as UserRole);
+                    } catch (e) {
+                        console.error('Failed to parse user data:', e);
+                        setRole('user');
+                    }
+                } else {
                     setRole('user');
                 }
-            }
 
-            // Set report type from URL params
-            if (searchParams.type === 'dd') {
-                setReportType('dd');
-            }
+                // Load analysis data from localStorage or use sample data
+                const storedAnalysis = localStorage.getItem('analysisResult');
+                if (storedAnalysis && !isPreview) {
+                    try {
+                        const parsedAnalysis = JSON.parse(storedAnalysis);
+                        setAnalysisData(parsedAnalysis);
+                    } catch (e) {
+                        console.error('Failed to parse analysis data:', e);
+                        setAnalysisData(sampleAnalysisData);
+                    }
+                } else {
+                    setAnalysisData(sampleAnalysisData);
+                }
 
-            setIsLoading(false);
+                // Load analysis duration
+                const storedDuration = localStorage.getItem('analysisDuration');
+                if (storedDuration) {
+                    setAnalysisDuration(parseFloat(storedDuration));
+                } else {
+                    setAnalysisDuration(45.32); // Default sample duration
+                }
+
+                // Load framework from localStorage
+                const storedFramework = localStorage.getItem('analysisFramework') as 'general' | 'medtech';
+                if (storedFramework) {
+                    setFramework(storedFramework);
+                }
+
+                // Set report type from URL params or localStorage
+                if (searchParams.type === 'dd') {
+                    setReportType('dd');
+                } else if (searchParams.type === 'triage') {
+                    setReportType('triage');
+                } else {
+                    // Try to load from localStorage or default to triage
+                    const savedReportType = localStorage.getItem('currentReportType') as ReportType;
+                    setReportType(savedReportType || 'triage');
+                }
+
+            } catch (error) {
+                console.error('Error loading user and config:', error);
+                setRole('user');
+                setReportType('triage');
+                setAnalysisData(sampleAnalysisData);
+                setAnalysisDuration(45.32);
+            } finally {
+                setIsLoading(false);
+            }
         };
 
         loadUserAndConfig();
-    }, [searchParams.type]);
+    }, [searchParams.type, isPreview]);
 
-    // Load configuration based on role and report type
+    // Load configuration based on role and report type - Dynamic Configuration
     React.useEffect(() => {
         if (isPreview) {
             // In preview mode, show all possible sections
@@ -183,31 +348,59 @@ export default function AnalysisResultPage({
         try {
             const isPrivileged = role === 'admin' || role === 'reviewer';
             let configKey = '';
+            let defaultConfig: ReportSection[] = [];
 
+            // Determine configuration based on report type and user role
             if (reportType === 'triage') {
-                configKey = isPrivileged ? 'report-config-triage-admin' : 'report-config-triage-standard';
-            } else {
+                if (isPrivileged) {
+                    configKey = 'report-config-triage-admin';
+                    defaultConfig = triageAdminConfig;
+                } else {
+                    configKey = 'report-config-triage-standard';
+                    defaultConfig = triageStandardConfig;
+                }
+            } else if (reportType === 'dd') {
                 configKey = 'report-config-dd';
+                defaultConfig = ddReportConfig;
+            } else {
+                // Fallback for any other report type
+                defaultConfig = triageStandardConfig;
             }
 
+            // Try to load saved configuration, fallback to default
             const savedConfig = localStorage.getItem(configKey);
             if (savedConfig) {
-                setVisibleSections(JSON.parse(savedConfig));
+                try {
+                    const parsed = JSON.parse(savedConfig);
+                    // Validate that parsed config has required structure
+                    if (Array.isArray(parsed) && parsed.every(item =>
+                        item.id && item.title && typeof item.active === 'boolean'
+                    )) {
+                        setVisibleSections(parsed);
+                    } else {
+                        // Invalid saved config, use default
+                        setVisibleSections(defaultConfig);
+                        localStorage.setItem(configKey, JSON.stringify(defaultConfig));
+                    }
+                } catch (parseError) {
+                    console.warn('Invalid saved config format, using default:', parseError);
+                    setVisibleSections(defaultConfig);
+                    localStorage.setItem(configKey, JSON.stringify(defaultConfig));
+                }
             } else {
-                // Fallback to default configuration
-                const defaultConfig = [
-                    { id: 'quick-summary', title: 'Quick Summary', active: true },
-                    { id: 'executive-summary', title: 'Executive Summary', active: true },
-                    { id: 'tca-scorecard', title: 'TCA Scorecard', active: true }
-                ];
+                // No saved config, use and save default
                 setVisibleSections(defaultConfig);
+                localStorage.setItem(configKey, JSON.stringify(defaultConfig));
             }
         } catch (e) {
             console.error("Failed to load report configuration:", e);
-            // Set minimal default configuration on error
-            setVisibleSections([
-                { id: 'quick-summary', title: 'Quick Summary', active: true }
-            ]);
+            // Emergency fallback - minimal working configuration
+            const emergencyConfig = [
+                { id: 'quick-summary', title: 'Quick Summary', active: true },
+                { id: 'tca-scorecard', title: 'TCA Scorecard', active: true },
+                { id: 'final-recommendation', title: 'Final Recommendation', active: true }
+            ];
+            setVisibleSections(emergencyConfig);
         }
     }, [role, reportType, isPreview]);
 
@@ -228,10 +421,16 @@ export default function AnalysisResultPage({
             role={role}
             reportType={reportType}
             framework={framework}
-            onFrameworkChange={setFramework}
-            setReportType={setReportType}
+            onFrameworkChangeAction={setFramework}
+            setReportTypeAction={setReportType}
+            uploadedFiles={[]}
+            setUploadedFilesAction={() => { }}
+            importedUrls={[]}
+            setImportedUrlsAction={() => { }}
+            submittedTexts={[]}
+            setSubmittedTextsAction={() => { }}
             isLoading={isLoading}
-            handleRunAnalysis={handleRunAnalysis}
+            handleRunAnalysisAction={handleRunAnalysis}
         >
             <main className="bg-background text-foreground min-h-screen">
                 <div className="container mx-auto p-4 md:p-8">
@@ -242,28 +441,66 @@ export default function AnalysisResultPage({
                             </h1>
                             <div className="absolute top-0 right-0 flex gap-2">
                                 {!isPreview && (
-                                    <Button asChild variant="outline">
-                                        <Link href="/dashboard/evaluation">
-                                            New Analysis
-                                        </Link>
-                                    </Button>
+                                    <>
+                                        <Button
+                                            variant={reportType === 'triage' ? 'default' : 'outline'}
+                                            onClick={() => {
+                                                setReportType('triage');
+                                                localStorage.setItem('currentReportType', 'triage');
+                                            }}
+                                        >
+                                            Triage Report
+                                        </Button>
+                                        {(role === 'admin' || role === 'reviewer') && (
+                                            <Button
+                                                variant={reportType === 'dd' ? 'default' : 'outline'}
+                                                onClick={() => {
+                                                    setReportType('dd');
+                                                    localStorage.setItem('currentReportType', 'dd');
+                                                }}
+                                            >
+                                                DD Report
+                                            </Button>
+                                        )}
+                                        <Button asChild variant="outline">
+                                            <Link href="/dashboard/evaluation">
+                                                New Analysis
+                                            </Link>
+                                        </Button>
+                                    </>
                                 )}
                                 <ExportButtons />
                             </div>
                         </div>
 
                         <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto text-center">
-                            Review the complete output from all analysis modules before generating the final report.
+                            {reportType === 'triage' ?
+                                'Triage analysis provides key insights for initial investment screening.' :
+                                'Due Diligence analysis provides comprehensive evaluation for investment decisions.'
+                            }
                         </p>
 
-                        {analysisDuration && !isPreview && (
-                            <div className="mt-4 flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                                <Timer className="size-4" />
+                        <div className="mt-4 flex items-center justify-center gap-4 text-sm text-muted-foreground">
+                            {analysisDuration && !isPreview && (
+                                <div className="flex items-center gap-2">
+                                    <Timer className="size-4" />
+                                    <span>
+                                        Analysis completed in {analysisDuration.toFixed(2)} seconds
+                                    </span>
+                                </div>
+                            )}
+                            <div className="flex items-center gap-2">
+                                <Eye className="size-4" />
                                 <span>
-                                    Analysis completed in {analysisDuration.toFixed(2)} seconds.
+                                    {visibleSections.filter(s => s.active).length} sections visible
                                 </span>
                             </div>
-                        )}
+                            <div className="px-2 py-1 bg-primary/10 rounded-md">
+                                <span className="text-primary font-medium">
+                                    {reportType.toUpperCase()} Report ({role})
+                                </span>
+                            </div>
+                        </div>
                     </header>
 
                     <ReportView
