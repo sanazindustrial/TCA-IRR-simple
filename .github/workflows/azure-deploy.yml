@@ -1,11 +1,10 @@
-name: Deploy TCA-IRR Dynamic Web App to Azure
+name: Deploy TCA-IRR App to Azure Production
+
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -14,11 +13,11 @@ permissions:
 
 env:
   AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-  AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
-  AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+  AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
 jobs:
-  build-and-deploy:
+  frontend-build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -27,29 +26,137 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "18"
-          cache: "npm"
+          node-version: '18'
+          cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Build application
+      - name: Build frontend
         run: npm run build
 
-      - name: Setup Azure CLI
-        uses: azure/setup-azd@v1.0.0
+      - name: Upload frontend artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: .next/
+
+  backend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Azure Login
-        uses: azure/login@v2
+        uses: azure/login@v1
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Deploy to Azure
+      - name: Build and deploy backend to Azure
         run: |
-          azd auth login --client-id ${{ secrets.AZURE_CLIENT_ID }} --federated-credential-provider "github" --tenant-id ${{ vars.AZURE_TENANT_ID }}
-          azd deploy --no-prompt
+          az webapp up --name tca-irr-backend \
+            --resource-group tca-platform-rg \
+            --location "East US" \
+            --runtime "PYTHON:3.11" \
+            --src-path backend/
+
+  deploy-frontend:
+    needs: [frontend-build]
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download frontend artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: .next/
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy to Azure Static Web Apps
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: 'upload'
+          app_location: '/'
+          output_location: '.next'
+
+  database-setup:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Initialize database
+        run: |
+          cd backend
+          python init_database.py
         env:
-          AZURE_ENV_NAME: "prod"
-          AZURE_LOCATION: "eastus2"
+          POSTGRES_HOST: ${{ secrets.POSTGRES_HOST }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_SSL_MODE: require
+
+  health-check:
+    needs: [deploy-frontend, backend-build, database-setup]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Frontend health check
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://tca-irr-app.azurestaticapps.net/health || echo "000")
+          if [ "$response" -eq "200" ]; then
+            echo "✅ Frontend is healthy"
+          else
+            echo "❌ Frontend health check failed (HTTP $response)"
+            exit 1
+          fi
+
+      - name: Backend health check
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://tca-irr-backend.azurewebsites.net/health || echo "000")
+          if [ "$response" -eq "200" ]; then
+            echo "✅ Backend is healthy"
+          else
+            echo "❌ Backend health check failed (HTTP $response)"
+            exit 1
+          fi
+
+      - name: Database connectivity check
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://tca-irr-backend.azurewebsites.net/api/v1/admin/health || echo "000")
+          if [ "$response" -eq "200" ]; then
+            echo "✅ Database connectivity is healthy"
+          else
+            echo "❌ Database health check failed (HTTP $response)"
+            exit 1
+          fi

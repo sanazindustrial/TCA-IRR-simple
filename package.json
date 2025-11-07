@@ -1,7 +1,13 @@
 {
-  "name": "nextn",
-  "version": "0.1.0",
+  "name": "tca-irr-app",
+  "version": "1.0.0",
   "private": "true",
+  "description": "TCA Investment Risk Review Application - AI-powered startup analysis platform",
+  "author": "TCA Development Team",
+  "engines": {
+    "node": ">=18.17.0",
+    "npm": ">=9.6.7"
+  },
   "scripts": {
     "dev": "next dev --turbopack",
     "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
@@ -9,7 +15,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "deploy": "pwsh ./deploy-production.ps1",
+    "deploy:force": "pwsh ./deploy-production.ps1 -Force",
+    "test": "echo 'No tests specified' && exit 0",
+    "postbuild": "echo 'Build completed successfully'"
   },
   "dependencies": {
     "@genkit-ai/google-genai": "^1.21.0",

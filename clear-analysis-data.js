@@ -9,7 +9,7 @@ if (typeof localStorage !== 'undefined') {
     localStorage.removeItem('analysisData');
     localStorage.removeItem('tcaData');
     localStorage.removeItem('reportData');
-    
+
     // Clear any other analysis-related data
     Object.keys(localStorage).forEach(key => {
         if (key.includes('analysis') || key.includes('tca') || key.includes('scorecard')) {
@@ -25,7 +25,7 @@ if (typeof sessionStorage !== 'undefined') {
     sessionStorage.removeItem('analysisData');
     sessionStorage.removeItem('tcaData');
     sessionStorage.removeItem('reportData');
-    
+
     // Clear any other analysis-related data
     Object.keys(sessionStorage).forEach(key => {
         if (key.includes('analysis') || key.includes('tca') || key.includes('scorecard')) {

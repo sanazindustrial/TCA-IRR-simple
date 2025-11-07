@@ -33,7 +33,9 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
-type ScoreRow = {
+import { runAnalysis } from '../actions';
+
+interface ScoreRow {
   id: string;
   category: string;
   score: number;
@@ -123,186 +125,200 @@ export default function WhatIfAnalysisPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    const storedData = localStorage.getItem('analysisResult');
-    if (storedData) {
-      const data: ComprehensiveAnalysisOutput = JSON.parse(storedData);
-      setAnalysisData(data);
+    const loadAnalysisData = async () => {
+      try {
+        setIsLoading(true);
 
-      const initialScores: Record<string, ScoreRow[]> = {};
+        // First, check if we have stored analysis data
+        const storedData = localStorage.getItem('analysisResult');
+        let data: ComprehensiveAnalysisOutput | null = null;
 
-      // Module 1: TCA Scorecard (12 Categories)
-      if (data.tcaData?.categories) {
-        initialScores['tca'] = data.tcaData.categories.map(c => ({ id: c.category, category: c.category, score: c.rawScore }));
-      } else {
-        // Default 12 TCA categories if no data
-        initialScores['tca'] = [
-          { id: 'leadership', category: 'Leadership', score: 8.5 },
-          { id: 'regulatory', category: 'Regulatory/Compliance', score: 7.0 },
-          { id: 'product-market-fit', category: 'Product-Market Fit', score: 9.0 },
-          { id: 'team-strength', category: 'Team Strength', score: 7.5 },
-          { id: 'technology-ip', category: 'Technology & IP', score: 8.0 },
-          { id: 'business-model', category: 'Business Model & Financials', score: 7.0 },
-          { id: 'go-to-market', category: 'Go-to-Market Strategy', score: 6.5 },
-          { id: 'competition-moat', category: 'Competition & Moat', score: 7.8 },
-          { id: 'market-potential', category: 'Market Potential', score: 8.8 },
-          { id: 'traction', category: 'Traction', score: 7.2 },
-          { id: 'scalability', category: 'Scalability', score: 6.8 },
-          { id: 'risk-assessment', category: 'Risk Assessment', score: 7.5 }
-        ];
+        if (storedData) {
+          try {
+            data = JSON.parse(storedData);
+            console.log('Found stored analysis data:', data);
+          } catch (e) {
+            console.warn('Failed to parse stored analysis data:', e);
+          }
+        }
+
+        // If no valid stored data or TCA data is missing, try to fetch fresh analysis
+        if (!data || !data.tcaData?.categories || data.tcaData.categories.length === 0) {
+          console.log('No valid TCA data found, fetching fresh analysis...');
+
+          try {
+            // Use default company data or fetch from session storage
+            const companySessionData = sessionStorage.getItem('companyData');
+            const userData = companySessionData ? JSON.parse(companySessionData) : {
+              companyName: 'TechCorp Solutions',
+              companyDescription: 'SaaS technology startup with proven revenue model',
+              sector: 'technology',
+              team_size: 12,
+              monthly_revenue: 85000,
+              monthly_burn: 65000,
+              cash_balance: 800000,
+              market_size: 5000000000,
+              founder_experience: true,
+              technical_team: true,
+              customer_validation: true,
+              revenue_traction: true,
+              patents: false,
+              technical_innovation: true
+            };
+
+            console.log('Fetching fresh analysis with data:', userData);
+            data = await runAnalysis('general', userData);
+
+            // Store the fresh data
+            localStorage.setItem('analysisResult', JSON.stringify(data));
+            console.log('Fresh analysis data fetched and stored:', data);
+
+          } catch (error) {
+            console.error('Failed to fetch fresh analysis:', error);
+            toast({
+              title: 'Analysis Required',
+              description: 'Unable to load analysis data. Please run a new analysis first.',
+              variant: 'destructive'
+            });
+            router.push('/analysis');
+            return;
+          }
+        }
+
+        if (data) {
+          setAnalysisData(data);
+
+          const initialScores: Record<string, ScoreRow[]> = {};
+
+          // Module 1: TCA Scorecard - Use REAL data from analysis
+          if (data.tcaData?.categories && data.tcaData.categories.length > 0) {
+            initialScores['tca'] = data.tcaData.categories.map(c => ({
+              id: c.category,
+              category: c.category,
+              score: c.rawScore || c.score || 5.0
+            }));
+            console.log(`Loaded ${initialScores.tca.length} TCA categories with real scores`);
+          } else {
+            console.error('No TCA categories found in analysis data');
+            toast({
+              title: 'Invalid Analysis Data',
+              description: 'TCA scorecard data is missing. Please run a new analysis.',
+              variant: 'destructive'
+            });
+            router.push('/analysis');
+            return;
+          }
+
+          // Module 2: Risk Assessment - Use REAL risk data
+          if (data.riskData?.riskFlags && data.riskData.riskFlags.length > 0) {
+            initialScores['risk'] = data.riskData.riskFlags.map((r, index) => ({
+              id: r.domain || r.category || `risk_${index}`,
+              category: r.domain || r.category || `Risk ${index + 1}`,
+              score: r.flag === 'green' ? 8 : r.flag === 'yellow' ? 6 : 4
+            }));
+            console.log(`Loaded ${initialScores.risk.length} risk factors`);
+          } else if (data.riskData?.riskLevel) {
+            // Generate risk scores from overall risk level
+            const riskScore = data.riskData.riskLevel === 'LOW' ? 8 :
+              data.riskData.riskLevel === 'MEDIUM' ? 6 : 4;
+            initialScores['risk'] = [
+              { id: 'overall-risk', category: 'Overall Risk Assessment', score: riskScore }
+            ];
+          } else {
+            // Generate calculated risk assessment based on TCA scores
+            const avgTcaScore = initialScores.tca.reduce((sum, cat) => sum + cat.score, 0) / initialScores.tca.length;
+            const riskScore = avgTcaScore >= 8 ? 8 : avgTcaScore >= 6.5 ? 6 : 4;
+            initialScores['risk'] = [
+              { id: 'calculated-risk', category: 'Calculated Risk Level', score: riskScore }
+            ];
+          }
+
+          // Module 3: Macro Trend Analysis - Calculate from TCA base
+          if (data.macroData?.pestelDashboard) {
+            initialScores['macro'] = Object.entries(data.macroData.pestelDashboard).map(([k, v]) => ({
+              id: k,
+              category: k.charAt(0).toUpperCase() + k.slice(1),
+              score: typeof v === 'number' ? v : 7.0
+            }));
+          } else {
+            // Calculate macro trends based on TCA composite score
+            const baseScore = Math.min((data.tcaData?.compositeScore || 50) / 10, 10);
+            initialScores['macro'] = [
+              { id: 'political', category: 'Political', score: Math.max(0, baseScore * 0.9) },
+              { id: 'economic', category: 'Economic', score: Math.max(0, baseScore * 0.85) },
+              { id: 'social', category: 'Social', score: Math.max(0, baseScore * 1.1) },
+              { id: 'technological', category: 'Technological', score: Math.max(0, baseScore * 1.15) },
+              { id: 'environmental', category: 'Environmental', score: Math.max(0, baseScore) },
+              { id: 'legal', category: 'Legal', score: Math.max(0, baseScore * 0.95) }
+            ];
+          }
+
+          // Additional modules based on available analysis data
+          if (data.benchmarkData && Object.keys(data.benchmarkData).length > 0) {
+            const benchmarkEntries = Object.entries(data.benchmarkData);
+            if (benchmarkEntries.length > 0) {
+              initialScores['benchmark'] = benchmarkEntries.map(([k, v]) => ({
+                id: k,
+                category: k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                score: typeof v === 'number' ? Math.min(Math.max(v, 0), 10) : 7.0
+              }));
+            }
+          }
+
+          if (data.growthData?.growthTier) {
+            initialScores['growth'] = [
+              { id: 'growth-tier', category: 'Growth Classification', score: data.growthData.growthTier }
+            ];
+          }
+
+          if (data.gapData?.heatmap) {
+            initialScores['gap'] = data.gapData.heatmap.map(g => ({
+              id: g.category,
+              category: g.category,
+              score: Math.max(0, 10 - (g.gap / 5))
+            }));
+          }
+
+          if (data.founderFitData?.readinessScore) {
+            initialScores['founderFit'] = [
+              { id: 'funding-readiness', category: 'Funding Readiness', score: data.founderFitData.readinessScore / 10 }
+            ];
+          }
+
+          if (data.teamData?.teamScore) {
+            initialScores['team'] = [
+              { id: 'team-effectiveness', category: 'Team Assessment', score: data.teamData.teamScore }
+            ];
+          }
+
+          // Set the scores and show the analysis
+          setEditableScores(initialScores);
+          setShowWelcome(false);
+          console.log('Analysis data loaded successfully with', Object.keys(initialScores).length, 'modules');
+        } else {
+          console.error('No analysis data available');
+          toast({
+            title: 'No Analysis Data',
+            description: 'Please run an analysis first to use What-If scenarios.',
+            variant: 'destructive'
+          });
+          router.push('/analysis');
+        }
+
+      } catch (error) {
+        console.error('Error loading analysis data:', error);
+        toast({
+          title: 'Data Loading Error',
+          description: 'Failed to load analysis data. Please try running a new analysis.',
+          variant: 'destructive'
+        });
+        router.push('/analysis');
+      } finally {
+        setIsLoading(false);
       }
+    };
 
-      // Module 2: Risk Assessment (14 Domains)
-      if (data.riskData?.riskFlags) {
-        initialScores['risk'] = data.riskData.riskFlags.map(r => ({
-          id: r.domain,
-          category: r.domain,
-          score: r.flag === 'green' ? 8 : r.flag === 'yellow' ? 6 : 4
-        }));
-      } else {
-        // Default 14 risk domains if no data
-        initialScores['risk'] = [
-          { id: 'technology', category: 'Technology Risk', score: 7.5 },
-          { id: 'market', category: 'Market Risk', score: 6.8 },
-          { id: 'competition', category: 'Competition Risk', score: 7.2 },
-          { id: 'financial', category: 'Financial Risk', score: 6.5 },
-          { id: 'regulatory', category: 'Regulatory Risk', score: 7.8 },
-          { id: 'team', category: 'Team Risk', score: 8.0 },
-          { id: 'execution', category: 'Execution Risk', score: 6.2 },
-          { id: 'legal', category: 'Legal Risk', score: 7.5 },
-          { id: 'strategic', category: 'Strategic Risk', score: 7.0 },
-          { id: 'customer', category: 'Customer Risk', score: 6.9 },
-          { id: 'operational', category: 'Operational Risk', score: 7.3 },
-          { id: 'esg', category: 'ESG Risk', score: 8.2 },
-          { id: 'ip', category: 'IP Risk', score: 7.7 },
-          { id: 'exit', category: 'Exit Risk', score: 6.6 }
-        ];
-      }
-
-      // Module 3: Macro Trend Analysis (PESTEL - 6 factors)
-      if (data.macroData?.pestelDashboard) {
-        initialScores['macro'] = Object.entries(data.macroData.pestelDashboard).map(([k, v]) => ({
-          id: k,
-          category: k.charAt(0).toUpperCase() + k.slice(1),
-          score: v
-        }));
-      } else {
-        // Default PESTEL factors if no data
-        initialScores['macro'] = [
-          { id: 'political', category: 'Political', score: 7.2 },
-          { id: 'economic', category: 'Economic', score: 6.8 },
-          { id: 'social', category: 'Social', score: 8.1 },
-          { id: 'technological', category: 'Technological', score: 8.5 },
-          { id: 'environmental', category: 'Environmental', score: 7.0 },
-          { id: 'legal', category: 'Legal', score: 7.3 }
-        ];
-      }
-
-      // Module 4: Benchmark Comparison
-      if (data.benchmarkData?.benchmarkOverlay) {
-        initialScores['benchmark'] = data.benchmarkData.benchmarkOverlay.map(b => ({
-          id: b.category,
-          category: b.category,
-          score: b.score / 10
-        }));
-      } else {
-        // Default benchmark categories if no data
-        initialScores['benchmark'] = [
-          { id: 'revenue-growth', category: 'Revenue Growth', score: 7.8 },
-          { id: 'market-share', category: 'Market Share', score: 6.5 },
-          { id: 'customer-acquisition', category: 'Customer Acquisition', score: 7.2 },
-          { id: 'operational-efficiency', category: 'Operational Efficiency', score: 6.9 }
-        ];
-      }
-
-      // Module 5: Growth Classification
-      if (data.growthData && Object.keys(data.growthData).length > 0) {
-        initialScores['growth'] = [{ id: 'growth-tier', category: 'Growth Tier', score: 8 }];
-      } else {
-        // Default growth metrics if no data
-        initialScores['growth'] = [
-          { id: 'growth-tier', category: 'Growth Tier', score: 7.5 },
-          { id: 'scalability', category: 'Scalability Potential', score: 8.2 },
-          { id: 'market-expansion', category: 'Market Expansion', score: 7.0 }
-        ];
-      }
-
-      // Module 6: Gap Analysis
-      if (data.gapData?.heatmap) {
-        initialScores['gap'] = data.gapData.heatmap.map(g => ({
-          id: g.category,
-          category: g.category,
-          score: Math.max(0, 10 - (g.gap / 5))
-        }));
-      } else {
-        // Default gap analysis categories if no data
-        initialScores['gap'] = [
-          { id: 'technology-gap', category: 'Technology Gap', score: 7.8 },
-          { id: 'market-gap', category: 'Market Gap', score: 6.5 },
-          { id: 'capability-gap', category: 'Capability Gap', score: 7.2 },
-          { id: 'resource-gap', category: 'Resource Gap', score: 6.8 }
-        ];
-      }
-
-      // Module 7: Founder Fit Analysis
-      if (data.founderFitData?.readinessScore) {
-        initialScores['founderFit'] = [{
-          id: 'readiness',
-          category: 'Funding Readiness',
-          score: data.founderFitData.readinessScore / 10
-        }];
-      } else {
-        // Default founder fit metrics if no data
-        initialScores['founderFit'] = [
-          { id: 'readiness', category: 'Funding Readiness', score: 7.5 },
-          { id: 'market-timing', category: 'Market Timing', score: 8.0 },
-          { id: 'execution-capability', category: 'Execution Capability', score: 7.2 }
-        ];
-      }
-
-      // Module 8: Team Assessment
-      if (data.teamData?.members) {
-        initialScores['team'] = data.teamData.members.map((m, idx) => ({
-          id: m.id,
-          category: m.name || `Team Member ${idx + 1}`,
-          score: 8.5
-        }));
-      } else {
-        // Default team assessment categories if no data
-        initialScores['team'] = [
-          { id: 'leadership', category: 'Leadership Quality', score: 8.2 },
-          { id: 'technical-expertise', category: 'Technical Expertise', score: 7.8 },
-          { id: 'industry-experience', category: 'Industry Experience', score: 7.5 },
-          { id: 'team-cohesion', category: 'Team Cohesion', score: 8.0 }
-        ];
-      }
-
-      // Module 9: Strategic Fit Matrix
-      if (data.strategicFitData && Object.keys(data.strategicFitData).length > 0) {
-        initialScores['strategicFit'] = [
-          { id: 'strategic-1', category: 'Strategic Alignment', score: 7.5 },
-          { id: 'strategic-2', category: 'Market Positioning', score: 8.0 }
-        ];
-      } else {
-        // Default strategic fit metrics if no data
-        initialScores['strategicFit'] = [
-          { id: 'strategic-alignment', category: 'Strategic Alignment', score: 7.5 },
-          { id: 'market-positioning', category: 'Market Positioning', score: 8.0 },
-          { id: 'competitive-advantage', category: 'Competitive Advantage', score: 7.3 },
-          { id: 'value-proposition', category: 'Value Proposition', score: 8.1 }
-        ];
-      }
-
-      setEditableScores(initialScores);
-      setShowWelcome(true);
-    } else {
-      toast({
-        variant: 'destructive',
-        title: 'No analysis data found',
-        description: 'Please run an analysis first.',
-      });
-      router.push('/dashboard/evaluation');
-    }
-    setIsLoading(false);
+    loadAnalysisData();
   }, [router, toast]);
 
   const handleScoreChange = (moduleId: string, rowId: string, newScore: number) => {
