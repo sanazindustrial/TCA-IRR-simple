@@ -67,6 +67,8 @@ cp .env.example .env.local
 # NEXT_PUBLIC_API_URL=http://localhost:8000
 # NEXTAUTH_SECRET=your-secret-key
 # NEXTAUTH_URL=http://localhost:3000
+# OPENAI_API_KEY=your-openai-api-key-here
+# OPENAI_MODEL=gpt-4-turbo-preview
 
 # Start development server
 npm run dev
@@ -94,6 +96,8 @@ cp .env.example .env
 # DATABASE_URL=postgresql://user:password@localhost:5432/tcairr
 # JWT_SECRET_KEY=your-jwt-secret
 # FRONTEND_URL=http://localhost:3000
+# OPENAI_API_KEY=your-openai-api-key-here
+# OPENAI_MODEL=gpt-4-turbo-preview
 
 # Initialize database (if using PostgreSQL)
 python init_database.py
@@ -105,11 +109,14 @@ python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ### 4. AI Service Setup (Optional)
 
 ```bash
-# Install Firebase Genkit (if using AI features)
-npm install -g firebase-tools
+# Configure OpenAI API (if using AI features)
+# Add your OpenAI API key to environment variables:
+# In .env.local (frontend) and .env (backend):
+# OPENAI_API_KEY=your-openai-api-key-here
+# OPENAI_MODEL=gpt-4-turbo-preview
 
-# Start Genkit development server
-npm run genkit:dev
+# Verify AI service configuration
+npm run test:ai
 ```
 
 ### 5. Database Setup (PostgreSQL)
@@ -320,6 +327,7 @@ For support and questions:
 **Built with ❤️ for intelligent investment analysis**
 
 ### Project Team
+
 - **Creator**: Dr. Sanaz Tehrani
 - **Co-Leader**: Dr. Omar Haddad
 - **SMART Capstone Project** - Westcliff University
