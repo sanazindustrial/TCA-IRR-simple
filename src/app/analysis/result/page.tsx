@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -41,6 +41,7 @@ import { FinancialsBurnRate } from '@/components/evaluation/financials-burn-rate
 import { ExitStrategyRoadmap } from '@/components/evaluation/exit-strategy-roadmap';
 import { TermSheetTriggerAnalysis } from '@/components/evaluation/term-sheet-trigger-analysis';
 import { Appendix } from '@/components/evaluation/appendix';
+import { CEOQuestions } from '@/components/evaluation/ceo-questions';
 
 // Loading Component
 import Loading from '../../loading';
@@ -91,6 +92,7 @@ const allReportComponents = [
     { id: 'regulatory-compliance', title: 'Regulatory Compliance Review', component: RegulatoryComplianceReview, category: 'technology' },
 
     // Review & Final Components
+    { id: 'ceo-questions', title: 'CEO Questions', component: CEOQuestions, category: 'review' },
     { id: 'reviewer-comments', title: 'Reviewer Comments', component: ReviewerComments, category: 'review' },
     { id: 'reviewer-ai-deviation', title: 'Reviewer AI Deviation', component: ReviewerAIDeviation, category: 'review' },
     { id: 'final-recommendation', title: 'Final Recommendation', component: FinalRecommendation, category: 'review' },
@@ -102,6 +104,7 @@ const triageStandardConfig = [
     { id: 'quick-summary', title: 'Quick Summary', active: true },
     { id: 'tca-scorecard', title: 'TCA Scorecard', active: true },
     { id: 'risk-flags', title: 'Risk Flags & Mitigation', active: true },
+    { id: 'ceo-questions', title: 'CEO Questions', active: true },
     { id: 'growth-classifier', title: 'Growth Classifier', active: true },
     { id: 'benchmark-comparison', title: 'Benchmark Comparison', active: true },
     { id: 'final-recommendation', title: 'Final Recommendation', active: true }
@@ -113,6 +116,7 @@ const triageAdminConfig = [
     { id: 'tca-scorecard', title: 'TCA Scorecard', active: true },
     { id: 'tca-summary-card', title: 'TCA Summary Card', active: true },
     { id: 'risk-flags', title: 'Risk Flags & Mitigation', active: true },
+    { id: 'ceo-questions', title: 'CEO Questions', active: true },
     { id: 'gap-analysis', title: 'Gap Analysis', active: true },
     { id: 'macro-trend-alignment', title: 'Macro Trend Alignment', active: true },
     { id: 'benchmark-comparison', title: 'Benchmark Comparison', active: true },
@@ -157,8 +161,8 @@ function getComponentData(componentId: string, analysisData: ComprehensiveAnalys
         // Core Components
         case 'quick-summary':
         case 'executive-summary':
-        case 'tca-summary-card':
             return analysisData;
+        case 'tca-summary-card':
         case 'tca-scorecard':
             return analysisData.tcaData;
 
@@ -202,6 +206,7 @@ function getComponentData(componentId: string, analysisData: ComprehensiveAnalys
             return analysisData;
 
         // Review & Final
+        case 'ceo-questions':
         case 'reviewer-comments':
         case 'reviewer-ai-deviation':
         case 'final-recommendation':
@@ -231,7 +236,11 @@ function ReportView({
         <div className="space-y-8">
             {visibleComponents.map(({ id, title, component: Component }) => (
                 <div key={id} id={id}>
-                    <Component data={getComponentData(id, analysisData)} />
+                    {id === 'tca-summary-card' ? (
+                        <Component initialData={getComponentData(id, analysisData)} />
+                    ) : (
+                        <Component data={getComponentData(id, analysisData)} />
+                    )}
                 </div>
             ))}
         </div>
@@ -245,7 +254,7 @@ export const dynamic = 'force-dynamic';
 export default function AnalysisResultPage({
     searchParams
 }: {
-    searchParams: { preview?: string; type?: string }
+    searchParams: Promise<{ preview?: string; type?: string }>
 }) {
     const { toast } = useToast();
     const router = useRouter();
@@ -256,10 +265,19 @@ export default function AnalysisResultPage({
     const [visibleSections, setVisibleSections] = useState<ReportSection[]>([]);
     const [analysisData, setAnalysisData] = useState<ComprehensiveAnalysisOutput>(sampleAnalysisData);
     const [analysisDuration, setAnalysisDuration] = useState<number | null>(null);
-    const isPreview = searchParams.preview === 'true';
+    const [params, setParams] = useState<{ preview?: string; type?: string }>({});
+    const [isPreview, setIsPreview] = useState(false);
+
+    // Unwrap searchParams
+    useEffect(() => {
+        searchParams.then(p => {
+            setParams(p);
+            setIsPreview(p.preview === 'true');
+        });
+    }, [searchParams]);
 
     // Load user role and analysis data - Dynamic Data Loading
-    React.useEffect(() => {
+    useEffect(() => {
         const loadUserAndConfig = () => {
             setIsLoading(true);
 
@@ -308,9 +326,9 @@ export default function AnalysisResultPage({
                 }
 
                 // Set report type from URL params or localStorage
-                if (searchParams.type === 'dd') {
+                if (params.type === 'dd') {
                     setReportType('dd');
-                } else if (searchParams.type === 'triage') {
+                } else if (params.type === 'triage') {
                     setReportType('triage');
                 } else {
                     // Try to load from localStorage or default to triage
@@ -330,10 +348,10 @@ export default function AnalysisResultPage({
         };
 
         loadUserAndConfig();
-    }, [searchParams.type, isPreview]);
+    }, [params.type, isPreview, params]);
 
     // Load configuration based on role and report type - Dynamic Configuration
-    React.useEffect(() => {
+    useEffect(() => {
         if (isPreview) {
             // In preview mode, show all possible sections
             const allSections = allReportComponents.map(comp => ({
@@ -435,15 +453,27 @@ export default function AnalysisResultPage({
             <main className="bg-background text-foreground min-h-screen">
                 <div className="container mx-auto p-4 md:p-8">
                     <header className="mb-12">
-                        <div className="relative text-center">
-                            <h1 className="text-3xl font-bold mb-4">
-                                Technology Commercialization Analysis
-                            </h1>
-                            <div className="absolute top-0 right-0 flex gap-2">
+                        {/* Main Header with Title and Action Buttons */}
+                        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-6">
+                            <div className="text-center lg:text-left">
+                                <h1 className="text-3xl md:text-4xl font-bold mb-2">
+                                    Technology Commercialization Analysis
+                                </h1>
+                                <p className="text-lg text-muted-foreground max-w-2xl">
+                                    {reportType === 'triage' ?
+                                        'Triage analysis provides key insights for initial investment screening.' :
+                                        'Due Diligence analysis provides comprehensive evaluation for investment decisions.'
+                                    }
+                                </p>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex flex-wrap items-center justify-center lg:justify-end gap-2 lg:flex-shrink-0">
                                 {!isPreview && (
                                     <>
                                         <Button
                                             variant={reportType === 'triage' ? 'default' : 'outline'}
+                                            size="sm"
                                             onClick={() => {
                                                 setReportType('triage');
                                                 localStorage.setItem('currentReportType', 'triage');
@@ -454,6 +484,7 @@ export default function AnalysisResultPage({
                                         {(role === 'admin' || role === 'reviewer') && (
                                             <Button
                                                 variant={reportType === 'dd' ? 'default' : 'outline'}
+                                                size="sm"
                                                 onClick={() => {
                                                     setReportType('dd');
                                                     localStorage.setItem('currentReportType', 'dd');
@@ -462,7 +493,7 @@ export default function AnalysisResultPage({
                                                 DD Report
                                             </Button>
                                         )}
-                                        <Button asChild variant="outline">
+                                        <Button asChild variant="outline" size="sm">
                                             <Link href="/dashboard/evaluation">
                                                 New Analysis
                                             </Link>
@@ -473,14 +504,8 @@ export default function AnalysisResultPage({
                             </div>
                         </div>
 
-                        <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto text-center">
-                            {reportType === 'triage' ?
-                                'Triage analysis provides key insights for initial investment screening.' :
-                                'Due Diligence analysis provides comprehensive evaluation for investment decisions.'
-                            }
-                        </p>
-
-                        <div className="mt-4 flex items-center justify-center gap-4 text-sm text-muted-foreground">
+                        {/* Status Information Bar */}
+                        <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground bg-muted/30 px-4 py-3 rounded-lg">
                             {analysisDuration && !isPreview && (
                                 <div className="flex items-center gap-2">
                                     <Timer className="size-4" />
@@ -492,10 +517,10 @@ export default function AnalysisResultPage({
                             <div className="flex items-center gap-2">
                                 <Eye className="size-4" />
                                 <span>
-                                    {visibleSections.filter(s => s.active).length} sections visible
+                                    {visibleSections.filter((s: ReportSection) => s.active).length} sections visible
                                 </span>
                             </div>
-                            <div className="px-2 py-1 bg-primary/10 rounded-md">
+                            <div className="px-3 py-1 bg-primary/10 rounded-md border border-primary/20">
                                 <span className="text-primary font-medium">
                                     {reportType.toUpperCase()} Report ({role})
                                 </span>

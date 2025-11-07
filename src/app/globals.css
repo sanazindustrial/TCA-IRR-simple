@@ -92,3 +92,63 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer components {
+  /* Improved layout consistency utilities */
+  .section-spacing {
+    @apply space-y-6;
+  }
+  
+  .card-padding {
+    @apply p-6;
+  }
+  
+  .status-badge {
+    @apply px-3 py-1 rounded-md border text-sm font-medium;
+  }
+  
+  .icon-container {
+    @apply p-2 bg-primary/10 rounded-lg flex-shrink-0;
+  }
+  
+  .flex-center {
+    @apply flex items-center justify-center;
+  }
+  
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  /* Analysis page specific styles */
+  .analysis-header {
+    @apply mb-12;
+  }
+  
+  .analysis-title {
+    @apply text-3xl md:text-4xl font-bold mb-2;
+  }
+  
+  .analysis-description {
+    @apply text-lg text-muted-foreground max-w-2xl;
+  }
+  
+  .status-info-bar {
+    @apply flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground bg-muted/30 px-4 py-3 rounded-lg;
+  }
+  
+  .status-item {
+    @apply flex items-center gap-2;
+  }
+  
+  .score-display {
+    @apply text-center p-6 bg-muted/30 rounded-lg;
+  }
+  
+  .score-large {
+    @apply text-5xl font-bold;
+  }
+  
+  .score-subtitle {
+    @apply text-xs text-muted-foreground mt-3;
+  }
+}
