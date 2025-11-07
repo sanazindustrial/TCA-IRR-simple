@@ -3,6 +3,7 @@ Database configuration and connection manager for Azure PostgreSQL
 """
 
 import asyncpg
+import asyncio
 import os
 import logging
 from typing import Optional, Dict, Any

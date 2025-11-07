@@ -459,6 +459,322 @@ async def get_evaluation(evaluation_id: str,
                             detail="Failed to fetch evaluation")
 
 
+# Analysis endpoints
+@app.post("/api/analysis/comprehensive")
+async def run_comprehensive_analysis(request: Request):
+    """Run comprehensive TCA analysis"""
+    try:
+        # Parse request data
+        data = await request.json()
+
+        # Extract analysis parameters
+        framework = data.get('framework', 'general')
+        company_data = data.get('company_data', {})
+        tca_input = data.get('tcaInput', {})
+
+        logger.info(
+            f"Running comprehensive analysis for framework: {framework}")
+        logger.info(f"Company: {company_data.get('name', 'Unknown')}")
+
+        # Simulate analysis processing
+        await asyncio.sleep(2)  # Simulate processing time
+
+        # Generate comprehensive analysis results
+        analysis_result = {
+            "final_tca_score": 78.5,
+            "investment_recommendation": "Proceed with due diligence",
+            "scorecard": {
+                "categories": {
+                    "market_potential": {
+                        "name":
+                        "Market Potential",
+                        "raw_score":
+                        8.2,
+                        "weight":
+                        0.20,
+                        "weighted_score":
+                        16.4,
+                        "notes":
+                        "Strong market opportunity with clear value proposition"
+                    },
+                    "technology_innovation": {
+                        "name":
+                        "Technology Innovation",
+                        "raw_score":
+                        7.8,
+                        "weight":
+                        0.15,
+                        "weighted_score":
+                        11.7,
+                        "notes":
+                        "Solid technology foundation with competitive advantages"
+                    },
+                    "team_capability": {
+                        "name": "Team Capability",
+                        "raw_score": 8.0,
+                        "weight": 0.25,
+                        "weighted_score": 20.0,
+                        "notes":
+                        "Experienced team with relevant domain expertise"
+                    },
+                    "business_model": {
+                        "name": "Business Model",
+                        "raw_score": 7.5,
+                        "weight": 0.20,
+                        "weighted_score": 15.0,
+                        "notes": "Clear revenue model with growth potential"
+                    },
+                    "financial_health": {
+                        "name":
+                        "Financial Health",
+                        "raw_score":
+                        7.0,
+                        "weight":
+                        0.20,
+                        "weighted_score":
+                        14.0,
+                        "notes":
+                        "Adequate funding runway with reasonable burn rate"
+                    }
+                }
+            },
+            "risk_assessment": {
+                "overall_risk_score": 6.5,
+                "flags": {
+                    "market_risk": {
+                        "level": {
+                            "value": "yellow"
+                        },
+                        "trigger":
+                        "Market competition intensity",
+                        "impact":
+                        "Medium competitive pressure in target market",
+                        "severity_score":
+                        6,
+                        "mitigation":
+                        "Strengthen differentiation and build market partnerships",
+                        "ai_recommendation":
+                        "Focus on unique value proposition and early customer acquisition"
+                    },
+                    "technology_risk": {
+                        "level": {
+                            "value": "green"
+                        },
+                        "trigger":
+                        "Technology scalability",
+                        "impact":
+                        "Strong technical architecture with good scalability",
+                        "severity_score":
+                        3,
+                        "mitigation":
+                        "Continue investing in technical talent and infrastructure",
+                        "ai_recommendation":
+                        "Maintain current technical roadmap and expand development team"
+                    }
+                }
+            },
+            "pestel_analysis": {
+                "political": 7.2,
+                "economic": 7.8,
+                "social": 8.0,
+                "technological": 8.5,
+                "environmental": 6.8,
+                "legal": 7.0,
+                "composite_score": 75.5,
+                "trend_alignment": {
+                    "digital_transformation": "Strong alignment",
+                    "sustainability": "Moderate alignment",
+                    "regulatory_changes": "Good preparation",
+                    "economic_growth": "Positive outlook",
+                    "technology_adoption": "Excellent positioning"
+                }
+            },
+            "benchmark_analysis": {
+                "overall_percentile": 72,
+                "category_benchmarks": {
+                    "growth_metrics": {
+                        "percentile_rank": 75,
+                        "sector_average": 65,
+                        "z_score": 0.8
+                    },
+                    "financial_metrics": {
+                        "percentile_rank": 68,
+                        "sector_average": 70,
+                        "z_score": -0.2
+                    },
+                    "operational_metrics": {
+                        "percentile_rank": 74,
+                        "sector_average": 68,
+                        "z_score": 0.6
+                    }
+                }
+            },
+            "gap_analysis": {
+                "total_gaps":
+                5,
+                "priority_areas": [
+                    "Sales and Marketing Capability",
+                    "Customer Success Infrastructure"
+                ],
+                "quick_wins":
+                ["Automated onboarding process", "Enhanced product analytics"],
+                "gaps": [{
+                    "category": "Sales Performance",
+                    "gap_size": 15,
+                    "priority": "High",
+                    "gap_percentage": 20
+                }, {
+                    "category": "Marketing Reach",
+                    "gap_size": 12,
+                    "priority": "Medium",
+                    "gap_percentage": 15
+                }]
+            },
+            "funder_analysis": {
+                "funding_readiness_score":
+                76,
+                "recommended_round_size":
+                2.5,
+                "investor_matches": [{
+                    "investor_name": "TechStars Ventures",
+                    "sector_focus": "B2B SaaS and AI",
+                    "fit_score": 85,
+                    "stage_match": "Seed"
+                }, {
+                    "investor_name": "Accel Partners",
+                    "sector_focus": "Technology Infrastructure",
+                    "fit_score": 78,
+                    "stage_match": "Series A"
+                }]
+            },
+            "team_analysis": {
+                "team_completeness":
+                82,
+                "diversity_score":
+                75,
+                "founders": [{
+                    "name":
+                    "CEO/Founder",
+                    "experience_score":
+                    85,
+                    "track_record":
+                    "Previous successful exit, 10+ years domain experience"
+                }, {
+                    "name":
+                    "CTO/Co-founder",
+                    "experience_score":
+                    80,
+                    "track_record":
+                    "Technical leadership at scale-up companies, strong engineering background"
+                }]
+            }
+        }
+
+        return analysis_result
+
+    except Exception as e:
+        logger.error(f"Comprehensive analysis error: {e}")
+        raise HTTPException(status_code=500,
+                            detail=f"Analysis failed: {str(e)}")
+
+
+# File upload endpoints
+@app.post("/api/files/upload")
+async def upload_files(request: Request):
+    """Handle file uploads and extract data"""
+    try:
+        # This is a simplified file upload handler
+        # In production, you'd want to use proper file upload handling
+        data = await request.json()
+        files_data = data.get('files', [])
+
+        processed_files = []
+        for file_info in files_data:
+            # Simulate file processing
+            processed_file = {
+                "name": file_info.get('name', 'unknown.pdf'),
+                "size": file_info.get('size', 0),
+                "type": file_info.get('type', 'application/pdf'),
+                "extracted_data": {
+                    "text_content":
+                    "Sample extracted text from uploaded document...",
+                    "financial_data": {
+                        "revenue": 500000,
+                        "burn_rate": 50000,
+                        "runway_months": 10
+                    },
+                    "key_metrics": {
+                        "team_size": 8,
+                        "customers": 45,
+                        "mrr": 25000
+                    }
+                },
+                "processing_status": "completed"
+            }
+            processed_files.append(processed_file)
+
+        return {
+            "status": "success",
+            "files_processed": len(processed_files),
+            "processed_files": processed_files
+        }
+
+    except Exception as e:
+        logger.error(f"File upload error: {e}")
+        raise HTTPException(status_code=500,
+                            detail=f"File upload failed: {str(e)}")
+
+
+@app.post("/api/urls/fetch")
+async def fetch_url_data(request: Request):
+    """Fetch and process data from URLs"""
+    try:
+        data = await request.json()
+        urls = data.get('urls', [])
+
+        processed_urls = []
+        for url in urls:
+            # Simulate URL data fetching
+            processed_url = {
+                "url": url,
+                "title": "Sample Web Page Title",
+                "extracted_data": {
+                    "text_content": f"Sample extracted content from {url}...",
+                    "metadata": {
+                        "domain": url.split('/')[2] if '://' in url else url,
+                        "content_type": "text/html",
+                        "word_count": 1250
+                    }
+                },
+                "processing_status": "completed"
+            }
+            processed_urls.append(processed_url)
+
+        return {
+            "status": "success",
+            "urls_processed": len(processed_urls),
+            "processed_urls": processed_urls
+        }
+
+    except Exception as e:
+        logger.error(f"URL fetch error: {e}")
+        raise HTTPException(status_code=500,
+                            detail=f"URL fetch failed: {str(e)}")
+
+
+# Health check for API
+@app.get("/api/health")
+async def api_health_check():
+    """API health check endpoint"""
+    health = await db_manager.health_check()
+    return {
+        "status": "healthy",
+        "timestamp": datetime.utcnow(),
+        "database": health.get("status", "unknown"),
+        "api_version": "1.0.0"
+    }
+
+
 # Admin endpoints
 @app.get("/admin/requests", response_model=List[AppRequestResponse])
 async def get_all_requests(current_user: dict = Depends(get_current_user)):

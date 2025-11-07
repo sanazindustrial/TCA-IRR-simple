@@ -5,8 +5,8 @@ import type { ComprehensiveAnalysisOutput } from '@/ai/flows/schemas';
 
 // Try different backend URLs based on environment
 const BACKEND_API_URL = process.env.NODE_ENV === 'development'
-  ? 'http://127.0.0.1:8000/api'  // Development
-  : process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api'; // Production fallback
+  ? 'http://127.0.0.1:8001'  // Development
+  : process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8001'; // Production fallback
 
 console.log('Backend API URL:', BACKEND_API_URL);
 console.log('Environment:', process.env.NODE_ENV);
@@ -54,6 +54,21 @@ export async function runAnalysis(
       console.error('Health check failed, but continuing with analysis attempt:', healthError);
       // Don't throw error here, just log and continue
     }
+    // Load processed data from localStorage
+    const processedFiles = JSON.parse(localStorage.getItem('processedFiles') || '[]');
+    const processedUrls = JSON.parse(localStorage.getItem('processedUrls') || '[]');
+    const processedTexts = JSON.parse(localStorage.getItem('processedTexts') || '[]');
+
+    // Extract financial data from processed files
+    const extractedFinancials = processedFiles.reduce((acc: any, file: any) => {
+      const financialData = file.extracted_data?.financial_data || {};
+      return {
+        revenue: acc.revenue + (financialData.revenue || 0),
+        burn_rate: acc.burn_rate + (financialData.burn_rate || 0),
+        runway_months: Math.max(acc.runway_months, financialData.runway_months || 0)
+      };
+    }, { revenue: 0, burn_rate: 0, runway_months: 0 });
+
     // Prepare comprehensive analysis payload with all original configurations preserved
     const analysisPayload = {
       // Framework configuration
@@ -64,21 +79,28 @@ export async function runAnalysis(
       // Company data structure - Use real user data if provided
       company_data: {
         name: userData?.companyName || 'Sample Company',
-        description: userData?.companyDescription || 'AI-powered startup using machine learning for optimization',
+        description: userData?.companyDescription || processedTexts[0]?.content?.slice(0, 200) || 'AI-powered startup using machine learning for optimization',
         stage: 'seed',
         sector: backendSectorMap[framework],
-        framework: framework
+        framework: framework,
+        processed_data: {
+          files: processedFiles,
+          urls: processedUrls,
+          texts: processedTexts,
+          extracted_financials: extractedFinancials
+        }
       },
 
       // TCA Input structure - Use real user data if provided
       tcaInput: {
-        founderQuestionnaire: userData?.submittedTexts?.[0] || 'Our team has extensive experience in AI and SaaS. We are solving a major pain point in the market.',
-        uploadedPitchDecks: userData?.uploadedFiles?.map(f => f.name).join(', ') || 'Pitch deck contains market analysis, product roadmap, and financial projections.',
-        financials: userData?.submittedTexts?.[1] || 'We have secured $500k in pre-seed funding and have a 12-month runway.',
+        founderQuestionnaire: userData?.submittedTexts?.[0] || processedTexts[0]?.content || 'Our team has extensive experience in AI and SaaS. We are solving a major pain point in the market.',
+        uploadedPitchDecks: userData?.uploadedFiles?.map(f => f.name).join(', ') || processedFiles.map((f: any) => f.name).join(', ') || 'Pitch deck contains market analysis, product roadmap, and financial projections.',
+        financials: userData?.submittedTexts?.[1] || `Revenue: $${extractedFinancials.revenue}, Burn: $${extractedFinancials.burn_rate}/month, Runway: ${extractedFinancials.runway_months} months` || 'We have secured $500k in pre-seed funding and have a 12-month runway.',
         framework: framework,
-      },
-
-      // Risk Input structure - Use real user data if provided
+        processed_files_count: processedFiles.length,
+        processed_urls_count: processedUrls.length,
+        processed_texts_count: processedTexts.length
+      },      // Risk Input structure - Use real user data if provided
       riskInput: {
         uploadedDocuments: userData?.uploadedFiles?.map(f => f.name).join(', ') || 'Business plan, financial statements, and IP registrations.',
         complianceChecklists: userData?.submittedTexts?.[2] || 'GDPR, CCPA, and industry-specific regulations checklist reviewed.',
@@ -120,7 +142,7 @@ export async function runAnalysis(
       companyName: 'Sample Company'
     };
 
-    console.log('Making request to:', `${BACKEND_API_URL}/analysis/comprehensive`);
+    console.log('Making request to:', `${BACKEND_API_URL}/api/analysis/comprehensive`);
     console.log('Request payload:', JSON.stringify(analysisPayload, null, 2));
 
     // Add timeout to the fetch request
@@ -130,7 +152,7 @@ export async function runAnalysis(
     let response: Response;
 
     try {
-      response = await fetch(`${BACKEND_API_URL}/analysis/comprehensive`, {
+      response = await fetch(`${BACKEND_API_URL}/api/analysis/comprehensive`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
