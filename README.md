@@ -4,6 +4,14 @@ A comprehensive investment analysis and deal evaluation platform built with Next
 
 ## 🎯 Latest Updates (November 2025)
 
+### ✅ **Enhanced Analysis Components & Simplified UI**
+
+- **New TCA Components**: TCA AI Table, Weighted Score Breakdown integration
+- **Enhanced Risk Analysis**: Risk Flag Summary Table with comprehensive dashboard
+- **Simplified Analysis Page**: Streamlined page-simple.tsx for better UX
+- **Report Storage System**: Advanced report persistence and retrieval
+- **Component Integration**: 28+ evaluation components fully integrated
+
 ### ✅ **Fully Tested & Deployment Ready**
 
 - **100% Test Coverage**: All core functionality tested (TCA scoring, what-if analysis, result loading)
@@ -33,7 +41,9 @@ A comprehensive investment analysis and deal evaluation platform built with Next
 
 - **Role-Based Access Control**: User/Admin/Reviewer tiers with tailored interfaces
 - **Real-time Report Switching**: Dynamic switching between Triage and DD reports
-- **Comprehensive Component Suite**: All evaluation components properly integrated and functional
+- **Enhanced Analysis Pages**: Simplified and comprehensive result views
+- **Report Storage System**: Persistent report management and retrieval
+- **Comprehensive Component Suite**: All 28+ evaluation components properly integrated
 - **Production-Ready Build**: Optimized bundle (5.62 kB dynamic result page)
 
 ### **Technical Excellence**
@@ -60,19 +70,23 @@ A comprehensive investment analysis and deal evaluation platform built with Next
 - **Azure App Service** for scalable cloud hosting
 - **Real-time Integration** with comprehensive health monitoring
 
-### **Complete Analysis Module Suite (25+ Components)**
+### **Complete Analysis Module Suite (28+ Components)**
 
 #### **Core Analysis**
 
 - Quick Summary & Executive Summary
 - TCA Scorecard & Summary Cards  
 - Weighted Score Breakdown
+- TCA AI Table (Enhanced scoring display)
+- TCA Interpretation Summary
 
 #### **Risk & Assessment**
 
 - Risk Flags & Mitigation Strategies
+- Risk Flag Summary Table (Enhanced dashboard)
 - Gap Analysis & Recommendations
 - Consistency Check & Validation
+- Flag Analysis Narrative
 
 #### **Market & Strategy**
 
@@ -244,17 +258,24 @@ Complete Azure infrastructure with Bicep templates:
 ├── src/
 │   ├── app/                    # Next.js App Router pages
 │   │   ├── analysis/          # Investment analysis interface
+│   │   │   └── result/        # Analysis results with simplified page views
 │   │   ├── dashboard/         # Main dashboard and admin panels
 │   │   ├── evaluation/        # Evaluation results and reporting
 │   │   └── data-sources/      # Data source management
 │   ├── components/            # Reusable React components
 │   │   ├── analysis/          # Analysis-specific components
 │   │   ├── dashboard/         # Dashboard components
-│   │   ├── evaluation/        # Evaluation display components
+│   │   ├── evaluation/        # 28+ evaluation display components
+│   │   │   ├── tca-ai-table.tsx           # Enhanced TCA scoring display
+│   │   │   ├── weighted-score-breakdown.tsx # Detailed score analysis
+│   │   │   ├── risk-flag-summary-table.tsx # Risk dashboard
+│   │   │   ├── tca-interpretation-summary.tsx # Analysis interpretation
+│   │   │   └── flag-analysis-narrative.tsx   # Risk narrative
 │   │   └── ui/                # Base UI components
 │   ├── ai/                    # AI and Genkit integration
 │   │   └── flows/             # AI analysis flows
 │   └── lib/                   # Utilities and configuration
+│       └── report-storage.ts  # Report persistence system
 ├── schema/                    # Database schema definitions
 ├── infra/                     # Azure infrastructure (Bicep templates)
 ├── scripts/                   # Deployment and utility scripts
