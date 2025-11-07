@@ -187,6 +187,9 @@ interface TcaInterpretationSummaryProps {
 export function TcaInterpretationSummary({ data = sampleTcaInterpretation }: TcaInterpretationSummaryProps) {
     const { framework, reportType } = useEvaluationContext();
 
+    // Use sample data if none provided or if data is incomplete
+    const tcaData = (data && data.triageOutcome) ? data : sampleTcaInterpretation;
+
     return (
         <DashboardCard
             title="TCA AI Interpretation Summary"
@@ -201,7 +204,7 @@ export function TcaInterpretationSummary({ data = sampleTcaInterpretation }: Tca
                         Executive AI Narrative
                     </h3>
                     <p className="text-gray-700 leading-relaxed">
-                        {data.executiveNarrative}
+                        {tcaData.executiveNarrative}
                     </p>
                 </div>
 
@@ -211,17 +214,17 @@ export function TcaInterpretationSummary({ data = sampleTcaInterpretation }: Tca
                         <CardHeader className="pb-3">
                             <div className="flex items-center justify-between">
                                 <CardTitle className="text-lg">Triage Decision</CardTitle>
-                                {getDecisionBadge(data.triageOutcome.decision)}
+                                {getDecisionBadge(tcaData.triageOutcome.decision)}
                             </div>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="flex items-center justify-between">
                                 <span className="text-sm text-muted-foreground">Confidence</span>
-                                <span className="font-bold">{data.triageOutcome.confidence}%</span>
+                                <span className="font-bold">{tcaData.triageOutcome.confidence}%</span>
                             </div>
-                            <Progress value={data.triageOutcome.confidence} className="h-2" />
+                            <Progress value={tcaData.triageOutcome.confidence} className="h-2" />
                             <p className="text-sm text-muted-foreground mt-3">
-                                {data.triageOutcome.reasoning}
+                                {tcaData.triageOutcome.reasoning}
                             </p>
                         </CardContent>
                     </Card>
@@ -236,16 +239,16 @@ export function TcaInterpretationSummary({ data = sampleTcaInterpretation }: Tca
                         <CardContent className="space-y-4">
                             <div className="text-center">
                                 <div className="text-3xl font-bold text-primary mb-1">
-                                    {data.compositeScoreAnalysis.currentScore}/10
+                                    {tcaData.compositeScoreAnalysis.currentScore}/10
                                 </div>
                                 <div className="text-sm text-muted-foreground">
-                                    {data.compositeScoreAnalysis.industryPercentile}th percentile
+                                    {tcaData.compositeScoreAnalysis.industryPercentile}th percentile
                                 </div>
                             </div>
                             <div className="flex justify-between text-xs text-muted-foreground">
-                                <span>Benchmark: {data.compositeScoreAnalysis.benchmarkScore}</span>
+                                <span>Benchmark: {tcaData.compositeScoreAnalysis.benchmarkScore}</span>
                                 <span className="font-medium text-primary">
-                                    +{(data.compositeScoreAnalysis.currentScore - data.compositeScoreAnalysis.benchmarkScore).toFixed(1)}
+                                    +{(tcaData.compositeScoreAnalysis.currentScore - tcaData.compositeScoreAnalysis.benchmarkScore).toFixed(1)}
                                 </span>
                             </div>
                         </CardContent>
@@ -262,14 +265,14 @@ export function TcaInterpretationSummary({ data = sampleTcaInterpretation }: Tca
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div className="text-center">
                             <div className="text-2xl font-bold text-red-600 mb-1">
-                                {data.riskOpportunityBalance.riskScore}/10
+                                {tcaData.riskOpportunityBalance.riskScore}/10
                             </div>
                             <div className="text-sm text-muted-foreground">Risk Score</div>
                         </div>
 
                         <div className="text-center">
                             <div className="text-2xl font-bold text-green-600 mb-1">
-                                {data.riskOpportunityBalance.opportunityScore}/10
+                                {tcaData.riskOpportunityBalance.opportunityScore}/10
                             </div>
                             <div className="text-sm text-muted-foreground">Opportunity Score</div>
                         </div>
@@ -277,12 +280,12 @@ export function TcaInterpretationSummary({ data = sampleTcaInterpretation }: Tca
                         <div className="text-center">
                             <Badge
                                 className={cn(
-                                    data.riskOpportunityBalance.balance === 'OPPORTUNITY_FAVORED' ? 'bg-green-100 text-green-800' :
-                                        data.riskOpportunityBalance.balance === 'BALANCED' ? 'bg-blue-100 text-blue-800' :
+                                    tcaData.riskOpportunityBalance.balance === 'OPPORTUNITY_FAVORED' ? 'bg-green-100 text-green-800' :
+                                        tcaData.riskOpportunityBalance.balance === 'BALANCED' ? 'bg-blue-100 text-blue-800' :
                                             'bg-red-100 text-red-800'
                                 )}
                             >
-                                {data.riskOpportunityBalance.balance.replace('_', ' ')}
+                                {tcaData.riskOpportunityBalance.balance.replace('_', ' ')}
                             </Badge>
                         </div>
                     </div>
@@ -299,7 +302,7 @@ export function TcaInterpretationSummary({ data = sampleTcaInterpretation }: Tca
                         </CardHeader>
                         <CardContent>
                             <ul className="space-y-3">
-                                {data.highlights.strengths.map((strength, index) => (
+                                {tcaData.highlights.strengths.map((strength, index) => (
                                     <li key={index} className="flex items-start gap-3">
                                         <Star className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
                                         <span className="text-sm">{strength}</span>
@@ -318,7 +321,7 @@ export function TcaInterpretationSummary({ data = sampleTcaInterpretation }: Tca
                         </CardHeader>
                         <CardContent>
                             <ul className="space-y-3">
-                                {data.highlights.concerns.map((concern, index) => (
+                                {tcaData.highlights.concerns.map((concern, index) => (
                                     <li key={index} className="flex items-start gap-3">
                                         <XCircle className="h-4 w-4 text-orange-600 mt-0.5 flex-shrink-0" />
                                         <span className="text-sm">{concern}</span>
@@ -333,7 +336,7 @@ export function TcaInterpretationSummary({ data = sampleTcaInterpretation }: Tca
                 <div className="space-y-4">
                     <h3 className="font-semibold text-lg">Detailed Score Breakdown</h3>
                     <div className="space-y-3">
-                        {data.categoryBreakdown.map((category, index) => (
+                        {tcaData.categoryBreakdown.map((category, index) => (
                             <div key={index} className="flex items-center gap-4 p-3 border rounded-lg">
                                 <div className={`w-3 h-3 rounded-full ${getFlagColor(category.flag)}`} />
                                 <div className="flex-1 min-w-0">

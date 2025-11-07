@@ -379,3 +379,7 @@ For support and questions:
 ---
 
 **Built with ❤️ for intelligent investment analysis**
+Collaboration TCA venture Group & westcliff University
+Creator:Dr.Sanaz Tehrani 
+and Co leader: Dr, Omar Haddad
+SMART CApston of Westcliff university
