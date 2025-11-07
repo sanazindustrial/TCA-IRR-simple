@@ -1,192 +1,127 @@
-# TCA-IRR Investment Analysis Application
+# TCA-IRR Platform - Comprehensive Technology Commercialization Analysis
 
-A comprehensive investment analysis and deal evaluation platform built with Next.js 15, React 18, TypeScript, and FastAPI. The application provides sophisticated tools for evaluating investment opportunities, performing risk assessments, and generating detailed analytical reports with dynamic web app capabilities.
+A sophisticated platform for technology commercialization analysis featuring AI-driven insights, 9-module analysis system, and comprehensive investment evaluation capabilities.
 
-## 🎯 Latest Updates (November 2025)
+## 🚀 Major Features
 
-### ✅ **Enhanced Analysis Components & Simplified UI**
+### 🎯 9-Module Analysis System
 
-- **New TCA Components**: TCA AI Table, Weighted Score Breakdown integration
-- **Enhanced Risk Analysis**: Risk Flag Summary Table with comprehensive dashboard
-- **Simplified Analysis Page**: Streamlined page-simple.tsx for better UX
-- **Report Storage System**: Advanced report persistence and retrieval
-- **Component Integration**: 28+ evaluation components fully integrated
+- **TCA Scorecard** (Core Assessment) - 20% weight
+- **Risk Assessment & Flags** - 15% weight
+- **Market & Competition Analysis** - 15% weight
+- **Team & Leadership Assessment** - 15% weight
+- **Financial Health & Projections** - 15% weight
+- **Technology & IP Assessment** - 10% weight
+- **Business Model & Strategy** - 5% weight
+- **Growth Potential & Scalability** - 5% weight
+- **Investment Readiness & Exit Potential** - 5% weight
 
-### ✅ **Fully Tested & Deployment Ready**
+### ⚙️ Advanced Configuration
 
-- **100% Test Coverage**: All core functionality tested (TCA scoring, what-if analysis, result loading)
-- **Dynamic Web App**: Force-dynamic configuration for real-time content
-- **Azure Deployment Ready**: Complete infrastructure as code with Bicep templates
-- **Production Build Verified**: 67 pages compiled successfully (39s build time)
+- **Module Status Control**: Active/Inactive/Testing modes for each module
+- **Data Mapping**: Automated mapping from uploaded CSV/JSON files
+- **Weighted Scoring**: Configurable importance weights per module
+- **Role-Based Access**: Different report types for different user roles
 
-### 🧪 **Test Results - 100% Pass Rate**
+### 🏗️ Technical Architecture
 
+- **Frontend**: Next.js 14+ with TypeScript, Tailwind CSS, shadcn/ui
+- **Backend**: FastAPI with Python 3.12+, Pydantic models
+- **AI Integration**: Firebase Genkit for AI-powered analysis
+- **Database**: PostgreSQL with Azure hosting support
+- **Deployment**: Docker containerization with Azure App Service
+
+## � System Requirements
+
+### Development Environment
+
+- **Node.js**: 18+ or 20+
+- **Python**: 3.12+
+- **Package Manager**: npm or yarn
+- **Database**: PostgreSQL 14+
+
+### Production Requirements
+
+- **Azure App Service**: Node.js 18+ runtime
+- **Azure Database**: PostgreSQL flexible server
+- **Azure Storage**: For file uploads and static assets
+
+## 🛠️ Local Development Setup
+
+### 1. Clone Repository
+
+```bash
+git clone https://github.com/sanazindustrial/TCA-IRR-simple.git
+cd TCA-IRR-simple
 ```
-✅ TCA Score Calculation: 5/5 tests passed
-✅ What-If Analysis: 4/4 tests passed  
-✅ Result Page Loading: 5/5 tests passed
-📈 Overall Success Rate: 100.0%
+
+### 2. Frontend Setup
+
+```bash
+# Install dependencies
+npm install
+
+# Set up environment variables
+cp .env.example .env.local
+# Edit .env.local with your configuration:
+# NEXT_PUBLIC_API_URL=http://localhost:8000
+# NEXTAUTH_SECRET=your-secret-key
+# NEXTAUTH_URL=http://localhost:3000
+
+# Start development server
+npm run dev
 ```
 
-## 🚀 Features
+### 3. Backend Setup
 
-### **Core Analysis Engine**
+```bash
+# Navigate to backend directory
+cd backend
 
-- **25+ Evaluation Components**: Complete integration of all analysis modules
-- **TCA Score Calculator**: Advanced weighted scoring with real-time calculations
-- **What-If Analysis**: Interactive scenario modeling and impact assessment
-- **Dynamic Report Generation**: Triage and Due Diligence report configurations
+# Create virtual environment
+python -m venv venv
+# Windows
+venv\Scripts\activate
+# MacOS/Linux
+source venv/bin/activate
 
-### **Advanced Capabilities**
+# Install dependencies
+pip install -r requirements.txt
 
-- **Role-Based Access Control**: User/Admin/Reviewer tiers with tailored interfaces
-- **Real-time Report Switching**: Dynamic switching between Triage and DD reports
-- **Enhanced Analysis Pages**: Simplified and comprehensive result views
-- **Report Storage System**: Persistent report management and retrieval
-- **Comprehensive Component Suite**: All 28+ evaluation components properly integrated
-- **Production-Ready Build**: Optimized bundle (5.62 kB dynamic result page)
+# Set up environment variables
+cp .env.example .env
+# Edit .env with your configuration:
+# DATABASE_URL=postgresql://user:password@localhost:5432/tcairr
+# JWT_SECRET_KEY=your-jwt-secret
+# FRONTEND_URL=http://localhost:3000
 
-### **Technical Excellence**
+# Initialize database (if using PostgreSQL)
+python init_database.py
 
-- **FastAPI Backend**: High-performance Python backend with Azure PostgreSQL
-- **Dynamic Web Architecture**: Server-side rendering with real-time data loading
-- **Error Resilience**: Comprehensive fallback mechanisms and graceful error handling
-- **Azure Cloud Integration**: Full cloud deployment with monitoring and scaling
+# Start backend server
+python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+```
 
-## 🏗️ Architecture
+### 4. AI Service Setup (Optional)
 
-### Frontend
+```bash
+# Install Firebase Genkit (if using AI features)
+npm install -g firebase-tools
 
-- **Next.js 15** with App Router and React 18
-- **TypeScript** for type safety and better development experience
-- **Tailwind CSS** for modern, responsive styling
-- **Shadcn/UI** components for consistent design system
+# Start Genkit development server
+npm run genkit:dev
+```
 
-### **Backend & Database**
+### 5. Database Setup (PostgreSQL)
 
-- **FastAPI** for high-performance API backend (Python 3.12)
-- **Azure PostgreSQL** for robust data persistence (17.6)
-- **Google Genkit** for AI-powered analysis flows
-- **Azure App Service** for scalable cloud hosting
-- **Real-time Integration** with comprehensive health monitoring
+```sql
+-- Create database
+CREATE DATABASE tcairr;
 
-### **Complete Analysis Module Suite (28+ Components)**
-
-#### **Core Analysis**
-
-- Quick Summary & Executive Summary
-- TCA Scorecard & Summary Cards  
-- Weighted Score Breakdown
-- TCA AI Table (Enhanced scoring display)
-- TCA Interpretation Summary
-
-#### **Risk & Assessment**
-
-- Risk Flags & Mitigation Strategies
-- Risk Flag Summary Table (Enhanced dashboard)
-- Gap Analysis & Recommendations
-- Consistency Check & Validation
-- Flag Analysis Narrative
-
-#### **Market & Strategy**
-
-- Macro Trend Alignment Assessment
-- Benchmark Comparison Analysis
-- Competitive Landscape Evaluation
-- Go-to-Market Strategy Review
-
-#### **Financial & Growth**
-
-- Growth Classification & Projections
-- Financial Metrics & Burn Rate Analysis
-- Exit Strategy Roadmap
-- Term Sheet Trigger Analysis
-
-#### **Team & Fit Evaluation**
-
-- Founder-Market Fit Assessment
-- Team Assessment & Capabilities
-- Strategic Fit Matrix Analysis
-
-#### **Technology & Compliance**
-
-- IP & Technology Review
-- Regulatory Compliance Assessment
-
-#### **Review & Final**
-
-- Reviewer Comments System
-- AI Deviation Analysis  
-- Final Investment Recommendation
-- Comprehensive Appendix
-
-## 🛠️ Getting Started
-
-### Prerequisites
-
-- Node.js 18+ and npm
-- Azure account (for cloud deployment)
-- Google Cloud account (for AI features)
-
-### Local Development
-
-1. **Clone the repository:**
-
-   ```bash
-   git clone https://github.com/sanazindustrial/TCA-IRR-simple.git
-   cd TCA-IRR-simple
-   ```
-
-2. **Install dependencies:**
-
-   ```bash
-   npm install
-   ```
-
-3. **Environment Setup:**
-
-   ```bash
-   cp .env.example .env.local
-   ```
-
-   Configure your environment variables:
-
-   ```env
-   # Database Configuration
-   DATABASE_URL="your_database_connection_string"
-   
-   # Google Genkit AI Configuration
-   GOOGLE_GENKIT_API_KEY="your_genkit_api_key"
-   
-   # Azure Configuration (optional for local dev)
-   AZURE_CLIENT_ID="your_azure_client_id"
-   AZURE_CLIENT_SECRET="your_azure_client_secret"
-   ```
-
-4. **Start the development server:**
-
-   ```bash
-   npm run dev
-   ```
-
-   Open [http://localhost:3000](http://localhost:3000) to view the application.
-
-### Database Setup
-
-1. **Initialize the database:**
-
-   ```bash
-   python init_db.py
-   ```
-
-2. **Run database migrations:**
-
-   ```bash
-   # The schema files are located in ./schema/
-   # - users.sql: User management and roles
-   # - app_requests.sql: Investment request tracking
-   # - evaluations.sql: Analysis results and reports
-   ```
+-- Create user (optional)
+CREATE USER tca_user WITH PASSWORD 'your_password';
+GRANT ALL PRIVILEGES ON DATABASE tcairr TO tca_user;
+```
 
 ## 🚀 Deployment & Production Status
 
@@ -255,31 +190,35 @@ Complete Azure infrastructure with Bicep templates:
 ## 📁 Project Structure
 
 ```
+TCA-IRR-simple/
+├── backend/                          # FastAPI backend
+│   ├── app/
+│   │   ├── api/v1/endpoints/         # API endpoints
+│   │   ├── core/                     # Configuration & security
+│   │   ├── models/                   # Data models & schemas
+│   │   │   └── module_config.py      # 9-module configuration
+│   │   ├── services/                 # Business logic
+│   │   │   └── ai_service.py         # Enhanced AI analysis processor
+│   │   ├── db/                       # Database configuration
+│   │   └── utils/                    # Utility functions
+│   ├── main.py                       # FastAPI application entry
+│   ├── requirements.txt              # Python dependencies
+│   └── Dockerfile                    # Container configuration
 ├── src/
-│   ├── app/                    # Next.js App Router pages
-│   │   ├── analysis/          # Investment analysis interface
-│   │   │   └── result/        # Analysis results with simplified page views
-│   │   ├── dashboard/         # Main dashboard and admin panels
-│   │   ├── evaluation/        # Evaluation results and reporting
-│   │   └── data-sources/      # Data source management
-│   ├── components/            # Reusable React components
-│   │   ├── analysis/          # Analysis-specific components
-│   │   ├── dashboard/         # Dashboard components
-│   │   ├── evaluation/        # 28+ evaluation display components
-│   │   │   ├── tca-ai-table.tsx           # Enhanced TCA scoring display
-│   │   │   ├── weighted-score-breakdown.tsx # Detailed score analysis
-│   │   │   ├── risk-flag-summary-table.tsx # Risk dashboard
-│   │   │   ├── tca-interpretation-summary.tsx # Analysis interpretation
-│   │   │   └── flag-analysis-narrative.tsx   # Risk narrative
-│   │   └── ui/                # Base UI components
-│   ├── ai/                    # AI and Genkit integration
-│   │   └── flows/             # AI analysis flows
-│   └── lib/                   # Utilities and configuration
-│       └── report-storage.ts  # Report persistence system
-├── schema/                    # Database schema definitions
-├── infra/                     # Azure infrastructure (Bicep templates)
-├── scripts/                   # Deployment and utility scripts
-└── docs/                      # Project documentation
+│   ├── app/                          # Next.js app directory
+│   │   ├── analysis/                 # Analysis workflows
+│   │   ├── dashboard/                # Dashboard pages
+│   │   └── globals.css               # Global styles
+│   ├── components/
+│   │   ├── analysis/                 # Analysis components
+│   │   │   └── module-configuration.tsx  # Module config UI
+│   │   ├── evaluation/               # Evaluation components
+│   │   └── ui/                       # Reusable UI components
+│   └── lib/                          # Utility libraries
+├── test_simple_module_system.py      # 9-module system tests
+├── 9-MODULE-ANALYSIS-IMPLEMENTATION.md  # System documentation
+├── DEPLOYMENT_READY.md               # Deployment guide
+└── PRODUCTION_DEPLOYMENT_GUIDE.md    # Production setup guide
 ```
 
 ## 🧪 Testing & Quality Assurance
@@ -379,7 +318,9 @@ For support and questions:
 ---
 
 **Built with ❤️ for intelligent investment analysis**
-Collaboration TCA venture Group & westcliff University
-Creator:Dr.Sanaz Tehrani 
-and Co leader: Dr, Omar Haddad
-SMART CApston of Westcliff university
+
+### Project Team
+- **Creator**: Dr. Sanaz Tehrani
+- **Co-Leader**: Dr. Omar Haddad
+- **SMART Capstone Project** - Westcliff University
+- **Collaboration**: TCA Venture Group & Westcliff University
