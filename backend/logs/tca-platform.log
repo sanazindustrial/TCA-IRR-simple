@@ -609,3 +609,12 @@
 {"timestamp": "2025-11-07T14:50:07.907151", "level": "ERROR", "logger": "app.services.ai_service", "message": "AI service health check failed: All connection attempts failed", "module": "ai_service", "function": "health_check", "line": 335}
 {"timestamp": "2025-11-07T14:50:08.492594", "level": "ERROR", "logger": "app.services.ai_service", "message": "AI service health check failed: All connection attempts failed", "module": "ai_service", "function": "health_check", "line": 335}
 {"timestamp": "2025-11-07T15:09:07.934616", "level": "INFO", "logger": "app.db.database", "message": "Database connection pool closed", "module": "database", "function": "disconnect", "line": 82}
+{"timestamp": "2025-11-07T15:09:19.382201", "level": "INFO", "logger": "app.db.database", "message": "Database connection pool closed", "module": "database", "function": "disconnect", "line": 82}
+{"timestamp": "2025-11-07T15:10:26.483819", "level": "INFO", "logger": "app.db", "message": "Database logger initialized", "module": "logging_config", "function": "setup_custom_loggers", "line": 202}
+{"timestamp": "2025-11-07T15:10:26.483819", "level": "INFO", "logger": "app.api", "message": "API logger initialized", "module": "logging_config", "function": "setup_custom_loggers", "line": 206}
+{"timestamp": "2025-11-07T15:10:26.485330", "level": "INFO", "logger": "app.services", "message": "Services logger initialized", "module": "logging_config", "function": "setup_custom_loggers", "line": 210}
+{"timestamp": "2025-11-07T15:10:26.486511", "level": "INFO", "logger": "app.security", "message": "Security logger initialized", "module": "logging_config", "function": "setup_custom_loggers", "line": 214}
+{"timestamp": "2025-11-07T15:10:26.490079", "level": "INFO", "logger": "app.db", "message": "Database logger initialized", "module": "logging_config", "function": "setup_custom_loggers", "line": 202}
+{"timestamp": "2025-11-07T15:10:26.491108", "level": "INFO", "logger": "app.api", "message": "API logger initialized", "module": "logging_config", "function": "setup_custom_loggers", "line": 206}
+{"timestamp": "2025-11-07T15:10:26.491108", "level": "INFO", "logger": "app.services", "message": "Services logger initialized", "module": "logging_config", "function": "setup_custom_loggers", "line": 210}
+{"timestamp": "2025-11-07T15:10:26.491108", "level": "INFO", "logger": "app.security", "message": "Security logger initialized", "module": "logging_config", "function": "setup_custom_loggers", "line": 214}

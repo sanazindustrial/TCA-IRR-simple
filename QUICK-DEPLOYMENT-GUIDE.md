@@ -1,11 +1,13 @@
 # 🚀 Quick Deployment Guide - TCA-IRR Platform
 
 ## Overview
+
 This guide provides step-by-step instructions for deploying the TCA-IRR Platform locally and on Azure.
 
 ## 📋 Prerequisites
 
 ### Required Software
+
 - **Git**: Version control
 - **Node.js**: 18+ or 20+
 - **Python**: 3.12+
@@ -13,6 +15,7 @@ This guide provides step-by-step instructions for deploying the TCA-IRR Platform
 - **PostgreSQL**: 14+ (for local development)
 
 ### Azure Requirements
+
 - Active Azure subscription
 - Resource group with contributor permissions
 - App Service plan availability
@@ -20,6 +23,7 @@ This guide provides step-by-step instructions for deploying the TCA-IRR Platform
 ## 🖥️ Local Development Deployment
 
 ### Step 1: Repository Setup
+
 ```bash
 # Clone repository
 git clone https://github.com/sanazindustrial/TCA-IRR-simple.git
@@ -31,6 +35,7 @@ ls -la
 ```
 
 ### Step 2: Frontend Setup
+
 ```bash
 # Install Node.js dependencies
 npm install
@@ -50,9 +55,10 @@ npm run build
 npm run dev
 ```
 
-**Verification**: Open http://localhost:3000 - should see TCA-IRR interface
+**Verification**: Open <http://localhost:3000> - should see TCA-IRR interface
 
 ### Step 3: Backend Setup
+
 ```bash
 # Navigate to backend
 cd backend
@@ -81,9 +87,10 @@ echo "FRONTEND_URL=http://localhost:3000" >> .env
 python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-**Verification**: Open http://localhost:8000/docs - should see API documentation
+**Verification**: Open <http://localhost:8000/docs> - should see API documentation
 
 ### Step 4: Database Setup (Optional for Local)
+
 ```bash
 # Install PostgreSQL (if not installed)
 # Windows: Download from postgresql.org
@@ -103,6 +110,7 @@ python init_database.py
 ```
 
 ### Step 5: Test 9-Module System
+
 ```bash
 # Run comprehensive tests
 cd ..
@@ -119,6 +127,7 @@ python test_simple_module_system.py
 ## ☁️ Azure Production Deployment
 
 ### Step 1: Azure CLI Login
+
 ```bash
 # Login to Azure
 az login
@@ -131,6 +140,7 @@ az account set --subscription "your-subscription-id"
 ```
 
 ### Step 2: Create Azure Resources
+
 ```bash
 # Set variables for consistent naming
 export RESOURCE_GROUP="tca-irr-rg"
@@ -171,6 +181,7 @@ az postgres flexible-server firewall-rule create \
 ```
 
 ### Step 3: Frontend Deployment
+
 ```bash
 # Create frontend web app
 az webapp create \
@@ -200,6 +211,7 @@ az webapp deploy \
 ```
 
 ### Step 4: Backend Deployment
+
 ```bash
 # Create backend web app
 az webapp create \
@@ -241,6 +253,7 @@ az webapp deploy \
 ```
 
 ### Step 5: Database Initialization
+
 ```bash
 # Connect to Azure PostgreSQL and initialize
 cd backend
@@ -254,6 +267,7 @@ print('Database initialized successfully!')
 ```
 
 ### Step 6: Verification & Health Checks
+
 ```bash
 # Test frontend
 curl -I https://$FRONTEND_APP.azurewebsites.net
@@ -279,6 +293,7 @@ curl -X POST https://$BACKEND_APP.azurewebsites.net/api/v1/analysis/comprehensiv
 ### Environment Variables Checklist
 
 #### Frontend (.env.local for development, App Settings for Azure)
+
 - ✅ `NEXT_PUBLIC_API_URL`: Backend URL
 - ✅ `NEXTAUTH_SECRET`: Authentication secret
 - ✅ `NEXTAUTH_URL`: Frontend URL
@@ -286,6 +301,7 @@ curl -X POST https://$BACKEND_APP.azurewebsites.net/api/v1/analysis/comprehensiv
 - ✅ `NEXT_PUBLIC_ENABLE_MODULE_CONFIG`: true
 
 #### Backend (.env for development, App Settings for Azure)
+
 - ✅ `DATABASE_URL`: PostgreSQL connection string
 - ✅ `JWT_SECRET_KEY`: JWT signing secret
 - ✅ `FRONTEND_URL`: Frontend URL for CORS
@@ -293,6 +309,7 @@ curl -X POST https://$BACKEND_APP.azurewebsites.net/api/v1/analysis/comprehensiv
 - ✅ `BACKEND_PORT`: 8000
 
 ### Security Considerations
+
 - Use strong, unique passwords for database
 - Enable HTTPS for all endpoints
 - Configure proper CORS origins
@@ -302,6 +319,7 @@ curl -X POST https://$BACKEND_APP.azurewebsites.net/api/v1/analysis/comprehensiv
 ## 🔧 Monitoring & Maintenance
 
 ### Health Check Endpoints
+
 ```bash
 # Local development
 curl http://localhost:3000/api/health
@@ -315,6 +333,7 @@ curl https://your-backend-app.azurewebsites.net/health/database
 ```
 
 ### Application Logs
+
 ```bash
 # View Azure logs
 az webapp log tail --name $FRONTEND_APP --resource-group $RESOURCE_GROUP
@@ -325,6 +344,7 @@ az webapp log download --name $BACKEND_APP --resource-group $RESOURCE_GROUP
 ```
 
 ### Performance Monitoring
+
 ```bash
 # Enable Application Insights (optional)
 az extension add --name application-insights
@@ -352,6 +372,7 @@ az webapp config appsettings set \
 ### Common Issues
 
 #### 1. Frontend Build Errors
+
 ```bash
 # Clear cache and reinstall
 rm -rf .next node_modules
@@ -360,6 +381,7 @@ npm run build
 ```
 
 #### 2. Backend Import Errors
+
 ```bash
 # Reinstall Python dependencies
 cd backend
@@ -368,6 +390,7 @@ pip install -r requirements.txt --force-reinstall
 ```
 
 #### 3. Database Connection Issues
+
 ```bash
 # Test database connection
 cd backend
@@ -378,6 +401,7 @@ test_connection()
 ```
 
 #### 4. Azure Deployment Issues
+
 ```bash
 # Check deployment logs
 az webapp log tail --name $APP_NAME --resource-group $RESOURCE_GROUP
@@ -389,12 +413,14 @@ az webapp restart --name $APP_NAME --resource-group $RESOURCE_GROUP
 ### Environment-Specific Debugging
 
 #### Local Development
+
 - Check Node.js and Python versions
 - Verify environment variable files
 - Test database connectivity
 - Check port availability (3000, 8000)
 
 #### Azure Production
+
 - Verify App Service configuration
 - Check environment variables in Azure portal
 - Review application logs
@@ -403,11 +429,13 @@ az webapp restart --name $APP_NAME --resource-group $RESOURCE_GROUP
 ## 📞 Support & Resources
 
 ### Documentation
+
 - [Main README](README.md)
 - [9-Module System Documentation](9-MODULE-ANALYSIS-IMPLEMENTATION.md)
 - [Deployment Guide](DEPLOYMENT_READY.md)
 
 ### Useful Commands
+
 ```bash
 # Quick local setup
 git clone https://github.com/sanazindustrial/TCA-IRR-simple.git
@@ -429,18 +457,21 @@ az group create --name tca-irr-rg --location westus2
 ## ✅ Deployment Checklist
 
 ### Pre-Deployment
+
 - [ ] Repository cloned and dependencies installed
 - [ ] Local environment tested successfully
 - [ ] 9-module system tests passing
 - [ ] Azure CLI authenticated and configured
 
 ### Local Deployment
-- [ ] Frontend running on http://localhost:3000
-- [ ] Backend running on http://localhost:8000
+
+- [ ] Frontend running on <http://localhost:3000>
+- [ ] Backend running on <http://localhost:8000>
 - [ ] Database connected (if applicable)
 - [ ] All health checks passing
 
 ### Azure Deployment
+
 - [ ] Resource group created
 - [ ] App Service plan configured
 - [ ] PostgreSQL database deployed
@@ -452,6 +483,7 @@ az group create --name tca-irr-rg --location westus2
 - [ ] 9-module system functional in production
 
 ### Post-Deployment
+
 - [ ] Application Insights configured (optional)
 - [ ] Monitoring and alerts set up
 - [ ] Backup strategy implemented
