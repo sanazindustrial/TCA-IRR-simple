@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, FileText, AlertTriangle, BarChart3, Loader2 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { DashboardCard } from '@/components/shared/dashboard-card';
-import { runAnalysis } from '../actions';
+import { runAnalysis } from '@/app/analysis/actions';
 import type { ComprehensiveAnalysisOutput } from '@/ai/flows/schemas';
 import Loading from '@/app/loading';
 

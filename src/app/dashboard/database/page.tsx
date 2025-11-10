@@ -1,4 +1,3 @@
-
 'use client';
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -41,6 +40,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ExportButtons } from '@/components/evaluation/export-buttons';
 import { useToast } from '@/hooks/use-toast';
+import { EvaluationProvider } from '@/components/evaluation/evaluation-provider';
 
 const queries = [
   {
@@ -254,8 +254,14 @@ export default function DatabaseSearchPage() {
   });
 
   return (
-    <>
-        <div className="container mx-auto p-4 md:p-8">
+        <EvaluationProvider role={'user'} reportType={'dd'} framework={'general'} onFrameworkChangeAction={function (): void {
+      throw new Error('Function not implemented.');
+    } } setReportTypeAction={function (): void {
+      throw new Error('Function not implemented.');
+    } } isLoading={false} handleRunAnalysisAction={function (): void {
+      throw new Error('Function not implemented.');
+    } }>
+      <div className="container mx-auto p-4 md:p-8">
         <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
             <div>
             <h1 className="text-2xl font-semibold flex items-center gap-2">
@@ -311,13 +317,13 @@ export default function DatabaseSearchPage() {
                     <p>Try adjusting your search or filter criteria.</p>
                 </div>
             )}
-        </div>
-        <SqlEditorDialog 
-            query={selectedQuery}
-            open={isDialogOpen}
-            onOpenChange={setDialogOpen}
-            onExecute={handleExecuteCustom}
-        />
-    </>
+      </div>
+      <SqlEditorDialog 
+        query={selectedQuery}
+        open={isDialogOpen}
+        onOpenChange={setDialogOpen}
+        onExecute={handleExecuteCustom}
+      />
+    </EvaluationProvider>
   );
 }
