@@ -171,9 +171,10 @@ def start_backend_server():
         import uvicorn
 
         # Start server
+        port = int(os.getenv("PORT", 80))  # Default to 8000 if PORT is not set
         uvicorn.run("main:app",
                     host="0.0.0.0",
-                    port=8000,
+                    port=port,
                     reload=True,
                     log_level="info",
                     access_log=True)
