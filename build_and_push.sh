@@ -18,3 +18,10 @@ echo "Pushing Docker image to registry..."
 docker push $DOCKER_REGISTRY/$IMAGE_NAME:$TAG
 
 echo "Docker image build and push complete."
+
+echo "Deploying UI"
+
+
+az webapp deploy --name TCA-IRR --resource-group DEV  --src-path .\ui.zip 
+
+7z a -tzip ui.zip . -xr!.azure -xr!__pycache__ -xr!.github -xr!.git -xr!snapshots -xr!.vscode -xr!node_modules #-xr!excluded_file
