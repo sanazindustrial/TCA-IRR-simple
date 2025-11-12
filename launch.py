@@ -217,8 +217,8 @@ async def main():
 
     # Step 5: Start backend server
     logger.info("✅ All checks passed! Starting backend server...")
-    logger.info("🌐 Backend API will be available at: http://localhost:8000")
-    logger.info("📚 API Documentation: http://localhost:8000/docs")
+    logger.info("🌐 Backend API will be available at: https://tcairrapiccontainer.azurewebsites.net")
+    logger.info("📚 API Documentation: https://tcairrapiccontainer.azurewebsites.net/docs")
     logger.info("🎯 Frontend should run on: http://localhost:3000")
     logger.info("")
     logger.info("Press Ctrl+C to stop the server")
@@ -245,8 +245,8 @@ Before first run:
 2. Update .env file with your database credentials
 3. Install Node.js dependencies for the frontend: npm install
 
-The backend will be available at: http://localhost:8000
-API Documentation: http://localhost:8000/docs
+The backend will be available at: https://tcairrapiccontainer.azurewebsites.net
+API Documentation: https://tcairrapiccontainer.azurewebsites.net/docs
     """)
 
 

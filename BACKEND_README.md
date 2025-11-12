@@ -227,8 +227,8 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 Once running, visit:
 
-- **Swagger UI:** <http://localhost:8000/docs>
-- **ReDoc:** <http://localhost:8000/redoc>
+- **Swagger UI:** <https://tcairrapiccontainer.azurewebsites.net/docs>
+- **ReDoc:** <https://tcairrapiccontainer.azurewebsites.net/redoc>
 
 ### Testing
 
@@ -248,7 +248,7 @@ Add API calls to your Next.js frontend:
 
 ```javascript
 // lib/api.js
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'https://tcairrapiccontainer.azurewebsites.net';
 
 export async function loginUser(email, password) {
   const response = await fetch(`${API_BASE_URL}/auth/login`, {
@@ -355,7 +355,7 @@ For issues and questions:
 1. Check the logs for error details
 2. Verify all environment variables are set correctly
 3. Ensure all services (PostgreSQL, Genkit) are running
-4. Check the API documentation at <http://localhost:8000/docs>
+4. Check the API documentation at <https://tcairrapiccontainer.azurewebsites.net/docs>
 
 ## License
 

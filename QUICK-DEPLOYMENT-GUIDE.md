@@ -44,7 +44,7 @@ npm install
 cp .env.example .env.local
 
 # Edit .env.local with local configuration
-echo "NEXT_PUBLIC_API_URL=http://localhost:8000" >> .env.local
+echo "NEXT_PUBLIC_API_URL=https://tcairrapiccontainer.azurewebsites.net" >> .env.local
 echo "NEXTAUTH_SECRET=local-dev-secret-key" >> .env.local
 echo "NEXTAUTH_URL=http://localhost:3000" >> .env.local
 
@@ -87,7 +87,7 @@ echo "FRONTEND_URL=http://localhost:3000" >> .env
 python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-**Verification**: Open <http://localhost:8000/docs> - should see API documentation
+**Verification**: Open <https://tcairrapiccontainer.azurewebsites.net/docs> - should see API documentation
 
 ### Step 4: Database Setup (Optional for Local)
 
@@ -323,8 +323,8 @@ curl -X POST https://$BACKEND_APP.azurewebsites.net/api/v1/analysis/comprehensiv
 ```bash
 # Local development
 curl http://localhost:3000/api/health
-curl http://localhost:8000/health
-curl http://localhost:8000/health/database
+curl https://tcairrapiccontainer.azurewebsites.net/health
+curl https://tcairrapiccontainer.azurewebsites.net/health/database
 
 # Production
 curl https://your-frontend-app.azurewebsites.net/api/health
@@ -466,7 +466,7 @@ az group create --name tca-irr-rg --location westus2
 ### Local Deployment
 
 - [ ] Frontend running on <http://localhost:3000>
-- [ ] Backend running on <http://localhost:8000>
+- [ ] Backend running on <https://tcairrapiccontainer.azurewebsites.net>
 - [ ] Database connected (if applicable)
 - [ ] All health checks passing
 

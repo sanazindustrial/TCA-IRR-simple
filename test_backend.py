@@ -10,7 +10,7 @@ from main import app
 import os
 
 # Test configuration
-API_BASE_URL = "http://localhost:8000"
+API_BASE_URL = "https://tcairrapiccontainer.azurewebsites.net"
 TEST_USER_EMAIL = "test@example.com"
 TEST_USER_PASSWORD = "testpassword123"
 

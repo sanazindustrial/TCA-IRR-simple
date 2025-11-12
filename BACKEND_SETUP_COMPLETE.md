@@ -50,7 +50,7 @@ python launch.py
 
 ## 📡 API Endpoints Available
 
-Once running, your backend will be available at `http://localhost:8000` with:
+Once running, your backend will be available at `https://tcairrapiccontainer.azurewebsites.net` with:
 
 - **Root**: `GET /` - API information
 - **Health**: `GET /health` - Database connectivity check
@@ -70,15 +70,15 @@ Once running, your backend will be available at `http://localhost:8000` with:
 
 ```bash
 # PowerShell
-Invoke-RestMethod -Uri "http://localhost:8000/health" -Method GET
+Invoke-RestMethod -Uri "https://tcairrapiccontainer.azurewebsites.net/health" -Method GET
 
 # Or visit in browser
-http://localhost:8000/health
+https://tcairrapiccontainer.azurewebsites.net/health
 ```
 
 ### API Documentation
 
-Visit `http://localhost:8000/docs` for interactive API documentation.
+Visit `https://tcairrapiccontainer.azurewebsites.net/docs` for interactive API documentation.
 
 ## 📊 Database Status
 
@@ -100,8 +100,8 @@ The backend is adapted to work with your existing database schema:
 
 ## 🎯 Next Steps
 
-1. **Test the Backend**: Run `python main_adapted.py` and visit `http://localhost:8000/docs`
-2. **Frontend Integration**: Update your Next.js app to connect to `http://localhost:8000/api/*`
+1. **Test the Backend**: Run `python main_adapted.py` and visit `https://tcairrapiccontainer.azurewebsites.net/docs`
+2. **Frontend Integration**: Update your Next.js app to connect to `https://tcairrapiccontainer.azurewebsites.net/api/*`
 3. **User Management**: Register test users or check existing users in your database
 4. **Add Features**: Extend the API with additional endpoints as needed
 

@@ -16,7 +16,7 @@ Usage:
   .\start-app.ps1 -Help     Show this help message
 
 Services:
-  Backend:  FastAPI server on http://localhost:8000
+  Backend:  FastAPI server on https://tcairrapiccontainer.azurewebsites.net
   Frontend: Next.js dev server on http://localhost:3000
 
 PowerShell Command Equivalents:
@@ -52,7 +52,7 @@ function Test-Service($url, $name) {
 
 # Test current status
 Write-Host "`n🔍 Checking current service status..." -ForegroundColor Cyan
-$backendRunning = Test-Service "http://localhost:8000/health" "Backend (FastAPI)"
+$backendRunning = Test-Service "https://tcairrapiccontainer.azurewebsites.net/health" "Backend (FastAPI)"
 $frontendRunning = Test-Service "http://localhost:3000" "Frontend (Next.js)"
 
 if ($TestOnly) {
@@ -80,7 +80,7 @@ Write-Host "`n⏳ Waiting for services to start..." -ForegroundColor Cyan
 Start-Sleep -Seconds 10
 
 Write-Host "`n🔍 Final status check..." -ForegroundColor Cyan
-$backendFinal = Test-Service "http://localhost:8000/health" "Backend"
+$backendFinal = Test-Service "https://tcairrapiccontainer.azurewebsites.net/health" "Backend"
 $frontendFinal = Test-Service "http://localhost:3000" "Frontend"
 
 Write-Host "`n📊 Final Service Status:" -ForegroundColor Yellow
@@ -89,9 +89,9 @@ Write-Host "Frontend: $(if($frontendFinal){'✅ Running'}else{'❌ Failed to sta
 
 if ($backendFinal -and $frontendFinal) {
     Write-Host "`n🎉 All services started successfully!" -ForegroundColor Green
-    Write-Host "   Backend:  http://localhost:8000" -ForegroundColor Cyan
+    Write-Host "   Backend:  https://tcairrapiccontainer.azurewebsites.net" -ForegroundColor Cyan
     Write-Host "   Frontend: http://localhost:3000" -ForegroundColor Cyan
-    Write-Host "   Health:   http://localhost:8000/health" -ForegroundColor Cyan
+    Write-Host "   Health:   https://tcairrapiccontainer.azurewebsites.net/health" -ForegroundColor Cyan
 }
 else {
     Write-Host "`n⚠️  Some services failed to start. Check the opened windows for error logs." -ForegroundColor Red

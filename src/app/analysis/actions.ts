@@ -4,8 +4,8 @@ import type { ComprehensiveAnalysisOutput } from '@/ai/flows/schemas';
 
 // Try different backend URLs based on environment
 const BACKEND_API_URL = process.env.NODE_ENV === 'development'
-  ? 'http://localhost:8000'  // Development (use localhost for consistency)
-  : process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'; // Production fallback
+  ? 'https://tcairrapiccontainer.azurewebsites.net'  // Development (use localhost for consistency)
+  : process.env.NEXT_PUBLIC_API_BASE_URL || 'https://tcairrapiccontainer.azurewebsites.net'; // Production fallback
 
 console.log('Backend API URL:', BACKEND_API_URL);
 console.log('Environment:', process.env.NODE_ENV);

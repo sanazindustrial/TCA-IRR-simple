@@ -60,7 +60,7 @@ def test_enhanced_file_formats():
     }]
 
     try:
-        response = requests.post("http://localhost:8000/api/files/upload",
+        response = requests.post("https://tcairrapiccontainer.azurewebsites.net/api/files/upload",
                                  json={"files": enhanced_formats},
                                  timeout=15)
 
@@ -88,7 +88,7 @@ def test_enhanced_file_formats():
 def test_backend_connectivity():
     """Test basic backend connectivity"""
     try:
-        response = requests.get("http://localhost:8000/api/health", timeout=5)
+        response = requests.get("https://tcairrapiccontainer.azurewebsites.net/api/health", timeout=5)
         if response.status_code == 200:
             data = response.json()
             print("✅ Backend connectivity - OK")
@@ -137,8 +137,8 @@ def main():
             "📁 File upload supports: PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, TXT, CSV, JSON, RTF, ODT"
         )
         print("🌐 Frontend: http://localhost:3001")
-        print("🔧 Backend API: http://localhost:8000")
-        print("📚 API Docs: http://localhost:8000/docs")
+        print("🔧 Backend API: https://tcairrapiccontainer.azurewebsites.net")
+        print("📚 API Docs: https://tcairrapiccontainer.azurewebsites.net/docs")
     else:
         print("⚠️ Some tests failed. Check the output above.")
 

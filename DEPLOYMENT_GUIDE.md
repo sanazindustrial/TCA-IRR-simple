@@ -5,7 +5,7 @@
 ### Local Development Status
 
 - ✅ **Frontend (Next.js)**: Running on <http://localhost:3000>
-- ✅ **Backend (FastAPI)**: Running on <http://localhost:8000> (port 8000)
+- ✅ **Backend (FastAPI)**: Running on <https://tcairrapiccontainer.azurewebsites.net> (port 8000)
 - ✅ **Python Dependencies**: All installed via requirements.txt
 - ✅ **Node Dependencies**: All installed via package.json
 - ✅ **Production Build**: Successfully compiled 65 pages
@@ -178,7 +178,7 @@ volumes:
 ```bash
 # Terminal 1 - Backend
 py main.py
-# Backend will run on http://localhost:8000
+# Backend will run on https://tcairrapiccontainer.azurewebsites.net
 
 # Terminal 2 - Frontend  
 npm run dev
@@ -201,7 +201,7 @@ JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production-minimum-32-chars
 
 # Application Configuration
 NEXT_PUBLIC_APP_URL=http://localhost:3000
-NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_API_URL=https://tcairrapiccontainer.azurewebsites.net
 ```
 
 ### 3. Database Setup
@@ -306,7 +306,7 @@ Resource Group: tca-irr-rg-{unique-id}
 ### Health Checks
 
 Frontend Health: `GET http://localhost:3000/`
-Backend Health: `GET http://localhost:8000/health`
+Backend Health: `GET https://tcairrapiccontainer.azurewebsites.net/health`
 Database Health: Check via backend `/health` endpoint
 
 ## 📊 Monitoring & Maintenance

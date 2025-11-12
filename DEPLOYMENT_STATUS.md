@@ -5,7 +5,7 @@
 ### ✅ Local Development - WORKING
 
 - **Frontend (Next.js)**: `http://localhost:3000` ✅
-- **Backend (FastAPI)**: `http://localhost:8000` ✅
+- **Backend (FastAPI)**: `https://tcairrapiccontainer.azurewebsites.net` ✅
 - **Database**: Azure PostgreSQL (21 tables) ✅
 - **API Health**: `{"status":"healthy"}` ✅
 

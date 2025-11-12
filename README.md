@@ -64,7 +64,7 @@ npm install
 # Set up environment variables
 cp .env.example .env.local
 # Edit .env.local with your configuration:
-# NEXT_PUBLIC_API_URL=http://localhost:8000
+# NEXT_PUBLIC_API_URL=https://tcairrapiccontainer.azurewebsites.net
 # NEXTAUTH_SECRET=your-secret-key
 # NEXTAUTH_URL=http://localhost:3000
 # OPENAI_API_KEY=your-openai-api-key-here
@@ -264,10 +264,10 @@ Test Suite: 14/14 tests passing (100% success rate)
 
 ```bash
 # Test Python backend
-py main.py  # Runs on http://localhost:8000
+py main.py  # Runs on https://tcairrapiccontainer.azurewebsites.net
 
 # Database health check
-curl http://localhost:8000/health
+curl https://tcairrapiccontainer.azurewebsites.net/health
 ```
 
 ## 📖 API Documentation

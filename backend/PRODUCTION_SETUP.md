@@ -165,8 +165,8 @@ This starts:
 
 ### 2. Access Development Tools
 
-- **Application**: <http://localhost:8000>
-- **API Documentation**: <http://localhost:8000/docs>
+- **Application**: <https://tcairrapiccontainer.azurewebsites.net>
+- **API Documentation**: <https://tcairrapiccontainer.azurewebsites.net/docs>
 - **PgAdmin**: <http://localhost:5050>
   - Email: <admin@tcaplatform.com>
   - Password: admin123

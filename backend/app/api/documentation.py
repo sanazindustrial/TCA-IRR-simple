@@ -147,7 +147,7 @@ All request and response bodies use JSON format. Timestamps are in ISO 8601 form
         "url": "https://tca-irr-app.azurewebsites.net/api/v1",
         "description": "Production server"
     }, {
-        "url": "http://localhost:8000/api/v1",
+        "url": "https://tcairrapiccontainer.azurewebsites.net/api/v1",
         "description": "Development server"
     }]
 
