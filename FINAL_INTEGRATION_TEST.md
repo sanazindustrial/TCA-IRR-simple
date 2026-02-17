@@ -15,7 +15,7 @@
 
 ## Backend Testing
 
-- ✅ FastAPI Server: Running on <http://localhost:8000>  
+- ✅ FastAPI Server: Running on <https://tcairrapiccontainer.azurewebsites.net>  
 - ✅ Health Endpoint: `/health` responding correctly
 - ✅ Database Connection: Connected to Azure PostgreSQL
 - ✅ Database Status: Healthy (PostgreSQL 17.6)

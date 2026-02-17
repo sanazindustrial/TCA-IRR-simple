@@ -4,11 +4,11 @@ Write-Host "🚀 TCA-IRR Service Status Check" -ForegroundColor Green
 # Test Backend
 Write-Host "Testing Backend..." -ForegroundColor Yellow
 try {
-    $backend = Invoke-WebRequest -Uri "http://localhost:8000/health" -TimeoutSec 5 -ErrorAction Stop
-    Write-Host "✅ Backend is running on http://localhost:8000" -ForegroundColor Green
+    $backend = Invoke-WebRequest -Uri "https://tcairrapiccontainer.azurewebsites.net/health" -TimeoutSec 5 -ErrorAction Stop
+    Write-Host "✅ Backend is running on https://tcairrapiccontainer.azurewebsites.net" -ForegroundColor Green
 }
 catch {
-    Write-Host "❌ Backend is not running on http://localhost:8000" -ForegroundColor Red
+    Write-Host "❌ Backend is not running on https://tcairrapiccontainer.azurewebsites.net" -ForegroundColor Red
 }
 
 # Test Frontend  

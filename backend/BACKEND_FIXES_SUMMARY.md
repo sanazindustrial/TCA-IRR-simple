@@ -180,8 +180,8 @@ async def admin_endpoint(user: dict = Depends(require_admin)):
    ```
 
 3. **Access documentation**:
-   - API Docs: <http://localhost:8000/docs>
-   - ReDoc: <http://localhost:8000/redoc>
+   - API Docs: <https://tcairrapiccontainer.azurewebsites.net/docs>
+   - ReDoc: <https://tcairrapiccontainer.azurewebsites.net/redoc>
 
 ### Production Deployment
 

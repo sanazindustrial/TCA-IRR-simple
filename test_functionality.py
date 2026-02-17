@@ -10,7 +10,7 @@ import time
 from datetime import datetime
 
 # Configuration
-BACKEND_URL = "http://localhost:8000"
+BACKEND_URL = "https://tcairrapiccontainer.azurewebsites.net"
 FRONTEND_URL = "http://localhost:3001"
 
 

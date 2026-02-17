@@ -23,13 +23,13 @@ export default function DirectApiTest() {
 
         log('Starting API test...');
         log('Frontend URL: ' + (typeof window !== 'undefined' ? window.location.origin : 'SSR'));
-        log('Target API URL: http://localhost:8000/api/');
+        log('Target API URL: https://tcairrapiccontainer.azurewebsites.net/api/');
         log('Environment NEXT_PUBLIC_API_URL: ' + (process.env.NEXT_PUBLIC_API_URL || 'Not set'));
 
         try {
             log('Making fetch request...');
             
-            const response = await fetch('http://localhost:8000/api/', {
+            const response = await fetch('https://tcairrapiccontainer.azurewebsites.net/api/', {
                 method: 'GET',
                 mode: 'cors',
                 headers: {
@@ -76,7 +76,7 @@ export default function DirectApiTest() {
 
                     <div className="text-xs text-muted-foreground">
                         <p>This test bypasses the API client and makes a direct fetch request to the backend.</p>
-                        <p>Backend URL: http://localhost:8000/api/</p>
+                        <p>Backend URL: https://tcairrapiccontainer.azurewebsites.net/api/</p>
                         <p>Current URL: {typeof window !== 'undefined' ? window.location.href : 'SSR'}</p>
                     </div>
                 </CardContent>

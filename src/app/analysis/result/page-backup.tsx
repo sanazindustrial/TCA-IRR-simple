@@ -3,7 +3,7 @@
 
 import * as React from 'react';
 import { useEffect, useState } from 'react';
-import { useToast } from '@/hooks/use-toast';
+// import { useToast } from '@/hooks/use-toast';
 // Define the type locally until the correct import path is established
 type ComprehensiveAnalysisOutput = {
     tcaData: {
@@ -116,7 +116,7 @@ import { StrategicFitMatrix } from '@/components/evaluation/strategic-fit-matrix
 import { TcaScorecard } from '@/components/evaluation/tca-scorecard';
 import { TeamAssessment } from '@/components/evaluation/team-assessment';
 import { Button } from '@/components/ui/button';
-import Loading from '../../loading';
+import Loading from '@/app/loading';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Timer, Eye } from 'lucide-react';

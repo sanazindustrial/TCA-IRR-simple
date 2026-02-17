@@ -51,7 +51,7 @@ Edit `.env.local` and configure:
 
 ```env
 # Frontend Configuration
-NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_API_URL=https://tcairrapiccontainer.azurewebsites.net
 NEXT_PUBLIC_APP_NAME="TCA Investment Platform"
 
 # Google Genkit AI Configuration (Optional)
@@ -125,7 +125,7 @@ venv\Scripts\activate  # Windows
 python main.py
 ```
 
-Backend will start at: <http://localhost:8000>
+Backend will start at: <https://tcairrapiccontainer.azurewebsites.net>
 
 **Terminal 2 - Frontend:**
 
@@ -141,8 +141,8 @@ Frontend will start at: <http://localhost:3000> (or 3001 if 3000 is busy)
 Open your browser and navigate to:
 
 - **Frontend**: <http://localhost:3000>
-- **Backend API Docs**: <http://localhost:8000/docs>
-- **Backend Health**: <http://localhost:8000/health>
+- **Backend API Docs**: <https://tcairrapiccontainer.azurewebsites.net/docs>
+- **Backend Health**: <https://tcairrapiccontainer.azurewebsites.net/health>
 
 ### Step 9: Create Admin User (Optional)
 

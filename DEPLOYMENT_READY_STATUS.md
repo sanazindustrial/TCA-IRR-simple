@@ -23,7 +23,7 @@ The TCA-IRR (Technology Commercialization Analysis - Investment Risk Rating) app
 
 ### Backend (FastAPI + Python)
 
-- **Server Status:** ✅ Running on <http://localhost:8000>
+- **Server Status:** ✅ Running on <https://tcairrapiccontainer.azurewebsites.net>
 - **Health Endpoint:** ✅ Responding correctly
 - **Database Connection:** ✅ Azure PostgreSQL connected
 - **Authentication:** ✅ JWT system implemented

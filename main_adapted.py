@@ -486,7 +486,7 @@ async def startup_event():
     """Initialize database connection on startup"""
     logger.info("🚀 Starting TCA IRR Platform Backend...")
     logger.info("✅ Backend server is ready!")
-    logger.info("📡 API Documentation: http://localhost:8000/docs")
+    logger.info("📡 API Documentation: https://tcairrapiccontainer.azurewebsites.net/docs")
 
 
 @app.on_event("shutdown")

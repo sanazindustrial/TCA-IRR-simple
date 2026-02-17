@@ -25,7 +25,7 @@ function Test-Url($url, $name) {
 
 # Test backend
 Write-Host "🔍 Testing Backend (FastAPI)..." -ForegroundColor Cyan
-$backendRunning = Test-Url "http://localhost:8000/health" "Backend API"
+$backendRunning = Test-Url "https://tcairrapiccontainer.azurewebsites.net/health" "Backend API"
 
 # Test frontend  
 Write-Host "🔍 Testing Frontend (Next.js)..." -ForegroundColor Cyan

@@ -12,7 +12,7 @@ start "TCA-IRR Frontend" cmd /k "cd /d %~dp0 && npm run dev"
 
 echo.
 echo Services are starting...
-echo Backend: http://localhost:8000
+echo Backend: https://tcairrapiccontainer.azurewebsites.net
 echo Frontend: http://localhost:3000
 echo.
 echo Check the opened windows for logs and status.

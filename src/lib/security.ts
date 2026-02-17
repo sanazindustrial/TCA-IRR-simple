@@ -15,7 +15,7 @@ export const CSP_HEADERS = {
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "font-src 'self' https://fonts.gstatic.com",
         "img-src 'self' data: https:",
-        "connect-src 'self' http://localhost:8000 ws://localhost:3000",
+        "connect-src 'self' https://tcairrapiccontainer.azurewebsites.net ws://localhost:3000",
         "frame-ancestors 'none'",
         "base-uri 'self'",
         "form-action 'self'",

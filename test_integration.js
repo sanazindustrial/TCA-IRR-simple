@@ -4,7 +4,7 @@ const fetch = require('node-fetch');
 async function testBackendConnectivity() {
     try {
         console.log('Testing backend health endpoint...');
-        const response = await fetch('http://localhost:8000/health');
+        const response = await fetch('https://tcairrapiccontainer.azurewebsites.net/health');
         const data = await response.json();
 
         console.log('Backend Health Check Response:');

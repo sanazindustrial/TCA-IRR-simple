@@ -33,7 +33,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
-import { runAnalysis } from '../actions';
+import { runAnalysis } from '@/app/analysis/actions';
 
 interface ScoreRow {
   id: string;

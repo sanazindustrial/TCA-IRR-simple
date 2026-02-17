@@ -150,4 +150,4 @@ Write-Host "3. Monitor deployment in Azure Portal" -ForegroundColor White
 Write-Host ""
 Write-Host "Local Development:" -ForegroundColor Cyan
 Write-Host "• Frontend: npm run dev (http://localhost:3000)" -ForegroundColor White
-Write-Host "• Backend: py main.py (http://localhost:8000)" -ForegroundColor White
+Write-Host "• Backend: py main.py (https://tcairrapiccontainer.azurewebsites.net)" -ForegroundColor White

@@ -5,8 +5,8 @@
 ### Backend (FastAPI)
 
 - **Status**: ✅ Running
-- **URL**: <http://localhost:8000>
-- **Health Check**: <http://localhost:8000/health>
+- **URL**: <https://tcairrapiccontainer.azurewebsites.net>
+- **Health Check**: <https://tcairrapiccontainer.azurewebsites.net/health>
 - **Database**: ✅ Connected to Azure PostgreSQL
 - **Tables**: 21 tables found
 
@@ -64,8 +64,8 @@ npm run build | Select-Object -First 20
 ## 📊 Service URLs
 
 - **Frontend**: <http://localhost:3001>
-- **Backend API**: <http://localhost:8000>
-- **Health Check**: <http://localhost:8000/health>
+- **Backend API**: <https://tcairrapiccontainer.azurewebsites.net>
+- **Health Check**: <https://tcairrapiccontainer.azurewebsites.net/health>
 - **Database**: Azure PostgreSQL (connected)
 
 ## ✅ All Systems Operational

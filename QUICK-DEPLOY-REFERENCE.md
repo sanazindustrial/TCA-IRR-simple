@@ -34,7 +34,7 @@ npm run dev
 cd backend
 venv\Scripts\activate
 python main.py
-# → http://localhost:8000
+# → https://tcairrapiccontainer.azurewebsites.net
 ```
 
 ---
@@ -114,7 +114,7 @@ azd deploy                                         # Deploy updates
 ### `.env.local` (Frontend - Development)
 
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_API_URL=https://tcairrapiccontainer.azurewebsites.net
 NEXT_PUBLIC_APP_NAME="TCA Investment Platform"
 NODE_ENV=development
 ```
@@ -200,8 +200,8 @@ find . -type d -name __pycache__ -exec rm -rf {} +
 ### Local Development
 
 - Frontend: <http://localhost:3000>
-- Backend API: <http://localhost:8000/docs>
-- Health Check: <http://localhost:8000/health>
+- Backend API: <https://tcairrapiccontainer.azurewebsites.net/docs>
+- Health Check: <https://tcairrapiccontainer.azurewebsites.net/health>
 
 ### Azure Production
 
