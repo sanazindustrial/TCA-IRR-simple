@@ -1,7 +1,10 @@
 // Configuration management utilities for analysis modules
 import * as React from 'react';
 import { useState, useEffect, useCallback } from 'react';
-import type { UserRole, ReportType, Framework } from '@/components/analysis/module-configuration';
+// Define types locally if not available from module-configuration
+export type UserRole = 'admin' | 'reviewer' | 'analyst' | 'viewer';
+export type ReportType = 'triage' | 'due-diligence';
+export type Framework = 'general' | 'medtech' | 'biotech' | 'fintech';
 
 export interface ModuleConfig {
     id: string;

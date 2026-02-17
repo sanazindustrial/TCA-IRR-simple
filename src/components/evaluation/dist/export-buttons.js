@@ -46,11 +46,13 @@ var __spreadArrays = (this && this.__spreadArrays) || function () {
 exports.__esModule = true;
 exports.ExportButtons = void 0;
 var lucide_react_1 = require("lucide-react");
+var XLSX = require("xlsx");
 var button_1 = require("@/components/ui/button");
 var dropdown_menu_1 = require("@/components/ui/dropdown-menu");
 var use_toast_1 = require("@/hooks/use-toast");
 var jszip_1 = require("jszip");
 var file_saver_1 = require("file-saver");
+var jspdf_1 = require("jspdf");
 var jspdf_autotable_1 = require("jspdf-autotable");
 var docx_1 = require("docx");
 var pptxgenjs_1 = require("pptxgenjs");
@@ -98,7 +100,7 @@ function ExportButtons() {
         var data = getAnalysisData();
         if (!data)
             return;
-        var doc = new jsPDF();
+        var doc = new jspdf_1["default"]();
         var companyName = getCompanyName();
         // PAGE 1: Executive Summary & TCA Scorecard
         doc.setFontSize(20);
@@ -193,7 +195,7 @@ function ExportButtons() {
         var data = getAnalysisData();
         if (!data)
             return;
-        var doc = new jsPDF();
+        var doc = new jspdf_1["default"]();
         var companyName = getCompanyName();
         // PAGE 1: Comprehensive Analysis Summary
         doc.setFontSize(20);
@@ -303,7 +305,7 @@ function ExportButtons() {
         var data = getAnalysisData();
         if (!data)
             return;
-        var doc = new jsPDF();
+        var doc = new jspdf_1["default"]();
         var companyName = getCompanyName();
         // TITLE PAGE
         doc.setFontSize(24);
@@ -1169,9 +1171,9 @@ function ExportButtons() {
             }
         });
     }); };
-    // Comprehensive Excel Export with Multiple Sheets
+    // Comprehensive Excel Export with Multiple Sheets using xlsx library
     var handleExportXlsx = function () {
-        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p;
+        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18, _19, _20, _21, _22, _23, _24;
         var data = getAnalysisData();
         if (!data)
             return;
@@ -1179,112 +1181,211 @@ function ExportButtons() {
             title: 'Excel Export In Progress',
             description: 'Generating comprehensive Excel workbook with multiple analysis sheets...'
         });
-        // For now, we'll create a CSV-based data export
-        // TODO: Implement actual Excel export with multiple sheets using libraries like xlsx
         var companyName = getCompanyName();
-        // Create comprehensive data for Excel export
-        var excelData = {
-            summary: {
-                companyName: companyName,
-                reportType: reportType,
-                analyst: role,
-                generatedDate: new Date().toLocaleDateString(),
-                overallScore: ((_a = data.tcaData) === null || _a === void 0 ? void 0 : _a.compositeScore) || 'N/A',
-                recommendation: ((_b = data.tcaData) === null || _b === void 0 ? void 0 : _b.compositeScore) >= 7 ? 'RECOMMEND' :
-                    ((_c = data.tcaData) === null || _c === void 0 ? void 0 : _c.compositeScore) >= 5 ? 'CONDITIONAL' : 'DECLINE'
-            },
-            tcaScores: ((_d = data.tcaData) === null || _d === void 0 ? void 0 : _d.categories) || [],
-            riskAnalysis: ((_e = data.riskData) === null || _e === void 0 ? void 0 : _e.riskFlags) || [],
-            benchmarkData: ((_f = data.benchmarkData) === null || _f === void 0 ? void 0 : _f.comparisons) || [],
-            financialMetrics: data.financialsData || {},
-            teamAssessment: data.teamData || {},
-            growthFactors: ((_g = data.growthData) === null || _g === void 0 ? void 0 : _g.factors) || [],
-            strategicFit: ((_h = data.strategicFitData) === null || _h === void 0 ? void 0 : _h.factors) || []
-        };
-        // Create CSV content for comprehensive analysis
-        var csvContent = "COMPREHENSIVE ANALYSIS DATA EXPORT\n\n";
-        csvContent += "Company," + companyName + "\n";
-        csvContent += "Report Type," + reportType.toUpperCase() + "\n";
-        csvContent += "Analyst," + role + "\n";
-        csvContent += "Generated," + new Date().toLocaleDateString() + "\n";
-        csvContent += "Overall TCA Score," + (((_j = data.tcaData) === null || _j === void 0 ? void 0 : _j.compositeScore) || 'N/A') + "\n\n";
-        // TCA Scorecard Data
-        csvContent += "TCA SCORECARD ANALYSIS\n";
-        csvContent += "Category,Raw Score,Weight %,Weighted Score,Flag,Strengths,Concerns\n";
-        if (data.tcaData) {
-            data.tcaData.categories.forEach(function (cat) {
-                csvContent += "\"" + cat.category + "\"," + cat.rawScore + "," + cat.weight + "," + ((cat.rawScore * cat.weight) / 100).toFixed(2) + ",\"" + cat.flag + "\",\"" + (cat.strengths || 'N/A') + "\",\"" + (cat.concerns || 'None') + "\"\n";
-            });
-        }
-        csvContent += "\n";
-        // Risk Analysis Data
-        csvContent += "RISK ANALYSIS\n";
-        csvContent += "Domain,Risk Level,Trigger,Mitigation Strategy,Priority\n";
-        if (data.riskData) {
-            data.riskData.riskFlags.forEach(function (risk) {
-                csvContent += "\"" + risk.domain + "\",\"" + risk.flag + "\",\"" + risk.trigger + "\",\"" + (risk.mitigation || 'TBD') + "\",\"" + (risk.priority || 'High') + "\"\n";
-            });
-        }
-        csvContent += "\n";
-        // Benchmark Analysis
-        if ((_k = data.benchmarkData) === null || _k === void 0 ? void 0 : _k.comparisons) {
-            csvContent += "BENCHMARK COMPARISON\n";
-            csvContent += "Metric,Company Value,Industry Average,Percentile,Assessment\n";
-            data.benchmarkData.comparisons.forEach(function (comp) {
-                csvContent += "\"" + (comp.metric || 'Metric') + "\",\"" + (comp.companyValue || 'TBD') + "\",\"" + (comp.industryAverage || 'TBD') + "\",\"" + (comp.percentile || 'TBD') + "\",\"" + (comp.assessment || 'Under Review') + "\"\n";
-            });
-            csvContent += "\n";
-        }
-        // Financial Health Data
-        if (data.financialsData) {
-            csvContent += "FINANCIAL HEALTH METRICS\n";
-            csvContent += "Metric,Value,Status,Notes\n";
-            csvContent += "\"Revenue Growth\",\"" + (data.financialsData.revenueGrowth || 'TBD') + "\",\"Under Analysis\",\"Key growth indicator\"\n";
-            csvContent += "\"Monthly Burn Rate\",\"" + (data.financialsData.burnRate || 'TBD') + "\",\"Under Review\",\"Cash efficiency metric\"\n";
-            csvContent += "\"Cash Runway\",\"" + (data.financialsData.runway || 'TBD') + "\",\"Critical\",\"Months of operation remaining\"\n";
-            csvContent += "\"Gross Margin\",\"" + (data.financialsData.grossMargin || 'TBD') + "\",\"Important\",\"Profitability indicator\"\n";
-            csvContent += "\n";
-        }
-        // Growth Analysis
-        if ((_l = data.growthData) === null || _l === void 0 ? void 0 : _l.factors) {
-            csvContent += "GROWTH POTENTIAL ANALYSIS\n";
-            csvContent += "Growth Factor,Assessment,Score,Trend,Time Horizon\n";
-            data.growthData.factors.forEach(function (factor) {
-                csvContent += "\"" + (factor.name || 'Growth Factor') + "\",\"" + (factor.assessment || 'Positive') + "\",\"" + (factor.score || '7.5') + "\",\"" + (factor.trend || 'Increasing') + "\",\"" + (factor.timeHorizon || '12-18 months') + "\"\n";
-            });
-            csvContent += "\n";
-        }
-        // Team Assessment
-        if ((_m = data.teamData) === null || _m === void 0 ? void 0 : _m.teamMembers) {
-            csvContent += "TEAM ASSESSMENT\n";
-            csvContent += "Name,Role,Experience,Assessment,Notes\n";
-            data.teamData.teamMembers.forEach(function (member) {
-                csvContent += "\"" + (member.name || 'Team Member') + "\",\"" + (member.role || 'Key Role') + "\",\"" + (member.experience || 'Experienced') + "\",\"" + (member.assessment || 'Strong') + "\",\"" + (member.notes || 'N/A') + "\"\n";
-            });
-            csvContent += "\n";
-        }
-        // Strategic Fit Analysis
-        if ((_o = data.strategicFitData) === null || _o === void 0 ? void 0 : _o.factors) {
-            csvContent += "STRATEGIC FIT MATRIX\n";
-            csvContent += "Strategic Factor,Alignment,Impact,Priority,Assessment\n";
-            data.strategicFitData.factors.forEach(function (factor) {
-                csvContent += "\"" + (factor.factor || 'Strategic Element') + "\",\"" + (factor.alignment || 'Strong') + "\",\"" + (factor.impact || 'High') + "\",\"" + (factor.priority || 'Critical') + "\",\"" + (factor.assessment || 'Positive') + "\"\n";
-            });
-            csvContent += "\n";
-        }
-        // Investment Decision Summary
-        csvContent += "INVESTMENT DECISION FRAMEWORK\n";
-        csvContent += "Decision Factor,Assessment,Rationale\n";
-        var score = ((_p = data.tcaData) === null || _p === void 0 ? void 0 : _p.compositeScore) || 0;
-        csvContent += "\"Overall Recommendation\",\"" + (score >= 7 ? 'RECOMMEND' : score >= 5 ? 'CONDITIONAL' : 'DECLINE') + "\",\"Based on TCA score of " + score.toFixed(2) + "\"\n";
-        csvContent += "\"Confidence Level\",\"" + (score >= 8 ? 'Very High' : score >= 7 ? 'High' : score >= 5 ? 'Moderate' : 'Low') + "\",\"Analysis completeness and data quality\"\n";
-        csvContent += "\"Risk Profile\",\"" + (score >= 7 ? 'Acceptable' : score >= 5 ? 'Elevated' : 'High Risk') + "\",\"Based on risk assessment matrix\"\n";
-        // Download the comprehensive CSV
-        var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        file_saver_1.saveAs(blob, companyName + "-COMPREHENSIVE-Analysis-Data.csv");
+        var score = ((_a = data.tcaData) === null || _a === void 0 ? void 0 : _a.compositeScore) || 0;
+        // Create a new workbook
+        var wb = XLSX.utils.book_new();
+        // ========== SHEET 1: Executive Summary ==========
+        var summaryData = [
+            ['COMPREHENSIVE INVESTMENT ANALYSIS REPORT'],
+            [''],
+            ['Company Name', companyName],
+            ['Report Type', reportType.toUpperCase()],
+            ['Analyst', role],
+            ['Generated Date', new Date().toLocaleDateString()],
+            ['Generated Time', new Date().toLocaleTimeString()],
+            [''],
+            ['EXECUTIVE SUMMARY'],
+            ['Overall TCA Score', ((_c = (_b = data.tcaData) === null || _b === void 0 ? void 0 : _b.compositeScore) === null || _c === void 0 ? void 0 : _c.toFixed(2)) || 'N/A'],
+            ['Score Rating', score >= 8 ? 'EXCELLENT' : score >= 7 ? 'STRONG' : score >= 6 ? 'GOOD' : score >= 5 ? 'MODERATE' : 'WEAK'],
+            ['Investment Recommendation', score >= 7 ? 'RECOMMEND - Proceed to Due Diligence' : score >= 5 ? 'CONDITIONAL - Address Key Concerns' : 'DECLINE - Does Not Meet Criteria'],
+            ['Confidence Level', score >= 8 ? 'Very High' : score >= 7 ? 'High' : score >= 5 ? 'Moderate' : 'Low'],
+            ['Risk Profile', score >= 7 ? 'Acceptable' : score >= 5 ? 'Elevated' : 'High Risk'],
+            [''],
+            ['ANALYSIS SUMMARY'],
+            ['Categories Analyzed', ((_e = (_d = data.tcaData) === null || _d === void 0 ? void 0 : _d.categories) === null || _e === void 0 ? void 0 : _e.length) || 0],
+            ['Green Flags', ((_g = (_f = data.tcaData) === null || _f === void 0 ? void 0 : _f.categories) === null || _g === void 0 ? void 0 : _g.filter(function (c) { return c.flag === 'green'; }).length) || 0],
+            ['Yellow Flags', ((_j = (_h = data.tcaData) === null || _h === void 0 ? void 0 : _h.categories) === null || _j === void 0 ? void 0 : _j.filter(function (c) { return c.flag === 'yellow'; }).length) || 0],
+            ['Red Flags', ((_l = (_k = data.tcaData) === null || _k === void 0 ? void 0 : _k.categories) === null || _l === void 0 ? void 0 : _l.filter(function (c) { return c.flag === 'red'; }).length) || 0],
+            ['Total Risk Factors', ((_o = (_m = data.riskData) === null || _m === void 0 ? void 0 : _m.riskFlags) === null || _o === void 0 ? void 0 : _o.length) || 0],
+            ['Critical Risks', ((_q = (_p = data.riskData) === null || _p === void 0 ? void 0 : _p.riskFlags) === null || _q === void 0 ? void 0 : _q.filter(function (r) { return r.flag === 'red'; }).length) || 0]
+        ];
+        var wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+        wsSummary['!cols'] = [{ wch: 30 }, { wch: 50 }];
+        XLSX.utils.book_append_sheet(wb, wsSummary, 'Executive Summary');
+        // ========== SHEET 2: TCA Scorecard ==========
+        var tcaHeader = ['Category', 'Raw Score', 'Weight %', 'Weighted Score', 'Flag', 'Confidence', 'Strengths', 'Concerns', 'Recommendations'];
+        var tcaRows = ((_s = (_r = data.tcaData) === null || _r === void 0 ? void 0 : _r.categories) === null || _s === void 0 ? void 0 : _s.map(function (cat) {
+            var _a;
+            return [
+                cat.category,
+                cat.rawScore,
+                cat.weight,
+                ((cat.rawScore * cat.weight) / 100).toFixed(2),
+                ((_a = cat.flag) === null || _a === void 0 ? void 0 : _a.toUpperCase()) || 'N/A',
+                cat.confidence || 'High',
+                cat.strengths || 'N/A',
+                cat.concerns || 'None identified',
+                cat.recommendations || 'Continue monitoring'
+            ];
+        })) || [];
+        var tcaData = __spreadArrays([tcaHeader], tcaRows);
+        var wsTCA = XLSX.utils.aoa_to_sheet(tcaData);
+        wsTCA['!cols'] = [{ wch: 25 }, { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 10 }, { wch: 12 }, { wch: 40 }, { wch: 40 }, { wch: 40 }];
+        XLSX.utils.book_append_sheet(wb, wsTCA, 'TCA Scorecard');
+        // ========== SHEET 3: Risk Analysis ==========
+        var riskHeader = ['Domain', 'Risk Level', 'Trigger', 'Mitigation Strategy', 'Priority', 'Impact', 'Likelihood', 'Status'];
+        var riskRows = ((_u = (_t = data.riskData) === null || _t === void 0 ? void 0 : _t.riskFlags) === null || _u === void 0 ? void 0 : _u.map(function (risk) {
+            var _a;
+            return [
+                risk.domain,
+                ((_a = risk.flag) === null || _a === void 0 ? void 0 : _a.toUpperCase()) || 'N/A',
+                risk.trigger,
+                risk.mitigation || 'Under development',
+                risk.priority || 'High',
+                risk.impact || 'Significant',
+                risk.likelihood || 'Medium',
+                risk.status || 'Active'
+            ];
+        })) || [];
+        var riskData = __spreadArrays([riskHeader], riskRows);
+        var wsRisk = XLSX.utils.aoa_to_sheet(riskData);
+        wsRisk['!cols'] = [{ wch: 20 }, { wch: 12 }, { wch: 45 }, { wch: 45 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
+        XLSX.utils.book_append_sheet(wb, wsRisk, 'Risk Analysis');
+        // ========== SHEET 4: Benchmark Comparison ==========
+        var benchmarkHeader = ['Metric', 'Company Value', 'Industry Average', 'Percentile Rank', 'Assessment', 'Variance', 'Notes'];
+        var benchmarkRows = ((_w = (_v = data.benchmarkData) === null || _v === void 0 ? void 0 : _v.comparisons) === null || _w === void 0 ? void 0 : _w.map(function (comp) { return [
+            comp.metric || 'Metric',
+            comp.companyValue || 'TBD',
+            comp.industryAverage || 'TBD',
+            comp.percentile || 'TBD',
+            comp.assessment || 'Under Review',
+            comp.variance || 'N/A',
+            comp.notes || ''
+        ]; })) || [['No benchmark data available', '', '', '', '', '', '']];
+        var benchmarkData = __spreadArrays([benchmarkHeader], benchmarkRows);
+        var wsBenchmark = XLSX.utils.aoa_to_sheet(benchmarkData);
+        wsBenchmark['!cols'] = [{ wch: 25 }, { wch: 18 }, { wch: 18 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 30 }];
+        XLSX.utils.book_append_sheet(wb, wsBenchmark, 'Benchmark Comparison');
+        // ========== SHEET 5: Financial Analysis ==========
+        var financialData = [
+            ['FINANCIAL HEALTH ANALYSIS'],
+            [''],
+            ['Metric', 'Value', 'Assessment', 'Industry Benchmark', 'Notes'],
+            ['Revenue Growth Rate', ((_x = data.financialsData) === null || _x === void 0 ? void 0 : _x.revenueGrowth) || 'Under Analysis', 'Key Performance Indicator', '25%+ Strong', 'Primary growth metric'],
+            ['Monthly Burn Rate', ((_y = data.financialsData) === null || _y === void 0 ? void 0 : _y.burnRate) || 'Under Review', 'Cash Efficiency', '$50K Average', 'Monitor closely'],
+            ['Cash Runway (Months)', ((_z = data.financialsData) === null || _z === void 0 ? void 0 : _z.runway) || 'To be determined', 'Sustainability', '18 months ideal', 'Critical metric'],
+            ['Gross Margin', ((_0 = data.financialsData) === null || _0 === void 0 ? void 0 : _0.grossMargin) || 'Pending', 'Profitability', '60%+ target', 'Efficiency indicator'],
+            ['Customer Acquisition Cost', ((_1 = data.financialsData) === null || _1 === void 0 ? void 0 : _1.cac) || 'Under Review', 'Efficiency', 'Varies by sector', 'Growth efficiency'],
+            ['Lifetime Value (LTV)', ((_2 = data.financialsData) === null || _2 === void 0 ? void 0 : _2.ltv) || 'Under Calculation', 'Unit Economics', 'LTV > 3x CAC', 'Customer value'],
+            ['LTV:CAC Ratio', ((_3 = data.financialsData) === null || _3 === void 0 ? void 0 : _3.cacLtv) || 'TBD', 'Unit Economics', '3:1 or better', 'Business viability'],
+            [''],
+            ['FINANCIAL SUMMARY'],
+            ['Overall Financial Health', ((_4 = data.financialsData) === null || _4 === void 0 ? void 0 : _4.overallHealth) || 'Requires Analysis'],
+            ['Key Financial Strengths', ((_5 = data.financialsData) === null || _5 === void 0 ? void 0 : _5.strengths) || 'To be identified'],
+            ['Key Financial Concerns', ((_6 = data.financialsData) === null || _6 === void 0 ? void 0 : _6.concerns) || 'To be assessed']
+        ];
+        var wsFinancial = XLSX.utils.aoa_to_sheet(financialData);
+        wsFinancial['!cols'] = [{ wch: 25 }, { wch: 20 }, { wch: 22 }, { wch: 18 }, { wch: 30 }];
+        XLSX.utils.book_append_sheet(wb, wsFinancial, 'Financial Analysis');
+        // ========== SHEET 6: Team Assessment ==========
+        var teamHeader = ['Name', 'Role', 'Experience', 'Assessment', 'Strengths', 'Areas for Development', 'Notes'];
+        var teamRows = ((_8 = (_7 = data.teamData) === null || _7 === void 0 ? void 0 : _7.teamMembers) === null || _8 === void 0 ? void 0 : _8.map(function (member) { return [
+            member.name || 'Team Member',
+            member.role || 'Key Role',
+            member.experience || 'Experienced Professional',
+            member.assessment || 'Strong Contributor',
+            member.strengths || 'To be assessed',
+            member.areasForDevelopment || 'N/A',
+            member.notes || ''
+        ]; })) || [['No team data available', '', '', '', '', '', '']];
+        var teamData = __spreadArrays([teamHeader], teamRows);
+        var wsTeam = XLSX.utils.aoa_to_sheet(teamData);
+        wsTeam['!cols'] = [{ wch: 20 }, { wch: 20 }, { wch: 25 }, { wch: 18 }, { wch: 30 }, { wch: 25 }, { wch: 30 }];
+        XLSX.utils.book_append_sheet(wb, wsTeam, 'Team Assessment');
+        // ========== SHEET 7: Growth Analysis ==========
+        var growthHeader = ['Growth Factor', 'Assessment', 'Score', 'Trend', 'Time Horizon', 'Impact', 'Confidence'];
+        var growthRows = ((_10 = (_9 = data.growthData) === null || _9 === void 0 ? void 0 : _9.factors) === null || _10 === void 0 ? void 0 : _10.map(function (factor) { return [
+            factor.name || 'Growth Driver',
+            factor.assessment || 'Positive',
+            factor.score || '7.5',
+            factor.trend || 'Increasing',
+            factor.timeHorizon || '12-18 months',
+            factor.impact || 'High',
+            factor.confidence || 'Medium'
+        ]; })) || [['No growth data available', '', '', '', '', '', '']];
+        var growthData = __spreadArrays([growthHeader], growthRows);
+        var wsGrowth = XLSX.utils.aoa_to_sheet(growthData);
+        wsGrowth['!cols'] = [{ wch: 25 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 12 }];
+        XLSX.utils.book_append_sheet(wb, wsGrowth, 'Growth Analysis');
+        // ========== SHEET 8: Strategic Fit ==========
+        var strategicHeader = ['Strategic Factor', 'Alignment', 'Impact', 'Priority', 'Assessment', 'Action Required'];
+        var strategicRows = ((_12 = (_11 = data.strategicFitData) === null || _11 === void 0 ? void 0 : _11.factors) === null || _12 === void 0 ? void 0 : _12.map(function (factor) { return [
+            factor.factor || 'Strategic Element',
+            factor.alignment || 'Strong',
+            factor.impact || 'High',
+            factor.priority || 'Critical',
+            factor.assessment || 'Positive',
+            factor.actionRequired || 'Monitor'
+        ]; })) || [['No strategic fit data available', '', '', '', '', '']];
+        var strategicData = __spreadArrays([strategicHeader], strategicRows);
+        var wsStrategic = XLSX.utils.aoa_to_sheet(strategicData);
+        wsStrategic['!cols'] = [{ wch: 25 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 25 }];
+        XLSX.utils.book_append_sheet(wb, wsStrategic, 'Strategic Fit');
+        // ========== SHEET 9: Investment Decision ==========
+        var decisionData = [
+            ['INVESTMENT DECISION FRAMEWORK'],
+            [''],
+            ['Decision Factor', 'Assessment', 'Rationale'],
+            ['Overall Recommendation', score >= 7 ? 'RECOMMEND' : score >= 5 ? 'CONDITIONAL' : 'DECLINE', "Based on TCA score of " + score.toFixed(2)],
+            ['Confidence Level', score >= 8 ? 'Very High' : score >= 7 ? 'High' : score >= 5 ? 'Moderate' : 'Low', 'Analysis completeness and data quality'],
+            ['Risk Profile', score >= 7 ? 'Acceptable' : score >= 5 ? 'Elevated' : 'High Risk', 'Based on risk assessment matrix'],
+            ['Strategic Alignment', 'Review Required', 'Requires fund strategy alignment analysis'],
+            ['Valuation Assessment', 'TBD', 'Pending detailed financial due diligence'],
+            [''],
+            ['DUE DILIGENCE CHECKLIST'],
+            ['Action Item', 'Status', 'Priority'],
+            ['Management presentation and Q&A', 'Pending', 'High'],
+            ['Financial model validation', 'Pending', 'Critical'],
+            ['Customer reference calls', 'Pending', 'High'],
+            ['Technical architecture review', 'Pending', 'Medium'],
+            ['Competitive analysis deep dive', 'Pending', 'Medium'],
+            ['Legal and regulatory review', 'Pending', 'High'],
+            ['Background checks', 'Pending', 'Medium'],
+            ['Market size validation', 'Pending', 'High'],
+            ['Unit economics analysis', 'Pending', 'Critical']
+        ];
+        var wsDecision = XLSX.utils.aoa_to_sheet(decisionData);
+        wsDecision['!cols'] = [{ wch: 35 }, { wch: 20 }, { wch: 45 }];
+        XLSX.utils.book_append_sheet(wb, wsDecision, 'Investment Decision');
+        // ========== SHEET 10: Raw Data (JSON) ==========
+        var rawDataForSheet = [
+            ['RAW ANALYSIS DATA'],
+            [''],
+            ['Data Source', 'Status', 'Record Count'],
+            ['TCA Data', data.tcaData ? 'Available' : 'Not Available', ((_14 = (_13 = data.tcaData) === null || _13 === void 0 ? void 0 : _13.categories) === null || _14 === void 0 ? void 0 : _14.length) || 0],
+            ['Risk Data', data.riskData ? 'Available' : 'Not Available', ((_16 = (_15 = data.riskData) === null || _15 === void 0 ? void 0 : _15.riskFlags) === null || _16 === void 0 ? void 0 : _16.length) || 0],
+            ['Benchmark Data', data.benchmarkData ? 'Available' : 'Not Available', ((_18 = (_17 = data.benchmarkData) === null || _17 === void 0 ? void 0 : _17.comparisons) === null || _18 === void 0 ? void 0 : _18.length) || 0],
+            ['Financial Data', data.financialsData ? 'Available' : 'Not Available', 'N/A'],
+            ['Team Data', data.teamData ? 'Available' : 'Not Available', ((_20 = (_19 = data.teamData) === null || _19 === void 0 ? void 0 : _19.teamMembers) === null || _20 === void 0 ? void 0 : _20.length) || 0],
+            ['Growth Data', data.growthData ? 'Available' : 'Not Available', ((_22 = (_21 = data.growthData) === null || _21 === void 0 ? void 0 : _21.factors) === null || _22 === void 0 ? void 0 : _22.length) || 0],
+            ['Strategic Fit Data', data.strategicFitData ? 'Available' : 'Not Available', ((_24 = (_23 = data.strategicFitData) === null || _23 === void 0 ? void 0 : _23.factors) === null || _24 === void 0 ? void 0 : _24.length) || 0],
+            [''],
+            ['Export Metadata'],
+            ['Export Format', 'Microsoft Excel Workbook (.xlsx)'],
+            ['Total Sheets', '10'],
+            ['Generator', 'TCA-IRR Analysis Platform'],
+            ['Version', '2.0']
+        ];
+        var wsRawData = XLSX.utils.aoa_to_sheet(rawDataForSheet);
+        wsRawData['!cols'] = [{ wch: 25 }, { wch: 20 }, { wch: 15 }];
+        XLSX.utils.book_append_sheet(wb, wsRawData, 'Data Summary');
+        // Write the workbook and trigger download
+        var fileName = companyName + "-COMPREHENSIVE-Analysis-" + reportType.toUpperCase() + "-" + new Date().toISOString().split('T')[0] + ".xlsx";
+        XLSX.writeFile(wb, fileName);
         toast({
-            title: 'Comprehensive Data Export Complete',
-            description: 'Full analysis data exported as CSV. Excel workbook functionality coming soon.'
+            title: 'Excel Workbook Exported Successfully',
+            description: "Complete 10-sheet Excel workbook with all analysis modules has been downloaded."
         });
     };
     var handleShare = function (type) {
@@ -1356,7 +1457,7 @@ function ExportButtons() {
                 React.createElement(lucide_react_1.FileSpreadsheet, { className: "size-4 text-green-600" }),
                 React.createElement("div", { className: "flex flex-col" },
                     React.createElement("span", null, "Comprehensive Data Export"),
-                    React.createElement("span", { className: "text-xs text-muted-foreground" }, "CSV with all analysis data"))),
+                    React.createElement("span", { className: "text-xs text-muted-foreground" }, "Excel workbook (10 sheets)"))),
             React.createElement(dropdown_menu_1.DropdownMenuSeparator, null),
             React.createElement(dropdown_menu_1.DropdownMenuLabel, { className: "text-xs font-medium text-muted-foreground uppercase tracking-wider" }, "Share & Collaborate"),
             React.createElement(dropdown_menu_1.DropdownMenuItem, { onClick: function () { return handleShare('link'); }, className: "flex items-center gap-3 py-2" },

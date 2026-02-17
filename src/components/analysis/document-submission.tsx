@@ -1,5 +1,4 @@
 'use client';
-import { useState, useRef } from 'react';
 import {
   Card,
   CardContent,
@@ -19,6 +18,7 @@ import {
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
+import { useState, useRef } from 'react';
 import { Badge } from '../ui/badge';
 
 export type UploadedFile = {
@@ -232,7 +232,7 @@ export function DocumentSubmission({
                         <FileText className="size-5 text-primary" />
                         <span className="font-medium">{file.name}</span>
                         <Badge variant="secondary">
-                          <span>{formatBytes(file.size)}</span>
+                          {formatBytes(file.size)}
                         </Badge>
                       </div>
                       <Button
@@ -258,7 +258,7 @@ export function DocumentSubmission({
                 placeholder="https://example.com/pitch-deck.pdf\nhttps://medium.com/my-startup/our-vision"
                 rows={5}
                 value={urlInput}
-                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setUrlInput(e.target.value)}
+                onChange={(e) => setUrlInput(e.target.value)}
               />
               <Button onClick={handleImportUrls}>Import from URLs</Button>
             </div>
@@ -301,7 +301,7 @@ export function DocumentSubmission({
                 placeholder="Paste your content here..."
                 rows={8}
                 value={textInput}
-                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setTextInput(e.target.value)}
+                onChange={(e) => setTextInput(e.target.value)}
               />
               <Button onClick={handleSubmitText}>Submit Text</Button>
             </div>

@@ -21,6 +21,12 @@ __all__ = [
     "UserLogin",
     "Token",
 
+    # Password Reset Models
+    "ForgotPasswordRequest",
+    "ForgotPasswordResponse",
+    "ResetPasswordRequest",
+    "ResetPasswordResponse",
+
     # Company Models
     "CompanyBase",
     "CompanyCreate",

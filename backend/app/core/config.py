@@ -11,6 +11,34 @@ except ImportError:
     from pydantic import BaseSettings, validator as field_validator
 import logging
 
+logger = logging.getLogger(__name__)
+
+
+def get_secret_from_keyvault(secret_name: str, default: str = None) -> str:
+    """
+    Fetch secret from Azure Key Vault if available, otherwise use default.
+    Requires: azure-identity, azure-keyvault-secrets packages
+    """
+    keyvault_url = os.environ.get("AZURE_KEYVAULT_URL")
+    if not keyvault_url:
+        return default or os.environ.get(secret_name, "")
+    
+    try:
+        from azure.identity import DefaultAzureCredential
+        from azure.keyvault.secrets import SecretClient
+        
+        credential = DefaultAzureCredential()
+        client = SecretClient(vault_url=keyvault_url, credential=credential)
+        secret = client.get_secret(secret_name)
+        logger.info(f"Successfully loaded secret '{secret_name}' from Azure Key Vault")
+        return secret.value
+    except ImportError:
+        logger.warning("Azure Key Vault SDK not installed. Using environment variables.")
+        return default or os.environ.get(secret_name, "")
+    except Exception as e:
+        logger.warning(f"Failed to get secret '{secret_name}' from Key Vault: {e}. Using default.")
+        return default or os.environ.get(secret_name, "")
+
 
 class Settings(BaseSettings):
     """Application settings with environment variable support"""
@@ -25,12 +53,15 @@ class Settings(BaseSettings):
     api_v1_prefix: str = "/api/v1"
     allowed_hosts: List[str] = ["*"]
 
+    # Azure Key Vault Settings (for production secrets)
+    azure_keyvault_url: Optional[str] = None  # e.g., "https://tca-irr-vault.vault.azure.net"
+
     # Database Settings
     postgres_host: str = "tca-irr-server.postgres.database.azure.com"
     postgres_port: int = 5432
     postgres_db: str = "tca_platform"
     postgres_user: str = "tcairrserver"
-    postgres_password: str = "Tc@1rr53rv5r"
+    postgres_password: str = "Tc@1rr53rv5r"  # Will be overridden from Key Vault in production
     postgres_ssl_mode: str = "require"
 
     # Database Pool Settings
@@ -39,7 +70,7 @@ class Settings(BaseSettings):
     db_pool_max_queries: int = 50000
     db_pool_max_inactive_time: float = 300
 
-    # Security Settings
+    # Security Settings (overridden from Key Vault in production)
     secret_key: str = "your-secret-key-here"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
@@ -94,6 +125,34 @@ class Settings(BaseSettings):
 
 # Global settings instance
 settings = Settings()
+
+
+def load_secrets_from_keyvault():
+    """Load sensitive settings from Azure Key Vault in production"""
+    global settings
+    
+    if not settings.azure_keyvault_url:
+        logger.info("Azure Key Vault URL not configured. Using local settings.")
+        return
+    
+    logger.info(f"Loading secrets from Azure Key Vault: {settings.azure_keyvault_url}")
+    
+    # Load secret key
+    secret_key = get_secret_from_keyvault("jwt-secret-key", settings.secret_key)
+    if secret_key and secret_key != settings.secret_key:
+        settings.secret_key = secret_key
+    
+    # Load database password
+    db_password = get_secret_from_keyvault("postgres-password", settings.postgres_password)
+    if db_password and db_password != settings.postgres_password:
+        settings.postgres_password = db_password
+    
+    logger.info("Secrets loaded from Azure Key Vault successfully")
+
+
+# Auto-load secrets from Key Vault on module import (production only)
+if settings.is_production and settings.azure_keyvault_url:
+    load_secrets_from_keyvault()
 
 
 def configure_logging():

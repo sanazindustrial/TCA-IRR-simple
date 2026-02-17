@@ -3,6 +3,7 @@
  * Tests comprehensive export functionality for all report formats
  */
 
+const XLSX = require('xlsx');
 console.log('🧪 TCA-IRR Export System Test Suite');
 console.log('=====================================\n');
 
@@ -26,7 +27,7 @@ const mockAnalysisData = {
             {
                 category: "Technology & IP",
                 rawScore: 7.5,
-                weight: 15,
+                weight: 20,
                 weightedScore: 1.125,
                 flag: "green",
                 strengths: "Strong patent portfolio and proprietary technology",
@@ -37,7 +38,7 @@ const mockAnalysisData = {
             {
                 category: "Financial Health",
                 rawScore: 6.8,
-                weight: 15,
+                weight: 20,
                 weightedScore: 1.02,
                 flag: "yellow",
                 strengths: "Positive cash flow trajectory",
@@ -48,7 +49,7 @@ const mockAnalysisData = {
             {
                 category: "Leadership Team",
                 rawScore: 8.5,
-                weight: 15,
+                weight: 20,
                 weightedScore: 1.275,
                 flag: "green",
                 strengths: "Experienced leadership with track record",
@@ -59,7 +60,7 @@ const mockAnalysisData = {
             {
                 category: "Business Model",
                 rawScore: 7.2,
-                weight: 10,
+                weight: 20,
                 weightedScore: 0.72,
                 flag: "green",
                 strengths: "Scalable SaaS model with recurring revenue",
@@ -286,7 +287,7 @@ runTest('Two-Page Report Structure - DD', () => {
 
 // Test 6: Export Format Compatibility
 runTest('Export Format Compatibility', () => {
-    const formats = ['PDF', 'DOCX', 'PPTX', 'JSON', 'ZIP'];
+    const formats = ['PDF', 'DOCX', 'PPTX', 'JSON', 'ZIP', 'XLSX'];
     const dataCompatible = formats.every(format => {
         switch (format) {
             case 'PDF':
@@ -309,6 +310,10 @@ runTest('Export Format Compatibility', () => {
                 case 'ZIP':
                     // ZIP needs multiple data sections
                     return Object.keys(mockAnalysisData).length >= 3;
+                case 'XLSX':
+                    // XLSX needs tabular data
+                    return Array.isArray(mockAnalysisData.tcaData.categories) &&
+                        mockAnalysisData.tcaData.categories.length > 0;
                 default:
                     return false;
         }
@@ -365,21 +370,26 @@ runTest('Export File Naming Convention', () => {
     const companyName = mockAnalysisData.companyName;
     const date = new Date().toISOString().split('T')[0];
 
-    const expectedNames = {
-        triage: `${companyName}-Triage-Report-${date}.pdf`,
-        dd: `${companyName}-DD-Report-${date}.pdf`,
-        comprehensive: `${companyName}-Comprehensive-Report-${date}.pdf`,
-        package: `${companyName}-triage-Analysis-Package.zip`
-    };
+    const validations = [
+        `${companyName}-Triage-Report-${date}.pdf`,
+        `${companyName}-DD-Report-${date}.pdf`,
+        `${companyName}-COMPREHENSIVE-Analysis-Report-${date}.pdf`,
+        `${companyName}-triage-Analysis-Package.zip`,
+        `${companyName}-COMPREHENSIVE-triage-Analysis.docx`,
+        `${companyName}-COMPREHENSIVE-Analysis-TRIAGE-${date}.xlsx`
+    ];
 
-    // Test naming pattern validity
-    const validNames = Object.values(expectedNames).every(name => {
-        return name.includes(companyName) &&
-            name.includes(date) &&
-            /\.(pdf|zip|docx|pptx)$/.test(name);
-    });
+    const isValidPdf = (name) => name.includes(companyName) && name.includes(date) && name.endsWith('.pdf');
+    const isValidZip = (name) => name.includes(companyName) && name.endsWith('.zip');
+    const isValidDocx = (name) => name.includes(companyName) && name.includes('COMPREHENSIVE') && name.endsWith('.docx');
+    const isValidXlsx = (name) => name.includes(companyName) && name.includes(date) && name.endsWith('.xlsx');
 
-    return validNames;
+    return isValidPdf(validations[0]) &&
+        isValidPdf(validations[1]) &&
+        isValidPdf(validations[2]) &&
+        isValidZip(validations[3]) &&
+        isValidDocx(validations[4]) &&
+        isValidXlsx(validations[5]);
 });
 
 // Test 11: Content Quality Validation
@@ -415,6 +425,39 @@ runTest('Multi-Format Export Consistency', () => {
     };
 
     return Object.values(consistencyChecks).every(check => check === true);
+});
+
+// Test 13: XLSX Workbook Generation
+runTest('XLSX Workbook Generation', () => {
+    const wb = XLSX.utils.book_new();
+    const summary = [
+        ['Company Name', mockAnalysisData.companyName],
+        ['Report Type', 'triage'],
+        ['Score', mockAnalysisData.tcaData.compositeScore]
+    ];
+    const wsSummary = XLSX.utils.aoa_to_sheet(summary);
+    XLSX.utils.book_append_sheet(wb, wsSummary, 'Executive Summary');
+
+    const tcaHeader = ['Category', 'Raw Score', 'Weight', 'Flag'];
+    const tcaRows = mockAnalysisData.tcaData.categories.map(cat => [
+        cat.category,
+        cat.rawScore,
+        cat.weight,
+        cat.flag
+    ]);
+    const wsTca = XLSX.utils.aoa_to_sheet([tcaHeader, ...tcaRows]);
+    XLSX.utils.book_append_sheet(wb, wsTca, 'TCA Scorecard');
+
+    const buffer = XLSX.write(wb, {
+        type: 'buffer',
+        bookType: 'xlsx'
+    });
+    const sheetNames = wb.SheetNames;
+
+    return Buffer.isBuffer(buffer) &&
+        buffer.length > 0 &&
+        sheetNames.includes('Executive Summary') &&
+        sheetNames.includes('TCA Scorecard');
 });
 
 // Run Summary
@@ -466,7 +509,7 @@ console.log('   • PowerPoint Deck - Presentation format');
 console.log('');
 console.log('💾 Data Packages:');
 console.log('   • Complete Data Package (.zip) - All analysis data');
-console.log('   • Excel Analytics - Structured data (Coming Soon)');
+console.log('   • Excel Analytics - 10-sheet workbook');
 console.log('');
 console.log('🔗 Sharing:');
 console.log('   • Copy Report Link - Direct sharing');

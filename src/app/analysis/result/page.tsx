@@ -271,7 +271,7 @@ function ReportView({
                     ) : id === 'flag-analysis-narrative' ? (
                         <Component riskData={analysisData.riskData} tcaData={analysisData.tcaData} />
                     ) : (
-                        <Component initialData={getComponentData(id, analysisData)} />
+                        <Component data={getComponentData(id, analysisData)} />
                     )}
                 </div>
             ))}

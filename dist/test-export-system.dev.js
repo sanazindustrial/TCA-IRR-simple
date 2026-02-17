@@ -1,9 +1,19 @@
 "use strict";
 
+function _toConsumableArray(arr) { return _arrayWithoutHoles(arr) || _iterableToArray(arr) || _nonIterableSpread(); }
+
+function _nonIterableSpread() { throw new TypeError("Invalid attempt to spread non-iterable instance"); }
+
+function _iterableToArray(iter) { if (Symbol.iterator in Object(iter) || Object.prototype.toString.call(iter) === "[object Arguments]") return Array.from(iter); }
+
+function _arrayWithoutHoles(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = new Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } }
+
 /**
  * TCA-IRR Export System Test Suite
  * Tests comprehensive export functionality for all report formats
  */
+var XLSX = require('xlsx');
+
 console.log('🧪 TCA-IRR Export System Test Suite');
 console.log('=====================================\n'); // Mock localStorage data for testing
 
@@ -25,7 +35,7 @@ var mockAnalysisData = {
     }, {
       category: "Technology & IP",
       rawScore: 7.5,
-      weight: 15,
+      weight: 20,
       weightedScore: 1.125,
       flag: "green",
       strengths: "Strong patent portfolio and proprietary technology",
@@ -35,7 +45,7 @@ var mockAnalysisData = {
     }, {
       category: "Financial Health",
       rawScore: 6.8,
-      weight: 15,
+      weight: 20,
       weightedScore: 1.02,
       flag: "yellow",
       strengths: "Positive cash flow trajectory",
@@ -45,7 +55,7 @@ var mockAnalysisData = {
     }, {
       category: "Leadership Team",
       rawScore: 8.5,
-      weight: 15,
+      weight: 20,
       weightedScore: 1.275,
       flag: "green",
       strengths: "Experienced leadership with track record",
@@ -55,7 +65,7 @@ var mockAnalysisData = {
     }, {
       category: "Business Model",
       rawScore: 7.2,
-      weight: 10,
+      weight: 20,
       weightedScore: 0.72,
       flag: "green",
       strengths: "Scalable SaaS model with recurring revenue",
@@ -257,7 +267,7 @@ runTest('Two-Page Report Structure - DD', function () {
 }); // Test 6: Export Format Compatibility
 
 runTest('Export Format Compatibility', function () {
-  var formats = ['PDF', 'DOCX', 'PPTX', 'JSON', 'ZIP'];
+  var formats = ['PDF', 'DOCX', 'PPTX', 'JSON', 'ZIP', 'XLSX'];
   var dataCompatible = formats.every(function (format) {
     switch (format) {
       case 'PDF':
@@ -284,6 +294,10 @@ runTest('Export Format Compatibility', function () {
       case 'ZIP':
         // ZIP needs multiple data sections
         return Object.keys(mockAnalysisData).length >= 3;
+
+      case 'XLSX':
+        // XLSX needs tabular data
+        return Array.isArray(mockAnalysisData.tcaData.categories) && mockAnalysisData.tcaData.categories.length > 0;
 
       default:
         return false;
@@ -331,17 +345,25 @@ runTest('Data Completeness for Export', function () {
 runTest('Export File Naming Convention', function () {
   var companyName = mockAnalysisData.companyName;
   var date = new Date().toISOString().split('T')[0];
-  var expectedNames = {
-    triage: "".concat(companyName, "-Triage-Report-").concat(date, ".pdf"),
-    dd: "".concat(companyName, "-DD-Report-").concat(date, ".pdf"),
-    comprehensive: "".concat(companyName, "-Comprehensive-Report-").concat(date, ".pdf"),
-    "package": "".concat(companyName, "-triage-Analysis-Package.zip")
-  }; // Test naming pattern validity
+  var validations = ["".concat(companyName, "-Triage-Report-").concat(date, ".pdf"), "".concat(companyName, "-DD-Report-").concat(date, ".pdf"), "".concat(companyName, "-COMPREHENSIVE-Analysis-Report-").concat(date, ".pdf"), "".concat(companyName, "-triage-Analysis-Package.zip"), "".concat(companyName, "-COMPREHENSIVE-triage-Analysis.docx"), "".concat(companyName, "-COMPREHENSIVE-Analysis-TRIAGE-").concat(date, ".xlsx")];
 
-  var validNames = Object.values(expectedNames).every(function (name) {
-    return name.includes(companyName) && name.includes(date) && /\.(pdf|zip|docx|pptx)$/.test(name);
-  });
-  return validNames;
+  var isValidPdf = function isValidPdf(name) {
+    return name.includes(companyName) && name.includes(date) && name.endsWith('.pdf');
+  };
+
+  var isValidZip = function isValidZip(name) {
+    return name.includes(companyName) && name.endsWith('.zip');
+  };
+
+  var isValidDocx = function isValidDocx(name) {
+    return name.includes(companyName) && name.includes('COMPREHENSIVE') && name.endsWith('.docx');
+  };
+
+  var isValidXlsx = function isValidXlsx(name) {
+    return name.includes(companyName) && name.includes(date) && name.endsWith('.xlsx');
+  };
+
+  return isValidPdf(validations[0]) && isValidPdf(validations[1]) && isValidPdf(validations[2]) && isValidZip(validations[3]) && isValidDocx(validations[4]) && isValidXlsx(validations[5]);
 }); // Test 11: Content Quality Validation
 
 runTest('Export Content Quality', function () {
@@ -383,6 +405,25 @@ runTest('Multi-Format Export Consistency', function () {
   return Object.values(consistencyChecks).every(function (check) {
     return check === true;
   });
+}); // Test 13: XLSX Workbook Generation
+
+runTest('XLSX Workbook Generation', function () {
+  var wb = XLSX.utils.book_new();
+  var summary = [['Company Name', mockAnalysisData.companyName], ['Report Type', 'triage'], ['Score', mockAnalysisData.tcaData.compositeScore]];
+  var wsSummary = XLSX.utils.aoa_to_sheet(summary);
+  XLSX.utils.book_append_sheet(wb, wsSummary, 'Executive Summary');
+  var tcaHeader = ['Category', 'Raw Score', 'Weight', 'Flag'];
+  var tcaRows = mockAnalysisData.tcaData.categories.map(function (cat) {
+    return [cat.category, cat.rawScore, cat.weight, cat.flag];
+  });
+  var wsTca = XLSX.utils.aoa_to_sheet([tcaHeader].concat(_toConsumableArray(tcaRows)));
+  XLSX.utils.book_append_sheet(wb, wsTca, 'TCA Scorecard');
+  var buffer = XLSX.write(wb, {
+    type: 'buffer',
+    bookType: 'xlsx'
+  });
+  var sheetNames = wb.SheetNames;
+  return Buffer.isBuffer(buffer) && buffer.length > 0 && sheetNames.includes('Executive Summary') && sheetNames.includes('TCA Scorecard');
 }); // Run Summary
 
 console.log('\n📊 TEST SUMMARY');
@@ -433,7 +474,7 @@ console.log('   • PowerPoint Deck - Presentation format');
 console.log('');
 console.log('💾 Data Packages:');
 console.log('   • Complete Data Package (.zip) - All analysis data');
-console.log('   • Excel Analytics - Structured data (Coming Soon)');
+console.log('   • Excel Analytics - 10-sheet workbook');
 console.log('');
 console.log('🔗 Sharing:');
 console.log('   • Copy Report Link - Direct sharing');

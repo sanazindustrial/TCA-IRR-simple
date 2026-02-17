@@ -1,5 +1,8 @@
 // Module registry for all available analysis modules
-import type { ModuleConfig, UserRole, ReportType, Framework } from '@/components/analysis/module-configuration';
+import type { ModuleConfig, ReportType, Framework } from '@/components/analysis/module-configuration';
+
+// Define UserRole type locally since it's not exported from module-configuration
+type UserRole = 'user' | 'admin' | 'reviewer';
 
 /**
  * Central registry of all available analysis modules

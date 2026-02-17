@@ -1,0 +1,106 @@
+{
+  "passed": 13,
+  "failed": 7,
+  "tests": [
+    {
+      "name": "User Registration",
+      "passed": true,
+      "details": "User ID: 25, Username: e2e_test_02858253"
+    },
+    {
+      "name": "Login with Valid Credentials",
+      "passed": true,
+      "details": "Token Type: bearer, Expires In: 1800s"
+    },
+    {
+      "name": "Access /me with Token",
+      "passed": true,
+      "details": "Username: e2e_test_02858253, Email: e2e_test_02858253@test.com"
+    },
+    {
+      "name": "Logout",
+      "passed": true,
+      "details": "Message: Logout successful. Please remove the token from client storage."
+    },
+    {
+      "name": "Token Blacklisted After Logout",
+      "passed": false,
+      "details": "Status: 200 - Token should have been rejected"
+    },
+    {
+      "name": "Login After Logout",
+      "passed": true,
+      "details": "Successfully logged in again"
+    },
+    {
+      "name": "Reject Invalid Password",
+      "passed": true,
+      "details": "Correctly rejected wrong password"
+    },
+    {
+      "name": "Reject Non-Existent User",
+      "passed": true,
+      "details": "Correctly rejected unknown user"
+    },
+    {
+      "name": "Reject Weak Password (Short)",
+      "passed": true,
+      "details": "Correctly rejected short password"
+    },
+    {
+      "name": "Reject Weak Password (No Complexity)",
+      "passed": false,
+      "details": "Status: 201 - Should have been 422"
+    },
+    {
+      "name": "Reject Password Mismatch",
+      "passed": true,
+      "details": "Correctly rejected mismatched passwords"
+    },
+    {
+      "name": "Reject Duplicate User",
+      "passed": true,
+      "details": "Correctly rejected duplicate registration"
+    },
+    {
+      "name": "Reject Invalid Email",
+      "passed": true,
+      "details": "Correctly rejected invalid email format"
+    },
+    {
+      "name": "Reject Unauthenticated Access",
+      "passed": true,
+      "details": "Correctly rejected request without token"
+    },
+    {
+      "name": "Reject Invalid Token",
+      "passed": true,
+      "details": "Correctly rejected invalid token"
+    },
+    {
+      "name": "Forgot Password Request",
+      "passed": false,
+      "details": "Status: 404, Response: {\"detail\":\"Not Found\"}"
+    },
+    {
+      "name": "Forgot Password Security",
+      "passed": false,
+      "details": "Status: 404 - Should be 200 to prevent enumeration"
+    },
+    {
+      "name": "Validate Invalid Reset Token",
+      "passed": false,
+      "details": "Status: 404 - Should be 400"
+    },
+    {
+      "name": "Reset Password Invalid Token",
+      "passed": false,
+      "details": "Status: 404 - Should be 400"
+    },
+    {
+      "name": "Reset Password Mismatch",
+      "passed": false,
+      "details": "Status: 404 - Should be 422"
+    }
+  ]
+}

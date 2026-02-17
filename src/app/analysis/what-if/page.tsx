@@ -285,9 +285,20 @@ export default function WhatIfAnalysisPage() {
             ];
           }
 
-          if (data.teamData?.teamScore) {
+          if (data.teamData?.members && data.teamData.members.length > 0) {
+            // Calculate team score based on team size and experience levels
+            const teamSize = data.teamData.members.length;
+            const experienceLevels = data.teamData.members.map(member => {
+              const exp = member.experience.toLowerCase();
+              if (exp.includes('senior') || exp.includes('lead')) return 3;
+              if (exp.includes('mid') || exp.includes('intermediate')) return 2;
+              return 1;
+            });
+            const avgExperience = experienceLevels.reduce((sum, exp) => sum + exp, 0) / experienceLevels.length;
+            const teamScore = Math.min(10, (teamSize * 0.5 + avgExperience * 2.5));
+            
             initialScores['team'] = [
-              { id: 'team-effectiveness', category: 'Team Assessment', score: data.teamData.teamScore }
+              { id: 'team-effectiveness', category: 'Team Assessment', score: teamScore }
             ];
           }
 

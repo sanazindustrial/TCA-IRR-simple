@@ -123,6 +123,37 @@ class Token(BaseModel):
     refresh_token: Optional[str] = None
 
 
+# Password Reset Models
+class ForgotPasswordRequest(BaseModel):
+    """Forgot password request model"""
+    email: str = Field(..., pattern=r'^[^@]+@[^@]+\.[^@]+$')
+
+
+class ForgotPasswordResponse(BaseResponse):
+    """Forgot password response model"""
+    message: str = "If an account exists with that email, a password reset link has been sent."
+
+
+class ResetPasswordRequest(BaseModel):
+    """Reset password request model"""
+    token: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=8)
+    confirm_password: str
+
+    @field_validator('confirm_password')
+    @classmethod
+    def passwords_match(cls, v, info):
+        password = info.data.get('new_password')
+        if password and v != password:
+            raise ValueError('Passwords do not match')
+        return v
+
+
+class ResetPasswordResponse(BaseResponse):
+    """Reset password response model"""
+    message: str = "Password has been reset successfully."
+
+
 # Company Models
 class CompanyBase(BaseModel):
     """Base company model"""

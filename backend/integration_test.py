@@ -12,12 +12,39 @@ try:
     from main import app
     from fastapi.testclient import TestClient
     import json
-    from app.db.test_database import mock_get_db
+    from unittest.mock import AsyncMock
 
     print("🔍 Frontend-Backend Integration Test")
     print("=" * 50)
 
-    # Override the database dependency with test mock
+    # Create a mock database connection for testing
+    class MockDatabase:
+
+        async def fetchrow(self, query, *args):
+            # Mock user data for auth endpoints
+            if "users" in query and "username" in query:
+                return {
+                    'id': 1,
+                    'username': 'testuser',
+                    'email': 'test@example.com',
+                    'password':
+                    '$2b$12$o7ihfYy03eT6b5P0Ucj8MOeadGX5Cdyh500HggyDzhmDSzXQvQDum',  # bcrypt hash of "test12345"
+                    'full_name': 'Test User',
+                    'role': 'user',
+                    'is_active': True,
+                    'created_at': '2024-01-20T10:00:00Z'
+                }
+            return None
+
+        async def fetchval(self, query, *args):
+            # Mock for insert operations
+            return 1
+
+    async def mock_get_db():
+        """Mock database dependency for testing"""
+        return MockDatabase()
+
+    # Override the database dependency
     from app.db import get_db
     app.dependency_overrides[get_db] = mock_get_db
 
