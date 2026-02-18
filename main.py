@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 TCA IRR App Backend
 FastAPI backend server for the TCA Investment Risk Rating application
@@ -81,10 +81,7 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000", "http://localhost:3001",
-        "http://127.0.0.1:3000", "http://127.0.0.1:3001"
-    ],  # Next.js dev server
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -94,12 +91,56 @@ app.add_middleware(
 security = HTTPBearer()
 
 
+# Global exception handlers
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from json import JSONDecodeError
+from fastapi.exceptions import RequestValidationError
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class CatchAllErrorMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        try:
+            response = await call_next(request)
+            return response
+        except JSONDecodeError:
+            return JSONResponse(status_code=422, content={"detail": "Invalid JSON in request body"})
+        except Exception as e:
+            if isinstance(e, HTTPException):
+                raise
+            logger.error(f"Unhandled error: {e}")
+            return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+
+app.add_middleware(CatchAllErrorMiddleware)
+
+@app.exception_handler(JSONDecodeError)
+async def json_decode_error_handler(request, exc):
+    return JSONResponse(
+        status_code=422,
+        content={"detail": "Invalid JSON in request body"}
+    )
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(request, exc):
+    return JSONResponse(
+        status_code=422,
+        content={"detail": str(exc)}
+    )
+
+
 # Pydantic models
 class UserCreate(BaseModel):
     full_name: str
     email: EmailStr
     password: str
     role: str = "User"
+
+    @validator('password')
+    def password_not_empty(cls, v):
+        if not v or len(v.strip()) == 0:
+            raise ValueError('Password cannot be empty')
+        if len(v) < 6:
+            raise ValueError('Password must be at least 6 characters')
+        return v
 
 
 class UserLogin(BaseModel):
@@ -117,6 +158,20 @@ class UserResponse(BaseModel):
     created_at: datetime
     last_activity: Optional[datetime] = None
 
+    @classmethod
+    def from_db_row(cls, row: dict):
+        """Create UserResponse from actual DB row (maps column names)"""
+        return cls(
+            user_id=str(row['id']),
+            full_name=row.get('username', ''),
+            email=row['email'],
+            role=row.get('role', 'User'),
+            status='Active' if row.get('is_active', True) else 'Inactive',
+            avatar_url=None,
+            created_at=row.get('created_at', datetime.now()),
+            last_activity=row.get('updated_at')
+        )
+
 
 class AppRequestCreate(BaseModel):
     request_type: str
@@ -130,12 +185,28 @@ class AppRequestResponse(BaseModel):
     user_id: str
     request_type: str
     title: str
-    description: str
+    description: Optional[str] = None
     priority: str
     status: str
     submitted_at: datetime
     resolved_at: Optional[datetime] = None
     resolution_notes: Optional[str] = None
+
+    @classmethod
+    def from_db_row(cls, row: dict):
+        """Create AppRequestResponse from actual DB row"""
+        return cls(
+            request_id=str(row['request_id']),
+            user_id=str(row['user_id']),
+            request_type=row['request_type'],
+            title=row['title'],
+            description=row.get('description'),
+            priority=row.get('priority', 'Medium'),
+            status=str(row.get('status', 'Pending')),
+            submitted_at=row.get('created_at', datetime.now()),
+            resolved_at=row.get('completed_at'),
+            resolution_notes=None
+        )
 
 
 class EvaluationCreate(BaseModel):
@@ -186,8 +257,8 @@ async def get_current_user(
 
         async with db_manager.get_connection() as conn:
             user = await conn.fetchrow(
-                "SELECT * FROM users WHERE user_id = $1 AND status = 'Active'",
-                uuid.UUID(user_id))
+                "SELECT * FROM users WHERE id = $1 AND is_active = true",
+                int(user_id))
             if user is None:
                 raise HTTPException(status_code=401, detail="User not found")
             return dict(user)
@@ -223,41 +294,34 @@ async def register_user(user_data: UserCreate):
     """Register a new user"""
     try:
         async with db_manager.get_connection() as conn:
-            # Check if user already exists
+            # Check if user already exists (email or username)
             existing = await conn.fetchrow(
                 "SELECT email FROM users WHERE email = $1", user_data.email)
             if existing:
                 raise HTTPException(status_code=400,
                                     detail="Email already registered")
+            existing_name = await conn.fetchrow(
+                "SELECT username FROM users WHERE username = $1", user_data.full_name)
+            if existing_name:
+                raise HTTPException(status_code=400,
+                                    detail="Username already taken")
 
             # Hash password and create user
             hashed_password = hash_password(user_data.password)
-            user_id = uuid.uuid4()
 
-            await conn.execute(
+            # Insert using actual DB schema: id is auto-increment, username maps to full_name
+            user = await conn.fetchrow(
                 """
-                INSERT INTO users (user_id, full_name, email, password_hash, role)
-                VALUES ($1, $2, $3, $4, $5)
-            """, user_id, user_data.full_name, user_data.email,
+                INSERT INTO users (username, email, password_hash, role, is_active, created_at, updated_at)
+                VALUES ($1, $2, $3, $4, true, NOW(), NOW())
+                RETURNING *
+            """, user_data.full_name, user_data.email,
                 hashed_password, user_data.role)
 
-            # Create user settings
-            await conn.execute(
-                """
-                INSERT INTO user_settings (user_id) VALUES ($1)
-            """, user_id)
+            return UserResponse.from_db_row(dict(user))
 
-            # Create report quotas
-            await conn.execute(
-                """
-                INSERT INTO report_quotas (user_id) VALUES ($1)
-            """, user_id)
-
-            # Fetch and return user
-            user = await conn.fetchrow(
-                "SELECT * FROM users WHERE user_id = $1", user_id)
-            return UserResponse(**dict(user))
-
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Registration error: {e}")
         raise HTTPException(status_code=500, detail="Registration failed")
@@ -269,7 +333,7 @@ async def login_user(user_data: UserLogin):
     try:
         async with db_manager.get_connection() as conn:
             user = await conn.fetchrow(
-                "SELECT * FROM users WHERE email = $1 AND status = 'Active'",
+                "SELECT * FROM users WHERE email = $1 AND is_active = true",
                 user_data.email)
 
             if not user or not verify_password(user_data.password,
@@ -279,16 +343,16 @@ async def login_user(user_data: UserLogin):
 
             # Update last activity
             await conn.execute(
-                "UPDATE users SET last_activity = NOW() WHERE user_id = $1",
-                user['user_id'])
+                "UPDATE users SET updated_at = NOW() WHERE id = $1",
+                user['id'])
 
             # Create access token
-            access_token = create_access_token({"sub": str(user['user_id'])})
+            access_token = create_access_token({"sub": str(user['id'])})
 
             return {
                 "access_token": access_token,
                 "token_type": "bearer",
-                "user": UserResponse(**dict(user))
+                "user": UserResponse.from_db_row(dict(user))
             }
 
     except HTTPException:
@@ -302,7 +366,7 @@ async def login_user(user_data: UserLogin):
 async def get_current_user_info(
         current_user: dict = Depends(get_current_user)):
     """Get current user information"""
-    return UserResponse(**current_user)
+    return UserResponse.from_db_row(current_user)
 
 
 # App Requests endpoints
@@ -313,20 +377,24 @@ async def create_app_request(request_data: AppRequestCreate,
     try:
         async with db_manager.get_connection() as conn:
             request_id = uuid.uuid4()
+            # Convert integer user id to UUID for app_requests table compatibility
+            user_uuid = uuid.uuid5(uuid.NAMESPACE_DNS, str(current_user['id']))
 
             await conn.execute(
                 """
                 INSERT INTO app_requests (request_id, user_id, request_type, title, description, priority)
                 VALUES ($1, $2, $3, $4, $5, $6)
-            """, request_id, current_user['user_id'],
+            """, request_id, user_uuid,
                 request_data.request_type, request_data.title,
                 request_data.description, request_data.priority)
 
             request = await conn.fetchrow(
                 "SELECT * FROM app_requests WHERE request_id = $1", request_id)
 
-            return AppRequestResponse(**dict(request))
+            return AppRequestResponse.from_db_row(dict(request))
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Create request error: {e}")
         raise HTTPException(status_code=500, detail="Failed to create request")
@@ -338,22 +406,23 @@ async def get_app_requests(status: Optional[str] = None,
     """Get app requests for current user"""
     try:
         async with db_manager.get_connection() as conn:
+            user_uuid = uuid.uuid5(uuid.NAMESPACE_DNS, str(current_user['id']))
             if status:
                 requests = await conn.fetch(
                     """
                     SELECT * FROM app_requests 
                     WHERE user_id = $1 AND status = $2 
-                    ORDER BY submitted_at DESC
-                """, current_user['user_id'], status)
+                    ORDER BY created_at DESC
+                """, user_uuid, status)
             else:
                 requests = await conn.fetch(
                     """
                     SELECT * FROM app_requests 
                     WHERE user_id = $1 
-                    ORDER BY submitted_at DESC
-                """, current_user['user_id'])
+                    ORDER BY created_at DESC
+                """, user_uuid)
 
-            return [AppRequestResponse(**dict(req)) for req in requests]
+            return [AppRequestResponse.from_db_row(dict(req)) for req in requests]
 
     except Exception as e:
         logger.error(f"Get requests error: {e}")
@@ -375,7 +444,7 @@ async def create_evaluation(evaluation_data: EvaluationCreate,
                 """
                 INSERT INTO evaluations (evaluation_id, user_id, company_name, status, evaluation_data)
                 VALUES ($1, $2, $3, $4, $5)
-            """, evaluation_id, current_user['user_id'],
+            """, evaluation_id, current_user['id'],
                 evaluation_data.company_name, 'processing',
                 json.dumps(evaluation_data.evaluation_data))
 
@@ -445,7 +514,7 @@ async def get_evaluation(evaluation_id: str,
                 """
                 SELECT * FROM evaluations 
                 WHERE evaluation_id = $1 AND user_id = $2
-            """, uuid.UUID(evaluation_id), current_user['user_id'])
+            """, uuid.UUID(evaluation_id), current_user['id'])
 
             if not evaluation:
                 raise HTTPException(status_code=404,
@@ -680,7 +749,7 @@ async def run_comprehensive_analysis(request: Request):
                             detail=f"Analysis failed: {str(e)}")
 
 
-# ─── File upload endpoints (persisted to allupload table) ─────────────────────
+# â”€â”€â”€ File upload endpoints (persisted to allupload table) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.post("/api/files/upload")
 async def upload_files(request: Request):
@@ -697,7 +766,7 @@ async def upload_files(request: Request):
                 ftype = file_info.get('type', 'application/pdf')
                 fsize = file_info.get('size', 0)
 
-                # Simulated extraction – replace with real parser later
+                # Simulated extraction â€“ replace with real parser later
                 extracted_data = {
                     "text_content":
                     f"Extracted text from {fname}",
@@ -823,7 +892,7 @@ async def submit_text(request: Request):
     """Submit raw text and persist to allupload table"""
     try:
         data = await request.json()
-        text = data.get('text', '') or data.get('content', '')
+        text = data.get('text', '') or data.get('content', '') or data.get('extracted_text', '')
         title = data.get('title', 'Text Submission')
         company_name = data.get('company_name', None)
 
@@ -836,6 +905,28 @@ async def submit_text(request: Request):
         user_extracted = data.get('extracted_data')
         if isinstance(user_extracted, dict):
             extracted_data = {**extracted_data, **user_extracted}
+
+        # Map company_data fields to the expected extracted_data structure
+        company_data = data.get('company_data')
+        if isinstance(company_data, dict):
+            financial_data = {}
+            key_metrics = {}
+            # Financial fields
+            for fk in ('revenue', 'mrr', 'burn_rate', 'runway_months', 'gross_margin',
+                        'arr', 'ltv', 'cac', 'arpu'):
+                if fk in company_data:
+                    financial_data[fk] = company_data[fk]
+            # Key metrics
+            for mk in ('customers', 'nrr', 'mom_growth', 'team_size', 'funding_stage',
+                        'industry', 'churn_rate', 'dau', 'mau'):
+                if mk in company_data:
+                    key_metrics[mk] = company_data[mk]
+            if financial_data:
+                extracted_data['financial_data'] = financial_data
+            if key_metrics:
+                extracted_data['key_metrics'] = key_metrics
+            # Keep the raw company_data for reference
+            extracted_data['company_data'] = company_data
 
         async with db_manager.get_connection() as conn:
             row = await conn.fetchrow(
@@ -873,7 +964,7 @@ async def submit_text(request: Request):
                             detail=f"Text submit failed: {str(e)}")
 
 
-# ─── AllUpload query endpoints ────────────────────────────────────────────────
+# â”€â”€â”€ AllUpload query endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.get("/api/uploads")
 async def list_uploads(status: Optional[str] = None, limit: int = 50):
@@ -964,7 +1055,7 @@ async def delete_upload(upload_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ─── 9-Module Analysis (reads uploads from allupload) ─────────────────────────
+# â”€â”€â”€ 9-Module Analysis (reads uploads from allupload) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 # The 9 modules and their weights (total weight 17.5 for normalization)
 NINE_MODULES = [
@@ -1012,7 +1103,7 @@ def _run_module(module_cfg: dict, company_data: dict, extracted: dict) -> dict:
     ci  = extracted.get("company_info", {})
     text = company_data.get("extracted_text", "")
 
-    # ── helpers to normalise incoming numeric values ──────────────────
+    # â”€â”€ helpers to normalise incoming numeric values â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     def n(dct, key, default=0):
         v = dct.get(key, default)
         try:
@@ -1020,9 +1111,9 @@ def _run_module(module_cfg: dict, company_data: dict, extracted: dict) -> dict:
         except (TypeError, ValueError):
             return float(default)
 
-    # ══════════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     # 1. TCA SCORECARD
-    # ══════════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     if mid == "tca_scorecard":
         # --- Market Potential (weight 20) --------------------------
         revenue = n(fin, "revenue")
@@ -1041,13 +1132,13 @@ def _run_module(module_cfg: dict, company_data: dict, extracted: dict) -> dict:
         if revenue >= 300_000:
             market_strengths.append(f"Revenue ${revenue:,.0f} shows product-market fit")
         else:
-            market_concerns.append(f"Revenue ${revenue:,.0f} — product-market fit not yet proven")
+            market_concerns.append(f"Revenue ${revenue:,.0f} â€” product-market fit not yet proven")
         if customers >= 30:
             market_strengths.append(f"{int(customers)} paying customers")
         elif customers > 0:
-            market_concerns.append(f"Only {int(customers)} customers — early traction")
+            market_concerns.append(f"Only {int(customers)} customers â€” early traction")
         if nrr > 100:
-            market_strengths.append(f"{nrr:.0f}% NRR — strong retention")
+            market_strengths.append(f"{nrr:.0f}% NRR â€” strong retention")
 
         # --- Technology Innovation (weight 15) ---------------------
         tech_mentions = _extract_text_mentions(text,
@@ -1143,9 +1234,9 @@ def _run_module(module_cfg: dict, company_data: dict, extracted: dict) -> dict:
             "confidence": min(0.95, 0.5 + 0.15 * sum([bool(fin), bool(met), bool(text)])),
         }
 
-    # ══════════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     # 2. RISK ASSESSMENT
-    # ══════════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     if mid == "risk_assessment":
         revenue = n(fin, "revenue")
         burn_rate = n(fin, "burn_rate")
@@ -1161,19 +1252,19 @@ def _run_module(module_cfg: dict, company_data: dict, extracted: dict) -> dict:
         else:
             fin_risk = 5.0
         fin_trigger = f"Burn ${burn_rate:,.0f}/mo with {runway:.0f} months runway" if burn_rate else "Financial data incomplete"
-        fin_impact = "High — limited runway" if runway < 12 else "Medium — adequate runway" if runway < 18 else "Low — strong runway"
+        fin_impact = "High â€” limited runway" if runway < 12 else "Medium â€” adequate runway" if runway < 18 else "Low â€” strong runway"
         fin_mitigation = "Raise follow-on or cut burn" if runway < 12 else "Optimise spend; plan next raise" if runway < 18 else "Maintain current trajectory"
 
         # Market risk: customer concentration
         mkt_risk = _clamp(round(8 - min(4.0, customers / 15), 1), 1, 9) if customers > 0 else 6.0
-        mkt_trigger = f"{int(customers)} customers — {'diversified' if customers >= 30 else 'concentration risk'}"
-        mkt_impact = "Low" if customers >= 50 else "Medium" if customers >= 20 else "High — customer concentration"
+        mkt_trigger = f"{int(customers)} customers â€” {'diversified' if customers >= 30 else 'concentration risk'}"
+        mkt_impact = "Low" if customers >= 50 else "Medium" if customers >= 20 else "High â€” customer concentration"
         mkt_mitigation = "Expand customer base" if customers < 30 else "Continue customer acquisition"
 
         # Team risk
         team_risk = _clamp(round(7 - min(3.0, team_size / 5), 1), 1, 9) if team_size > 0 else 6.0
         team_trigger = f"Team of {int(team_size)}" if team_size else "Team size unknown"
-        team_impact = "Limited" if team_size >= 10 else "Medium — small team" if team_size >= 5 else "High — very small team"
+        team_impact = "Limited" if team_size >= 10 else "Medium â€” small team" if team_size >= 5 else "High â€” very small team"
         team_mitigation = "Cross-train and hire for gaps" if team_size < 10 else "Ensure succession planning"
 
         # Technology risk from text signals
@@ -1231,9 +1322,9 @@ def _run_module(module_cfg: dict, company_data: dict, extracted: dict) -> dict:
                 "data_sources": {"financial_data": bool(fin), "key_metrics": bool(met), "text_analysis": bool(text)},
                 "confidence": min(0.90, 0.4 + 0.15 * sum([bool(fin), bool(met), bool(text)]))}
 
-    # ══════════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     # 3. MARKET ANALYSIS
-    # ══════════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     if mid == "market_analysis":
         revenue = n(fin, "revenue")
         customers = n(met, "customers")
@@ -1299,9 +1390,9 @@ def _run_module(module_cfg: dict, company_data: dict, extracted: dict) -> dict:
                 "confidence": min(0.90, 0.4 + 0.1 * sum([tam != "Not provided", sam != "Not provided",
                                                           revenue > 0, customers > 0, mom_growth > 0]))}
 
-    # ══════════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     # 4. TEAM ASSESSMENT
-    # ══════════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     if mid == "team_assessment":
         team_size = n(met, "team_size")
 
@@ -1364,9 +1455,9 @@ def _run_module(module_cfg: dict, company_data: dict, extracted: dict) -> dict:
                 "data_sources": {"text_analysis": bool(text), "key_metrics": bool(met)},
                 "confidence": min(0.90, 0.3 + 0.15 * sum([team_size > 0, bool(founders), bool(experience_signals), bool(text)]))}
 
-    # ══════════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     # 5. FINANCIAL ANALYSIS
-    # ══════════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     if mid == "financial_analysis":
         revenue = n(fin, "revenue")
         burn_rate = n(fin, "burn_rate")
@@ -1434,9 +1525,9 @@ def _run_module(module_cfg: dict, company_data: dict, extracted: dict) -> dict:
                 "data_sources": {"financial_data": bool(fin), "key_metrics": bool(met)},
                 "confidence": min(0.95, 0.3 + 0.1 * sum([revenue > 0, burn_rate > 0, runway > 0, mrr > 0, gross_margin > 0, mom_growth > 0]))}
 
-    # ══════════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     # 6. TECHNOLOGY ASSESSMENT
-    # ══════════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     if mid == "technology_assessment":
         tech_keywords = ["patent", "proprietary", "AI", "ML", "NLP", "machine learning",
                          "deep learning", "cloud-native", "microservice", "kubernetes",
@@ -1485,10 +1576,10 @@ def _run_module(module_cfg: dict, company_data: dict, extracted: dict) -> dict:
         if not risks:
             risks.append("Monitor technology evolution and competitive responses")
 
-        ip_strength = "Strong" if patent_match and security_found else "Moderate" if patent_match or security_found else "Weak — no IP signals found"
+        ip_strength = "Strong" if patent_match and security_found else "Moderate" if patent_match or security_found else "Weak â€” no IP signals found"
 
         return {"module_id": mid, "score": score, "technology_score": score,
-                "ip_strength": f"{ip_strength} — {patents_desc}",
+                "ip_strength": f"{ip_strength} â€” {patents_desc}",
                 "trl": min(trl, 9),
                 "scalability": "Production-ready" if trl >= 7 else "Scaling needed" if trl >= 5 else "Early stage",
                 "stack": stack_found if stack_found else ["Not identified from submitted data"],
@@ -1498,9 +1589,9 @@ def _run_module(module_cfg: dict, company_data: dict, extracted: dict) -> dict:
                 "data_sources": {"text_analysis": bool(text)},
                 "confidence": min(0.85, 0.3 + 0.1 * sum([bool(tech_found), bool(security_found), bool(stack_found), bool(patent_match)]))}
 
-    # ══════════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     # 7. BUSINESS MODEL
-    # ══════════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     if mid == "business_model":
         revenue = n(fin, "revenue")
         mrr = n(fin, "mrr") or n(met, "mrr")
@@ -1565,9 +1656,9 @@ def _run_module(module_cfg: dict, company_data: dict, extracted: dict) -> dict:
                 "data_sources": {"financial_data": bool(fin), "key_metrics": bool(met), "text_analysis": bool(text)},
                 "confidence": min(0.90, 0.3 + 0.1 * sum([revenue > 0, mrr > 0, customers > 0, gross_margin > 0, bool(model_signals)]))}
 
-    # ══════════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     # 8. GROWTH ASSESSMENT
-    # ══════════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     if mid == "growth_assessment":
         revenue = n(fin, "revenue")
         mrr = n(fin, "mrr") or n(met, "mrr")
@@ -1608,18 +1699,18 @@ def _run_module(module_cfg: dict, company_data: dict, extracted: dict) -> dict:
 
         # Growth projections from actual growth rate
         growth_multiplier = 1 + (mom_growth / 100) if mom_growth > 0 else 1.05
-        proj_y1 = round(growth_multiplier ** 12, 1) if mom_growth > 0 else "N/A — growth data not provided"
+        proj_y1 = round(growth_multiplier ** 12, 1) if mom_growth > 0 else "N/A â€” growth data not provided"
         proj_y2 = round(growth_multiplier ** 24, 1) if mom_growth > 0 else "N/A"
         proj_y3 = round(growth_multiplier ** 36, 1) if mom_growth > 0 else "N/A"
 
         # Drivers and challenges from actual data signals
         growth_drivers = []
         if nrr > 100:
-            growth_drivers.append(f"Net revenue retention {nrr}% — expansion revenue")
+            growth_drivers.append(f"Net revenue retention {nrr}% â€” expansion revenue")
         if mom_growth > 10:
-            growth_drivers.append(f"{mom_growth}% MoM growth — strong momentum")
+            growth_drivers.append(f"{mom_growth}% MoM growth â€” strong momentum")
         if customers > 20:
-            growth_drivers.append(f"{int(customers)} customers — expanding base")
+            growth_drivers.append(f"{int(customers)} customers â€” expanding base")
         text_drivers = _extract_text_mentions(text,
             ["network effect", "platform", "expansion", "partnership", "integration"])
         growth_drivers.extend(text_drivers)
@@ -1646,9 +1737,9 @@ def _run_module(module_cfg: dict, company_data: dict, extracted: dict) -> dict:
                 "data_sources": {"financial_data": bool(fin), "key_metrics": bool(met), "text_analysis": bool(text)},
                 "confidence": min(0.90, 0.3 + 0.15 * sum([mom_growth > 0, nrr > 0, customers > 0, revenue > 0]))}
 
-    # ══════════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     # 9. INVESTMENT READINESS
-    # ══════════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     if mid == "investment_readiness":
         revenue = n(fin, "revenue")
         mrr = n(fin, "mrr") or n(met, "mrr")
@@ -1739,7 +1830,7 @@ async def run_nine_module_analysis(request: Request):
         company_name = data.get("company_name", "Unknown")
         upload_ids = data.get("upload_ids", [])          # optional filter
 
-        # ── 1. Read uploads from allupload ────────────────────────────────
+        # â”€â”€ 1. Read uploads from allupload â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         async with db_manager.get_connection() as conn:
             if upload_ids:
                 rows = await conn.fetch(
@@ -1760,7 +1851,7 @@ async def run_nine_module_analysis(request: Request):
                     company_name
                 )
 
-        # ── 2. Merge extracted data from all uploads ──────────────────────
+        # â”€â”€ 2. Merge extracted data from all uploads â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         merged_text = []
         merged_data = {}
         source_ids = []
@@ -1805,7 +1896,7 @@ async def run_nine_module_analysis(request: Request):
 
         logger.info(f"Running 9-module analysis for '{company_name}' using {len(rows)} uploads")
 
-        # ── 3. Run all 9 modules ──────────────────────────────────────────
+        # â”€â”€ 3. Run all 9 modules â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         await asyncio.sleep(1)  # simulate processing
 
         module_results = {}
@@ -1823,15 +1914,15 @@ async def run_nine_module_analysis(request: Request):
 
         final_score = round(weighted_score / total_weight, 1) if total_weight > 0 else 0
 
-        # ── 4. Determine recommendation ───────────────────────────────────
+        # â”€â”€ 4. Determine recommendation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if final_score >= 8.0:
-            recommendation = "STRONG BUY — High confidence investment opportunity"
+            recommendation = "STRONG BUY â€” High confidence investment opportunity"
         elif final_score >= 7.0:
-            recommendation = "PROCEED — Proceed with due diligence"
+            recommendation = "PROCEED â€” Proceed with due diligence"
         elif final_score >= 5.5:
-            recommendation = "CONDITIONAL — Address key risks before investing"
+            recommendation = "CONDITIONAL â€” Address key risks before investing"
         else:
-            recommendation = "PASS — Risk/reward profile not aligned"
+            recommendation = "PASS â€” Risk/reward profile not aligned"
 
         analysis_output = {
             "analysis_type": "comprehensive_9_module",
@@ -1846,7 +1937,7 @@ async def run_nine_module_analysis(request: Request):
             "module_results": module_results,
         }
 
-        # ── 5. Store analysis result back into allupload rows ─────────────
+        # â”€â”€ 5. Store analysis result back into allupload rows â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if source_ids:
             async with db_manager.get_connection() as conn:
                 for uid in source_ids:
@@ -1871,7 +1962,7 @@ async def run_nine_module_analysis(request: Request):
         raise HTTPException(status_code=500, detail=f"9-module analysis failed: {str(e)}")
 
 
-# ─── Triage Report Generation ─────────────────────────────────────────────────
+# â”€â”€â”€ Triage Report Generation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.post("/api/reports/triage")
 async def generate_triage_report(request: Request):
@@ -1921,13 +2012,13 @@ async def generate_triage_report(request: Request):
             "recommendation": analysis.get("investment_recommendation", ""),
             "total_pages": 6,
 
-            # ── Page 1: Executive Summary ──────────────────────────────
+            # â”€â”€ Page 1: Executive Summary â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             "page_1_executive_summary": {
-                "title": f"Triage Report — {company_name}",
+                "title": f"Triage Report â€” {company_name}",
                 "overall_score": analysis.get("final_tca_score", 0),
                 "score_interpretation": (
                     "Strong candidate for investment" if analysis.get("final_tca_score", 0) >= 7.5
-                    else "Moderate potential — further analysis required" if analysis.get("final_tca_score", 0) >= 5.5
+                    else "Moderate potential â€” further analysis required" if analysis.get("final_tca_score", 0) >= 5.5
                     else "Significant concerns identified"
                 ),
                 "investment_recommendation": analysis.get("investment_recommendation", ""),
@@ -1935,16 +2026,16 @@ async def generate_triage_report(request: Request):
                 "modules_run": analysis.get("module_count", 9),
             },
 
-            # ── Page 2: TCA Scorecard ─────────────────────────────────
+            # â”€â”€ Page 2: TCA Scorecard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             "page_2_tca_scorecard": {
-                "title": "TCA Scorecard — Category Breakdown",
+                "title": "TCA Scorecard â€” Category Breakdown",
                 "composite_score": tca.get("composite_score", 0),
                 "categories": tca.get("categories", []),
                 "top_strengths": [c["category"] for c in tca.get("categories", []) if c.get("flag") == "green"][:3],
                 "areas_of_concern": [c["category"] for c in tca.get("categories", []) if c.get("flag") != "green"][:3],
             },
 
-            # ── Page 3: Risk Assessment ───────────────────────────────
+            # â”€â”€ Page 3: Risk Assessment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             "page_3_risk_assessment": {
                 "title": "Risk Assessment & Flags",
                 "overall_risk_score": risk.get("overall_risk_score", 0),
@@ -1954,7 +2045,7 @@ async def generate_triage_report(request: Request):
                 "risk_domains": risk.get("risk_domains", {}),
             },
 
-            # ── Page 4: Market & Team ─────────────────────────────────
+            # â”€â”€ Page 4: Market & Team â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             "page_4_market_and_team": {
                 "title": "Market Opportunity & Team Assessment",
                 "market_score": market.get("market_score", 0),
@@ -1970,7 +2061,7 @@ async def generate_triage_report(request: Request):
                 "team_gaps": team.get("gaps", []),
             },
 
-            # ── Page 5: Financial & Technology ────────────────────────
+            # â”€â”€ Page 5: Financial & Technology â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             "page_5_financials_and_tech": {
                 "title": "Financial Health & Technology Assessment",
                 "financial_score": fin.get("financial_health_score", 0),
@@ -1986,7 +2077,7 @@ async def generate_triage_report(request: Request):
                 "tech_stack": tech.get("stack", []),
             },
 
-            # ── Page 6: Recommendations & Next Steps ─────────────────
+            # â”€â”€ Page 6: Recommendations & Next Steps â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             "page_6_recommendations": {
                 "title": "Investment Recommendation & Next Steps",
                 "final_decision": analysis.get("investment_recommendation", ""),
@@ -2008,7 +2099,7 @@ async def generate_triage_report(request: Request):
             },
         }
 
-        logger.info(f"Triage report generated for '{company_name}' — 6 pages")
+        logger.info(f"Triage report generated for '{company_name}' â€” 6 pages")
         return triage_report
 
     except HTTPException:
@@ -2018,7 +2109,7 @@ async def generate_triage_report(request: Request):
         raise HTTPException(status_code=500, detail=f"Triage report failed: {str(e)}")
 
 
-# ─── DD (Due Diligence) Report Generation ─────────────────────────────────────
+# â”€â”€â”€ DD (Due Diligence) Report Generation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.post("/api/reports/dd")
 async def generate_dd_report(request: Request):
@@ -2066,9 +2157,9 @@ async def generate_dd_report(request: Request):
             "final_tca_score": analysis.get("final_tca_score", 0),
             "total_pages": 25,
 
-            # ── Section 1: Cover & Table of Contents ──────────────────
+            # â”€â”€ Section 1: Cover & Table of Contents â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             "section_01_cover": {
-                "title": f"Due Diligence Report — {company_name}",
+                "title": f"Due Diligence Report â€” {company_name}",
                 "subtitle": "Comprehensive Investment Analysis",
                 "prepared_by": "TCA IRR Analysis Platform",
                 "date": datetime.utcnow().strftime("%B %d, %Y"),
@@ -2087,7 +2178,7 @@ async def generate_dd_report(request: Request):
                 ],
             },
 
-            # ── Section 2: Executive Summary (2 pages) ────────────────
+            # â”€â”€ Section 2: Executive Summary (2 pages) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             "section_02_executive_summary": {
                 "title": "Executive Summary",
                 "overall_score": analysis.get("final_tca_score", 0),
@@ -2106,7 +2197,7 @@ async def generate_dd_report(request: Request):
                 "analysis_completeness": analysis.get("analysis_completeness", 100),
             },
 
-            # ── Section 3: Investment Thesis ──────────────────────────
+            # â”€â”€ Section 3: Investment Thesis â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             "section_03_investment_thesis": {
                 "title": "Investment Thesis",
                 "thesis_statement": f"{company_name} presents a {'compelling' if analysis.get('final_tca_score', 0) >= 7.5 else 'moderate'} investment opportunity with strong potential in its target market.",
@@ -2120,21 +2211,21 @@ async def generate_dd_report(request: Request):
                 "risk_mitigants": [f.get("mitigation", "") for f in risk.get("flags", []) if f.get("severity", 0) >= 5],
             },
 
-            # ── Section 4: TCA Scorecard (2 pages) ────────────────────
+            # â”€â”€ Section 4: TCA Scorecard (2 pages) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             "section_04_tca_scorecard": {
-                "title": "TCA Scorecard — Detailed Category Breakdown",
+                "title": "TCA Scorecard â€” Detailed Category Breakdown",
                 "composite_score": tca.get("composite_score", 0),
                 "categories": tca.get("categories", []),
                 "scoring_methodology": "Weighted average across 5 core categories (weights sum to 100%)",
                 "interpretation_scale": {
-                    "8.0_plus": "Excellent — strong investment candidate",
-                    "7.0_to_8.0": "Good — proceed with due diligence",
-                    "5.5_to_7.0": "Moderate — conditional proceed",
-                    "below_5.5": "Weak — significant barriers to investment",
+                    "8.0_plus": "Excellent â€” strong investment candidate",
+                    "7.0_to_8.0": "Good â€” proceed with due diligence",
+                    "5.5_to_7.0": "Moderate â€” conditional proceed",
+                    "below_5.5": "Weak â€” significant barriers to investment",
                 },
             },
 
-            # ── Section 5: Risk Assessment (3 pages) ─────────────────
+            # â”€â”€ Section 5: Risk Assessment (3 pages) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             "section_05_risk_assessment": {
                 "title": "Comprehensive Risk Assessment",
                 "overall_risk_score": risk.get("overall_risk_score", 0),
@@ -2157,7 +2248,7 @@ async def generate_dd_report(request: Request):
                 ],
             },
 
-            # ── Section 6: Market Analysis (2 pages) ─────────────────
+            # â”€â”€ Section 6: Market Analysis (2 pages) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             "section_06_market_analysis": {
                 "title": "Market & Competition Analysis",
                 "market_score": market.get("market_score", 0),
@@ -2169,7 +2260,7 @@ async def generate_dd_report(request: Request):
                 "barriers_to_entry": ["Technical complexity", "Regulatory requirements", "Network effects"],
             },
 
-            # ── Section 7: Team Assessment (2 pages) ──────────────────
+            # â”€â”€ Section 7: Team Assessment (2 pages) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             "section_07_team_assessment": {
                 "title": "Team & Leadership Assessment",
                 "team_score": team.get("team_score", 0),
@@ -2184,7 +2275,7 @@ async def generate_dd_report(request: Request):
                 "organizational_readiness": "Adequate for current stage; scaling plan needed for Series A",
             },
 
-            # ── Section 8: Financial Analysis (3 pages) ───────────────
+            # â”€â”€ Section 8: Financial Analysis (3 pages) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             "section_08_financial_analysis": {
                 "title": "Financial Health & Projections",
                 "financial_score": fin.get("financial_health_score", 0),
@@ -2209,7 +2300,7 @@ async def generate_dd_report(request: Request):
                 ],
             },
 
-            # ── Section 9: Technology & IP (2 pages) ──────────────────
+            # â”€â”€ Section 9: Technology & IP (2 pages) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             "section_09_technology": {
                 "title": "Technology & Intellectual Property Assessment",
                 "technology_score": tech.get("technology_score", 0),
@@ -2219,10 +2310,10 @@ async def generate_dd_report(request: Request):
                 "development_risks": tech.get("risks", []),
                 "scalability_assessment": tech.get("scalability", ""),
                 "security_posture": "SOC 2 Type I in progress, GDPR compliant",
-                "technical_debt": "Moderate — refactoring scheduled for Q3",
+                "technical_debt": "Moderate â€” refactoring scheduled for Q3",
             },
 
-            # ── Section 10: Business Model (2 pages) ──────────────────
+            # â”€â”€ Section 10: Business Model (2 pages) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             "section_10_business_model": {
                 "title": "Business Model & Strategy Analysis",
                 "business_model_score": biz.get("business_model_score", 0),
@@ -2234,7 +2325,7 @@ async def generate_dd_report(request: Request):
                 "customer_segments": ["Mid-market B2B", "Enterprise", "Government"],
             },
 
-            # ── Section 11: Growth Assessment (2 pages) ───────────────
+            # â”€â”€ Section 11: Growth Assessment (2 pages) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             "section_11_growth": {
                 "title": "Growth Potential & Scalability Analysis",
                 "growth_potential_score": growth.get("growth_potential_score", 0),
@@ -2249,7 +2340,7 @@ async def generate_dd_report(request: Request):
                 },
             },
 
-            # ── Section 12: Investment Readiness (2 pages) ────────────
+            # â”€â”€ Section 12: Investment Readiness (2 pages) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             "section_12_investment_readiness": {
                 "title": "Investment Readiness & Exit Potential",
                 "readiness_score": invest.get("readiness_score", 0),
@@ -2262,7 +2353,7 @@ async def generate_dd_report(request: Request):
                 ],
             },
 
-            # ── Section 13: PESTEL Analysis ───────────────────────────
+            # â”€â”€ Section 13: PESTEL Analysis â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             "section_13_pestel": {
                 "title": "PESTEL Macro-Environment Analysis",
                 "factors": {
@@ -2276,7 +2367,7 @@ async def generate_dd_report(request: Request):
                 "composite_score": 44.7,
             },
 
-            # ── Section 14: Benchmark Comparison ──────────────────────
+            # â”€â”€ Section 14: Benchmark Comparison â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             "section_14_benchmarks": {
                 "title": "Industry Benchmarking & Peer Comparison",
                 "overall_percentile": 72,
@@ -2288,7 +2379,7 @@ async def generate_dd_report(request: Request):
                 },
             },
 
-            # ── Section 15: Gap Analysis ──────────────────────────────
+            # â”€â”€ Section 15: Gap Analysis â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             "section_15_gap_analysis": {
                 "title": "Gap Analysis & Improvement Roadmap",
                 "gaps": [
@@ -2303,7 +2394,7 @@ async def generate_dd_report(request: Request):
                 ],
             },
 
-            # ── Section 16–20: Strategic Fit, Valuation, Deal, Conditions, Appendices
+            # â”€â”€ Section 16â€“20: Strategic Fit, Valuation, Deal, Conditions, Appendices
             "section_16_strategic_fit": {
                 "title": "Strategic Fit Analysis",
                 "alignment_score": 7.5,
@@ -2359,7 +2450,7 @@ async def generate_dd_report(request: Request):
             },
         }
 
-        logger.info(f"DD report generated for '{company_name}' — {dd_report['total_pages']} pages, 20 sections")
+        logger.info(f"DD report generated for '{company_name}' â€” {dd_report['total_pages']} pages, 20 sections")
         return dd_report
 
     except HTTPException:
@@ -2392,13 +2483,12 @@ async def get_all_requests(current_user: dict = Depends(get_current_user)):
     try:
         async with db_manager.get_connection() as conn:
             requests = await conn.fetch("""
-                SELECT ar.*, u.full_name as user_name
+                SELECT ar.*
                 FROM app_requests ar
-                JOIN users u ON ar.user_id = u.user_id
-                ORDER BY ar.submitted_at DESC
+                ORDER BY ar.created_at DESC
             """)
 
-            return [AppRequestResponse(**dict(req)) for req in requests]
+            return [AppRequestResponse.from_db_row(dict(req)) for req in requests]
 
     except Exception as e:
         logger.error(f"Get all requests error: {e}")
