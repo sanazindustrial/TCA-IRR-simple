@@ -15,8 +15,6 @@ variables:
   acrLoginServer: 'tcairrresgistry-a4bahwbpegfve2gq.azurecr.io'
   imageName: 'tcaapi'
   imageTag: 'latest'
-  # Full image reference
-  imageRepository: '$(acrLoginServer)/$(imageName):$(imageTag)'
 
 stages:
   - stage: BuildAndPush
@@ -25,32 +23,21 @@ stages:
       - job: BuildPushImage
         displayName: 'Build and Push to ACR'
         steps:
-          - task: Docker@2
+          - script: |
+              echo "Building Docker image..."
+              docker build -t $(acrLoginServer)/$(imageName):$(imageTag) -t $(acrLoginServer)/$(imageName):$(Build.BuildId) -f dockerfile .
             displayName: 'Build Docker Image'
-            inputs:
-              command: 'build'
-              Dockerfile: '$(Build.SourcesDirectory)/dockerfile'
-              buildContext: '$(Build.SourcesDirectory)'
-              tags: |
-                $(imageTag)
-                $(Build.BuildId)
-              arguments: '--no-cache'
 
-          - task: Docker@2
+          - script: |
+              echo "Logging into ACR..."
+              echo $(ACR_PASSWORD) | docker login $(acrLoginServer) -u $(ACR_USERNAME) --password-stdin
             displayName: 'Login to ACR'
-            inputs:
-              command: 'login'
-              containerRegistry: 'ACRConnection'
 
-          - task: Docker@2
+          - script: |
+              echo "Pushing images to ACR..."
+              docker push $(acrLoginServer)/$(imageName):$(imageTag)
+              docker push $(acrLoginServer)/$(imageName):$(Build.BuildId)
             displayName: 'Push Image to ACR'
-            inputs:
-              command: 'push'
-              containerRegistry: 'ACRConnection'
-              repository: '$(imageName)'
-              tags: |
-                $(imageTag)
-                $(Build.BuildId)
 
           - script: |
               echo "================================================"
