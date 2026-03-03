@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { CompanyInformation } from '@/components/analysis/company-information';
 import { DocumentSubmission, type UploadedFile } from '@/components/analysis/document-submission';
 import { ModuleConfiguration } from '@/components/analysis/module-configuration';
@@ -17,8 +17,20 @@ import { sampleAnalysisData } from '@/lib/sample-data';
 export type UserRole = 'user' | 'admin' | 'reviewer';
 export type ReportType = 'triage' | 'dd';
 
+// Autosave storage key
+const AUTOSAVE_KEY = 'evaluation_autosave';
 
-function AnalysisSetup() {
+type AutosaveData = {
+    uploadedFiles: UploadedFile[];
+    importedUrls: string[];
+    submittedTexts: string[];
+    framework: 'general' | 'medtech';
+    reportType: ReportType;
+    savedAt: number;
+};
+
+
+function AnalysisSetup({ onClearAllData }: { onClearAllData: () => void }) {
     const {
         framework,
         onFrameworkChangeAction,
@@ -32,6 +44,8 @@ function AnalysisSetup() {
         submittedTexts = [],
         setSubmittedTextsAction,
     } = useEvaluationContext();
+
+    const hasData = uploadedFiles.length > 0 || importedUrls.length > 0 || submittedTexts.length > 0;
 
     return (
         <div className="space-y-8 mb-12">
@@ -50,10 +64,25 @@ function AnalysisSetup() {
             <ExternalDataSources framework={framework} />
             {isPrivilegedUser && <ModuleConfiguration framework={framework} />}
 
-            <div className="flex justify-end gap-4">
-                <Button size="lg" onClick={handleRunAnalysisAction} disabled={isLoading}>
-                    {isLoading ? 'Running...' : 'Run Analysis'}
-                </Button>
+            <div className="flex justify-between items-center gap-4">
+                <div className="text-sm text-muted-foreground">
+                    {hasData && (
+                        <span className="flex items-center gap-2">
+                            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                            Auto-saving enabled
+                        </span>
+                    )}
+                </div>
+                <div className="flex gap-4">
+                    {hasData && (
+                        <Button variant="outline" size="lg" onClick={onClearAllData}>
+                            Clear All Data
+                        </Button>
+                    )}
+                    <Button size="lg" onClick={handleRunAnalysisAction} disabled={isLoading}>
+                        {isLoading ? 'Running...' : 'Run Analysis'}
+                    </Button>
+                </div>
             </div>
         </div>
     )
@@ -64,6 +93,7 @@ export default function EvaluationPage() {
     const [framework, setFramework] = useState<'general' | 'medtech'>('general');
     const [role, setRole] = useState<UserRole>('user');
     const [reportType, setReportType] = useState<ReportType>('triage');
+    const [isInitialized, setIsInitialized] = useState(false);
     const { toast } = useToast();
     const router = useRouter();
 
@@ -71,6 +101,75 @@ export default function EvaluationPage() {
     const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
     const [importedUrls, setImportedUrls] = useState<string[]>([]);
     const [submittedTexts, setSubmittedTexts] = useState<string[]>([]);
+
+    // Restore autosaved data on mount
+    useEffect(() => {
+        try {
+            const savedData = localStorage.getItem(AUTOSAVE_KEY);
+            if (savedData) {
+                const parsed: AutosaveData = JSON.parse(savedData);
+                // Only restore if data is less than 24 hours old
+                const isRecent = Date.now() - parsed.savedAt < 24 * 60 * 60 * 1000;
+                if (isRecent) {
+                    if (parsed.uploadedFiles?.length > 0) setUploadedFiles(parsed.uploadedFiles);
+                    if (parsed.importedUrls?.length > 0) setImportedUrls(parsed.importedUrls);
+                    if (parsed.submittedTexts?.length > 0) setSubmittedTexts(parsed.submittedTexts);
+                    if (parsed.framework) setFramework(parsed.framework);
+                    if (parsed.reportType) setReportType(parsed.reportType);
+
+                    // Show toast if data was restored
+                    if (parsed.uploadedFiles?.length > 0 || parsed.importedUrls?.length > 0 || parsed.submittedTexts?.length > 0) {
+                        toast({
+                            title: 'Data Restored',
+                            description: `Restored ${parsed.uploadedFiles?.length || 0} files, ${parsed.importedUrls?.length || 0} URLs, ${parsed.submittedTexts?.length || 0} texts from your last session.`,
+                        });
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('Failed to restore autosaved data:', e);
+        }
+        setIsInitialized(true);
+    }, []);
+
+    // Autosave data whenever it changes
+    useEffect(() => {
+        if (!isInitialized) return; // Don't save during initial restore
+
+        const autosaveData: AutosaveData = {
+            uploadedFiles,
+            importedUrls,
+            submittedTexts,
+            framework,
+            reportType,
+            savedAt: Date.now(),
+        };
+
+        try {
+            localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(autosaveData));
+        } catch (e) {
+            console.warn('Failed to autosave:', e);
+        }
+    }, [uploadedFiles, importedUrls, submittedTexts, framework, reportType, isInitialized]);
+
+    // Clear autosave after successful analysis
+    const clearAutosave = useCallback(() => {
+        localStorage.removeItem(AUTOSAVE_KEY);
+    }, []);
+
+    // Clear all data (state + autosave)
+    const clearAllData = useCallback(() => {
+        setUploadedFiles([]);
+        setImportedUrls([]);
+        setSubmittedTexts([]);
+        setFramework('general');
+        setReportType('triage');
+        clearAutosave();
+        toast({
+            title: 'Data Cleared',
+            description: 'All uploaded files, URLs, and text inputs have been removed.',
+        });
+    }, [clearAutosave, toast]);
 
 
     useEffect(() => {
@@ -100,6 +199,7 @@ export default function EvaluationPage() {
             localStorage.setItem('analysisResult', JSON.stringify(sampleAnalysisData));
             localStorage.setItem('analysisFramework', framework);
             localStorage.removeItem('analysisDuration');
+            clearAutosave();
             router.push('/analysis/what-if');
             return;
         }
@@ -131,6 +231,9 @@ export default function EvaluationPage() {
                 title: 'Analysis Complete!',
                 description: `Processed real data from your inputs in ${duration.toFixed(1)}s`,
             });
+
+            // Clear autosave after successful analysis
+            clearAutosave();
 
             // Role-based navigation:
             // - Admin/Reviewer: Must go to what-if to review and adjust 9 module scores
@@ -212,7 +315,7 @@ export default function EvaluationPage() {
                                 <p className="mt-4 text-muted-foreground">Loading...</p>
                             </div>
                         </div>
-                    ) : <AnalysisSetup />}
+                    ) : <AnalysisSetup onClearAllData={clearAllData} />}
                 </div>
             </main>
         </EvaluationProvider>
