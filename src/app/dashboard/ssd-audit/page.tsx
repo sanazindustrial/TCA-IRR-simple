@@ -54,7 +54,7 @@ import {
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
 
 interface AuditLogEvent {
     event_type: string;
@@ -162,12 +162,24 @@ export default function SsdAuditLogPage() {
     const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
     const [detailsOpen, setDetailsOpen] = useState(false);
     const [filterStatus, setFilterStatus] = useState<string>('all');
+    const [apiAvailable, setApiAvailable] = useState(true);
     const { toast } = useToast();
 
     const fetchLogs = async () => {
         try {
             const statusParam = filterStatus !== 'all' ? `?status=${filterStatus}` : '';
             const response = await fetch(`${API_BASE}/api/ssd/audit/logs${statusParam}`);
+            if (!response.ok) {
+                if (response.status === 404) {
+                    // Endpoint not deployed yet
+                    console.warn('SSD audit endpoint not available (404)');
+                    setApiAvailable(false);
+                    setLogs([]);
+                    return;
+                }
+                throw new Error(`HTTP ${response.status}`);
+            }
+            setApiAvailable(true);
             const data = await response.json();
             setLogs(data.logs || []);
         } catch (error) {
@@ -183,6 +195,13 @@ export default function SsdAuditLogPage() {
     const fetchStats = async () => {
         try {
             const response = await fetch(`${API_BASE}/api/ssd/audit/stats`);
+            if (!response.ok) {
+                if (response.status === 404) {
+                    console.warn('SSD stats endpoint not available (404)');
+                    return;
+                }
+                throw new Error(`HTTP ${response.status}`);
+            }
             const data = await response.json();
             setStats(data);
         } catch (error) {
@@ -193,6 +212,9 @@ export default function SsdAuditLogPage() {
     const fetchLogDetails = async (trackingId: string) => {
         try {
             const response = await fetch(`${API_BASE}/api/ssd/audit/logs/${trackingId}`);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
             const data = await response.json();
             setSelectedLog(data);
             setDetailsOpen(true);
@@ -386,6 +408,13 @@ export default function SsdAuditLogPage() {
                     {loading ? (
                         <div className="flex items-center justify-center py-8">
                             <Loader2 className="size-8 animate-spin text-muted-foreground" />
+                        </div>
+                    ) : !apiAvailable ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                            <AlertTriangle className="size-12 mx-auto mb-4 text-yellow-500 opacity-70" />
+                            <p className="font-medium">SSD Integration Not Available</p>
+                            <p className="text-sm mt-2">The SSD integration backend is pending deployment.</p>
+                            <p className="text-sm">Please contact your administrator to deploy the latest backend code.</p>
                         </div>
                     ) : logs.length === 0 ? (
                         <div className="text-center py-8 text-muted-foreground">
