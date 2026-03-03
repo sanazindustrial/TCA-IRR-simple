@@ -1,17 +1,27 @@
 # Azure DevOps Pipeline for TCA-IRR Backend
 # Builds Docker image and pushes to Azure Container Registry (ACR)
-# Container App has continuous deployment enabled via webhook
+# Credentials are prompted when you run the pipeline
 
 trigger:
   branches:
     include:
       - main
 
+# Runtime parameters - prompted when you click "Run pipeline"
+parameters:
+  - name: acrUsername
+    displayName: 'ACR Username (from Azure Portal -> Container Registry -> Access keys)'
+    type: string
+    default: 'tcairrresgistry'
+  - name: acrPassword
+    displayName: 'ACR Password (from Access keys -> password)'
+    type: string
+    default: ''
+
 pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  # ACR Configuration
   acrLoginServer: 'tcairrresgistry.azurecr.io'
   imageName: 'tcaapi'
   imageTag: 'latest'
@@ -30,7 +40,7 @@ stages:
 
           - script: |
               echo "Logging into ACR..."
-              echo $(ACR_PASSWORD) | docker login $(acrLoginServer) -u $(ACR_USERNAME) --password-stdin
+              echo "${{ parameters.acrPassword }}" | docker login $(acrLoginServer) -u "${{ parameters.acrUsername }}" --password-stdin
               
               echo "Pushing images to ACR..."
               docker push $(acrLoginServer)/$(imageName):$(imageTag)
