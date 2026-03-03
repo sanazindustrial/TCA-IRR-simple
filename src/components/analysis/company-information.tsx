@@ -26,7 +26,7 @@ export function CompanyInformation({
   framework,
   onFrameworkChange,
 }: CompanyInformationProps) {
-  const { isPrivilegedUser } = useEvaluationContext();
+  const { isPrivilegedUser, companyName, setCompanyNameAction, companyDescription, setCompanyDescriptionAction } = useEvaluationContext();
 
   return (
     <Card className="shadow-lg">
@@ -40,7 +40,12 @@ export function CompanyInformation({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
             <Label htmlFor="company-name">Company Name *</Label>
-            <Input id="company-name" placeholder="Enter company name" />
+            <Input
+              id="company-name"
+              placeholder="Enter company name"
+              value={companyName || ''}
+              onChange={(e) => setCompanyNameAction?.(e.target.value)}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="industry-sector">Evaluation Framework *</Label>
@@ -84,10 +89,10 @@ export function CompanyInformation({
                 </p>
               </>
             ) : (
-                <div className="p-4 border rounded-md bg-muted/50">
-                    <p className="font-semibold">{framework === 'general' ? 'General Tech / SaaS' : 'MedTech / Biotech'}</p>
-                    <p className="text-xs text-muted-foreground">Framework is automatically selected. Contact an admin to change.</p>
-                </div>
+              <div className="p-4 border rounded-md bg-muted/50">
+                <p className="font-semibold">{framework === 'general' ? 'General Tech / SaaS' : 'MedTech / Biotech'}</p>
+                <p className="text-xs text-muted-foreground">Framework is automatically selected. Contact an admin to change.</p>
+              </div>
             )}
           </div>
         </div>
@@ -118,6 +123,8 @@ export function CompanyInformation({
             id="company-description"
             placeholder="Brief description of your company and what it does..."
             rows={4}
+            value={companyDescription || ''}
+            onChange={(e) => setCompanyDescriptionAction?.(e.target.value)}
           />
         </div>
       </CardContent>

@@ -26,6 +26,8 @@ type AutosaveData = {
     submittedTexts: string[];
     framework: 'general' | 'medtech';
     reportType: ReportType;
+    companyName: string;
+    companyDescription: string;
     savedAt: number;
 };
 
@@ -43,9 +45,11 @@ function AnalysisSetup({ onClearAllData }: { onClearAllData: () => void }) {
         setImportedUrlsAction,
         submittedTexts = [],
         setSubmittedTextsAction,
+        companyName = '',
+        companyDescription = '',
     } = useEvaluationContext();
 
-    const hasData = uploadedFiles.length > 0 || importedUrls.length > 0 || submittedTexts.length > 0;
+    const hasData = uploadedFiles.length > 0 || importedUrls.length > 0 || submittedTexts.length > 0 || companyName.length > 0 || companyDescription.length > 0;
 
     return (
         <div className="space-y-8 mb-12">
@@ -102,6 +106,10 @@ export default function EvaluationPage() {
     const [importedUrls, setImportedUrls] = useState<string[]>([]);
     const [submittedTexts, setSubmittedTexts] = useState<string[]>([]);
 
+    // State for company information
+    const [companyName, setCompanyName] = useState<string>('');
+    const [companyDescription, setCompanyDescription] = useState<string>('');
+
     // Restore autosaved data on mount
     useEffect(() => {
         try {
@@ -116,12 +124,15 @@ export default function EvaluationPage() {
                     if (parsed.submittedTexts?.length > 0) setSubmittedTexts(parsed.submittedTexts);
                     if (parsed.framework) setFramework(parsed.framework);
                     if (parsed.reportType) setReportType(parsed.reportType);
+                    if (parsed.companyName) setCompanyName(parsed.companyName);
+                    if (parsed.companyDescription) setCompanyDescription(parsed.companyDescription);
 
                     // Show toast if data was restored
-                    if (parsed.uploadedFiles?.length > 0 || parsed.importedUrls?.length > 0 || parsed.submittedTexts?.length > 0) {
+                    const hasData = parsed.uploadedFiles?.length > 0 || parsed.importedUrls?.length > 0 || parsed.submittedTexts?.length > 0 || parsed.companyName || parsed.companyDescription;
+                    if (hasData) {
                         toast({
                             title: 'Data Restored',
-                            description: `Restored ${parsed.uploadedFiles?.length || 0} files, ${parsed.importedUrls?.length || 0} URLs, ${parsed.submittedTexts?.length || 0} texts from your last session.`,
+                            description: `Restored your evaluation data from your last session.`,
                         });
                     }
                 }
@@ -142,6 +153,8 @@ export default function EvaluationPage() {
             submittedTexts,
             framework,
             reportType,
+            companyName,
+            companyDescription,
             savedAt: Date.now(),
         };
 
@@ -150,7 +163,7 @@ export default function EvaluationPage() {
         } catch (e) {
             console.warn('Failed to autosave:', e);
         }
-    }, [uploadedFiles, importedUrls, submittedTexts, framework, reportType, isInitialized]);
+    }, [uploadedFiles, importedUrls, submittedTexts, framework, reportType, companyName, companyDescription, isInitialized]);
 
     // Clear autosave after successful analysis
     const clearAutosave = useCallback(() => {
@@ -164,10 +177,12 @@ export default function EvaluationPage() {
         setSubmittedTexts([]);
         setFramework('general');
         setReportType('triage');
+        setCompanyName('');
+        setCompanyDescription('');
         clearAutosave();
         toast({
             title: 'Data Cleared',
-            description: 'All uploaded files, URLs, and text inputs have been removed.',
+            description: 'All evaluation data has been removed.',
         });
     }, [clearAutosave, toast]);
 
@@ -277,6 +292,10 @@ export default function EvaluationPage() {
             setImportedUrlsAction={setImportedUrls}
             submittedTexts={submittedTexts}
             setSubmittedTextsAction={setSubmittedTexts}
+            companyName={companyName}
+            setCompanyNameAction={setCompanyName}
+            companyDescription={companyDescription}
+            setCompanyDescriptionAction={setCompanyDescription}
         >
             <main className="bg-background text-foreground">
                 <div className="container mx-auto p-4 md:p-8">

@@ -21,6 +21,11 @@ type EvaluationContextType = {
     setImportedUrlsAction?: React.Dispatch<React.SetStateAction<string[]>>;
     submittedTexts?: string[];
     setSubmittedTextsAction?: React.Dispatch<React.SetStateAction<string[]>>;
+    // Company information
+    companyName?: string;
+    setCompanyNameAction?: React.Dispatch<React.SetStateAction<string>>;
+    companyDescription?: string;
+    setCompanyDescriptionAction?: React.Dispatch<React.SetStateAction<string>>;
 };
 
 const EvaluationContext = createContext<EvaluationContextType | null>(null);
@@ -48,6 +53,11 @@ type EvaluationProviderProps = {
     setImportedUrlsAction?: React.Dispatch<React.SetStateAction<string[]>>;
     submittedTexts?: string[];
     setSubmittedTextsAction?: React.Dispatch<React.SetStateAction<string[]>>;
+    // Company information
+    companyName?: string;
+    setCompanyNameAction?: React.Dispatch<React.SetStateAction<string>>;
+    companyDescription?: string;
+    setCompanyDescriptionAction?: React.Dispatch<React.SetStateAction<string>>;
 };
 
 export function EvaluationProvider({
@@ -65,6 +75,10 @@ export function EvaluationProvider({
     setImportedUrlsAction,
     submittedTexts,
     setSubmittedTextsAction,
+    companyName,
+    setCompanyNameAction,
+    companyDescription,
+    setCompanyDescriptionAction,
 }: EvaluationProviderProps) {
     const isPrivilegedUser = useMemo(() => role === 'admin' || role === 'reviewer', [role]);
     const isEditable = useMemo(() => isPrivilegedUser, [isPrivilegedUser]);
@@ -85,6 +99,10 @@ export function EvaluationProvider({
         setImportedUrlsAction,
         submittedTexts,
         setSubmittedTextsAction,
+        companyName,
+        setCompanyNameAction,
+        companyDescription,
+        setCompanyDescriptionAction,
     };
 
     return (
