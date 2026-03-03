@@ -1,20 +1,25 @@
 # Azure DevOps Pipeline for TCA-IRR Backend
 # Builds Docker image and pushes to Azure Container Registry (ACR)
-# Credentials are prompted when you run the pipeline
+# 
+# AUTO-DEPLOY SETUP: 
+# 1. Go to Azure DevOps > Pipelines > [This Pipeline] > Edit > Variables
+# 2. Add: ACR_USERNAME = tcairrresgistry
+# 3. Add: ACR_PASSWORD = [your password from Azure Portal] (mark as secret)
+# 4. Save - now every push to main will auto-deploy!
 
 trigger:
   branches:
     include:
       - main
 
-# Runtime parameters - prompted when you click "Run pipeline"
+# Runtime parameters - used as fallback if variables not set
 parameters:
   - name: acrUsername
-    displayName: 'ACR Username (from Azure Portal -> Container Registry -> Access keys)'
+    displayName: 'ACR Username (leave empty to use pipeline variable)'
     type: string
-    default: 'tcairrresgistry'
+    default: ''
   - name: acrPassword
-    displayName: 'ACR Password (from Access keys -> password)'
+    displayName: 'ACR Password (leave empty to use pipeline variable)'
     type: string
     default: ''
 
@@ -39,8 +44,19 @@ stages:
             displayName: 'Build Docker Image'
 
           - script: |
+              # Use pipeline variables if set, otherwise use parameters
+              ACR_USER="${ACR_USERNAME:-${{ parameters.acrUsername }}}"
+              ACR_PASS="${ACR_PASSWORD:-${{ parameters.acrPassword }}}"
+              
+              if [ -z "$ACR_USER" ] || [ -z "$ACR_PASS" ]; then
+                echo "##[error]ACR credentials not configured!"
+                echo "##[error]Either set pipeline variables (ACR_USERNAME, ACR_PASSWORD)"
+                echo "##[error]or provide them when running the pipeline manually."
+                exit 1
+              fi
+              
               echo "Logging into ACR..."
-              echo "${{ parameters.acrPassword }}" | docker login $(acrLoginServer) -u "${{ parameters.acrUsername }}" --password-stdin
+              echo "$ACR_PASS" | docker login $(acrLoginServer) -u "$ACR_USER" --password-stdin
               
               echo "Pushing images to ACR..."
               docker push $(acrLoginServer)/$(imageName):$(imageTag)
@@ -53,6 +69,9 @@ stages:
               echo "Container App will auto-deploy via webhook."
               echo "================================================"
             displayName: 'Push to ACR'
+            env:
+              ACR_USERNAME: $(ACR_USERNAME)
+              ACR_PASSWORD: $(ACR_PASSWORD)
 
   - stage: Verify
     displayName: 'Verify Deployment'
