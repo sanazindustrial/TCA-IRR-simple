@@ -28,30 +28,21 @@ stages:
               docker build -t $(acrLoginServer)/$(imageName):$(imageTag) -t $(acrLoginServer)/$(imageName):$(Build.BuildId) -f dockerfile .
             displayName: 'Build Docker Image'
 
-          - task: AzureCLI@2
-            displayName: 'Login and Push to ACR'
-            inputs:
-              azureSubscription: 'AzureServiceConnection'
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                echo "Logging into ACR using Azure CLI..."
-                az acr login --name tcairrresgistry
-                
-                echo "Pushing images to ACR..."
-                docker push $(acrLoginServer)/$(imageName):$(imageTag)
-                docker push $(acrLoginServer)/$(imageName):$(Build.BuildId)
-                
-                echo "================================================"
-                echo "  Docker image pushed to ACR!"
-                echo "================================================"
-                echo ""
-                echo "Image: $(acrLoginServer)/$(imageName):$(imageTag)"
-                echo "Build ID tag: $(acrLoginServer)/$(imageName):$(Build.BuildId)"
-                echo ""
-                echo "Container App has continuous deployment enabled."
-                echo "It will automatically pull the new image."
-                echo "================================================"
+          - script: |
+              echo "Logging into ACR..."
+              echo $(ACR_PASSWORD) | docker login $(acrLoginServer) -u $(ACR_USERNAME) --password-stdin
+              
+              echo "Pushing images to ACR..."
+              docker push $(acrLoginServer)/$(imageName):$(imageTag)
+              docker push $(acrLoginServer)/$(imageName):$(Build.BuildId)
+              
+              echo "================================================"
+              echo "  Docker image pushed to ACR!"
+              echo "================================================"
+              echo "Image: $(acrLoginServer)/$(imageName):$(imageTag)"
+              echo "Container App will auto-deploy via webhook."
+              echo "================================================"
+            displayName: 'Push to ACR'
 
   - stage: Verify
     displayName: 'Verify Deployment'
