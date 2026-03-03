@@ -10,10 +10,8 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  - name: backendAppName
-    value: 'tcairrapiccontainer'
-  - name: pythonVersion
-    value: '3.11'
+  backendAppName: 'tcairrapiccontainer'
+  pythonVersion: '3.11'
 
 stages:
   - stage: Build
@@ -113,8 +111,8 @@ stages:
                     fi
                   displayName: 'Deploy via Kudu ZIP Deploy'
                   env:
-                    DEPLOY_USER: $(DEPLOY_USER)
-                    DEPLOY_PASSWORD: $(DEPLOY_PASSWORD)
+                    DEPLOY_USER: '$(DEPLOY_USER)'
+                    DEPLOY_PASSWORD: '$(DEPLOY_PASSWORD)'
 
   - stage: Verify
     displayName: 'Verify Deployment'
