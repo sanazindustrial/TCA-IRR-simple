@@ -12,7 +12,7 @@ pool:
 
 variables:
   # ACR Configuration
-  acrLoginServer: 'tcairrresgistry-a4bahwbpegfve2gq.azurecr.io'
+  acrLoginServer: 'tcairrresgistry.azurecr.io'
   imageName: 'tcaapi'
   imageTag: 'latest'
 
@@ -28,29 +28,30 @@ stages:
               docker build -t $(acrLoginServer)/$(imageName):$(imageTag) -t $(acrLoginServer)/$(imageName):$(Build.BuildId) -f dockerfile .
             displayName: 'Build Docker Image'
 
-          - script: |
-              echo "Logging into ACR..."
-              echo $(ACR_PASSWORD) | docker login $(acrLoginServer) -u $(ACR_USERNAME) --password-stdin
-            displayName: 'Login to ACR'
-
-          - script: |
-              echo "Pushing images to ACR..."
-              docker push $(acrLoginServer)/$(imageName):$(imageTag)
-              docker push $(acrLoginServer)/$(imageName):$(Build.BuildId)
-            displayName: 'Push Image to ACR'
-
-          - script: |
-              echo "================================================"
-              echo "  Docker image pushed to ACR!"
-              echo "================================================"
-              echo ""
-              echo "Image: $(acrLoginServer)/$(imageName):$(imageTag)"
-              echo "Build ID tag: $(acrLoginServer)/$(imageName):$(Build.BuildId)"
-              echo ""
-              echo "Container App has continuous deployment enabled."
-              echo "It will automatically pull the new image."
-              echo "================================================"
-            displayName: 'Deployment Summary'
+          - task: AzureCLI@2
+            displayName: 'Login and Push to ACR'
+            inputs:
+              azureSubscription: 'AzureServiceConnection'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                echo "Logging into ACR using Azure CLI..."
+                az acr login --name tcairrresgistry
+                
+                echo "Pushing images to ACR..."
+                docker push $(acrLoginServer)/$(imageName):$(imageTag)
+                docker push $(acrLoginServer)/$(imageName):$(Build.BuildId)
+                
+                echo "================================================"
+                echo "  Docker image pushed to ACR!"
+                echo "================================================"
+                echo ""
+                echo "Image: $(acrLoginServer)/$(imageName):$(imageTag)"
+                echo "Build ID tag: $(acrLoginServer)/$(imageName):$(Build.BuildId)"
+                echo ""
+                echo "Container App has continuous deployment enabled."
+                echo "It will automatically pull the new image."
+                echo "================================================"
 
   - stage: Verify
     displayName: 'Verify Deployment'
