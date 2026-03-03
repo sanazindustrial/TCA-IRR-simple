@@ -1,0 +1,161 @@
+# Azure DevOps Pipeline for TCA-IRR App
+# This pipeline deploys both frontend and backend to Azure
+
+trigger:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  - name: backendAppName
+    value: 'tcairrapiccontainer'
+  - name: frontendAppName
+    value: 'tca-irr'
+  - name: resourceGroup
+    value: 'tca-platform-rg'
+  - name: pythonVersion
+    value: '3.11'
+  - name: nodeVersion
+    value: '18.x'
+
+stages:
+  - stage: Build
+    displayName: 'Build Stage'
+    jobs:
+      - job: BuildBackend
+        displayName: 'Build Backend'
+        steps:
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '$(pythonVersion)'
+            displayName: 'Use Python $(pythonVersion)'
+
+          - script: |
+              python -m pip install --upgrade pip
+              pip install -r requirements.txt
+            displayName: 'Install Python dependencies'
+
+          - task: ArchiveFiles@2
+            inputs:
+              rootFolderOrFile: '$(Build.SourcesDirectory)'
+              includeRootFolder: false
+              archiveType: 'zip'
+              archiveFile: '$(Build.ArtifactStagingDirectory)/backend.zip'
+              replaceExistingArchive: true
+            displayName: 'Archive backend files'
+
+          - publish: '$(Build.ArtifactStagingDirectory)/backend.zip'
+            artifact: backend
+            displayName: 'Publish backend artifact'
+
+      - job: BuildFrontend
+        displayName: 'Build Frontend'
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: '$(nodeVersion)'
+            displayName: 'Use Node.js $(nodeVersion)'
+
+          - script: |
+              npm ci
+              npm run build
+            displayName: 'Install and build frontend'
+
+          - task: ArchiveFiles@2
+            inputs:
+              rootFolderOrFile: '$(Build.SourcesDirectory)/.next'
+              includeRootFolder: false
+              archiveType: 'zip'
+              archiveFile: '$(Build.ArtifactStagingDirectory)/frontend.zip'
+              replaceExistingArchive: true
+            displayName: 'Archive frontend build'
+
+          - publish: '$(Build.ArtifactStagingDirectory)/frontend.zip'
+            artifact: frontend
+            displayName: 'Publish frontend artifact'
+
+  - stage: Deploy
+    displayName: 'Deploy Stage'
+    dependsOn: Build
+    condition: succeeded()
+    jobs:
+      - deployment: DeployBackend
+        displayName: 'Deploy Backend to Azure'
+        environment: 'production'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  artifact: backend
+
+                - task: AzureWebApp@1
+                  inputs:
+                    azureSubscription: 'Azure-TCA-ServiceConnection'
+                    appType: 'webAppLinux'
+                    appName: '$(backendAppName)'
+                    package: '$(Pipeline.Workspace)/backend/backend.zip'
+                    runtimeStack: 'PYTHON|3.11'
+                    startUpCommand: 'python main.py'
+                  displayName: 'Deploy backend to Azure Web App'
+
+      - deployment: DeployFrontend
+        displayName: 'Deploy Frontend to Azure'
+        environment: 'production'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  artifact: frontend
+
+                - task: AzureWebApp@1
+                  inputs:
+                    azureSubscription: 'Azure-TCA-ServiceConnection'
+                    appType: 'webAppLinux'
+                    appName: '$(frontendAppName)'
+                    package: '$(Pipeline.Workspace)/frontend/frontend.zip'
+                  displayName: 'Deploy frontend to Azure Web App'
+
+  - stage: Verify
+    displayName: 'Verify Deployment'
+    dependsOn: Deploy
+    condition: succeeded()
+    jobs:
+      - job: HealthCheck
+        displayName: 'Health Check'
+        steps:
+          - script: |
+              echo "Checking backend health..."
+              response=$(curl -s -o /dev/null -w "%{http_code}" https://$(backendAppName).azurewebsites.net/health)
+              if [ "$response" -eq "200" ]; then
+                echo "✅ Backend is healthy"
+              else
+                echo "❌ Backend health check failed (HTTP $response)"
+                exit 1
+              fi
+            displayName: 'Backend health check'
+
+          - script: |
+              echo "Checking SSD endpoint..."
+              response=$(curl -s -o /dev/null -w "%{http_code}" https://$(backendAppName).azurewebsites.net/api/ssd/audit/stats)
+              if [ "$response" -eq "200" ]; then
+                echo "✅ SSD endpoint is available"
+              else
+                echo "⚠️ SSD endpoint returned HTTP $response"
+              fi
+            displayName: 'SSD endpoint check'
+
+          - script: |
+              echo "Checking frontend..."
+              response=$(curl -s -o /dev/null -w "%{http_code}" https://$(frontendAppName).azurewebsites.net)
+              if [ "$response" -eq "200" ] || [ "$response" -eq "302" ]; then
+                echo "✅ Frontend is accessible"
+              else
+                echo "❌ Frontend check failed (HTTP $response)"
+                exit 1
+              fi
+            displayName: 'Frontend health check'
