@@ -209,6 +209,18 @@ async def main():
         )
         return False
 
+    # Step 3.5: Run schema migration to fix column differences
+    try:
+        logger.info("🔄 Running schema migration...")
+        from migrate_schema import run_migration
+        migration_success = await run_migration()
+        if migration_success:
+            logger.info("✅ Schema migration completed successfully")
+        else:
+            logger.warning("⚠️  Schema migration had issues, but continuing...")
+    except Exception as e:
+        logger.warning(f"⚠️  Schema migration skipped: {e}")
+
     # Step 4: Start Genkit server (optional)
     start_genkit_server()
 
@@ -259,6 +271,11 @@ if __name__ == "__main__":
             from init_db import init_database
             asyncio.run(init_database())
             sys.exit(0)
+        elif sys.argv[1] == "--migrate":
+            logger.info("Running schema migration...")
+            from migrate_schema import run_migration
+            success = asyncio.run(run_migration())
+            sys.exit(0 if success else 1)
         elif sys.argv[1] == "--check":
             logger.info("Checking system requirements...")
             if check_requirements():
