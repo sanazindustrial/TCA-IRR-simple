@@ -1,16 +1,16 @@
 {
   "meta": {
-    "date": "2026-02-18T03:44:18.777Z",
+    "date": "2026-02-18T04:48:12.371Z",
     "target": "http://localhost:8000",
-    "elapsed": "18.8s",
+    "elapsed": "18.0s",
     "nodeVersion": "v22.17.0"
   },
   "summary": {
-    "passed": 122,
-    "failed": 1,
+    "passed": 123,
+    "failed": 0,
     "skipped": 0,
     "warnings": 2,
-    "bugsFound": 4,
+    "bugsFound": 3,
     "total": 123
   },
   "results": {
@@ -19,7 +19,7 @@
       "health": 200,
       "db": "tca_platform",
       "tables": 22,
-      "avgMs": "193"
+      "avgMs": "203"
     },
     "auth": {
       "register": 200,
@@ -28,7 +28,7 @@
       "meStatus": 200
     },
     "upload": {
-      "uploadId": "80012716-d50a-45d5-93d4-55eb980042c0",
+      "uploadId": "7ca03864-0f74-4271-aaa4-4a1588df23b0",
       "status": 200,
       "precision": "tested"
     },
@@ -36,7 +36,7 @@
       "score": 8.9,
       "recommendation": "STRONG BUY â€” High confidence investment opportunity",
       "modules": 9,
-      "elapsed": 1493
+      "elapsed": 1522
     },
     "reports": {
       "triage": 200,
@@ -71,7 +71,7 @@
       "title": "Empty text upload accepted without validation",
       "detail": "Status 200",
       "steps": "POST /api/text/submit with empty company_name and text",
-      "timestamp": "2026-02-18T03:44:05.740Z"
+      "timestamp": "2026-02-18T04:47:59.437Z"
     },
     {
       "id": "SEC-001",
@@ -80,16 +80,7 @@
       "title": "XSS payload stored without sanitization",
       "detail": "Script tags in company_name stored as-is",
       "steps": "Upload company_name with <script> tag",
-      "timestamp": "2026-02-18T03:44:06.047Z"
-    },
-    {
-      "id": "EDGE-001",
-      "severity": "MEDIUM",
-      "area": "EdgeCases",
-      "title": "Malformed JSON causes 500 error",
-      "detail": "Status 500",
-      "steps": "POST with invalid JSON",
-      "timestamp": "2026-02-18T03:44:09.067Z"
+      "timestamp": "2026-02-18T04:47:59.653Z"
     },
     {
       "id": "EDGE-002",
@@ -98,7 +89,7 @@
       "title": "No max length on company_name",
       "detail": "Accepted 10000 chars",
       "steps": "POST /api/text/submit with 10000-char name",
-      "timestamp": "2026-02-18T03:44:09.164Z"
+      "timestamp": "2026-02-18T04:48:02.748Z"
     }
   ],
   "testMatrix": {
@@ -225,7 +216,7 @@
     "score": 8.9,
     "recommendation": "STRONG BUY â€” High confidence investment opportunity",
     "modules": 9,
-    "elapsed": 1493
+    "elapsed": 1522
   },
   "comparative": {
     "strongScore": 8.9,
