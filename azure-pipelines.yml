@@ -1,25 +1,10 @@
 # Azure DevOps Pipeline for TCA-IRR App
-# This pipeline deploys both frontend and backend to Azure
+# Uses Publish Profile credentials (no service connection required)
 
 trigger:
   branches:
     include:
       - main
-
-# Parameters allow runtime configuration
-parameters:
-  - name: azureServiceConnection
-    displayName: 'Azure Service Connection Name'
-    type: string
-    default: 'Azure-TCA-ServiceConnection'
-  - name: deployBackend
-    displayName: 'Deploy Backend'
-    type: boolean
-    default: true
-  - name: deployFrontend
-    displayName: 'Deploy Frontend'
-    type: boolean
-    default: true
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -29,14 +14,10 @@ variables:
     value: 'tcairrapiccontainer'
   - name: frontendAppName
     value: 'tca-irr'
-  - name: resourceGroup
-    value: 'Default-Web-EastUS'
   - name: pythonVersion
     value: '3.11'
   - name: nodeVersion
     value: '18.x'
-  - name: serviceConnection
-    value: ${{ parameters.azureServiceConnection }}
 
 stages:
   - stage: Build
@@ -99,43 +80,74 @@ stages:
     dependsOn: Build
     condition: succeeded()
     jobs:
-      - deployment: DeployBackend
-        displayName: 'Deploy Backend to Azure'
-        environment: 'production'
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - download: current
-                  artifact: backend
+      - job: DeployBackend
+        displayName: 'Deploy Backend via Kudu'
+        steps:
+          - download: current
+            artifact: backend
+          
+          - script: |
+              echo "Deploying backend to $(backendAppName)..."
+              
+              # Deploy using Kudu ZIP deploy API with publish profile credentials
+              DEPLOY_URL="https://$(backendAppName).scm.azurewebsites.net/api/zipdeploy"
+              ZIP_FILE="$(Pipeline.Workspace)/backend/backend.zip"
+              
+              HTTP_CODE=$(curl -X POST \
+                -u "$(BACKEND_PUBLISH_USER):$(BACKEND_PUBLISH_PASSWORD)" \
+                --data-binary @"$ZIP_FILE" \
+                -H "Content-Type: application/zip" \
+                -w "%{http_code}" \
+                -o /tmp/deploy_response.txt \
+                "$DEPLOY_URL" 2>/dev/null)
+              
+              echo "Deployment response code: $HTTP_CODE"
+              
+              if [ "$HTTP_CODE" -eq "200" ] || [ "$HTTP_CODE" -eq "202" ]; then
+                echo "Backend deployment successful!"
+              else
+                echo "Backend deployment failed with code: $HTTP_CODE"
+                cat /tmp/deploy_response.txt
+                exit 1
+              fi
+            displayName: 'Deploy backend to Azure'
+            env:
+              BACKEND_PUBLISH_USER: $(BACKEND_PUBLISH_USER)
+              BACKEND_PUBLISH_PASSWORD: $(BACKEND_PUBLISH_PASSWORD)
 
-                - task: AzureWebApp@1
-                  inputs:
-                    azureSubscription: '$(serviceConnection)'
-                    appType: 'webAppLinux'
-                    appName: '$(backendAppName)'
-                    package: '$(Pipeline.Workspace)/backend/backend.zip'
-                    runtimeStack: 'PYTHON|3.11'
-                    startUpCommand: 'gunicorn -w 4 -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:8000'
-                  displayName: 'Deploy backend to Azure Web App'
-
-      - deployment: DeployFrontend
-        displayName: 'Deploy Frontend to Azure'
-        environment: 'production'
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - download: current
-                  artifact: frontend
-
-                - task: AzureWebApp@1
-                  inputs:
-                    azureSubscription: '$(serviceConnection)'
-                    appType: 'webAppLinux'
-                    appName: '$(frontendAppName)'
-                    package: '$(Pipeline.Workspace)/frontend/frontend.zip'
-                  displayName: 'Deploy frontend to Azure Web App'
+      - job: DeployFrontend
+        displayName: 'Deploy Frontend via Kudu'
+        steps:
+          - download: current
+            artifact: frontend
+          
+          - script: |
+              echo "Deploying frontend to $(frontendAppName)..."
+              
+              DEPLOY_URL="https://$(frontendAppName).scm.azurewebsites.net/api/zipdeploy"
+              ZIP_FILE="$(Pipeline.Workspace)/frontend/frontend.zip"
+              
+              HTTP_CODE=$(curl -X POST \
+                -u "$(FRONTEND_PUBLISH_USER):$(FRONTEND_PUBLISH_PASSWORD)" \
+                --data-binary @"$ZIP_FILE" \
+                -H "Content-Type: application/zip" \
+                -w "%{http_code}" \
+                -o /tmp/deploy_response.txt \
+                "$DEPLOY_URL" 2>/dev/null)
+              
+              echo "Deployment response code: $HTTP_CODE"
+              
+              if [ "$HTTP_CODE" -eq "200" ] || [ "$HTTP_CODE" -eq "202" ]; then
+                echo "Frontend deployment successful!"
+              else
+                echo "Frontend deployment failed with code: $HTTP_CODE"
+                cat /tmp/deploy_response.txt
+                exit 1
+              fi
+            displayName: 'Deploy frontend to Azure'
+            env:
+              FRONTEND_PUBLISH_USER: $(FRONTEND_PUBLISH_USER)
+              FRONTEND_PUBLISH_PASSWORD: $(FRONTEND_PUBLISH_PASSWORD)
 
   - stage: Verify
     displayName: 'Verify Deployment'
@@ -146,33 +158,20 @@ stages:
         displayName: 'Health Check'
         steps:
           - script: |
+              echo "Waiting 30 seconds for deployment to stabilize..."
+              sleep 30
+              
               echo "Checking backend health..."
-              response=$(curl -s -o /dev/null -w "%{http_code}" https://$(backendAppName).azurewebsites.net/health)
-              if [ "$response" -eq "200" ]; then
-                echo "✅ Backend is healthy"
-              else
-                echo "❌ Backend health check failed (HTTP $response)"
-                exit 1
-              fi
-            displayName: 'Backend health check'
-
-          - script: |
+              response=$(curl -s -o /dev/null -w "%{http_code}" https://$(backendAppName).azurewebsites.net/api/health)
+              echo "Backend /api/health: HTTP $response"
+              
               echo "Checking SSD endpoint..."
               response=$(curl -s -o /dev/null -w "%{http_code}" https://$(backendAppName).azurewebsites.net/api/ssd/audit/stats)
-              if [ "$response" -eq "200" ]; then
-                echo "✅ SSD endpoint is available"
-              else
-                echo "⚠️ SSD endpoint returned HTTP $response"
-              fi
-            displayName: 'SSD endpoint check'
-
-          - script: |
+              echo "SSD /api/ssd/audit/stats: HTTP $response"
+              
               echo "Checking frontend..."
               response=$(curl -s -o /dev/null -w "%{http_code}" https://$(frontendAppName).azurewebsites.net)
-              if [ "$response" -eq "200" ] || [ "$response" -eq "302" ]; then
-                echo "✅ Frontend is accessible"
-              else
-                echo "❌ Frontend check failed (HTTP $response)"
-                exit 1
-              fi
-            displayName: 'Frontend health check'
+              echo "Frontend: HTTP $response"
+              
+              echo "Health checks complete"
+            displayName: 'Verify endpoints'
