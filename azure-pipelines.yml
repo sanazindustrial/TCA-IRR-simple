@@ -72,22 +72,23 @@ stages:
                       echo "ERROR: Deployment credentials not configured!"
                       echo ""
                       echo "To fix this, add these pipeline variables as secrets:"
-                      echo "  DEPLOY_USER     - e.g., \$tcairrapiccontainer"
-                      echo "  DEPLOY_PASSWORD - from publish profile"
-                      echo ""
-                      echo "Get these from Azure Portal:"
-                      echo "  1. Go to App Services > $(backendAppName)"
-                      echo "  2. Click 'Deployment Center' > 'Manage publish profile'"
-                      echo "  3. Download and open the .PublishSettings file"
-                      echo "  4. Find userName and userPWD in the file"
+                      echo "  DEPLOY_USER     - from publish profile userName"
+                      echo "  DEPLOY_PASSWORD - from publish profile userPWD"
                       echo ""
                       exit 1
                     fi
                     
+                    # Debug: Show credential format (not values)
+                    echo "DEPLOY_USER length: ${#DEPLOY_USER} chars"
+                    echo "DEPLOY_USER starts with \$: $(echo "$DEPLOY_USER" | grep -c '^\$' || true)"
+                    
                     echo "Uploading $(ls -lh "$ZIP_FILE" | awk '{print $5}') to Azure..."
                     
+                    # Use base64 for auth to handle special characters
+                    AUTH_HEADER=$(echo -n "$DEPLOY_USER:$DEPLOY_PASSWORD" | base64)
+                    
                     HTTP_CODE=$(curl -X POST \
-                      --user "$DEPLOY_USER:$DEPLOY_PASSWORD" \
+                      -H "Authorization: Basic $AUTH_HEADER" \
                       --data-binary @"$ZIP_FILE" \
                       -H "Content-Type: application/zip" \
                       -w "%{http_code}" \
@@ -104,9 +105,14 @@ stages:
                       echo "================================================"
                     else
                       echo ""
-                      echo "Deployment failed!"
+                      echo "Deployment failed with code: $HTTP_CODE"
                       echo "Response:"
                       cat /tmp/deploy_response.txt
+                      echo ""
+                      echo "Troubleshooting:"
+                      echo "  - Verify DEPLOY_USER starts with \$ (e.g., \$tcairrapiccontainer)"
+                      echo "  - Re-download publish profile and re-enter credentials"
+                      echo "  - When entering DEPLOY_USER in Azure DevOps, use \$\$tcairrapiccontainer"
                       exit 1
                     fi
                   displayName: 'Deploy via Kudu ZIP Deploy'
