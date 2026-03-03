@@ -176,7 +176,7 @@ export function ApiConnectionTest() {
                 </Alert>
 
                 <div className="text-xs text-muted-foreground space-y-1">
-                    <p><strong>Backend URL:</strong> {process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net'}</p>
+                    <p><strong>Backend URL:</strong> {process.env.NEXT_PUBLIC_API_URL || 'https://tca-irr-api.azurewebsites.net'}</p>
                     <p><strong>Frontend URL:</strong> {typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}</p>
                     <p><strong>Environment Variables:</strong></p>
                     <ul className="list-disc list-inside ml-4 space-y-1">
@@ -191,7 +191,7 @@ export function ApiConnectionTest() {
                         You can also test the API manually by opening the browser console and running:
                     </p>
                     <code className="block bg-muted p-2 text-xs rounded">
-                        {`fetch('https://tcairrapiccontainer.azurewebsites.net/api/').then(r => r.json()).then(console.log).catch(console.error)`}
+                        {`fetch('https://tca-irr-api.azurewebsites.net/api/').then(r => r.json()).then(console.log).catch(console.error)`}
                     </code>
                 </div>
             </CardContent>

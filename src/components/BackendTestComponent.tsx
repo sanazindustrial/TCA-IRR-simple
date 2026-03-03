@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import styles from './BackendTestComponent.module.css';
 
-const API_BASE = 'https://tcairrapiccontainer.azurewebsites.net';
+const API_BASE = 'https://tca-irr-api.azurewebsites.net';
 
 function timeoutFetch(url: string, opts: RequestInit = {}, ms = 5000) {
     const controller = new AbortController();

@@ -66,7 +66,7 @@ export function DocumentSubmission({
           type: file.type
         }));
 
-        const response = await fetch('https://tcairrapiccontainer.azurewebsites.net/api/files/upload', {
+        const response = await fetch('https://tca-irr-api.azurewebsites.net/api/files/upload', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ files: fileData })
@@ -108,7 +108,7 @@ export function DocumentSubmission({
 
       // Process URLs with backend (if available)
       try {
-        const response = await fetch('https://tcairrapiccontainer.azurewebsites.net/api/urls/fetch', {
+        const response = await fetch('https://tca-irr-api.azurewebsites.net/api/urls/fetch', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ urls })

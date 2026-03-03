@@ -54,7 +54,7 @@ import {
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://tca-irr-api.azurewebsites.net';
 
 interface AuditLogEvent {
     event_type: string;
