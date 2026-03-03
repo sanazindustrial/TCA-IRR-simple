@@ -23,11 +23,13 @@ This document describes how to run and test the SSD Application to TCA TIRR inte
 ## Prerequisites
 
 ### Backend Requirements
+
 - Python 3.11+
 - PostgreSQL database (Azure PostgreSQL or local)
 - Virtual environment with dependencies installed
 
 ### Frontend Requirements
+
 - Node.js 18+
 - npm or pnpm
 
@@ -334,6 +336,7 @@ node test-ssd-tirr-integration.js
 ```
 
 **Expected Output:**
+
 ```
 ═══════════════════════════════════════════════════════════
   SSD → TCA TIRR INTEGRATION TEST SUITE
@@ -392,6 +395,7 @@ curl http://localhost:8000/api/ssd/audit/stats
 **URL:** `https://your-domain.com/dashboard/ssd-audit`
 
 Features:
+
 - Real-time statistics dashboard (total requests, success rate, avg processing time)
 - Filterable audit log table
 - Detailed view of each request with:
@@ -405,6 +409,7 @@ Features:
 **URL:** `https://your-domain.com/dashboard/reports/configure`
 
 Click the **"SSD Integration"** tab to access:
+
 1. **Endpoint Configuration** — API endpoint URL, callback URL
 2. **Report Sections** — 6 sections with customizable scores
 3. **Scoring Thresholds** — Recommendation ranges
@@ -520,6 +525,101 @@ LOG_LEVEL=DEBUG python main.py
 
 ---
 
+## Deploying to Azure Production
+
+### Deploy Backend to Azure
+
+The SSD integration requires deploying the updated `main.py` to the Azure backend.
+
+```powershell
+# 1. Login to Azure
+az login
+
+# 2. Create a zip of the backend files
+Compress-Archive -Path main.py, requirements.txt, ssd_tirr_report_config.py, ai_integration.py, database_config.py -DestinationPath backend-deploy.zip -Force
+
+# 3. Deploy to Azure Web App
+az webapp deployment source config-zip `
+  --resource-group tca-platform-rg `
+  --name tcairrapiccontainer `
+  --src backend-deploy.zip
+
+# Alternative: Use az webapp up
+az webapp up `
+  --name tcairrapiccontainer `
+  --resource-group tca-platform-rg `
+  --runtime "PYTHON:3.11"
+```
+
+### Verify Deployment
+
+```powershell
+# Check backend health
+Invoke-WebRequest -Uri "https://tcairrapiccontainer.azurewebsites.net/health" -Method GET
+
+# Check if SSD endpoint is available
+Invoke-WebRequest -Uri "https://tcairrapiccontainer.azurewebsites.net/api/ssd/audit/stats" -Method GET
+```
+
+### Frontend Deployment
+
+The frontend auto-deploys via GitHub Actions when you push to the `main` branch:
+
+```bash
+git push origin main
+```
+
+Monitor deployment at: <https://github.com/sanazindustrial/TCA-IRR-simple/actions>
+
+---
+
+## Production URLs
+
+| Component | URL |
+|-----------|-----|
+| Frontend | <https://tca-irr.azurewebsites.net> |
+| Backend API | <https://tcairrapiccontainer.azurewebsites.net> |
+| API Docs | <https://tcairrapiccontainer.azurewebsites.net/docs> |
+| SSD Audit | <https://tca-irr.azurewebsites.net/dashboard/ssd-audit> |
+| Report Config | <https://tca-irr.azurewebsites.net/dashboard/reports/configure> |
+
+---
+
+## Git Repositories
+
+| Remote | URL | Purpose |
+|--------|-----|---------|
+| origin | <https://github.com/sanazindustrial/TCA-IRR-simple.git> | Primary repo, triggers GitHub Actions |
+| azure | <https://dev.azure.com/ssddevopsazure/TCA/_git/TCA-IRR> | Azure DevOps mirror |
+
+### Sync Repositories
+
+```bash
+# Push to both remotes
+git push origin main
+git push azure main
+```
+
+---
+
+## Implementation Checklist
+
+| Item | Status | Location |
+|------|--------|----------|
+| SSD TIRR endpoint | ✅ Implemented | `main.py` line 2861 |
+| Status check endpoint | ✅ Implemented | `main.py` line 2944 |
+| Audit log endpoints (7) | ✅ Implemented | `main.py` lines 3044-3159 |
+| Pydantic models (8 sections) | ✅ Implemented | `main.py` lines 2758-2859 |
+| 17 mandatory fields validation | ✅ Implemented | `main.py` SSDStartupData model |
+| 6-page triage report generation | ✅ Implemented | `main.py` _generate_triage_report() |
+| Callback to SSD | ✅ Implemented | `main.py` _ssd_callback_response() |
+| Report config file | ✅ Created | `ssd_tirr_report_config.py` |
+| Admin SSD Audit page | ✅ Created | `src/app/dashboard/ssd-audit/page.tsx` |
+| SSD Integration tab | ✅ Added | `src/app/dashboard/reports/configure/page.tsx` |
+| Integration test suite | ✅ 52/52 passing | `test-ssd-tirr-integration.js` |
+
+---
+
 ## Version History
 
 | Version | Date | Changes |
@@ -531,6 +631,31 @@ LOG_LEVEL=DEBUG python main.py
 ## Support
 
 For issues or questions:
+
 - Check the [Audit Log](/dashboard/ssd-audit) for request details
 - Review server logs for `[SSD-TIRR]` entries
 - Run integration tests to verify setup
+
+---
+
+## Quick Reference Commands
+
+```bash
+# Run all tests
+node test-ssd-tirr-integration.js
+
+# Start local backend
+.\.venv\Scripts\python.exe main.py
+
+# Start local frontend
+npm run dev
+
+# Build frontend
+npm run build
+
+# Push to Git
+git add -A && git commit -m "Update" && git push origin main
+
+# View API docs
+start https://tcairrapiccontainer.azurewebsites.net/docs
+```
