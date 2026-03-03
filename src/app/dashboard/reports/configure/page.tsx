@@ -603,7 +603,7 @@ export default function ReportConfigurationPage() {
                                                     <div className="flex items-center gap-2">
                                                         <input
                                                             type="color"
-                                                            value={threshold.color}                                                            aria-label={`Color for ${threshold.tier} tier`}                                                            onChange={(e) => {
+                                                            value={threshold.color} aria-label={`Color for ${threshold.tier} tier`} onChange={(e) => {
                                                                 const updated = [...ssdThresholds];
                                                                 updated[index] = { ...threshold, color: e.target.value };
                                                                 setSsdThresholds(updated);
