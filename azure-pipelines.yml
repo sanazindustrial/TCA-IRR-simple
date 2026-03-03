@@ -1,155 +1,92 @@
 # Azure DevOps Pipeline for TCA-IRR Backend
-# Deploys Python backend to Azure Web App using Kudu ZIP Deploy
+# Builds Docker image and pushes to Azure Container Registry (ACR)
+# Container App has continuous deployment enabled via webhook
 
 trigger:
   branches:
     include:
       - main
 
-# Runtime parameters - you'll be prompted to enter these when running the pipeline
-parameters:
-  - name: deployUser
-    displayName: 'Deploy User (from publish profile userName, e.g., $tcairrapiccontainer)'
-    type: string
-    default: '$tcairrapiccontainer'
-  - name: deployPassword
-    displayName: 'Deploy Password (from publish profile userPWD)'
-    type: string
-    default: ''
-
 pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  backendAppName: 'tcairrapiccontainer'
-  pythonVersion: '3.11'
+  # ACR Configuration
+  acrLoginServer: 'tcairrresgistry-a4bahwbpegfve2gq.azurecr.io'
+  imageName: 'tcaapi'
+  imageTag: 'latest'
+  # Full image reference
+  imageRepository: '$(acrLoginServer)/$(imageName):$(imageTag)'
 
 stages:
-  - stage: Build
-    displayName: 'Build Stage'
+  - stage: BuildAndPush
+    displayName: 'Build & Push Docker Image'
     jobs:
-      - job: BuildBackend
-        displayName: 'Build Backend'
+      - job: BuildPushImage
+        displayName: 'Build and Push to ACR'
         steps:
-          - task: UsePythonVersion@0
+          - task: Docker@2
+            displayName: 'Build Docker Image'
             inputs:
-              versionSpec: '$(pythonVersion)'
-            displayName: 'Use Python $(pythonVersion)'
+              command: 'build'
+              Dockerfile: '$(Build.SourcesDirectory)/dockerfile'
+              buildContext: '$(Build.SourcesDirectory)'
+              tags: |
+                $(imageTag)
+                $(Build.BuildId)
+              arguments: '--no-cache'
+
+          - task: Docker@2
+            displayName: 'Login to ACR'
+            inputs:
+              command: 'login'
+              containerRegistry: 'ACRConnection'
+
+          - task: Docker@2
+            displayName: 'Push Image to ACR'
+            inputs:
+              command: 'push'
+              containerRegistry: 'ACRConnection'
+              repository: '$(imageName)'
+              tags: |
+                $(imageTag)
+                $(Build.BuildId)
 
           - script: |
-              python -m pip install --upgrade pip
-              pip install -r requirements.txt
-            displayName: 'Install Python dependencies'
-
-          - task: ArchiveFiles@2
-            inputs:
-              rootFolderOrFile: '$(Build.SourcesDirectory)'
-              includeRootFolder: false
-              archiveType: 'zip'
-              archiveFile: '$(Build.ArtifactStagingDirectory)/backend.zip'
-              replaceExistingArchive: true
-            displayName: 'Archive backend files'
-
-          - publish: '$(Build.ArtifactStagingDirectory)/backend.zip'
-            artifact: backend
-            displayName: 'Publish backend artifact'
-
-  - stage: Deploy
-    displayName: 'Deploy Stage'
-    dependsOn: Build
-    condition: succeeded()
-    jobs:
-      - deployment: DeployBackend
-        displayName: 'Deploy Backend'
-        environment: 'production'
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - download: current
-                  artifact: backend
-                
-                - script: |
-                    echo "================================================"
-                    echo "  Deploying backend to $(backendAppName)"
-                    echo "================================================"
-                    
-                    DEPLOY_URL="https://$(backendAppName).scm.azurewebsites.net/api/zipdeploy"
-                    ZIP_FILE="$(Pipeline.Workspace)/backend/backend.zip"
-                    
-                    # Get credentials from parameters
-                    DEPLOY_USER="${{ parameters.deployUser }}"
-                    DEPLOY_PASSWORD="${{ parameters.deployPassword }}"
-                    
-                    # Check if credentials are set
-                    if [ -z "$DEPLOY_USER" ] || [ -z "$DEPLOY_PASSWORD" ]; then
-                      echo ""
-                      echo "ERROR: Deployment credentials not provided!"
-                      echo ""
-                      echo "When running the pipeline, enter:"
-                      echo "  deployUser     - from publish profile userName (e.g., \$tcairrapiccontainer)"
-                      echo "  deployPassword - from publish profile userPWD"
-                      echo ""
-                      exit 1
-                    fi
-                    
-                    echo "Deploy user: $DEPLOY_USER"
-                    echo "Uploading $(ls -lh "$ZIP_FILE" | awk '{print $5}') to Azure..."
-                    
-                    # Use base64 for auth to handle special characters
-                    AUTH_HEADER=$(echo -n "$DEPLOY_USER:$DEPLOY_PASSWORD" | base64)
-                    
-                    HTTP_CODE=$(curl -X POST \
-                      -H "Authorization: Basic $AUTH_HEADER" \
-                      --data-binary @"$ZIP_FILE" \
-                      -H "Content-Type: application/zip" \
-                      -w "%{http_code}" \
-                      -o /tmp/deploy_response.txt \
-                      --silent \
-                      "$DEPLOY_URL")
-                    
-                    echo "Response code: $HTTP_CODE"
-                    
-                    if [ "$HTTP_CODE" -eq "200" ] || [ "$HTTP_CODE" -eq "202" ]; then
-                      echo ""
-                      echo "================================================"
-                      echo "  Deployment successful!"
-                      echo "================================================"
-                    else
-                      echo ""
-                      echo "Deployment failed with code: $HTTP_CODE"
-                      echo "Response:"
-                      cat /tmp/deploy_response.txt
-                      echo ""
-                      echo "Troubleshooting:"
-                      echo "  - Verify deployUser starts with \$ (e.g., \$tcairrapiccontainer)"
-                      echo "  - Re-download publish profile and check userPWD value"
-                      exit 1
-                    fi
-                  displayName: 'Deploy via Kudu ZIP Deploy'
+              echo "================================================"
+              echo "  Docker image pushed to ACR!"
+              echo "================================================"
+              echo ""
+              echo "Image: $(acrLoginServer)/$(imageName):$(imageTag)"
+              echo "Build ID tag: $(acrLoginServer)/$(imageName):$(Build.BuildId)"
+              echo ""
+              echo "Container App has continuous deployment enabled."
+              echo "It will automatically pull the new image."
+              echo "================================================"
+            displayName: 'Deployment Summary'
 
   - stage: Verify
     displayName: 'Verify Deployment'
-    dependsOn: Deploy
+    dependsOn: BuildAndPush
     condition: succeeded()
     jobs:
       - job: HealthCheck
         displayName: 'Health Check'
         steps:
           - script: |
-              echo "Waiting 30 seconds for deployment to stabilize..."
-              sleep 30
+              echo "Waiting 60 seconds for Container App to pull new image..."
+              sleep 60
               
               echo ""
               echo "Checking endpoints..."
               echo ""
               
               echo -n "GET /api/health: "
-              response=$(curl -s -o /dev/null -w "%{http_code}" https://$(backendAppName).azurewebsites.net/api/health)
+              response=$(curl -s -o /dev/null -w "%{http_code}" https://tcairrapiccontainer.azurewebsites.net/api/health)
               echo "$response"
               
               echo -n "GET /api/ssd/audit/stats: "
-              response=$(curl -s -o /dev/null -w "%{http_code}" https://$(backendAppName).azurewebsites.net/api/ssd/audit/stats)
+              response=$(curl -s -o /dev/null -w "%{http_code}" https://tcairrapiccontainer.azurewebsites.net/api/ssd/audit/stats)
               echo "$response"
               
               echo ""
