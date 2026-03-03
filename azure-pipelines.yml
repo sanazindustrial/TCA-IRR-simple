@@ -6,6 +6,17 @@ trigger:
     include:
       - main
 
+# Runtime parameters - you'll be prompted to enter these when running the pipeline
+parameters:
+  - name: deployUser
+    displayName: 'Deploy User (from publish profile userName, e.g., $tcairrapiccontainer)'
+    type: string
+    default: '$tcairrapiccontainer'
+  - name: deployPassword
+    displayName: 'Deploy Password (from publish profile userPWD)'
+    type: string
+    default: ''
+
 pool:
   vmImage: 'ubuntu-latest'
 
@@ -66,22 +77,23 @@ stages:
                     DEPLOY_URL="https://$(backendAppName).scm.azurewebsites.net/api/zipdeploy"
                     ZIP_FILE="$(Pipeline.Workspace)/backend/backend.zip"
                     
+                    # Get credentials from parameters
+                    DEPLOY_USER="${{ parameters.deployUser }}"
+                    DEPLOY_PASSWORD="${{ parameters.deployPassword }}"
+                    
                     # Check if credentials are set
                     if [ -z "$DEPLOY_USER" ] || [ -z "$DEPLOY_PASSWORD" ]; then
                       echo ""
-                      echo "ERROR: Deployment credentials not configured!"
+                      echo "ERROR: Deployment credentials not provided!"
                       echo ""
-                      echo "To fix this, add these pipeline variables as secrets:"
-                      echo "  DEPLOY_USER     - from publish profile userName"
-                      echo "  DEPLOY_PASSWORD - from publish profile userPWD"
+                      echo "When running the pipeline, enter:"
+                      echo "  deployUser     - from publish profile userName (e.g., \$tcairrapiccontainer)"
+                      echo "  deployPassword - from publish profile userPWD"
                       echo ""
                       exit 1
                     fi
                     
-                    # Debug: Show credential format (not values)
-                    echo "DEPLOY_USER length: ${#DEPLOY_USER} chars"
-                    echo "DEPLOY_USER starts with \$: $(echo "$DEPLOY_USER" | grep -c '^\$' || true)"
-                    
+                    echo "Deploy user: $DEPLOY_USER"
                     echo "Uploading $(ls -lh "$ZIP_FILE" | awk '{print $5}') to Azure..."
                     
                     # Use base64 for auth to handle special characters
@@ -110,15 +122,11 @@ stages:
                       cat /tmp/deploy_response.txt
                       echo ""
                       echo "Troubleshooting:"
-                      echo "  - Verify DEPLOY_USER starts with \$ (e.g., \$tcairrapiccontainer)"
-                      echo "  - Re-download publish profile and re-enter credentials"
-                      echo "  - When entering DEPLOY_USER in Azure DevOps, use \$\$tcairrapiccontainer"
+                      echo "  - Verify deployUser starts with \$ (e.g., \$tcairrapiccontainer)"
+                      echo "  - Re-download publish profile and check userPWD value"
                       exit 1
                     fi
                   displayName: 'Deploy via Kudu ZIP Deploy'
-                  env:
-                    DEPLOY_USER: '$(DEPLOY_USER)'
-                    DEPLOY_PASSWORD: '$(DEPLOY_PASSWORD)'
 
   - stage: Verify
     displayName: 'Verify Deployment'
