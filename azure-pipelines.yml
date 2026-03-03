@@ -1,16 +1,10 @@
-# Azure DevOps Pipeline for TCA-IRR App
-# Deploys backend and frontend to Azure Web Apps
+# Azure DevOps Pipeline for TCA-IRR Backend
+# Deploys Python backend to Azure Web App using Kudu ZIP Deploy
 
 trigger:
   branches:
     include:
       - main
-
-parameters:
-  - name: azureServiceConnection
-    displayName: 'Azure Service Connection'
-    type: string
-    default: 'Azure-TCA-ServiceConnection'
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -18,16 +12,8 @@ pool:
 variables:
   - name: backendAppName
     value: 'tcairrapiccontainer'
-  - name: frontendAppName
-    value: 'tca-irr'
-  - name: resourceGroup
-    value: 'Default-Web-EastUS'
   - name: pythonVersion
     value: '3.11'
-  - name: nodeVersion
-    value: '18.x'
-  - name: serviceConnection
-    value: ${{ parameters.azureServiceConnection }}
 
 stages:
   - stage: Build
@@ -59,69 +45,76 @@ stages:
             artifact: backend
             displayName: 'Publish backend artifact'
 
-      - job: BuildFrontend
-        displayName: 'Build Frontend'
-        steps:
-          - task: NodeTool@0
-            inputs:
-              versionSpec: '$(nodeVersion)'
-            displayName: 'Use Node.js $(nodeVersion)'
-
-          - script: |
-              npm ci
-              npm run build
-            displayName: 'Install and build frontend'
-
-          - task: ArchiveFiles@2
-            inputs:
-              rootFolderOrFile: '$(Build.SourcesDirectory)/.next'
-              includeRootFolder: false
-              archiveType: 'zip'
-              archiveFile: '$(Build.ArtifactStagingDirectory)/frontend.zip'
-              replaceExistingArchive: true
-            displayName: 'Archive frontend build'
-
-          - publish: '$(Build.ArtifactStagingDirectory)/frontend.zip'
-            artifact: frontend
-            displayName: 'Publish frontend artifact'
-
   - stage: Deploy
     displayName: 'Deploy Stage'
     dependsOn: Build
     condition: succeeded()
     jobs:
-      - job: DeployBackend
+      - deployment: DeployBackend
         displayName: 'Deploy Backend'
-        steps:
-          - download: current
-            artifact: backend
-          
-          - task: AzureWebApp@1
-            displayName: 'Deploy backend to Azure'
-            inputs:
-              azureSubscription: '$(serviceConnection)'
-              appType: 'webAppLinux'
-              appName: '$(backendAppName)'
-              resourceGroupName: '$(resourceGroup)'
-              package: '$(Pipeline.Workspace)/backend/backend.zip'
-              runtimeStack: 'PYTHON|3.11'
-              startUpCommand: 'python launch.py'
-
-      - job: DeployFrontend
-        displayName: 'Deploy Frontend'
-        steps:
-          - download: current
-            artifact: frontend
-          
-          - task: AzureWebApp@1
-            displayName: 'Deploy frontend to Azure'
-            inputs:
-              azureSubscription: '$(serviceConnection)'
-              appType: 'webAppLinux'
-              appName: '$(frontendAppName)'
-              resourceGroupName: '$(resourceGroup)'
-              package: '$(Pipeline.Workspace)/frontend/frontend.zip'
-              runtimeStack: 'NODE|18-lts'
+        environment: 'production'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  artifact: backend
+                
+                - script: |
+                    echo "================================================"
+                    echo "  Deploying backend to $(backendAppName)"
+                    echo "================================================"
+                    
+                    DEPLOY_URL="https://$(backendAppName).scm.azurewebsites.net/api/zipdeploy"
+                    ZIP_FILE="$(Pipeline.Workspace)/backend/backend.zip"
+                    
+                    # Check if credentials are set
+                    if [ -z "$DEPLOY_USER" ] || [ -z "$DEPLOY_PASSWORD" ]; then
+                      echo ""
+                      echo "ERROR: Deployment credentials not configured!"
+                      echo ""
+                      echo "To fix this, add these pipeline variables as secrets:"
+                      echo "  DEPLOY_USER     - e.g., \$tcairrapiccontainer"
+                      echo "  DEPLOY_PASSWORD - from publish profile"
+                      echo ""
+                      echo "Get these from Azure Portal:"
+                      echo "  1. Go to App Services > $(backendAppName)"
+                      echo "  2. Click 'Deployment Center' > 'Manage publish profile'"
+                      echo "  3. Download and open the .PublishSettings file"
+                      echo "  4. Find userName and userPWD in the file"
+                      echo ""
+                      exit 1
+                    fi
+                    
+                    echo "Uploading $(ls -lh "$ZIP_FILE" | awk '{print $5}') to Azure..."
+                    
+                    HTTP_CODE=$(curl -X POST \
+                      --user "$DEPLOY_USER:$DEPLOY_PASSWORD" \
+                      --data-binary @"$ZIP_FILE" \
+                      -H "Content-Type: application/zip" \
+                      -w "%{http_code}" \
+                      -o /tmp/deploy_response.txt \
+                      --silent \
+                      "$DEPLOY_URL")
+                    
+                    echo "Response code: $HTTP_CODE"
+                    
+                    if [ "$HTTP_CODE" -eq "200" ] || [ "$HTTP_CODE" -eq "202" ]; then
+                      echo ""
+                      echo "================================================"
+                      echo "  Deployment successful!"
+                      echo "================================================"
+                    else
+                      echo ""
+                      echo "Deployment failed!"
+                      echo "Response:"
+                      cat /tmp/deploy_response.txt
+                      exit 1
+                    fi
+                  displayName: 'Deploy via Kudu ZIP Deploy'
+                  env:
+                    DEPLOY_USER: $(DEPLOY_USER)
+                    DEPLOY_PASSWORD: $(DEPLOY_PASSWORD)
 
   - stage: Verify
     displayName: 'Verify Deployment'
@@ -135,17 +128,18 @@ stages:
               echo "Waiting 30 seconds for deployment to stabilize..."
               sleep 30
               
-              echo "Checking backend health..."
+              echo ""
+              echo "Checking endpoints..."
+              echo ""
+              
+              echo -n "GET /api/health: "
               response=$(curl -s -o /dev/null -w "%{http_code}" https://$(backendAppName).azurewebsites.net/api/health)
-              echo "Backend /api/health: HTTP $response"
+              echo "$response"
               
-              echo "Checking SSD endpoint..."
+              echo -n "GET /api/ssd/audit/stats: "
               response=$(curl -s -o /dev/null -w "%{http_code}" https://$(backendAppName).azurewebsites.net/api/ssd/audit/stats)
-              echo "SSD /api/ssd/audit/stats: HTTP $response"
+              echo "$response"
               
-              echo "Checking frontend..."
-              response=$(curl -s -o /dev/null -w "%{http_code}" https://$(frontendAppName).azurewebsites.net)
-              echo "Frontend: HTTP $response"
-              
-              echo "Health checks complete"
+              echo ""
+              echo "Health checks complete!"
             displayName: 'Verify endpoints'
