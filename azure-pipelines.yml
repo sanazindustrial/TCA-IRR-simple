@@ -6,6 +6,21 @@ trigger:
     include:
       - main
 
+# Parameters allow runtime configuration
+parameters:
+  - name: azureServiceConnection
+    displayName: 'Azure Service Connection Name'
+    type: string
+    default: 'Azure-TCA-ServiceConnection'
+  - name: deployBackend
+    displayName: 'Deploy Backend'
+    type: boolean
+    default: true
+  - name: deployFrontend
+    displayName: 'Deploy Frontend'
+    type: boolean
+    default: true
+
 pool:
   vmImage: 'ubuntu-latest'
 
@@ -15,11 +30,13 @@ variables:
   - name: frontendAppName
     value: 'tca-irr'
   - name: resourceGroup
-    value: 'tca-platform-rg'
+    value: 'Default-Web-EastUS'
   - name: pythonVersion
     value: '3.11'
   - name: nodeVersion
     value: '18.x'
+  - name: serviceConnection
+    value: ${{ parameters.azureServiceConnection }}
 
 stages:
   - stage: Build
@@ -94,12 +111,12 @@ stages:
 
                 - task: AzureWebApp@1
                   inputs:
-                    azureSubscription: 'Azure-TCA-ServiceConnection'
+                    azureSubscription: '$(serviceConnection)'
                     appType: 'webAppLinux'
                     appName: '$(backendAppName)'
                     package: '$(Pipeline.Workspace)/backend/backend.zip'
                     runtimeStack: 'PYTHON|3.11'
-                    startUpCommand: 'python main.py'
+                    startUpCommand: 'gunicorn -w 4 -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:8000'
                   displayName: 'Deploy backend to Azure Web App'
 
       - deployment: DeployFrontend
@@ -114,7 +131,7 @@ stages:
 
                 - task: AzureWebApp@1
                   inputs:
-                    azureSubscription: 'Azure-TCA-ServiceConnection'
+                    azureSubscription: '$(serviceConnection)'
                     appType: 'webAppLinux'
                     appName: '$(frontendAppName)'
                     package: '$(Pipeline.Workspace)/frontend/frontend.zip'
