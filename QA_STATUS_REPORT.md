@@ -1,4 +1,5 @@
 # TCA-IRR Comprehensive QA Status Report
+
 ## Week 1 Delivery — February 18, 2026
 
 ---
@@ -17,6 +18,7 @@
 | **Test Runs Completed** | 8 iterations |
 
 ### Pass Rate Progression
+
 ```
 Run 1:  54/91  (59.3%) — Baseline
 Run 2:  88/116 (75.9%) — After backend auth fixes
@@ -33,6 +35,7 @@ Run 8: 122/123 (99.2%) — Final (CORS + validation handler)
 ## Test Coverage Matrix
 
 ### Area 1: Environment & Infrastructure (12/12 = 100%)
+
 | # | Test Case | Status | Details |
 |---|-----------|--------|---------|
 | 1.1 | Root endpoint responds 200 | ✅ PASS | 171ms |
@@ -50,6 +53,7 @@ Run 8: 122/123 (99.2%) — Final (CORS + validation handler)
 | 1.6 | Unknown route → 404 | ✅ PASS | |
 
 ### Area 2: Authentication & Authorization (12/12 = 100%)
+
 | # | Test Case | Status | Details |
 |---|-----------|--------|---------|
 | 2.1 | Register returns 200 | ✅ PASS | |
@@ -68,6 +72,7 @@ Run 8: 122/123 (99.2%) — Final (CORS + validation handler)
 | 2.10 | Missing fields rejected (422) | ✅ PASS | |
 
 ### Area 3: Data Upload & Storage Precision (19/19 = 100%)
+
 | # | Test Case | Status | Details |
 |---|-----------|--------|---------|
 | 3.1 | Upload returns 200 | ✅ PASS | |
@@ -93,6 +98,7 @@ Run 8: 122/123 (99.2%) — Final (CORS + validation handler)
 | 3.7 | Invalid UUID → error | ✅ PASS | |
 
 ### Area 4: 9-Module Analysis Engine (30/30 = 100%)
+
 | # | Test Case | Status | Score |
 |---|-----------|--------|-------|
 | 4.1 | Analysis returns 200 | ✅ PASS | |
@@ -129,6 +135,7 @@ Run 8: 122/123 (99.2%) — Final (CORS + validation handler)
 **Final TCA Score: 8.9/10 — STRONG BUY**
 
 ### Area 5: Report Generation (7/7 = 100%)
+
 | # | Test Case | Status | Details |
 |---|-----------|--------|---------|
 | 5.1 | Triage report → 200 | ✅ PASS | 6 pages |
@@ -141,12 +148,14 @@ Run 8: 122/123 (99.2%) — Final (CORS + validation handler)
 | 5.3 | Empty upload_ids → 404 | ✅ PASS | |
 
 ### Area 6: Request Management (2/2 = 100%)
+
 | # | Test Case | Status | Details |
 |---|-----------|--------|---------|
 | 6.1 | Create request → 200 | ✅ PASS | |
 | 6.2 | List requests → 200 | ✅ PASS | |
 
 ### Area 7: Edge Cases & Error Handling (5/6 = 83%)
+
 | # | Test Case | Status | Details |
 |---|-----------|--------|---------|
 | 7.1 | Malformed JSON → 422 | ❌ FAIL | Returns 500 (BUG-EDGE-001) |
@@ -157,6 +166,7 @@ Run 8: 122/123 (99.2%) — Final (CORS + validation handler)
 | 7.6 | 5 concurrent requests | ✅ PASS | All succeed |
 
 ### Area 8: Security Testing (5/5 = 100%)
+
 | # | Test Case | Status | Details |
 |---|-----------|--------|---------|
 | 8.1 | SQL injection in name | ✅ PASS | No DB compromise |
@@ -166,6 +176,7 @@ Run 8: 122/123 (99.2%) — Final (CORS + validation handler)
 | 8.5 | Method restriction | ✅ PASS | 405 |
 
 ### Area 9: Comparative Analysis (7/7 = 100%)
+
 | # | Test Case | Status | Details |
 |---|-----------|--------|---------|
 | 9.1 | Weak client uploaded | ✅ PASS | |
@@ -176,6 +187,7 @@ Run 8: 122/123 (99.2%) — Final (CORS + validation handler)
 | 9.4 | Weak team = 2 | ✅ PASS | |
 
 ### Area 10: Cleanup & Integrity (12/12 = 100%)
+
 | # | Test Case | Status | Details |
 |---|-----------|--------|---------|
 | 10.1 | Cleaned 10 test uploads | ✅ PASS | |
@@ -256,13 +268,14 @@ Run 8: 122/123 (99.2%) — Final (CORS + validation handler)
 | Avg Response Time | 193ms | |
 | CORS | ✅ Enabled | allow_origins=["*"] |
 | Auth | ✅ JWT-based | bcrypt password hashing |
-| Live App | https://tca-irr.azurewebsites.net/dashboard |
+| Live App | <https://tca-irr.azurewebsites.net/dashboard> |
 
 ---
 
 ## Files Modified This Sprint
 
 ### Backend (`main.py`)
+
 - Password validation (min 6 chars, no empty)
 - Auth register: Fixed for actual DB schema (id, username, is_active)
 - Auth login: Fixed WHERE clause, field mapping
@@ -273,6 +286,7 @@ Run 8: 122/123 (99.2%) — Final (CORS + validation handler)
 - Middleware: Added CatchAllErrorMiddleware
 
 ### Test Suite (`test-comprehensive-qa.js`)
+
 - All response field paths aligned with actual API
 - Unique test names per run (timestamp-based)
 - CORS test sends proper Origin header
@@ -285,19 +299,22 @@ Run 8: 122/123 (99.2%) — Final (CORS + validation handler)
 ## Recommendations for Week 2
 
 ### Priority 1 (Critical)
+
 1. **Fix XSS sanitization** — Sanitize all user inputs before storage (BUG-SEC-001)
 2. **Add input validation for uploads** — Reject empty company_name/text (BUG-DATA-002)
 
 ### Priority 2 (Important)
+
 3. **Fix malformed JSON handling** — Return 422 instead of 500 (BUG-EDGE-001)
-4. **Add field length limits** — Max 255 chars for company_name (BUG-EDGE-002)
-5. **Align DB schema** — `users.id` should be UUID or add a UUID column to match related tables
+2. **Add field length limits** — Max 255 chars for company_name (BUG-EDGE-002)
+3. **Align DB schema** — `users.id` should be UUID or add a UUID column to match related tables
 
 ### Priority 3 (Enhancement)
+
 6. **Deploy backend fixes to Azure** — Auth and request management fixes need deployment
-7. **Add rate limiting** — Protect analysis and report endpoints
-8. **Add integration tests for frontend** — Current tests are API-only
-9. **Invalid JWT returns 500** — Should return 401 (minor improvement)
+2. **Add rate limiting** — Protect analysis and report endpoints
+3. **Add integration tests for frontend** — Current tests are API-only
+4. **Invalid JWT returns 500** — Should return 401 (minor improvement)
 
 ---
 

@@ -1,4 +1,5 @@
 # TCA-IRR QA Test Plan
+
 ## Version 1.0 — February 18, 2026
 
 ---
@@ -10,6 +11,7 @@ Validate the TCA-IRR Investment Risk Rating Application's backend API functional
 ## 2. Scope
 
 ### In Scope
+
 - Backend API endpoints (FastAPI)
 - Authentication & authorization (JWT-based)
 - Data upload and storage precision
@@ -22,6 +24,7 @@ Validate the TCA-IRR Investment Risk Rating Application's backend API functional
 - Database integrity checks
 
 ### Out of Scope
+
 - Frontend UI testing (Next.js components)
 - Load/stress testing beyond 5 concurrent requests
 - Browser compatibility testing
@@ -38,7 +41,7 @@ Validate the TCA-IRR Investment Risk Rating Application's backend API functional
 | DB Name | tca_platform (22 tables) |
 | Test Runner | Node.js v22.17.0 (native fetch) |
 | Test File | test-comprehensive-qa.js (1,192 lines) |
-| API Target | http://localhost:8000 |
+| API Target | <http://localhost:8000> |
 
 ## 4. Test Areas
 
@@ -59,12 +62,14 @@ Validate the TCA-IRR Investment Risk Rating Application's backend API functional
 ## 5. Entry / Exit Criteria
 
 ### Entry Criteria
+
 - Backend server is running and healthy
 - Database is connected with ≥ 20 tables
 - Node.js 18+ is available
 - Network access to Azure PostgreSQL
 
 ### Exit Criteria
+
 - All Critical/High test areas pass ≥ 95%
 - No CRITICAL bugs remain unfixed
 - All 9 analysis modules return valid scores
@@ -73,6 +78,7 @@ Validate the TCA-IRR Investment Risk Rating Application's backend API functional
 ## 6. Test Data
 
 ### Strong Client (QA_TestCorp_Alpha)
+
 ```json
 {
   "revenue": 750000, "mrr": 62500, "burn_rate": 110000,
@@ -84,6 +90,7 @@ Validate the TCA-IRR Investment Risk Rating Application's backend API functional
 ```
 
 ### Weak Client (Weak_Startup)
+
 ```json
 {
   "revenue": 15000, "mrr": 1250, "burn_rate": 30000,

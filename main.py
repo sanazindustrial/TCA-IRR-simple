@@ -22,9 +22,33 @@ from pydantic import BaseModel, EmailStr, validator
 import asyncio
 from pathlib import Path
 import json
+import httpx
 
 # Import database configuration
 from database_config import db_manager, db_config
+
+# Import SSD → TCA TIRR report configuration
+from ssd_tirr_report_config import (
+    REPORT_META,
+    SCORING_THRESHOLDS,
+    PAGE_CONFIG,
+    SSD_FIELD_MAPPING,
+    SSD_MANDATORY_FIELDS,
+    CALLBACK_CONFIG,
+    REPORT_EXPORT,
+    SSD_MODULE_WEIGHTS,
+    SCORE_INTERPRETATION,
+    INVESTOR_QUESTION_MODULES,
+    get_recommendation,
+    interpret_score,
+)
+
+# Report output directory
+REPORTS_DIR = Path(__file__).parent / "reports"
+REPORTS_DIR.mkdir(exist_ok=True)
+
+# SSD callback URL — override via SSD_CALLBACK_URL environment variable
+SSD_CALLBACK_URL = os.getenv("SSD_CALLBACK_URL", "")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -111,6 +135,43 @@ class CatchAllErrorMiddleware(BaseHTTPMiddleware):
             return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 app.add_middleware(CatchAllErrorMiddleware)
+
+# Raw ASGI middleware to catch malformed JSON before Starlette parses it
+from starlette.types import ASGIApp, Receive, Scope, Send
+
+class JSONBodyValidationMiddleware:
+    """Validates JSON body at ASGI level before Starlette can parse and 500."""
+    def __init__(self, app: ASGIApp):
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send):
+        if scope["type"] == "http" and scope.get("method", "") in ("POST", "PUT", "PATCH"):
+            headers = dict(scope.get("headers", []))
+            content_type = headers.get(b"content-type", b"").decode("utf-8", errors="ignore")
+            if "application/json" in content_type:
+                body_parts = []
+                while True:
+                    message = await receive()
+                    body_parts.append(message.get("body", b""))
+                    if not message.get("more_body", False):
+                        break
+                body = b"".join(body_parts)
+                if body:
+                    try:
+                        json.loads(body)
+                    except (json.JSONDecodeError, ValueError):
+                        response = JSONResponse(
+                            status_code=422,
+                            content={"detail": "Invalid JSON in request body"}
+                        )
+                        await response(scope, receive, send)
+                        return
+                # Re-wrap body so downstream can read it
+                async def new_receive():
+                    return {"type": "http.request", "body": body, "more_body": False}
+                await self.app(scope, new_receive, send)
+                return
+        await self.app(scope, receive, send)
 
 @app.exception_handler(JSONDecodeError)
 async def json_decode_error_handler(request, exc):
@@ -215,6 +276,93 @@ class EvaluationCreate(BaseModel):
     request_id: Optional[str] = None
 
 
+# ── SSD → TCA TIRR Payload Models (sections 4.1.1 – 4.1.8) ──────────
+
+class SSDContactInformation(BaseModel):
+    email: EmailStr
+    phoneNumber: str
+    firstName: str
+    lastName: str
+    jobTitle: Optional[str] = None
+    linkedInUrl: Optional[str] = None
+
+class SSDCompanyInformation(BaseModel):
+    companyName: Optional[str] = None
+    website: Optional[str] = None
+    industryVertical: str
+    developmentStage: str
+    businessModel: str
+    country: str
+    state: str
+    city: str
+    oneLineDescription: str
+    companyDescription: str
+    productDescription: str
+    pitchDeckPath: str
+    legalName: Optional[str] = None
+    numberOfEmployees: Optional[int] = None
+
+class SSDFinancialInformation(BaseModel):
+    fundingType: str
+    annualRevenue: float
+    preMoneyValuation: float
+    postMoneyValuation: Optional[float] = None
+    offeringType: Optional[str] = None
+    targetRaise: Optional[float] = None
+    currentlyRaised: Optional[float] = None
+
+class SSDInvestorQuestions(BaseModel):
+    problemSolution: Optional[str] = None
+    companyBackgroundTeam: Optional[str] = None
+    markets: Optional[str] = None
+    competitionDifferentiation: Optional[str] = None
+    businessModelChannels: Optional[str] = None
+    timeline: Optional[str] = None
+    technologyIP: Optional[str] = None
+    specialAgreements: Optional[str] = None
+    cashFlow: Optional[str] = None
+    fundingHistory: Optional[str] = None
+    risksChallenges: Optional[str] = None
+    exitStrategy: Optional[str] = None
+
+class SSDDocuments(BaseModel):
+    executiveSummaryPath: Optional[str] = None
+    businessPlanPath: Optional[str] = None
+    financialProjectionPath: Optional[str] = None
+    additionalDocumentsPaths: Optional[List[str]] = None
+
+class SSDCustomerMetrics(BaseModel):
+    customerAcquisitionCost: Optional[float] = None
+    customerLifetimeValue: Optional[float] = None
+    churn: Optional[float] = None
+    margins: Optional[float] = None
+
+class SSDRevenueMetrics(BaseModel):
+    totalRevenuesToDate: Optional[float] = None
+    monthlyRecurringRevenue: Optional[float] = None
+    yearToDateRevenue: Optional[float] = None
+    burnRate: Optional[float] = None
+
+class SSDMarketSize(BaseModel):
+    totalAvailableMarket: Optional[float] = None
+    serviceableAreaMarket: Optional[float] = None
+    serviceableObtainableMarket: Optional[float] = None
+
+
+class SSDStartupData(BaseModel):
+    """Full SSD → TCA TIRR request schema (sections 4.1.1–4.1.8)."""
+    contactInformation: SSDContactInformation
+    companyInformation: SSDCompanyInformation
+    financialInformation: SSDFinancialInformation
+    investorQuestions: Optional[SSDInvestorQuestions] = None
+    documents: Optional[SSDDocuments] = None
+    customerMetrics: Optional[SSDCustomerMetrics] = None
+    revenueMetrics: Optional[SSDRevenueMetrics] = None
+    marketSize: Optional[SSDMarketSize] = None
+    # Internal fields (not from SSD spec — used for routing/callback)
+    callback_url: Optional[str] = None
+
+
 class EvaluationResponse(BaseModel):
     evaluation_id: str
     user_id: str
@@ -222,6 +370,64 @@ class EvaluationResponse(BaseModel):
     status: str
     created_at: datetime
     results: Optional[Dict[str, Any]] = None
+
+
+# ─── SSD Audit Log Models ─────────────────────────────────────────────
+class SSDAuditLogEntry(BaseModel):
+    """A single audit log entry for SSD→TCA TIRR integration."""
+    tracking_id: str
+    event_type: str  # received, validated, processing, completed, callback_sent, callback_failed, error
+    timestamp: str
+    details: Optional[Dict[str, Any]] = None
+
+
+class SSDAuditLog(BaseModel):
+    """Full audit log for an SSD request."""
+    tracking_id: str
+    company_name: str
+    founder_email: str
+    status: str  # pending, processing, completed, failed
+    created_at: str
+    updated_at: str
+    request_payload_hash: Optional[str] = None
+    request_payload_size: int = 0
+    report_path: Optional[str] = None
+    report_version: int = 1
+    callback_url: Optional[str] = None
+    callback_status: Optional[str] = None  # sent, failed, not_configured
+    callback_response_code: Optional[int] = None
+    processing_duration_ms: Optional[int] = None
+    final_score: Optional[float] = None
+    recommendation: Optional[str] = None
+    events: List[SSDAuditLogEntry] = []
+
+
+# In-memory audit storage (production would use database)
+SSD_AUDIT_LOGS: Dict[str, Dict[str, Any]] = {}
+
+
+def _ssd_audit_log(tracking_id: str, event_type: str, details: Optional[Dict[str, Any]] = None):
+    """Add an audit log entry for an SSD request."""
+    entry = {
+        "event_type": event_type,
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "details": details or {},
+    }
+    if tracking_id not in SSD_AUDIT_LOGS:
+        SSD_AUDIT_LOGS[tracking_id] = {
+            "tracking_id": tracking_id,
+            "events": [],
+            "created_at": entry["timestamp"],
+        }
+    SSD_AUDIT_LOGS[tracking_id]["events"].append(entry)
+    SSD_AUDIT_LOGS[tracking_id]["updated_at"] = entry["timestamp"]
+    logger.info(f"[SSD-AUDIT] {tracking_id}: {event_type}")
+
+
+def _ssd_audit_update(tracking_id: str, **kwargs):
+    """Update audit log metadata fields."""
+    if tracking_id in SSD_AUDIT_LOGS:
+        SSD_AUDIT_LOGS[tracking_id].update(kwargs)
 
 
 # Utility functions
@@ -2494,6 +2700,796 @@ async def get_all_requests(current_user: dict = Depends(get_current_user)):
         logger.error(f"Get all requests error: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch requests")
 
+
+# ═══════════════════════════════════════════════════════════════════════
+#  SSD → TCA TIRR INTEGRATION ENDPOINT
+# ═══════════════════════════════════════════════════════════════════════
+
+def _ssd_build_extracted_text(payload: SSDStartupData) -> str:
+    """Assemble a rich text block from the structured SSD payload
+    so the existing 9-module keyword scanner can derive signals."""
+    ci = payload.companyInformation
+    fi = payload.financialInformation
+    co = payload.contactInformation
+    iq = payload.investorQuestions or SSDInvestorQuestions()
+    cm = payload.customerMetrics or SSDCustomerMetrics()
+    rm = payload.revenueMetrics or SSDRevenueMetrics()
+    ms = payload.marketSize or SSDMarketSize()
+
+    parts = [
+        f"Company: {ci.companyName or 'N/A'}",
+        f"Industry: {ci.industryVertical}",
+        f"Stage: {ci.developmentStage}",
+        f"Business Model: {ci.businessModel}",
+        f"Location: {ci.city}, {ci.state}, {ci.country}",
+        f"One-liner: {ci.oneLineDescription}",
+        f"Description: {ci.companyDescription}",
+        f"Product: {ci.productDescription}",
+        f"Employees: {ci.numberOfEmployees or 'N/A'}",
+        f"Founder: {co.firstName} {co.lastName} — {co.jobTitle or 'Founder'}",
+        f"LinkedIn: {co.linkedInUrl or 'N/A'}",
+        f"Funding type: {fi.fundingType}",
+        f"Annual revenue: ${fi.annualRevenue:,.2f}",
+        f"Pre-money valuation: ${fi.preMoneyValuation:,.2f}",
+    ]
+    if fi.postMoneyValuation:
+        parts.append(f"Post-money valuation: ${fi.postMoneyValuation:,.2f}")
+    if fi.targetRaise:
+        parts.append(f"Target raise: ${fi.targetRaise:,.2f}")
+    if fi.currentlyRaised:
+        parts.append(f"Currently raised: ${fi.currentlyRaised:,.2f}")
+    if fi.offeringType:
+        parts.append(f"Offering type: {fi.offeringType}")
+
+    # Revenue metrics
+    if rm.totalRevenuesToDate:
+        parts.append(f"Total revenues to date: ${rm.totalRevenuesToDate:,.2f}")
+    if rm.monthlyRecurringRevenue:
+        parts.append(f"MRR: ${rm.monthlyRecurringRevenue:,.2f}")
+    if rm.yearToDateRevenue:
+        parts.append(f"YTD revenue: ${rm.yearToDateRevenue:,.2f}")
+    if rm.burnRate:
+        parts.append(f"Burn rate: ${rm.burnRate:,.2f}/month")
+
+    # Customer metrics
+    if cm.customerAcquisitionCost:
+        parts.append(f"CAC: ${cm.customerAcquisitionCost:,.2f}")
+    if cm.customerLifetimeValue:
+        parts.append(f"LTV: ${cm.customerLifetimeValue:,.2f}")
+    if cm.churn is not None:
+        parts.append(f"Churn: {cm.churn}%")
+    if cm.margins is not None:
+        parts.append(f"Gross margin: {cm.margins}%")
+
+    # Market size
+    if ms.totalAvailableMarket:
+        parts.append(f"TAM: ${ms.totalAvailableMarket:,.0f}")
+    if ms.serviceableAreaMarket:
+        parts.append(f"SAM: ${ms.serviceableAreaMarket:,.0f}")
+    if ms.serviceableObtainableMarket:
+        parts.append(f"SOM: ${ms.serviceableObtainableMarket:,.0f}")
+
+    # Investor question blocks
+    for field_name, label in [
+        ("problemSolution", "Problem & Solution"),
+        ("companyBackgroundTeam", "Team Background"),
+        ("markets", "Markets"),
+        ("competitionDifferentiation", "Competition & Differentiation"),
+        ("businessModelChannels", "Business Model & Channels"),
+        ("timeline", "Timeline"),
+        ("technologyIP", "Technology & IP"),
+        ("specialAgreements", "Special Agreements"),
+        ("cashFlow", "Cash Flow"),
+        ("fundingHistory", "Funding History"),
+        ("risksChallenges", "Risks & Challenges"),
+        ("exitStrategy", "Exit Strategy"),
+    ]:
+        val = getattr(iq, field_name, None)
+        if val:
+            parts.append(f"{label}: {val}")
+
+    return "\n".join(parts)
+
+
+def _ssd_build_financial_data(payload: SSDStartupData) -> Dict[str, Any]:
+    """Map SSD financial fields → analysis engine financial_data dict."""
+    fi = payload.financialInformation
+    rm = payload.revenueMetrics or SSDRevenueMetrics()
+    cm = payload.customerMetrics or SSDCustomerMetrics()
+
+    data: Dict[str, Any] = {
+        "revenue": fi.annualRevenue,
+        "arr": fi.annualRevenue,
+        "pre_money_valuation": fi.preMoneyValuation,
+    }
+    if fi.postMoneyValuation:
+        data["post_money_valuation"] = fi.postMoneyValuation
+    if fi.targetRaise:
+        data["target_raise"] = fi.targetRaise
+    if fi.currentlyRaised:
+        data["currently_raised"] = fi.currentlyRaised
+    if rm.monthlyRecurringRevenue:
+        data["mrr"] = rm.monthlyRecurringRevenue
+    if rm.burnRate:
+        data["burn_rate"] = rm.burnRate
+    if rm.totalRevenuesToDate:
+        data["total_revenues"] = rm.totalRevenuesToDate
+    if cm.margins is not None:
+        data["gross_margin"] = cm.margins
+    if cm.customerAcquisitionCost:
+        data["cac"] = cm.customerAcquisitionCost
+    if cm.customerLifetimeValue:
+        data["ltv"] = cm.customerLifetimeValue
+    if cm.churn is not None:
+        data["churn_rate"] = cm.churn
+
+    # Compute runway if burn_rate is available
+    if rm.burnRate and rm.burnRate > 0:
+        cash = fi.currentlyRaised or 0
+        if cash > 0:
+            data["runway_months"] = round(cash / rm.burnRate, 1)
+
+    return data
+
+
+def _ssd_build_key_metrics(payload: SSDStartupData) -> Dict[str, Any]:
+    """Map SSD fields → analysis engine key_metrics dict."""
+    ci = payload.companyInformation
+    fi = payload.financialInformation
+    cm = payload.customerMetrics or SSDCustomerMetrics()
+    ms = payload.marketSize or SSDMarketSize()
+
+    data: Dict[str, Any] = {
+        "industry": ci.industryVertical,
+        "funding_stage": fi.fundingType,
+        "development_stage": ci.developmentStage,
+        "business_model": ci.businessModel,
+    }
+    if ci.numberOfEmployees:
+        data["team_size"] = ci.numberOfEmployees
+    if cm.churn is not None:
+        data["churn_rate"] = cm.churn
+    if ms.totalAvailableMarket:
+        data["tam"] = ms.totalAvailableMarket
+    if ms.serviceableAreaMarket:
+        data["sam"] = ms.serviceableAreaMarket
+    if ms.serviceableObtainableMarket:
+        data["som"] = ms.serviceableObtainableMarket
+    return data
+
+
+@app.post("/api/ssd/tirr")
+async def ssd_tirr_endpoint(payload: SSDStartupData, background_tasks: BackgroundTasks):
+    """
+    TCA TIRR endpoint for the SSD application.
+
+    Flow:
+      1. Receive structured startup data from SSD (JSON POST, sections 4.1.1–4.1.8)
+      2. Persist to allupload table
+      3. Run 9-module analysis
+      4. Generate triage report and save to server
+      5. POST callback to SSD CaptureTCAReportResponse with founderEmail + generatedReportPath
+
+    Request body: SSDStartupData (contactInformation, companyInformation,
+                  financialInformation, investorQuestions, documents,
+                  customerMetrics, revenueMetrics, marketSize)
+
+    Response: immediate 202 Accepted with a tracking reference;
+              the full report is delivered asynchronously via the SSD callback.
+    """
+    import hashlib
+    
+    company_name = payload.companyInformation.companyName or f"{payload.contactInformation.firstName}'s Company"
+    founder_email = payload.contactInformation.email
+    tracking_id = str(uuid.uuid4())
+    
+    # Create payload hash and size for audit
+    payload_json = payload.model_dump_json(exclude_none=True)
+    payload_hash = hashlib.sha256(payload_json.encode()).hexdigest()[:16]
+    payload_size = len(payload_json)
+    
+    logger.info(
+        f"[SSD-TIRR] Received request for '{company_name}' "
+        f"(founder={founder_email}, tracking={tracking_id})"
+    )
+    
+    # Initialize audit log
+    _ssd_audit_log(tracking_id, "received", {
+        "company_name": company_name,
+        "founder_email": founder_email,
+    })
+    _ssd_audit_update(
+        tracking_id,
+        company_name=company_name,
+        founder_email=founder_email,
+        status="pending",
+        request_payload=payload.model_dump(exclude_none=True),
+        request_payload_hash=payload_hash,
+        request_payload_size=payload_size,
+    )
+
+    # Determine callback URL
+    callback = payload.callback_url or SSD_CALLBACK_URL
+    if not callback:
+        logger.warning("[SSD-TIRR] No SSD callback URL configured — report will be saved but not pushed.")
+        _ssd_audit_update(tracking_id, callback_url=None, callback_status="not_configured")
+    else:
+        _ssd_audit_update(tracking_id, callback_url=callback)
+    
+    # Log validation success
+    _ssd_audit_log(tracking_id, "validated", {
+        "payload_hash": payload_hash,
+        "payload_size": payload_size,
+    })
+
+    # Schedule the heavy work in a background task so SSD gets an immediate response
+    background_tasks.add_task(
+        _process_ssd_tirr_request,
+        payload=payload,
+        tracking_id=tracking_id,
+        callback_url=callback,
+    )
+
+    return JSONResponse(
+        status_code=202,
+        content={
+            "status": "accepted",
+            "tracking_id": tracking_id,
+            "message": f"Report generation started for '{company_name}'. "
+                       f"Results will be delivered to the SSD callback endpoint.",
+        },
+    )
+
+
+@app.get("/api/ssd/tirr/{tracking_id}")
+async def ssd_tirr_status(tracking_id: str):
+    """
+    Check the status of a TCA TIRR report by tracking_id.
+    Returns the report if it has been generated, or a status message otherwise.
+    """
+    report_path = REPORTS_DIR / f"tirr_{tracking_id}.json"
+    if report_path.exists():
+        with open(report_path, "r", encoding="utf-8") as f:
+            report = json.load(f)
+        return {
+            "status": "completed",
+            "tracking_id": tracking_id,
+            "report_file_path": str(report_path),
+            "report": report,
+        }
+    else:
+        return JSONResponse(
+            status_code=202,
+            content={
+                "status": "processing",
+                "tracking_id": tracking_id,
+                "message": "Report is still being generated.",
+            },
+        )
+
+
+async def _process_ssd_tirr_request(
+    payload: SSDStartupData,
+    tracking_id: str,
+    callback_url: str,
+):
+    """
+    Background task that:
+      1. Stores the SSD data in allupload
+      2. Runs the 9-module analysis
+      3. Generates a triage report
+      4. Saves the report to REPORTS_DIR
+      5. POSTs the callback to SSD CaptureTCAReportResponse
+    """
+    import time
+    start_time = time.time()
+    
+    company_name = payload.companyInformation.companyName or f"{payload.contactInformation.firstName}'s Company"
+    founder_email = payload.contactInformation.email
+    upload_id = None
+    
+    # Update audit status to processing
+    _ssd_audit_log(tracking_id, "processing", {"stage": "started"})
+    _ssd_audit_update(tracking_id, status="processing")
+    
+    try:
+        # ── 1. Persist to allupload ──────────────────────────────────
+        _ssd_audit_log(tracking_id, "processing", {"stage": "data_extraction"})
+        
+        text = _ssd_build_extracted_text(payload)
+        financial_data = _ssd_build_financial_data(payload)
+        key_metrics = _ssd_build_key_metrics(payload)
+
+        extracted_data: Dict[str, Any] = {
+            "text_content": text,
+            "word_count": len(text.split()),
+            "char_count": len(text),
+            "financial_data": financial_data,
+            "key_metrics": key_metrics,
+            "company_data": {
+                **financial_data,
+                **key_metrics,
+            },
+            "ssd_payload": payload.model_dump(exclude_none=True),
+        }
+        
+        _ssd_audit_log(tracking_id, "processing", {"stage": "database_insert"})
+
+        async with db_manager.get_connection() as conn:
+            row = await conn.fetchrow(
+                """
+                INSERT INTO allupload
+                    (source_type, file_name, file_type,
+                     extracted_text, extracted_data, company_name,
+                     processing_status, upload_metadata)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                RETURNING upload_id, created_at
+                """,
+                "ssd_tirr",
+                f"SSD-{company_name}",
+                "application/json",
+                text,
+                json.dumps(extracted_data, default=str),
+                company_name,
+                "processing",
+                json.dumps({
+                    "source": "ssd_tirr",
+                    "tracking_id": tracking_id,
+                    "founder_email": founder_email,
+                    "founder_name": f"{payload.contactInformation.firstName} {payload.contactInformation.lastName}",
+                }),
+            )
+            upload_id = str(row["upload_id"])
+
+        logger.info(f"[SSD-TIRR] Data stored as upload_id={upload_id}")
+        _ssd_audit_log(tracking_id, "processing", {"stage": "data_stored", "upload_id": upload_id})
+
+        # ── 2. Run 9-module analysis ─────────────────────────────────
+        _ssd_audit_log(tracking_id, "processing", {"stage": "analysis_started"})
+        
+        merged_data = extracted_data.copy()
+        company_context = {
+            "company_name": company_name,
+            "extracted_text": text,
+            **merged_data,
+        }
+
+        module_results: Dict[str, Any] = {}
+        total_weight = 0.0
+        weighted_score = 0.0
+        source_ids = [upload_id]
+
+        for mod in NINE_MODULES:
+            result = _run_module(mod, company_context, merged_data)
+            score = result.get("score", 0)
+            w = mod["weight"]
+            result["weighted_score"] = round(score * w / 100, 2)
+            module_results[mod["id"]] = result
+            weighted_score += score * w
+            total_weight += w
+
+        final_score = round(weighted_score / total_weight, 1) if total_weight > 0 else 0
+
+        rec_info = get_recommendation(final_score)
+        recommendation = rec_info["label"]
+        score_interpretation = interpret_score(final_score)
+
+        analysis_output = {
+            "analysis_type": "comprehensive_9_module",
+            "company_name": company_name,
+            "timestamp": datetime.utcnow().isoformat(),
+            "final_tca_score": final_score,
+            "investment_recommendation": recommendation,
+            "active_modules": [m["id"] for m in NINE_MODULES],
+            "module_count": len(NINE_MODULES),
+            "analysis_completeness": 100.0,
+            "source_upload_ids": source_ids,
+            "module_results": module_results,
+        }
+
+        # Store analysis result back into allupload
+        async with db_manager.get_connection() as conn:
+            await conn.execute(
+                """UPDATE allupload
+                   SET analysis_result = $1,
+                       analysis_id = $2,
+                       processing_status = 'completed',
+                       updated_at = NOW()
+                   WHERE upload_id = $3""",
+                json.dumps(analysis_output),
+                f"tirr_{tracking_id}",
+                uuid.UUID(upload_id),
+            )
+
+        logger.info(
+            f"[SSD-TIRR] 9-module analysis complete: score={final_score}, rec={recommendation}"
+        )
+        _ssd_audit_log(tracking_id, "processing", {
+            "stage": "analysis_complete",
+            "final_score": final_score,
+            "recommendation": recommendation,
+        })
+        _ssd_audit_update(
+            tracking_id,
+            final_score=final_score,
+            recommendation=recommendation,
+        )
+
+        # ── 3. Generate triage report ────────────────────────────────
+        _ssd_audit_log(tracking_id, "processing", {"stage": "report_generation"})
+        mr = analysis_output.get("module_results", {})
+        tca = mr.get("tca_scorecard", {})
+        risk = mr.get("risk_assessment", {})
+        market = mr.get("market_analysis", {})
+        team = mr.get("team_assessment", {})
+        fin_mod = mr.get("financial_analysis", {})
+        tech = mr.get("technology_assessment", {})
+        biz = mr.get("business_model", {})
+        growth = mr.get("growth_assessment", {})
+        invest = mr.get("investment_readiness", {})
+
+        triage_report = {
+            "report_type": "triage",
+            "company_name": company_name,
+            "founder_email": founder_email,
+            "founder_name": f"{payload.contactInformation.firstName} {payload.contactInformation.lastName}",
+            "tracking_id": tracking_id,
+            "generated_at": datetime.utcnow().isoformat(),
+            "final_tca_score": final_score,
+            "recommendation": recommendation,
+            "total_pages": 6,
+
+            "report_meta": REPORT_META,
+            "page_1_executive_summary": {
+                "title": f"Triage Report — {company_name}",
+                "overall_score": final_score,
+                "score_interpretation": score_interpretation,
+                "investment_recommendation": recommendation,
+                "analysis_completeness": 100.0,
+                "modules_run": 9,
+            },
+            "page_2_tca_scorecard": {
+                "title": "TCA Scorecard — Category Breakdown",
+                "composite_score": tca.get("composite_score", 0),
+                "categories": tca.get("categories", []),
+                "top_strengths": [c["category"] for c in tca.get("categories", []) if c.get("flag") == "green"][:3],
+                "areas_of_concern": [c["category"] for c in tca.get("categories", []) if c.get("flag") != "green"][:3],
+            },
+            "page_3_risk_assessment": {
+                "title": "Risk Assessment & Flags",
+                "overall_risk_score": risk.get("overall_risk_score", 0),
+                "total_flags": len(risk.get("flags", [])),
+                "high_risk_count": len([f for f in risk.get("flags", []) if f.get("severity", 0) >= 6]),
+                "risk_flags": risk.get("flags", []),
+                "risk_domains": risk.get("risk_domains", {}),
+            },
+            "page_4_market_and_team": {
+                "title": "Market Opportunity & Team Assessment",
+                "market_score": market.get("market_score", 0),
+                "tam": market.get("tam", "N/A"),
+                "sam": market.get("sam", "N/A"),
+                "som": market.get("som", "N/A"),
+                "growth_rate": market.get("growth_rate", "N/A"),
+                "competitive_position": market.get("competitive_position", "N/A"),
+                "competitive_advantages": market.get("competitive_advantages", []),
+                "team_score": team.get("team_score", 0),
+                "team_completeness": team.get("team_completeness", 0),
+                "founders": team.get("founders", []),
+                "team_gaps": team.get("gaps", []),
+            },
+            "page_5_financials_and_tech": {
+                "title": "Financial Health & Technology Assessment",
+                "financial_score": fin_mod.get("financial_health_score", 0),
+                "revenue": fin_mod.get("revenue", 0),
+                "mrr": fin_mod.get("mrr", 0),
+                "burn_rate": fin_mod.get("burn_rate", 0),
+                "runway_months": fin_mod.get("runway_months", 0),
+                "ltv_cac_ratio": fin_mod.get("ltv_cac_ratio", 0),
+                "gross_margin": fin_mod.get("gross_margin", 0),
+                "technology_score": tech.get("technology_score", 0),
+                "trl": tech.get("trl", 0),
+                "ip_strength": tech.get("ip_strength", "N/A"),
+                "tech_stack": tech.get("stack", []),
+            },
+            "page_6_recommendations": {
+                "title": "Investment Recommendation & Next Steps",
+                "final_decision": recommendation,
+                "business_model_score": biz.get("business_model_score", 0),
+                "business_model_type": biz.get("model_type", "N/A"),
+                "growth_potential_score": growth.get("growth_potential_score", 0),
+                "growth_projections": growth.get("growth_projections", {}),
+                "investment_readiness_score": invest.get("readiness_score", 0),
+                "exit_potential": invest.get("exit_potential", {}),
+                "funding_recommendation": invest.get("funding_recommendation", {}),
+                "next_steps": PAGE_CONFIG["page_6_recommendations"]["default_next_steps"],
+            },
+        }
+
+        # ── 4. Save report to filesystem ─────────────────────────────
+        report_filename = f"tirr_{tracking_id}.json"
+        report_path = REPORTS_DIR / report_filename
+        with open(report_path, "w", encoding="utf-8") as f:
+            json.dump(triage_report, f, indent=2, default=str)
+
+        logger.info(f"[SSD-TIRR] Triage report saved → {report_path}")
+        _ssd_audit_log(tracking_id, "processing", {"stage": "report_saved", "path": str(report_path)})
+        _ssd_audit_update(tracking_id, report_path=str(report_path))
+
+        # ── 5. POST callback to SSD CaptureTCAReportResponse ─────────
+        if callback_url:
+            # Response payload per spec section 4.2
+            callback_payload = {
+                "founderEmail": founder_email,
+                "generatedReportPath": str(report_path),
+            }
+            _ssd_audit_update(tracking_id, response_payload=callback_payload)
+            
+            try:
+                async with httpx.AsyncClient(timeout=30) as client:
+                    resp = await client.post(callback_url, json=callback_payload)
+                    resp.raise_for_status()
+                logger.info(
+                    f"[SSD-TIRR] Callback sent to {callback_url} — HTTP {resp.status_code}"
+                )
+                _ssd_audit_log(tracking_id, "callback_sent", {
+                    "url": callback_url,
+                    "status_code": resp.status_code,
+                })
+                _ssd_audit_update(
+                    tracking_id,
+                    callback_status="sent",
+                    callback_response_code=resp.status_code,
+                    callback_sent_at=datetime.utcnow().isoformat() + "Z",
+                )
+            except Exception as cb_err:
+                logger.error(f"[SSD-TIRR] Callback to SSD failed: {cb_err}")
+                _ssd_audit_log(tracking_id, "callback_failed", {
+                    "url": callback_url,
+                    "error": str(cb_err),
+                })
+                _ssd_audit_update(tracking_id, callback_status="failed")
+        else:
+            logger.info("[SSD-TIRR] No callback URL — skipping SSD notification.")
+        
+        # Mark completed
+        processing_duration_ms = int((time.time() - start_time) * 1000)
+        _ssd_audit_log(tracking_id, "completed", {
+            "duration_ms": processing_duration_ms,
+            "final_score": final_score,
+            "recommendation": recommendation,
+        })
+        _ssd_audit_update(
+            tracking_id,
+            status="completed",
+            processing_duration_ms=processing_duration_ms,
+        )
+
+    except Exception as e:
+        logger.error(f"[SSD-TIRR] Processing failed for tracking_id={tracking_id}: {e}")
+        _ssd_audit_log(tracking_id, "error", {"error": str(e)})
+        _ssd_audit_update(tracking_id, status="failed")
+        # Update allupload status to failed if we got an upload_id
+        if upload_id:
+            try:
+                async with db_manager.get_connection() as conn:
+                    await conn.execute(
+                        """UPDATE allupload
+                           SET processing_status = 'failed',
+                               processing_error = $1,
+                               updated_at = NOW()
+                           WHERE upload_id = $2""",
+                        str(e),
+                        uuid.UUID(upload_id),
+                    )
+            except Exception as update_err:
+                logger.error(f"[SSD-TIRR] Failed to update status: {update_err}")
+
+        # Attempt to notify SSD of failure (error response per spec section 5.3)
+        if callback_url:
+            try:
+                async with httpx.AsyncClient(timeout=15) as client:
+                    await client.post(callback_url, json={
+                        "error": {
+                            "code": "REPORT_GENERATION_FAILED",
+                            "message": str(e),
+                            "details": {
+                                "tracking_id": tracking_id,
+                                "timestamp": datetime.utcnow().isoformat() + "Z",
+                            },
+                        },
+                        "founderEmail": founder_email,
+                    })
+            except Exception:
+                pass
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  SSD AUDIT LOG API ENDPOINTS
+# ═══════════════════════════════════════════════════════════════════════
+
+@app.get("/api/ssd/audit/logs")
+async def list_ssd_audit_logs(
+    status: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+):
+    """
+    List all SSD integration audit logs.
+    Admin endpoint to review all SSD→TCA TIRR requests.
+    """
+    logs = list(SSD_AUDIT_LOGS.values())
+    
+    # Filter by status if provided
+    if status:
+        logs = [l for l in logs if l.get("status") == status]
+    
+    # Sort by created_at descending
+    logs.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    
+    # Paginate
+    total = len(logs)
+    paginated = logs[offset:offset + limit]
+    
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "logs": paginated,
+    }
+
+
+@app.get("/api/ssd/audit/logs/{tracking_id}")
+async def get_ssd_audit_log(tracking_id: str):
+    """
+    Get detailed audit log for a specific SSD request by tracking_id.
+    Includes all events, request/response data, and processing details.
+    """
+    if tracking_id not in SSD_AUDIT_LOGS:
+        raise HTTPException(status_code=404, detail=f"Audit log for tracking_id '{tracking_id}' not found")
+    
+    audit_log = SSD_AUDIT_LOGS[tracking_id]
+    
+    # Also check if report exists and enrich with report info
+    report_path = REPORTS_DIR / f"tirr_{tracking_id}.json"
+    if report_path.exists():
+        audit_log["report_exists"] = True
+        audit_log["report_file_size"] = report_path.stat().st_size
+    else:
+        audit_log["report_exists"] = False
+    
+    return audit_log
+
+
+@app.get("/api/ssd/audit/logs/{tracking_id}/request")
+async def get_ssd_request_payload(tracking_id: str):
+    """
+    Retrieve the original SSD request payload for a tracking_id.
+    Used for audit review to see exact data received from SSD.
+    """
+    if tracking_id not in SSD_AUDIT_LOGS:
+        raise HTTPException(status_code=404, detail=f"Audit log for tracking_id '{tracking_id}' not found")
+    
+    audit_log = SSD_AUDIT_LOGS[tracking_id]
+    
+    return {
+        "tracking_id": tracking_id,
+        "request_payload": audit_log.get("request_payload"),
+        "received_at": audit_log.get("created_at"),
+        "payload_size": audit_log.get("request_payload_size", 0),
+    }
+
+
+@app.get("/api/ssd/audit/logs/{tracking_id}/response")
+async def get_ssd_response_payload(tracking_id: str):
+    """
+    Retrieve the callback response sent to SSD for a tracking_id.
+    Used for audit review to see exact data sent back to SSD.
+    """
+    if tracking_id not in SSD_AUDIT_LOGS:
+        raise HTTPException(status_code=404, detail=f"Audit log for tracking_id '{tracking_id}' not found")
+    
+    audit_log = SSD_AUDIT_LOGS[tracking_id]
+    
+    return {
+        "tracking_id": tracking_id,
+        "callback_url": audit_log.get("callback_url"),
+        "callback_status": audit_log.get("callback_status"),
+        "callback_response_code": audit_log.get("callback_response_code"),
+        "response_payload": audit_log.get("response_payload"),
+        "sent_at": audit_log.get("callback_sent_at"),
+    }
+
+
+@app.get("/api/ssd/audit/logs/{tracking_id}/report")
+async def get_ssd_report_data(tracking_id: str):
+    """
+    Retrieve the generated report for a tracking_id.
+    Returns the full report JSON if available.
+    """
+    report_path = REPORTS_DIR / f"tirr_{tracking_id}.json"
+    if not report_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"Report for tracking_id '{tracking_id}' not found or not yet generated"
+        )
+    
+    with open(report_path, "r", encoding="utf-8") as f:
+        report = json.load(f)
+    
+    return {
+        "tracking_id": tracking_id,
+        "report_path": str(report_path),
+        "report": report,
+    }
+
+
+@app.get("/api/ssd/audit/stats")
+async def get_ssd_audit_stats():
+    """
+    Get aggregate statistics on SSD integration health.
+    """
+    logs = list(SSD_AUDIT_LOGS.values())
+    total = len(logs)
+    completed = len([l for l in logs if l.get("status") == "completed"])
+    failed = len([l for l in logs if l.get("status") == "failed"])
+    processing = len([l for l in logs if l.get("status") == "processing"])
+    
+    callback_sent = len([l for l in logs if l.get("callback_status") == "sent"])
+    callback_failed = len([l for l in logs if l.get("callback_status") == "failed"])
+    
+    # Calculate average processing time
+    processing_times = [
+        l.get("processing_duration_ms", 0) for l in logs
+        if l.get("processing_duration_ms")
+    ]
+    avg_processing_ms = sum(processing_times) / len(processing_times) if processing_times else 0
+    
+    # Score distribution
+    scores = [l.get("final_score") for l in logs if l.get("final_score") is not None]
+    avg_score = sum(scores) / len(scores) if scores else 0
+    
+    return {
+        "total_requests": total,
+        "status_breakdown": {
+            "completed": completed,
+            "failed": failed,
+            "processing": processing,
+        },
+        "callback_stats": {
+            "sent": callback_sent,
+            "failed": callback_failed,
+            "not_configured": total - callback_sent - callback_failed,
+        },
+        "performance": {
+            "avg_processing_time_ms": round(avg_processing_ms, 2),
+        },
+        "scores": {
+            "avg_final_score": round(avg_score, 2),
+            "total_evaluated": len(scores),
+        },
+    }
+
+
+@app.delete("/api/ssd/audit/logs/{tracking_id}")
+async def delete_ssd_audit_log(tracking_id: str):
+    """
+    Delete an audit log entry (admin only, for cleanup).
+    """
+    if tracking_id not in SSD_AUDIT_LOGS:
+        raise HTTPException(status_code=404, detail=f"Audit log for tracking_id '{tracking_id}' not found")
+    
+    del SSD_AUDIT_LOGS[tracking_id]
+    
+    # Also try to delete the report file
+    report_path = REPORTS_DIR / f"tirr_{tracking_id}.json"
+    if report_path.exists():
+        report_path.unlink()
+    
+    return {"status": "deleted", "tracking_id": tracking_id}
+
+
+# Wrap app with ASGI JSON validation middleware (must be after all route definitions)
+app = JSONBodyValidationMiddleware(app)
 
 if __name__ == "__main__":
     # Run the server

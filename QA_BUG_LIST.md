@@ -1,4 +1,5 @@
 # TCA-IRR Bug List — QA Sprint Week 1
+
 ## Version 1.0 — February 18, 2026
 
 ---
@@ -18,6 +19,7 @@
 ## Fixed Bugs
 
 ### BUG-AUTH-001 — Register endpoint 500 error [CRITICAL] ✅ FIXED
+
 - **Area:** Authentication
 - **Found in:** QA Run 1
 - **Root Cause:** Backend used non-existent DB columns (`user_id`, `full_name`, `status` varchar) instead of actual schema (`id` integer auto-increment, `username`, `is_active` boolean)
@@ -25,6 +27,7 @@
 - **File:** main.py (lines ~130–275)
 
 ### BUG-AUTH-002 — Login endpoint 500 error [CRITICAL] ✅ FIXED
+
 - **Area:** Authentication
 - **Found in:** QA Run 1
 - **Root Cause:** Login queried `WHERE status = 'Active'` but column is `is_active` (boolean)
@@ -32,6 +35,7 @@
 - **File:** main.py (lines ~280–310)
 
 ### BUG-AUTH-003 — HTTPException swallowed by generic handler [CRITICAL] ✅ FIXED
+
 - **Area:** Authentication
 - **Found in:** QA Run 3
 - **Root Cause:** `except Exception` caught `HTTPException` for 409 duplicate email, converting it to 500
@@ -39,6 +43,7 @@
 - **File:** main.py (line ~270)
 
 ### BUG-AUTH-004 — Empty password accepted [HIGH] ✅ FIXED
+
 - **Area:** Authentication / Security
 - **Found in:** QA Run 5
 - **Root Cause:** No password validation — empty string "" was accepted
@@ -46,6 +51,7 @@
 - **File:** main.py (line ~120)
 
 ### BUG-AUTH-005 — Duplicate username causes 500 [HIGH] ✅ FIXED
+
 - **Area:** Authentication
 - **Found in:** QA Run 5
 - **Root Cause:** `users.username` has UNIQUE constraint; test used hardcoded name
@@ -53,6 +59,7 @@
 - **Files:** main.py (line ~255), test-comprehensive-qa.js (line ~35)
 
 ### BUG-DATA-001 — Uploaded data not stored [HIGH] ✅ FIXED
+
 - **Area:** Data Upload
 - **Found in:** QA Run 2
 - **Root Cause:** `/text/submit` endpoint didn't map `company_data` or `extracted_text` from request body
@@ -60,6 +67,7 @@
 - **File:** main.py
 
 ### BUG-REQ-001 — Request management 500 error [MEDIUM] ✅ FIXED
+
 - **Area:** Request Management
 - **Found in:** QA Run 5
 - **Root Cause:** `users.id` is integer but `app_requests.user_id` is UUID — type mismatch on INSERT
@@ -67,6 +75,7 @@
 - **File:** main.py (lines ~162–191, ~345–405)
 
 ### BUG-CORS-001 — CORS headers not returned [MEDIUM] ✅ FIXED
+
 - **Area:** Infrastructure
 - **Found in:** QA Run 1
 - **Root Cause:** CORS middleware only allowed specific localhost origins; non-browser test had no Origin header
@@ -78,6 +87,7 @@
 ## Open Bugs
 
 ### BUG-SEC-001 — XSS payload stored without sanitization [HIGH] 🔴 OPEN
+
 - **Area:** Security
 - **Severity:** HIGH
 - **Found in:** QA Run 8
@@ -87,6 +97,7 @@
 - **Priority for Week 2:** P1
 
 ### BUG-DATA-002 — Empty text upload accepted [MEDIUM] 🟡 OPEN
+
 - **Area:** Data Upload
 - **Severity:** MEDIUM
 - **Found in:** QA Run 8
@@ -95,6 +106,7 @@
 - **Priority for Week 2:** P2
 
 ### BUG-EDGE-001 — Malformed JSON causes 500 [MEDIUM] 🟡 OPEN
+
 - **Area:** Edge Cases
 - **Severity:** MEDIUM
 - **Found in:** QA Run 8
@@ -104,6 +116,7 @@
 - **Priority for Week 2:** P3
 
 ### BUG-EDGE-002 — No max length on company_name [LOW] 🟢 OPEN
+
 - **Area:** Edge Cases
 - **Severity:** LOW
 - **Found in:** QA Run 8
