@@ -1,10 +1,16 @@
 # Azure DevOps Pipeline for TCA-IRR App
-# Uses Publish Profile credentials (no service connection required)
+# Deploys backend and frontend to Azure Web Apps
 
 trigger:
   branches:
     include:
       - main
+
+parameters:
+  - name: azureServiceConnection
+    displayName: 'Azure Service Connection'
+    type: string
+    default: 'Azure-TCA-ServiceConnection'
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -14,10 +20,14 @@ variables:
     value: 'tcairrapiccontainer'
   - name: frontendAppName
     value: 'tca-irr'
+  - name: resourceGroup
+    value: 'Default-Web-EastUS'
   - name: pythonVersion
     value: '3.11'
   - name: nodeVersion
     value: '18.x'
+  - name: serviceConnection
+    value: ${{ parameters.azureServiceConnection }}
 
 stages:
   - stage: Build
@@ -81,73 +91,37 @@ stages:
     condition: succeeded()
     jobs:
       - job: DeployBackend
-        displayName: 'Deploy Backend via Kudu'
+        displayName: 'Deploy Backend'
         steps:
           - download: current
             artifact: backend
           
-          - script: |
-              echo "Deploying backend to $(backendAppName)..."
-              
-              # Deploy using Kudu ZIP deploy API with publish profile credentials
-              DEPLOY_URL="https://$(backendAppName).scm.azurewebsites.net/api/zipdeploy"
-              ZIP_FILE="$(Pipeline.Workspace)/backend/backend.zip"
-              
-              HTTP_CODE=$(curl -X POST \
-                -u "$(BACKEND_PUBLISH_USER):$(BACKEND_PUBLISH_PASSWORD)" \
-                --data-binary @"$ZIP_FILE" \
-                -H "Content-Type: application/zip" \
-                -w "%{http_code}" \
-                -o /tmp/deploy_response.txt \
-                "$DEPLOY_URL" 2>/dev/null)
-              
-              echo "Deployment response code: $HTTP_CODE"
-              
-              if [ "$HTTP_CODE" -eq "200" ] || [ "$HTTP_CODE" -eq "202" ]; then
-                echo "Backend deployment successful!"
-              else
-                echo "Backend deployment failed with code: $HTTP_CODE"
-                cat /tmp/deploy_response.txt
-                exit 1
-              fi
+          - task: AzureWebApp@1
             displayName: 'Deploy backend to Azure'
-            env:
-              BACKEND_PUBLISH_USER: $(BACKEND_PUBLISH_USER)
-              BACKEND_PUBLISH_PASSWORD: $(BACKEND_PUBLISH_PASSWORD)
+            inputs:
+              azureSubscription: '$(serviceConnection)'
+              appType: 'webAppLinux'
+              appName: '$(backendAppName)'
+              resourceGroupName: '$(resourceGroup)'
+              package: '$(Pipeline.Workspace)/backend/backend.zip'
+              runtimeStack: 'PYTHON|3.11'
+              startUpCommand: 'python launch.py'
 
       - job: DeployFrontend
-        displayName: 'Deploy Frontend via Kudu'
+        displayName: 'Deploy Frontend'
         steps:
           - download: current
             artifact: frontend
           
-          - script: |
-              echo "Deploying frontend to $(frontendAppName)..."
-              
-              DEPLOY_URL="https://$(frontendAppName).scm.azurewebsites.net/api/zipdeploy"
-              ZIP_FILE="$(Pipeline.Workspace)/frontend/frontend.zip"
-              
-              HTTP_CODE=$(curl -X POST \
-                -u "$(FRONTEND_PUBLISH_USER):$(FRONTEND_PUBLISH_PASSWORD)" \
-                --data-binary @"$ZIP_FILE" \
-                -H "Content-Type: application/zip" \
-                -w "%{http_code}" \
-                -o /tmp/deploy_response.txt \
-                "$DEPLOY_URL" 2>/dev/null)
-              
-              echo "Deployment response code: $HTTP_CODE"
-              
-              if [ "$HTTP_CODE" -eq "200" ] || [ "$HTTP_CODE" -eq "202" ]; then
-                echo "Frontend deployment successful!"
-              else
-                echo "Frontend deployment failed with code: $HTTP_CODE"
-                cat /tmp/deploy_response.txt
-                exit 1
-              fi
+          - task: AzureWebApp@1
             displayName: 'Deploy frontend to Azure'
-            env:
-              FRONTEND_PUBLISH_USER: $(FRONTEND_PUBLISH_USER)
-              FRONTEND_PUBLISH_PASSWORD: $(FRONTEND_PUBLISH_PASSWORD)
+            inputs:
+              azureSubscription: '$(serviceConnection)'
+              appType: 'webAppLinux'
+              appName: '$(frontendAppName)'
+              resourceGroupName: '$(resourceGroup)'
+              package: '$(Pipeline.Workspace)/frontend/frontend.zip'
+              runtimeStack: 'NODE|18-lts'
 
   - stage: Verify
     displayName: 'Verify Deployment'
