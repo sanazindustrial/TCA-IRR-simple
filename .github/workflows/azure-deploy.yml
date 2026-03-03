@@ -56,11 +56,11 @@ jobs:
 
       - name: Build and deploy backend to Azure
         run: |
-          az webapp up --name tca-irr-backend \
+          az webapp up --name tcairrapiccontainer \
             --resource-group tca-platform-rg \
             --location "East US" \
             --runtime "PYTHON:3.11" \
-            --src-path backend/
+            --src-path .
 
   deploy-frontend:
     needs: [frontend-build]
@@ -133,7 +133,7 @@ jobs:
     steps:
       - name: Frontend health check
         run: |
-          response=$(curl -s -o /dev/null -w "%{http_code}" https://tca-irr-app.azurestaticapps.net/health || echo "000")
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://tca-irr.azurewebsites.net || echo "000")
           if [ "$response" -eq "200" ]; then
             echo "✅ Frontend is healthy"
           else
@@ -143,7 +143,7 @@ jobs:
 
       - name: Backend health check
         run: |
-          response=$(curl -s -o /dev/null -w "%{http_code}" https://tca-irr-backend.azurewebsites.net/health || echo "000")
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://tcairrapiccontainer.azurewebsites.net/health || echo "000")
           if [ "$response" -eq "200" ]; then
             echo "✅ Backend is healthy"
           else
@@ -153,7 +153,7 @@ jobs:
 
       - name: Database connectivity check
         run: |
-          response=$(curl -s -o /dev/null -w "%{http_code}" https://tca-irr-backend.azurewebsites.net/api/v1/admin/health || echo "000")
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://tcairrapiccontainer.azurewebsites.net/api/health || echo "000")
           if [ "$response" -eq "200" ]; then
             echo "✅ Database connectivity is healthy"
           else
