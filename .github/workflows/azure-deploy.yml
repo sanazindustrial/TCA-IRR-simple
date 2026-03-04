@@ -47,20 +47,35 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Azure Login
-        uses: azure/login@v1
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          python-version: '3.11'
 
-      - name: Build and deploy backend to Azure
+      - name: Install dependencies
         run: |
-          az webapp up --name tcairrapiccontainer \
-            --resource-group tca-platform-rg \
-            --location "East US" \
-            --runtime "PYTHON:3.11" \
-            --src-path .
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt --target=".python_packages/lib/site-packages"
+
+      - name: Create deployment package
+        run: |
+          echo 'gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000' > startup.txt
+          zip -r deploy.zip . \
+            -x "*.git*" \
+            -x "*node_modules*" \
+            -x "*.next*" \
+            -x "*__pycache__*" \
+            -x "*.venv*" \
+            -x "ui.zip" \
+            -x "src/*" \
+            -x "public/*"
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: tcairrapiccontainer
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: deploy.zip
 
   deploy-frontend:
     needs: [frontend-build]
