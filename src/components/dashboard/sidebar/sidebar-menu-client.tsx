@@ -32,7 +32,6 @@ import {
     DollarSign,
     User as UserIcon,
     Eye,
-    Server,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -254,12 +253,6 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
                             <SidebarMenuItem>
-                                <SidebarMenuButton href="/dashboard/ssd-audit" isActive={pathname === '/dashboard/ssd-audit'} tooltip="SSD Integration">
-                                    <Server />
-                                    <span>SSD Integration</span>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
-                            <SidebarMenuItem>
                                 <SidebarMenuButton href="/dashboard/system-config" isActive={pathname === '/dashboard/system-config'} tooltip="System Config">
                                     <Settings />
                                     <span>System Config</span>
@@ -275,6 +268,12 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
                                 <SidebarMenuButton href="/dashboard/reports/configure" isActive={pathname === '/dashboard/reports/configure'} tooltip="Report Configuration">
                                     <FileText />
                                     <span>Report Configuration</span>
+                                </SidebarMenuButton>
+                            </SidebarMenuItem>
+                            <SidebarMenuItem>
+                                <SidebarMenuButton href="/dashboard/ssd-audit" isActive={pathname === '/dashboard/ssd-audit'} tooltip="SSD Audit Logs">
+                                    <Activity />
+                                    <span>SSD Audit Logs</span>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
                             <SidebarMenuItem>

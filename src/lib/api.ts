@@ -5,7 +5,7 @@
 
 // API Configuration
 export const API_CONFIG = {
-    BASE_URL: process.env.NEXT_PUBLIC_API_URL || 'https://tca-irr-api.azurewebsites.net',
+    BASE_URL: process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net',
     ENDPOINTS: {
         AUTH: {
             REGISTER: '/auth/register',

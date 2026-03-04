@@ -3,6 +3,7 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   // Production configuration for Azure App Service
+  output: 'standalone',  // Required for Azure App Service deployment
 
   // Build configuration for production
   typescript: {
