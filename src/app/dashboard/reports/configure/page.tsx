@@ -72,7 +72,7 @@ const defaultDdSections = [
     { id: 'dd-appendix', title: "Appendix", active: true, description: "" },
 ];
 
-// ─── SSD → TCA TIRR Integration Report Sections (6-page triage) ──────
+// ─── SSD → TCA TIRR Integration Report Sections (10-page triage) ──────
 const defaultSsdSections: ReportSection[] = [
     { id: 'ssd-page-1', title: 'Page 1: Executive Summary', active: true, description: 'Overall score, investment recommendation, analysis completeness, company snapshot' },
     { id: 'ssd-page-2', title: 'Page 2: TCA Scorecard', active: true, description: 'Composite score, category breakdown, top strengths, areas of concern' },
@@ -114,6 +114,22 @@ const ssdMandatoryFields = [
     { section: 'Financial', field: 'fundingType', type: 'String', required: true },
     { section: 'Financial', field: 'annualRevenue', type: 'Decimal', required: true },
     { section: 'Financial', field: 'preMoneyValuation', type: 'Decimal', required: true },
+];
+
+// ─── TCA Scorecard Categories for SSD Configuration ──────────────────
+const defaultTcaScorecardCategories = [
+    { id: 'product-market-fit', name: 'Product-Market Fit', weight: 12, enabled: true },
+    { id: 'market-opportunity', name: 'Market Opportunity', weight: 10, enabled: true },
+    { id: 'competitive-advantage', name: 'Competitive Advantage', weight: 10, enabled: true },
+    { id: 'team-strength', name: 'Team Strength', weight: 12, enabled: true },
+    { id: 'financial-health', name: 'Financial Health', weight: 10, enabled: true },
+    { id: 'revenue-traction', name: 'Revenue & Traction', weight: 10, enabled: true },
+    { id: 'scalability', name: 'Scalability', weight: 8, enabled: true },
+    { id: 'technology-ip', name: 'Technology & IP', weight: 8, enabled: true },
+    { id: 'regulatory-compliance', name: 'Regulatory & Compliance', weight: 6, enabled: true },
+    { id: 'exit-potential', name: 'Exit Potential', weight: 6, enabled: true },
+    { id: 'customer-validation', name: 'Customer Validation', weight: 4, enabled: true },
+    { id: 'unit-economics', name: 'Unit Economics', weight: 4, enabled: true },
 ];
 
 
@@ -234,6 +250,7 @@ export default function ReportConfigurationPage() {
     const [ssdTestStatus, setSsdTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
     const [ssdTestResult, setSsdTestResult] = useState<string>('');
     const [ssdThresholds, setSsdThresholds] = useState(defaultSsdThresholds);
+    const [tcaScorecardCategories, setTcaScorecardCategories] = useState(defaultTcaScorecardCategories);
 
     const { toast } = useToast();
 
@@ -245,12 +262,14 @@ export default function ReportConfigurationPage() {
             const savedSsd = localStorage.getItem('report-config-ssd-sections');
             const savedSsdCallback = localStorage.getItem('report-config-ssd-callback');
             const savedSsdThresholds = localStorage.getItem('report-config-ssd-thresholds');
+            const savedTcaCategories = localStorage.getItem('report-config-tca-scorecard-categories');
             if (savedTriageAdmin) setTriageSectionsAdmin(JSON.parse(savedTriageAdmin));
             if (savedTriageStandard) setTriageSectionsStandard(JSON.parse(savedTriageStandard));
             if (savedDd) setDdSections(JSON.parse(savedDd));
             if (savedSsd) setSsdSections(JSON.parse(savedSsd));
             if (savedSsdCallback) setSsdCallbackUrl(savedSsdCallback);
             if (savedSsdThresholds) setSsdThresholds(JSON.parse(savedSsdThresholds));
+            if (savedTcaCategories) setTcaScorecardCategories(JSON.parse(savedTcaCategories));
         } catch (error) {
             console.error("Failed to load report configurations from localStorage", error);
         }
@@ -348,6 +367,7 @@ export default function ReportConfigurationPage() {
             localStorage.setItem('report-config-ssd-sections', JSON.stringify(ssdSections));
             localStorage.setItem('report-config-ssd-callback', ssdCallbackUrl);
             localStorage.setItem('report-config-ssd-thresholds', JSON.stringify(ssdThresholds));
+            localStorage.setItem('report-config-tca-scorecard-categories', JSON.stringify(tcaScorecardCategories));
             toast({
                 title: 'Configuration Saved',
                 description: 'Your report configurations have been saved locally.'
@@ -533,6 +553,72 @@ export default function ReportConfigurationPage() {
                                         </div>
                                         <Button onClick={() => handleAdd('ssd')}><Plus className="mr-2" /> Add Section</Button>
                                     </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* TCA Scorecard Configuration */}
+                        <Card>
+                            <CardHeader>
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <CardTitle>TCA Scorecard Configuration</CardTitle>
+                                        <CardDescription>Configure category weights for TCA analysis scoring (total should equal 100%)</CardDescription>
+                                    </div>
+                                    <Button variant="ghost" onClick={() => setTcaScorecardCategories(defaultTcaScorecardCategories)}>
+                                        <RotateCcw className="mr-2" /> Reset to Default
+                                    </Button>
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Category</TableHead>
+                                            <TableHead className="w-[120px]">Weight (%)</TableHead>
+                                            <TableHead className="w-[100px] text-center">Enabled</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {tcaScorecardCategories.map((category, index) => (
+                                            <TableRow key={category.id}>
+                                                <TableCell className="font-medium">{category.name}</TableCell>
+                                                <TableCell>
+                                                    <Input
+                                                        type="number"
+                                                        min="0"
+                                                        max="100"
+                                                        value={category.weight}
+                                                        onChange={(e) => {
+                                                            const updated = [...tcaScorecardCategories];
+                                                            updated[index] = { ...category, weight: parseInt(e.target.value) || 0 };
+                                                            setTcaScorecardCategories(updated);
+                                                        }}
+                                                        className="h-8 w-20"
+                                                    />
+                                                </TableCell>
+                                                <TableCell className="text-center">
+                                                    <Switch
+                                                        checked={category.enabled}
+                                                        onCheckedChange={(checked) => {
+                                                            const updated = [...tcaScorecardCategories];
+                                                            updated[index] = { ...category, enabled: checked };
+                                                            setTcaScorecardCategories(updated);
+                                                        }}
+                                                    />
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                                <div className="mt-4 flex justify-between items-center p-3 rounded-lg bg-muted/50">
+                                    <span className="font-medium">Total Weight:</span>
+                                    <span className={`text-lg font-bold ${tcaScorecardCategories.filter(c => c.enabled).reduce((sum, c) => sum + c.weight, 0) === 100
+                                            ? 'text-green-600'
+                                            : 'text-red-600'
+                                        }`}>
+                                        {tcaScorecardCategories.filter(c => c.enabled).reduce((sum, c) => sum + c.weight, 0)}%
+                                    </span>
                                 </div>
                             </CardContent>
                         </Card>
