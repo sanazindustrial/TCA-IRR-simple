@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, GripVertical, RotateCcw, Save, Trash2, Plus, Link2, TestTube2, CheckCircle2, XCircle, Loader2, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
+import { API_CONFIG } from '@/lib/api';
 import {
     Table,
     TableBody,
@@ -28,70 +29,62 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 
 const defaultTriageSectionsAdmin = [
-    { id: 'quick-summary', title: 'Quick Summary', active: true, description: "Company, sector, date, valuation, round, runtime, report version, export buttons" },
-    { id: 'tca-summary-card', title: 'TCA Summary Score Card', active: true, description: "Triage classification and statistical analysis (Total score, Score average, Std Dev, Confidence Interval, Tier Level)." },
-    { id: 'executive-summary', title: 'AI Interpretation Summary', active: true, description: "GPT narrative on triage outcome, highlights, risk-opportunity balance" },
-    { id: 'tca-scorecard', title: 'TCA AI Table – 12 Categories', active: true, description: "Central evaluation across fundamental categories (Raw Score, Weight, Weighted Score, Flag, PESTEL, Description, Strengths, Concerns)." },
-    { id: 'weighted-score-breakdown', title: 'TCA Weighted Score Breakdown', active: true, description: "Sector-adjusted total score calculation." },
-    { id: 'risk-flags', title: 'Risk Flag Summary Table', active: true, description: "Summary of top risks and breakdown of analysis, flags, descriptions, mitigations, and thresholds." },
-    { id: 'flag-analysis-narrative', title: 'Flag Analysis Narrative', active: true, description: "GPT-generated narrative of risk flags and triggers." },
-    { id: 'macro-trend', title: 'Macro Trend Alignment', active: true, description: "PESTEL analysis and trend overlay scores." },
-    { id: 'benchmark', title: 'Benchmark Comparison', active: true, description: "Performance vs. sector averages, percentile, deviation, and gap analysis." },
-    { id: 'growth-classifier', title: 'Growth Classifier Matrix', active: true, description: "6-model DSS, best/base/worst scenarios, and classification score." },
-    { id: 'strategic-fit', title: 'Strategic Fit Matrix', active: true, description: "Score trend (Δ vs last), performance direction." },
-    { id: 'consistency-check', title: 'Consistency Check', active: true, description: "Text coherence, score-comment match, pitch vs score stability, and more. (Admin/Reviewer Only)" },
-    { id: 'gap-analysis', title: 'Gap Analysis', active: true, description: "Identifies performance gaps against an 'investor-ready' profile and provides an action plan." },
-    { id: 'funder-fit-analysis', title: 'Funder Fit Analysis', active: true, description: "Generates a 'Funding Readiness' score and provides a shortlist of VCs." },
-    { id: 'team-assessment', title: 'Team Assessment', active: true, description: "GPT review of founder/team alignment, fit, and gaps." },
-    { id: 'reviewer-comments', title: 'Reviewer Comments & Sentiment', active: true, description: "Human reviewer input summary, sentiment, and tone." },
-    { id: 'reviewer-ai-deviation', title: 'Reviewer–AI Deviation Chart', active: true, description: "Score deviation (AI vs reviewer), rationale, and visuals." },
-    { id: 'reviewer-theme-analysis', title: 'Reviewer Theme Analysis', active: true, description: "NLP & manual themes (team, IP, GTM), keyword extraction, tone, topic cluster." },
-    { id: 'final-flag-summary', title: 'Final Flag Summary & Threshold Table', active: true, description: "Full table of triggers, thresholds, and mitigation guidance per risk domain." },
-    { id: 'final-recommendation', title: 'Final Recommendation', active: true, description: "AI and reviewer recommendation with rationale." },
-    { id: 'admin-approval-panel', title: 'Admin Final Approval Panel', active: true, description: "Buttons to lock outcome (Admin/Reviewer Only)." },
-    { id: 'export-links', title: 'Export & Superset Links', active: true, description: "PDF / DOCX / MD / XLSX / JSON downloads + Superset chart link." },
-    { id: 'appendix', title: 'Appendix', active: true, description: "JSON view of weights, flags, benchmark rules, classifier settings, etc." },
+    { id: 'quick-summary', title: 'Quick Summary', active: true, description: "" },
+    { id: 'tca-scorecard', title: 'TCA Scorecard', active: true, description: "" },
+    { id: 'tca-ai-analysis-table', title: 'TCA AI Analysis Table', active: true, description: "" },
+    { id: 'tca-ai-interpretation-summary', title: 'TCA AI Interpretation Summary', active: true, description: "" },
+    { id: 'weighted-score-breakdown', title: 'Weighted Score Breakdown', active: true, description: "" },
+    { id: 'risk-flag-summary-table', title: 'Risk Flag Summary Table', active: true, description: "" },
+    { id: 'flag-analysis-narrative', title: 'Flag Analysis Narrative', active: true, description: "" },
+    { id: 'ceo-questions', title: 'CEO Questions', active: true, description: "" },
+    { id: 'final-recommendation', title: 'Final Recommendation', active: true, description: "" },
 ];
 
-const defaultTriageSectionsStandard = defaultTriageSectionsAdmin.filter(
-    section => !section.description.includes('(Admin/Reviewer Only)')
-);
+const defaultTriageSectionsStandard = [
+    { id: 'quick-summary', title: 'Quick Summary', active: true, description: "" },
+    { id: 'tca-scorecard', title: 'TCA Scorecard', active: true, description: "" },
+    { id: 'tca-ai-analysis-table', title: 'TCA AI Analysis Table', active: true, description: "" },
+    { id: 'tca-ai-interpretation-summary', title: 'TCA AI Interpretation Summary', active: true, description: "" },
+    { id: 'weighted-score-breakdown', title: 'Weighted Score Breakdown', active: true, description: "" },
+    { id: 'risk-flag-summary-table', title: 'Risk Flag Summary Table', active: true, description: "" },
+    { id: 'flag-analysis-narrative', title: 'Flag Analysis Narrative', active: true, description: "" },
+    { id: 'ceo-questions', title: 'CEO Questions', active: true, description: "" },
+    { id: 'final-recommendation', title: 'Final Recommendation', active: true, description: "" },
+];
 
 const defaultDdSections = [
-    { id: 'dd-executive-summary', title: "Executive Summary", active: true, description: "Startup overview, score highlights, top 3 risks, and strengths" },
-    { id: 'dd-tca-scorecard', title: "TCA AI Table – 12 Categories", active: true, description: "Same table as triage, extended with notes if changed" },
-    { id: 'dd-weighted-score-breakdown', title: "Weighted Score Breakdown", active: true, description: "Sector-specific weighted outcome" },
-    { id: 'dd-risk-flags', title: "Risk Flag Table (14 Domains)", active: true, description: "Flag color, trigger, threshold, GPT mitigation plans" },
-    { id: 'dd-macro-trend', title: "Macro Trend + Benchmark Comparison", active: true, description: "Overlays with macro & industry trendlines" },
-    { id: 'dd-growth-classifier', title: "Growth Classifier Matrix", active: true, description: "6-model logic, base/best/worst, sector fit, team alignment" },
-    { id: 'dd-strategic-fit', title: "Strategic Fit Matrix", active: true, description: "Alignment with key strategic pathways." },
-    { id: 'dd-reviewer-analysis', title: "Reviewer Analysis & Sentiment", active: true, description: "Aggregated sentiment, score rationale, and summary of reviewers" },
-    { id: 'dd-reviewer-ai-deviation', title: "Reviewer–AI Score Deviation", active: true, description: "Comparison chart of scoring deviations" },
-    { id: 'dd-reviewer-themes', title: "Reviewer Themes (GPT + Manual)", active: true, description: "NLP + manual clustering (e.g. GTM, TAM, IP)" },
-    { id: 'dd-consistency-check', title: "Consistency Check", active: true, description: "Logical alignment of narrative vs score vs feedback" },
-    { id: 'dd-founder-fit', title: "Founder Fit + Team Analysis", active: true, description: "Extended GPT summary of team history, gaps, fit" },
-    { id: 'dd-competitive-landscape', title: "Competitive Landscape", active: true, description: "Top competitors, positioning, GPT M&A and defensibility insights" },
-    { id: 'dd-regulatory-compliance', title: "Regulatory / Compliance Review", active: true, description: "FDA/CE status, regulatory milestones, risk & timeline" },
-    { id: 'dd-gtm-strategy', title: "Go-to-Market & Commercial Strategy", active: true, description: "Customer pipeline, LOIs, distribution, CPT codes if applicable" },
-    { id: 'dd-ip-tech-review', title: "IP & Technology Review", active: true, description: "Patent filings, freedom to operate, barriers to entry" },
-    { id: 'dd-financials-burn-rate', title: "Financials & Burn Rate", active: true, description: "Runway, revenue growth, CAC/LTV, breakeven roadmap" },
-    { id: 'dd-exit-strategy', title: "Exit Strategy Roadmap", active: true, description: "M&A landscape, IPO viability, exit multiples, ideal acquirers" },
-    { id: 'dd-term-sheet', title: "Term Sheet Trigger Analysis", active: true, description: "Ideal valuation, dilution logic, SAFE/Equity notes" },
-    { id: 'dd-final-risk-summary', title: "Final Flag Summary + Risk Table", active: true, description: "An extended version of the triage risk table" },
-    { id: 'dd-final-recommendation', title: "Final Recommendation", active: true, description: "Human decision based on deep data + AI view" },
-    { id: 'dd-conclusion', title: "Conclusion and summary note", active: true, description: "Summary of risk, points of improvement, TCA recommendation, and detailed conclusion." },
-    { id: 'dd-appendix', title: "Appendix: DD Artifacts & Config Snapshot", active: true, description: "CEO call notes, customer interviews, uploaded docs, config JSON snapshot" },
-    { id: 'dd-export-links', title: 'Export & Superset Links', active: true, description: 'PDF / DOCX / MD / XLSX / JSON downloads + Superset chart link.' }
+    { id: 'dd-executive-summary', title: "Executive Summary", active: true, description: "" },
+    { id: 'dd-tca-scorecard', title: "TCA Scorecard", active: true, description: "" },
+    { id: 'dd-weighted-score-breakdown', title: "Weighted Score Breakdown", active: true, description: "" },
+    { id: 'dd-risk-flags', title: "Risk Flag Table", active: true, description: "" },
+    { id: 'dd-macro-trend', title: "Macro Trend & Benchmark", active: true, description: "" },
+    { id: 'dd-growth-classifier', title: "Growth Classifier Matrix", active: true, description: "" },
+    { id: 'dd-strategic-fit', title: "Strategic Fit Matrix", active: true, description: "" },
+    { id: 'dd-reviewer-analysis', title: "Reviewer Analysis", active: true, description: "" },
+    { id: 'dd-founder-fit', title: "Founder & Team Analysis", active: true, description: "" },
+    { id: 'dd-competitive-landscape', title: "Competitive Landscape", active: true, description: "" },
+    { id: 'dd-regulatory-compliance', title: "Regulatory & Compliance", active: true, description: "" },
+    { id: 'dd-gtm-strategy', title: "Go-to-Market Strategy", active: true, description: "" },
+    { id: 'dd-ip-tech-review', title: "IP & Technology Review", active: true, description: "" },
+    { id: 'dd-financials-burn-rate', title: "Financials & Burn Rate", active: true, description: "" },
+    { id: 'dd-exit-strategy', title: "Exit Strategy", active: true, description: "" },
+    { id: 'dd-final-recommendation', title: "Final Recommendation", active: true, description: "" },
+    { id: 'dd-appendix', title: "Appendix", active: true, description: "" },
 ];
 
 // ─── SSD → TCA TIRR Integration Report Sections (6-page triage) ──────
 const defaultSsdSections: ReportSection[] = [
-    { id: 'ssd-executive-summary', title: 'Page 1: Executive Summary', active: true, description: 'Overall score, score interpretation, investment recommendation, analysis completeness, modules run, company & founder snapshot' },
-    { id: 'ssd-tca-scorecard', title: 'Page 2: TCA Scorecard', active: true, description: 'Composite score, category breakdown (score, weight, flag), top strengths, areas of concern — radar/bar chart' },
-    { id: 'ssd-risk-assessment', title: 'Page 3: Risk Assessment & Flags', active: true, description: 'Overall risk score, total flags, high risk count, risk flags with severity, risk domains' },
-    { id: 'ssd-market-team', title: 'Page 4: Market & Team Assessment', active: true, description: 'Market score, TAM/SAM/SOM, growth rate, competitive position, team score, completeness, founders, gaps' },
-    { id: 'ssd-financials-tech', title: 'Page 5: Financials & Technology', active: true, description: 'Financial score, revenue, MRR, burn rate, runway, LTV/CAC ratio, gross margin, technology score, TRL, IP strength' },
-    { id: 'ssd-recommendations', title: 'Page 6: Investment Recommendation', active: true, description: 'Final decision, business model & growth scores, exit potential, funding recommendation, next steps' },
+    { id: 'ssd-page-1', title: 'Page 1: Executive Summary', active: true, description: 'Overall score, investment recommendation, analysis completeness, company snapshot' },
+    { id: 'ssd-page-2', title: 'Page 2: TCA Scorecard', active: true, description: 'Composite score, category breakdown, top strengths, areas of concern' },
+    { id: 'ssd-page-3', title: 'Page 3: TCA AI Interpretation Summary', active: true, description: "" },
+    { id: 'ssd-page-4', title: 'Page 4: Weighted Score Breakdown', active: true, description: "" },
+    { id: 'ssd-page-5', title: 'Page 5: Risk Assessment', active: true, description: 'Risk score, flags count, severity levels, risk domains' },
+    { id: 'ssd-page-6', title: 'Page 6: Flag Analysis Narrative', active: true, description: "" },
+    { id: 'ssd-page-7', title: 'Page 7: Market & Team', active: true, description: 'Market score, TAM/SAM/SOM, team score, founders, gaps' },
+    { id: 'ssd-page-8', title: 'Page 8: Financials & Technology', active: true, description: 'Financial score, revenue, burn rate, runway, technology score, IP' },
+    { id: 'ssd-page-9', title: 'Page 9: CEO Questions', active: true, description: "" },
+    { id: 'ssd-page-10', title: 'Page 10: Recommendation', active: true, description: 'Final decision, funding recommendation, next steps' },
+
 ];
 
 // ─── SSD Scoring Thresholds ──────────────────────────────────────────
@@ -333,16 +326,17 @@ export default function ReportConfigurationPage() {
         setSsdTestStatus('testing');
         setSsdTestResult('');
         try {
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/health`);
+            // Use the centralized API configuration
+            const response = await fetch(`${API_CONFIG.BASE_URL}/health`);
             if (response.ok) {
                 setSsdTestStatus('success');
-                setSsdTestResult('Backend connection successful! SSD integration endpoint is available at /api/ssd/tirr');
+                setSsdTestResult(`Backend connection successful! SSD integration endpoint is available at ${API_CONFIG.BASE_URL}/api/ssd/tirr`);
             } else {
                 throw new Error('Backend not responding');
             }
         } catch {
             setSsdTestStatus('error');
-            setSsdTestResult('Failed to connect to backend. Make sure the server is running.');
+            setSsdTestResult(`Failed to connect to backend at ${API_CONFIG.BASE_URL}. Make sure the server is running.`);
         }
     };
 

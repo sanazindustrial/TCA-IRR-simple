@@ -21,7 +21,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import type { ComprehensiveAnalysisOutput } from '@/ai/flows/schemas';
 import Loading from '@/app/loading';
-import { ArrowLeft, Calculator, Check, Eye, Lock, SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, Calculator, Check, Eye, Lock, SkipForward, SlidersHorizontal } from 'lucide-react';
 import Link from 'next/link';
 import {
   AlertDialog,
@@ -296,7 +296,7 @@ export default function WhatIfAnalysisPage() {
             });
             const avgExperience = experienceLevels.reduce((sum, exp) => sum + exp, 0) / experienceLevels.length;
             const teamScore = Math.min(10, (teamSize * 0.5 + avgExperience * 2.5));
-            
+
             initialScores['team'] = [
               { id: 'team-effectiveness', category: 'Team Assessment', score: teamScore }
             ];
@@ -431,6 +431,19 @@ export default function WhatIfAnalysisPage() {
     }
   }
 
+  const handleSkip = () => {
+    // Skip what-if analysis and proceed directly with original scores
+    localStorage.setItem('whatIfAdjusted', 'false');
+    localStorage.setItem('triageReportReady', 'true');
+
+    toast({
+      title: 'What-If Skipped',
+      description: 'Proceeding with original analysis scores.',
+    });
+
+    router.push('/analysis/result');
+  }
+
   const allScores = Object.values(editableScores).flat().map(s => s.score);
   const moduleCount = Object.keys(editableScores).length;
 
@@ -455,9 +468,14 @@ export default function WhatIfAnalysisPage() {
                 Adjust scores from {moduleCount} active modules to simulate outcomes before generating your triage report.
               </p>
             </div>
-            <Button size="lg" onClick={handleProceed} disabled={isLoading}>
-              <Lock className="mr-2" /> Lock Scores & Generate Triage Report
-            </Button>
+            <div className="flex gap-3">
+              <Button variant="outline" size="lg" onClick={handleSkip} disabled={isLoading}>
+                <SkipForward className="mr-2" /> Skip What-If
+              </Button>
+              <Button size="lg" onClick={handleProceed} disabled={isLoading}>
+                <Lock className="mr-2" /> Lock Scores & Generate Report
+              </Button>
+            </div>
           </div>
         </header>
 

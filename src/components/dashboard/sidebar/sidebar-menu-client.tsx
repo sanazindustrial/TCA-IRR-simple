@@ -9,6 +9,9 @@ import {
     SidebarGroup,
     SidebarGroupLabel,
     SidebarSeparator,
+    SidebarMenuSub,
+    SidebarMenuSubItem,
+    SidebarMenuSubButton,
 } from '@/components/ui/sidebar';
 import {
     LayoutDashboard,
@@ -32,9 +35,20 @@ import {
     DollarSign,
     User as UserIcon,
     Eye,
+    ChevronDown,
+    Layers,
+    BarChart3,
+    Shield,
+    TrendingUp,
+    Users2,
+    Target,
+    Calculator,
+    Gauge,
+    Lightbulb,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useEffect, useState } from 'react';
 import type { User as AppUser } from '@/lib/users';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -46,6 +60,7 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
     const router = useRouter();
     const [user, setUser] = useState<AppUser | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [modulesOpen, setModulesOpen] = useState(pathname.startsWith('/analysis/modules'));
 
     useEffect(() => {
         const updateUser = () => {
@@ -150,6 +165,75 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
             </SidebarMenu>
 
             <SidebarSeparator />
+
+            <SidebarGroup>
+                <SidebarGroupLabel>Analysis Modules</SidebarGroupLabel>
+                <SidebarMenu>
+                    <Collapsible open={modulesOpen} onOpenChange={setModulesOpen} className="group/collapsible">
+                        <SidebarMenuItem>
+                            <CollapsibleTrigger asChild>
+                                <SidebarMenuButton tooltip="Analysis Modules">
+                                    <Layers />
+                                    <span>Modules</span>
+                                    <ChevronDown className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+                                </SidebarMenuButton>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                                <SidebarMenuSub>
+                                    <SidebarMenuSubItem>
+                                        <SidebarMenuSubButton href="/analysis/modules/tca" isActive={pathname === '/analysis/modules/tca'}>
+                                            <BarChart3 className="size-4" />
+                                            <span>TCA Scorecard</span>
+                                        </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                    <SidebarMenuSubItem>
+                                        <SidebarMenuSubButton href="/analysis/modules/risk" isActive={pathname === '/analysis/modules/risk'}>
+                                            <Shield className="size-4" />
+                                            <span>Risk Assessment</span>
+                                        </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                    <SidebarMenuSubItem>
+                                        <SidebarMenuSubButton href="/analysis/modules/macro" isActive={pathname === '/analysis/modules/macro'}>
+                                            <TrendingUp className="size-4" />
+                                            <span>Macro Trends</span>
+                                        </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                    <SidebarMenuSubItem>
+                                        <SidebarMenuSubButton href="/analysis/modules/team" isActive={pathname === '/analysis/modules/team'}>
+                                            <Users2 className="size-4" />
+                                            <span>Team Analysis</span>
+                                        </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                    <SidebarMenuSubItem>
+                                        <SidebarMenuSubButton href="/analysis/modules/benchmark" isActive={pathname === '/analysis/modules/benchmark'}>
+                                            <Gauge className="size-4" />
+                                            <span>Benchmark</span>
+                                        </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                    <SidebarMenuSubItem>
+                                        <SidebarMenuSubButton href="/analysis/modules/growth" isActive={pathname === '/analysis/modules/growth'}>
+                                            <Target className="size-4" />
+                                            <span>Growth Classifier</span>
+                                        </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                    <SidebarMenuSubItem>
+                                        <SidebarMenuSubButton href="/analysis/modules/gap" isActive={pathname === '/analysis/modules/gap'}>
+                                            <Calculator className="size-4" />
+                                            <span>Gap Analysis</span>
+                                        </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                    <SidebarMenuSubItem>
+                                        <SidebarMenuSubButton href="/analysis/what-if" isActive={pathname === '/analysis/what-if'}>
+                                            <Lightbulb className="size-4" />
+                                            <span>What-If Analysis</span>
+                                        </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                </SidebarMenuSub>
+                            </CollapsibleContent>
+                        </SidebarMenuItem>
+                    </Collapsible>
+                </SidebarMenu>
+            </SidebarGroup>
 
             <SidebarGroup>
                 <SidebarGroupLabel>User Tools</SidebarGroupLabel>
