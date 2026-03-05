@@ -1,0 +1,262 @@
+{
+  "timestamp": "2026-03-04T12:21:20.120604",
+  "backend_url": "https://tcairrapiccontainer.azurewebsites.net",
+  "summary": {
+    "total": 26,
+    "passed": 26,
+    "failed": 0,
+    "skipped": 0
+  },
+  "sections": {
+    "1. Backend Health": {
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0
+    },
+    "2. Authentication E2E": {
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0
+    },
+    "3. SSD Integration": {
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0
+    },
+    "4. File Operations": {
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0
+    },
+    "5. Analysis Endpoints": {
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0
+    },
+    "6. Module System": {
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0
+    },
+    "7. Evaluation System": {
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0
+    },
+    "8. User Management & Requests": {
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "tests": [
+    {
+      "section": "1. Backend Health",
+      "name": "Root Endpoint (/)",
+      "status": "PASSED",
+      "passed": true,
+      "skipped": false,
+      "details": "Status: 200"
+    },
+    {
+      "section": "1. Backend Health",
+      "name": "Health Check (/api/health)",
+      "status": "PASSED",
+      "passed": true,
+      "skipped": false,
+      "details": "Status: healthy, DB: healthy"
+    },
+    {
+      "section": "1. Backend Health",
+      "name": "Health Check (/health)",
+      "status": "PASSED",
+      "passed": true,
+      "skipped": false,
+      "details": "Status: 200"
+    },
+    {
+      "section": "1. Backend Health",
+      "name": "API Docs (/docs)",
+      "status": "PASSED",
+      "passed": true,
+      "skipped": false,
+      "details": "Status: 200"
+    },
+    {
+      "section": "1. Backend Health",
+      "name": "OpenAPI Spec (/openapi.json)",
+      "status": "PASSED",
+      "passed": true,
+      "skipped": false,
+      "details": "Status: 200"
+    },
+    {
+      "section": "2. Authentication E2E",
+      "name": "User Registration",
+      "status": "PASSED",
+      "passed": true,
+      "skipped": false,
+      "details": "User ID: 57, Name: E2E Test User 08a27189"
+    },
+    {
+      "section": "2. Authentication E2E",
+      "name": "User Login",
+      "status": "PASSED",
+      "passed": true,
+      "skipped": false,
+      "details": "Token Type: bearer, Expires: 86400s"
+    },
+    {
+      "section": "2. Authentication E2E",
+      "name": "Get Current User (/me)",
+      "status": "PASSED",
+      "passed": true,
+      "skipped": false,
+      "details": "Username: None"
+    },
+    {
+      "section": "2. Authentication E2E",
+      "name": "Token Refresh",
+      "status": "PASSED",
+      "passed": true,
+      "skipped": false,
+      "details": "New token issued"
+    },
+    {
+      "section": "2. Authentication E2E",
+      "name": "Reject Invalid Login",
+      "status": "PASSED",
+      "passed": true,
+      "skipped": false,
+      "details": "Status: 401 (expected 401/400)"
+    },
+    {
+      "section": "2. Authentication E2E",
+      "name": "User Logout",
+      "status": "PASSED",
+      "passed": true,
+      "skipped": false,
+      "details": "Status: 200"
+    },
+    {
+      "section": "3. SSD Integration",
+      "name": "SSD Audit Stats",
+      "status": "PASSED",
+      "passed": true,
+      "skipped": false,
+      "details": "Stats retrieved successfully"
+    },
+    {
+      "section": "3. SSD Integration",
+      "name": "SSD Audit Logs List",
+      "status": "PASSED",
+      "passed": true,
+      "skipped": false,
+      "details": "Status: 200"
+    },
+    {
+      "section": "3. SSD Integration",
+      "name": "SSD TIRR Submit",
+      "status": "PASSED",
+      "passed": true,
+      "skipped": false,
+      "details": "Tracking ID: fb5413c8-ee89-4665-9fb7-f48f18d4e3f5, Status: accepted"
+    },
+    {
+      "section": "3. SSD Integration",
+      "name": "SSD TIRR Status Check",
+      "status": "PASSED",
+      "passed": true,
+      "skipped": false,
+      "details": "Status: completed"
+    },
+    {
+      "section": "3. SSD Integration",
+      "name": "SSD Audit Log Detail",
+      "status": "PASSED",
+      "passed": true,
+      "skipped": false,
+      "details": "Status: 200"
+    },
+    {
+      "section": "4. File Operations",
+      "name": "File Upload Endpoint",
+      "status": "PASSED",
+      "passed": true,
+      "skipped": false,
+      "details": "Files processed: 1"
+    },
+    {
+      "section": "4. File Operations",
+      "name": "URL Fetch Endpoint",
+      "status": "PASSED",
+      "passed": true,
+      "skipped": false,
+      "details": "URLs processed: 1"
+    },
+    {
+      "section": "5. Analysis Endpoints",
+      "name": "Comprehensive Analysis",
+      "status": "PASSED",
+      "passed": true,
+      "skipped": false,
+      "details": "Analysis ID: N/A"
+    },
+    {
+      "section": "5. Analysis Endpoints",
+      "name": "Analysis List",
+      "status": "PASSED",
+      "passed": true,
+      "skipped": false,
+      "details": "Status: 200"
+    },
+    {
+      "section": "6. Module System",
+      "name": "Get Module Weights",
+      "status": "PASSED",
+      "passed": true,
+      "skipped": false,
+      "details": "Weights retrieved"
+    },
+    {
+      "section": "6. Module System",
+      "name": "Get Module Config",
+      "status": "PASSED",
+      "passed": true,
+      "skipped": false,
+      "details": "Status: 404"
+    },
+    {
+      "section": "7. Evaluation System",
+      "name": "Create Evaluation",
+      "status": "PASSED",
+      "passed": true,
+      "skipped": false,
+      "details": "Evaluation ID: 6db0d134-c990-4088-bb4d-66d6ceba8b4a"
+    },
+    {
+      "section": "7. Evaluation System",
+      "name": "Get Evaluation Endpoint",
+      "status": "PASSED",
+      "passed": true,
+      "skipped": false,
+      "details": "Status: 404"
+    },
+    {
+      "section": "8. User Management & Requests",
+      "name": "List Requests",
+      "status": "PASSED",
+      "passed": true,
+      "skipped": false,
+      "details": "Status: 200"
+    },
+    {
+      "section": "8. User Management & Requests",
+      "name": "Admin Requests Endpoint",
+      "status": "PASSED",
+      "passed": true,
+      "skipped": false,
+      "details": "Status: 403"
+    }
+  ]
+}
