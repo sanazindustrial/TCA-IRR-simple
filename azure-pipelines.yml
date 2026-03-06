@@ -1,0 +1,137 @@
+# Azure DevOps Pipeline for TCA-IRR Backend
+# Deploys Python FastAPI backend to Azure App Service via ZIP Deploy
+# 
+# AUTO-DEPLOY SETUP: 
+# 1. Go to Azure DevOps > Pipelines > [This Pipeline] > Edit > Variables
+# 2. Add: WEBAPP_DEPLOY_USER = $tcairrapiccontainer
+# 3. Add: WEBAPP_DEPLOY_PASS = [password from Azure Portal > App Service > Deployment Center > FTPS credentials] (mark as secret)
+# 4. Save - now every push to main will auto-deploy!
+
+trigger:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  appServiceName: 'tcairrapiccontainer'
+  pythonVersion: '3.11'
+
+stages:
+  - stage: Build
+    displayName: 'Build Package'
+    jobs:
+      - job: BuildPackage
+        displayName: 'Build ZIP Package'
+        steps:
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '$(pythonVersion)'
+            displayName: 'Use Python $(pythonVersion)'
+
+          - script: |
+              echo "Installing dependencies..."
+              python -m pip install --upgrade pip
+              pip install -r requirements.txt --target=".python_packages/lib/site-packages"
+            displayName: 'Install Dependencies'
+
+          - script: |
+              echo "Creating deployment package..."
+              # Create startup script
+              echo 'gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000' > startup.txt
+              
+              # Create ZIP excluding unnecessary files
+              zip -r backend_deploy.zip . \
+                -x "*.git*" \
+                -x "*node_modules*" \
+                -x "*.next*" \
+                -x "*__pycache__*" \
+                -x "*.venv*" \
+                -x "*.md" \
+                -x "*.ps1" \
+                -x "*.bat" \
+                -x "ui.zip" \
+                -x "src/*" \
+                -x "public/*"
+              
+              ls -la backend_deploy.zip
+            displayName: 'Create ZIP Package'
+
+          - publish: backend_deploy.zip
+            artifact: backend
+
+  - stage: Deploy
+    displayName: 'Deploy to App Service'
+    dependsOn: Build
+    condition: succeeded()
+    jobs:
+      - job: DeployApp
+        displayName: 'Deploy via Kudu'
+        steps:
+          - download: current
+            artifact: backend
+
+          - script: |
+              DEPLOY_USER="${WEBAPP_DEPLOY_USER}"
+              DEPLOY_PASS="${WEBAPP_DEPLOY_PASS}"
+              
+              if [ -z "$DEPLOY_USER" ] || [ -z "$DEPLOY_PASS" ]; then
+                echo "##[error]Deployment credentials not configured!"
+                echo "##[error]Set pipeline variables: WEBAPP_DEPLOY_USER, WEBAPP_DEPLOY_PASS"
+                echo "##[error]Get credentials from Azure Portal > App Service > Deployment Center > FTPS credentials"
+                exit 1
+              fi
+              
+              echo "Deploying to Azure App Service..."
+              curl -X POST \
+                -u "$DEPLOY_USER:$DEPLOY_PASS" \
+                -T $(Pipeline.Workspace)/backend/backend_deploy.zip \
+                "https://$(appServiceName).scm.azurewebsites.net/api/zipdeploy?isAsync=true" \
+                --fail --show-error
+              
+              echo ""
+              echo "================================================"
+              echo "  Backend deployed to App Service!"
+              echo "================================================"
+              echo "URL: https://$(appServiceName).azurewebsites.net"
+              echo "================================================"
+            displayName: 'ZIP Deploy to App Service'
+            env:
+              WEBAPP_DEPLOY_USER: $(WEBAPP_DEPLOY_USER)
+              WEBAPP_DEPLOY_PASS: $(WEBAPP_DEPLOY_PASS)
+
+  - stage: Verify
+    displayName: 'Verify Deployment'
+    dependsOn: Deploy
+    condition: succeeded()
+    jobs:
+      - job: HealthCheck
+        displayName: 'Health Check'
+        steps:
+          - script: |
+              echo "Waiting 90 seconds for App Service restart..."
+              sleep 90
+              
+              echo ""
+              echo "Checking endpoints..."
+              echo ""
+              
+              echo -n "GET /api/health: "
+              response=$(curl -s -o /dev/null -w "%{http_code}" https://$(appServiceName).azurewebsites.net/api/health)
+              echo "$response"
+              
+              echo -n "GET /api/ssd/audit/stats: "
+              response=$(curl -s -o /dev/null -w "%{http_code}" https://$(appServiceName).azurewebsites.net/api/ssd/audit/stats)
+              echo "$response"
+              
+              echo ""
+              echo "Health checks complete!"
+              
+              if [ "$response" = "200" ]; then
+                echo "##[section]✅ SSD routes deployed successfully!"
+              else
+                echo "##[warning]⚠️ SSD routes returned $response - may need configuration"
+              fi
+            displayName: 'Verify endpoints'

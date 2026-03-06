@@ -1,0 +1,100 @@
+{
+  "summary": {
+    "total": 18,
+    "passed": 18,
+    "failed": 0,
+    "success_rate": 100.0
+  },
+  "tests": [
+    {
+      "name": "Register New User",
+      "passed": true,
+      "details": "User ID: 29, Username: fulltest_77c65dc2"
+    },
+    {
+      "name": "Reject Duplicate User",
+      "passed": true,
+      "details": "Correctly rejected duplicate registration"
+    },
+    {
+      "name": "Reject Weak Password",
+      "passed": true,
+      "details": "Password validation working"
+    },
+    {
+      "name": "Reject Password Mismatch",
+      "passed": true,
+      "details": "Password mismatch detected"
+    },
+    {
+      "name": "Login with Valid Credentials",
+      "passed": true,
+      "details": "Token Type: bearer"
+    },
+    {
+      "name": "Reject Invalid Password",
+      "passed": true,
+      "details": "Correctly rejected wrong password"
+    },
+    {
+      "name": "Reject Non-Existent User",
+      "passed": true,
+      "details": "Correctly rejected unknown user"
+    },
+    {
+      "name": "Access /me with Token",
+      "passed": true,
+      "details": "Username: fulltest_77c65dc2"
+    },
+    {
+      "name": "Reject Access Without Token",
+      "passed": true,
+      "details": "Correctly rejected unauthenticated request"
+    },
+    {
+      "name": "Reject Invalid Token",
+      "passed": true,
+      "details": "Correctly rejected invalid token"
+    },
+    {
+      "name": "Logout",
+      "passed": true,
+      "details": "Logout successful"
+    },
+    {
+      "name": "Token Blacklisted After Logout",
+      "passed": true,
+      "details": "Token correctly rejected"
+    },
+    {
+      "name": "Password Reset Request",
+      "passed": true,
+      "details": "Reset request processed"
+    },
+    {
+      "name": "No Email Enumeration",
+      "passed": true,
+      "details": "Same response for unknown emails - secure"
+    },
+    {
+      "name": "Reject Invalid Reset Token",
+      "passed": true,
+      "details": "Correctly rejected invalid token"
+    },
+    {
+      "name": "Reject Invalid Email Format",
+      "passed": true,
+      "details": "Email validation working"
+    },
+    {
+      "name": "Re-Login After Logout",
+      "passed": true,
+      "details": "Successfully logged in again"
+    },
+    {
+      "name": "New Token Works",
+      "passed": true,
+      "details": "New token is valid"
+    }
+  ]
+}

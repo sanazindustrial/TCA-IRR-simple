@@ -1,0 +1,43 @@
+# Azure Developer CLI Configuration for TCA-IRR App (Dynamic Deployment)
+name: tca-irr-app
+metadata:
+  template: nextjs-webapp-api@1.0.0
+
+# Default deployment target
+infra:
+  provider: bicep
+  path: ./infra
+
+# Services definition for dynamic deployment
+services:
+  web:
+    project: .
+    language: js
+    host: appservice
+    
+  api:
+    project: ./api
+    language: js
+    host: function
+
+# Hooks for build and deployment
+hooks:
+  predeploy:
+    windows:
+      shell: pwsh
+      run: |
+        echo "Building Next.js application for dynamic deployment..."
+        npm run build
+    posix:
+      shell: sh
+      run: |
+        echo "Building Next.js application for dynamic deployment..."
+        npm run build
+
+# Environment configuration
+environments:
+  production:
+    values:
+      AZURE_ENV_NAME: "prod"
+      AZURE_LOCATION: "eastus2"
+      APP_NAME: "tca-irr"
