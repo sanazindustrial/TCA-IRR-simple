@@ -11,6 +11,15 @@ trigger:
   branches:
     include:
       - main
+  paths:
+    include:
+      - backend/**
+      - requirements.txt
+      - main.py
+    exclude:
+      - src/**
+      - public/**
+      - '*.md'
 
 pool:
   vmImage: 'ubuntu-latest'
