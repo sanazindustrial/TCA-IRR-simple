@@ -1,0 +1,177 @@
+name: Deploy TCA-IRR App to Azure Production
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+jobs:
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Upload frontend artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: .next/
+
+  backend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt --target=".python_packages/lib/site-packages"
+
+      - name: Create deployment package
+        run: |
+          echo 'gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000' > startup.txt
+          zip -r deploy.zip . \
+            -x "*.git*" \
+            -x "*node_modules*" \
+            -x "*.next*" \
+            -x "*__pycache__*" \
+            -x "*.venv*" \
+            -x "ui.zip" \
+            -x "src/*" \
+            -x "public/*"
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: tcairrapiccontainer
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: deploy.zip
+
+  deploy-frontend:
+    needs: [frontend-build]
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download frontend artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: .next/
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy to Azure Static Web Apps
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: 'upload'
+          app_location: '/'
+          output_location: '.next'
+
+  database-setup:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Initialize database
+        run: |
+          cd backend
+          python init_database.py
+        env:
+          POSTGRES_HOST: ${{ secrets.POSTGRES_HOST }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_SSL_MODE: require
+
+  health-check:
+    needs: [deploy-frontend, backend-build, database-setup]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Frontend health check
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://tca-irr.azurewebsites.net || echo "000")
+          if [ "$response" -eq "200" ]; then
+            echo "✅ Frontend is healthy"
+          else
+            echo "❌ Frontend health check failed (HTTP $response)"
+            exit 1
+          fi
+
+      - name: Backend health check
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://tcairrapiccontainer.azurewebsites.net/health || echo "000")
+          if [ "$response" -eq "200" ]; then
+            echo "✅ Backend is healthy"
+          else
+            echo "❌ Backend health check failed (HTTP $response)"
+            exit 1
+          fi
+
+      - name: Database connectivity check
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://tcairrapiccontainer.azurewebsites.net/api/health || echo "000")
+          if [ "$response" -eq "200" ]; then
+            echo "✅ Database connectivity is healthy"
+          else
+            echo "❌ Database health check failed (HTTP $response)"
+            exit 1
+          fi
