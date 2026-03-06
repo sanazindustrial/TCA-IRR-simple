@@ -41,7 +41,20 @@ type WeightedScoreBreakdownProps = {
 
 export function WeightedScoreBreakdown({ data }: WeightedScoreBreakdownProps) {
     const { framework } = useEvaluationContext();
-    const categories = data?.categories || sampleData;
+
+    // Normalize categories: recalculate weighted scores if they appear incorrect
+    const rawCategories = data?.categories || sampleData;
+    const categories = rawCategories.map(cat => {
+        // Correct weighted score calculation: rawScore × (weight / 100)
+        const correctWeightedScore = cat.rawScore * (cat.weight / 100);
+        // Detect if weightedScore is ~10x what it should be (common error)
+        const isWeightedScoreWrong = cat.weightedScore > 0 && Math.abs(cat.weightedScore / correctWeightedScore - 10) < 1;
+        return {
+            ...cat,
+            weightedScore: isWeightedScoreWrong ? correctWeightedScore : (cat.weightedScore > 10 ? correctWeightedScore : cat.weightedScore)
+        };
+    });
+
     const totalScore = categories.reduce((acc, item) => acc + item.weightedScore, 0);
     const totalWeight = categories.reduce((acc, item) => acc + item.weight, 0);
 

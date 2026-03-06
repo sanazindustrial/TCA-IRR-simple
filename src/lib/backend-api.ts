@@ -4,7 +4,7 @@ export class BackendAPIClient {
     private authToken: string | null;
 
     constructor() {
-        this.baseURL = 'https://tca-irr-api.azurewebsites.net';
+        this.baseURL = process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
         this.authToken = null;
 
         // Try to get auth token from localStorage

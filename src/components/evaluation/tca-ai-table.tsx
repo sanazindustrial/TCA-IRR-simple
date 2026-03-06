@@ -207,7 +207,16 @@ export function TcaAiTable({ data }: TcaAiTableProps) {
     const { isPrivilegedUser } = useEvaluationContext();
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
-    const categories = data?.categories || defaultCategories;
+    // Normalize categories: ALWAYS recalculate weighted scores to ensure correctness
+    const rawCategories = data?.categories || defaultCategories;
+    const categories = rawCategories.map(cat => {
+        // ALWAYS calculate correct weighted score: rawScore × (weight / 100)
+        const correctWeightedScore = cat.rawScore * (cat.weight / 100);
+        return {
+            ...cat,
+            weightedScore: parseFloat(correctWeightedScore.toFixed(2))
+        };
+    });
     const totalWeightedScore = categories.reduce((sum, cat) => sum + cat.weightedScore, 0);
 
     const toggleRow = (category: string) => {
