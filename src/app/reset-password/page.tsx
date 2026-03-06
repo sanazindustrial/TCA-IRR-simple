@@ -9,7 +9,7 @@ import Link from 'next/link';
 import { KeyRound, Lock, ArrowLeft, Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://tca-irr-backend.azurewebsites.net/api/v1';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net/api/v1';
 
 export default function ResetPasswordPage() {
     const [password, setPassword] = useState('');
