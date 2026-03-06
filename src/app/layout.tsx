@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { ThemeProvider } from '@/components/theme-provider';
+import { CopyProtection } from '@/components/copy-protection';
 
 export const metadata: Metadata = {
   title: 'TCA-IRR APP',
@@ -27,7 +28,8 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="font-body antialiased">
+      <body className="font-body antialiased select-none">
+        <CopyProtection />
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"

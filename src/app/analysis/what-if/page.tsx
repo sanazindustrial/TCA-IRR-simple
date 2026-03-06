@@ -62,16 +62,16 @@ interface ModuleConfig {
 }
 
 // Default module definitions (used as fallback)
-const MODULE_DEFINITIONS: Record<string, { name: string; description: string; weight: number }> = {
-  tca: { name: 'TCA Scorecard', description: 'Core technology capability assessment', weight: 20 },
-  risk: { name: 'Risk Assessment', description: 'Risk factors and mitigation analysis', weight: 15 },
-  macro: { name: 'Macro Trend Analysis', description: 'PESTEL framework analysis', weight: 10 },
-  benchmark: { name: 'Benchmark Comparison', description: 'Industry benchmark overlay', weight: 10 },
-  growth: { name: 'Growth Classification', description: 'Growth trajectory analysis', weight: 10 },
-  gap: { name: 'Gap Analysis', description: 'Capability gap heatmap', weight: 10 },
-  founderFit: { name: 'Founder Fit Analysis', description: 'Funding readiness assessment', weight: 10 },
-  team: { name: 'Team Assessment', description: 'Team effectiveness evaluation', weight: 10 },
-  strategicFit: { name: 'Strategic Fit Matrix', description: 'Strategic alignment scoring', weight: 5 },
+const MODULE_DEFINITIONS: Record<string, { name: string; description: string; }> = {
+  tca: { name: 'TCA Scorecard', description: 'Core technology capability assessment',  },
+  risk: { name: 'Risk Assessment', description: 'Risk factors and mitigation analysis', },
+  macro: { name: 'Macro Trend Analysis', description: 'PESTEL framework analysis',  },
+  benchmark: { name: 'Benchmark Comparison', description: 'Industry benchmark overlay', },
+  growth: { name: 'Growth Classification', description: 'Growth trajectory analysis',  },
+  gap: { name: 'Gap Analysis', description: 'Capability gap heatmap',  },
+  founderFit: { name: 'Founder Fit Analysis', description: 'Funding readiness assessment',  },
+  team: { name: 'Team Assessment', description: 'Team effectiveness evaluation',  },
+  strategicFit: { name: 'Strategic Fit Matrix', description: 'Strategic alignment scoring', },
 };
 
 const EditableScoreTable = ({
@@ -675,7 +675,8 @@ export default function SimulationPage() {
           const newScore = editableScores.tca.find(s => s.id === cat.category)?.score;
           return newScore !== undefined ? { ...cat, rawScore: newScore, weightedScore: newScore * (cat.weight / 100) } : cat;
         });
-        const newCompositeScore = updatedData.tcaData.categories.reduce((sum, c) => sum + (c.rawScore * (c.weight / 100)), 0) * 10;
+        // Composite score is the sum of weighted scores (rawScore * weight/100), giving 0-10 scale
+        const newCompositeScore = updatedData.tcaData.categories.reduce((sum, c) => sum + (c.rawScore * (c.weight / 100)), 0);
         updatedData.tcaData.compositeScore = newCompositeScore;
       }
 
