@@ -1,0 +1,282 @@
+{
+  "report_type": "triage",
+  "company_name": "TechStartup Inc.",
+  "founder_email": "john.doe@techstartup.com",
+  "founder_name": "John Doe",
+  "tracking_id": "cd457408-5c37-48ad-94d4-58a5e87f2c6a",
+  "generated_at": "2026-03-03T11:45:21.030442",
+  "final_tca_score": 6.8,
+  "recommendation": "CONDITIONAL \u2014 Address key risks before investing",
+  "total_pages": 6,
+  "report_meta": {
+    "report_type": "triage",
+    "version": "2.0.0",
+    "total_pages": 6,
+    "branding": {
+      "title_prefix": "TCA Investment Risk Rating",
+      "subtitle": "Triage Report \u2014 SSD Integration",
+      "logo_path": null,
+      "footer_text": "Confidential \u2014 TCA TIRR Platform",
+      "color_primary": "#1E3A5F",
+      "color_accent": "#2F855A"
+    },
+    "generated_by": "TCA TIRR Analysis Engine v2.0"
+  },
+  "page_1_executive_summary": {
+    "title": "Triage Report \u2014 TechStartup Inc.",
+    "overall_score": 6.8,
+    "score_interpretation": "Moderate potential \u2014 further analysis required",
+    "investment_recommendation": "CONDITIONAL \u2014 Address key risks before investing",
+    "analysis_completeness": 100.0,
+    "modules_run": 9
+  },
+  "page_2_tca_scorecard": {
+    "title": "TCA Scorecard \u2014 Category Breakdown",
+    "composite_score": 7.49,
+    "categories": [
+      {
+        "category": "Market Potential",
+        "raw_score": 5.5,
+        "weight": 20,
+        "flag": "yellow",
+        "strengths": "N/A",
+        "concerns": "Revenue $250,000 \u00e2\u20ac\u201d product-market fit not yet proven"
+      },
+      {
+        "category": "Technology Innovation",
+        "raw_score": 8.0,
+        "weight": 15,
+        "flag": "green",
+        "strengths": "patent; proprietary; AI",
+        "concerns": "IP portfolio depth should be verified"
+      },
+      {
+        "category": "Team Capability",
+        "raw_score": 9.0,
+        "weight": 25,
+        "flag": "green",
+        "strengths": "Team of 12; signals: ex-Google, MIT, PhD, co-founder",
+        "concerns": "Key-person dependency risk"
+      },
+      {
+        "category": "Business Model",
+        "raw_score": 9.2,
+        "weight": 20,
+        "flag": "green",
+        "strengths": "MRR $62,500; Gross margin 75.0%",
+        "concerns": "Unit economics at scale need validation"
+      },
+      {
+        "category": "Financial Health",
+        "raw_score": 5.5,
+        "weight": 20,
+        "flag": "yellow",
+        "strengths": "Runway 9 months; Burn $85,000/mo",
+        "concerns": "Burn rate optimization needed"
+      }
+    ],
+    "top_strengths": [
+      "Technology Innovation",
+      "Team Capability",
+      "Business Model"
+    ],
+    "areas_of_concern": [
+      "Market Potential",
+      "Financial Health"
+    ]
+  },
+  "page_3_risk_assessment": {
+    "title": "Risk Assessment & Flags",
+    "overall_risk_score": 4.5,
+    "total_flags": 7,
+    "high_risk_count": 1,
+    "risk_flags": [
+      {
+        "domain": "financial_risk",
+        "flag": "red",
+        "severity": 5.6,
+        "trigger": "Burn $85,000/mo with 9 months runway",
+        "impact": "High \u00e2\u20ac\u201d limited runway",
+        "mitigation": "Raise follow-on or cut burn"
+      },
+      {
+        "domain": "market_risk",
+        "flag": "red",
+        "severity": 6.0,
+        "trigger": "0 customers \u00e2\u20ac\u201d concentration risk",
+        "impact": "High \u00e2\u20ac\u201d customer concentration",
+        "mitigation": "Expand customer base"
+      },
+      {
+        "domain": "team_risk",
+        "flag": "yellow",
+        "severity": 4.6,
+        "trigger": "Team of 12",
+        "impact": "Limited",
+        "mitigation": "Ensure succession planning"
+      },
+      {
+        "domain": "technology_risk",
+        "flag": "yellow",
+        "severity": 3.4,
+        "trigger": "3 tech differentiators identified",
+        "impact": "Low",
+        "mitigation": "Continue R&D investment"
+      },
+      {
+        "domain": "execution_risk",
+        "flag": "yellow",
+        "severity": 5.0,
+        "trigger": "Growth metrics not provided",
+        "impact": "Medium",
+        "mitigation": "Improve delivery processes"
+      },
+      {
+        "domain": "regulatory_risk",
+        "flag": "green",
+        "severity": 3.0,
+        "trigger": "Compliance signals: SOC2, compliance",
+        "impact": "Low",
+        "mitigation": "Maintain compliance posture"
+      },
+      {
+        "domain": "competitive_risk",
+        "flag": "yellow",
+        "severity": 4.0,
+        "trigger": "Competitive moats identified",
+        "impact": "Medium-high",
+        "mitigation": "Continue building competitive advantages"
+      }
+    ],
+    "risk_domains": {
+      "financial_risk": {
+        "score": 5.6,
+        "level": "red",
+        "trigger": "Burn $85,000/mo with 9 months runway",
+        "impact": "High \u00e2\u20ac\u201d limited runway",
+        "mitigation": "Raise follow-on or cut burn"
+      },
+      "market_risk": {
+        "score": 6.0,
+        "level": "red",
+        "trigger": "0 customers \u00e2\u20ac\u201d concentration risk",
+        "impact": "High \u00e2\u20ac\u201d customer concentration",
+        "mitigation": "Expand customer base"
+      },
+      "team_risk": {
+        "score": 4.6,
+        "level": "yellow",
+        "trigger": "Team of 12",
+        "impact": "Limited",
+        "mitigation": "Ensure succession planning"
+      },
+      "technology_risk": {
+        "score": 3.4,
+        "level": "yellow",
+        "trigger": "3 tech differentiators identified",
+        "impact": "Low",
+        "mitigation": "Continue R&D investment"
+      },
+      "execution_risk": {
+        "score": 5.0,
+        "level": "yellow",
+        "trigger": "Growth metrics not provided",
+        "impact": "Medium",
+        "mitigation": "Improve delivery processes"
+      },
+      "regulatory_risk": {
+        "score": 3.0,
+        "level": "green",
+        "trigger": "Compliance signals: SOC2, compliance",
+        "impact": "Low",
+        "mitigation": "Maintain compliance posture"
+      },
+      "competitive_risk": {
+        "score": 4.0,
+        "level": "yellow",
+        "trigger": "Competitive moats identified",
+        "impact": "Medium-high",
+        "mitigation": "Continue building competitive advantages"
+      }
+    }
+  },
+  "page_4_market_and_team": {
+    "title": "Market Opportunity & Team Assessment",
+    "market_score": 6.0,
+    "tam": "Not provided",
+    "sam": "Not provided",
+    "som": "Not provided",
+    "growth_rate": "25% MoM",
+    "competitive_position": "Emerging",
+    "competitive_advantages": [
+      "proprietary",
+      "patent",
+      "AI-powered",
+      "machine learning",
+      "NLP"
+    ],
+    "team_score": 8.2,
+    "team_completeness": 20,
+    "founders": [
+      {
+        "role": "CEO",
+        "description": "& Co-Founder",
+        "experience_score": 75
+      }
+    ],
+    "team_gaps": [
+      "CTO",
+      "VP Sales",
+      "CFO",
+      "VP Engineering"
+    ]
+  },
+  "page_5_financials_and_tech": {
+    "title": "Financial Health & Technology Assessment",
+    "financial_score": 7.0,
+    "revenue": 250000.0,
+    "mrr": 62500.0,
+    "burn_rate": 85000.0,
+    "runway_months": 8.8,
+    "ltv_cac_ratio": 0,
+    "gross_margin": 0.75,
+    "technology_score": 7.5,
+    "trl": 8,
+    "ip_strength": "Moderate \u00e2\u20ac\u201d No patent data found",
+    "tech_stack": [
+      "Not identified from submitted data"
+    ]
+  },
+  "page_6_recommendations": {
+    "title": "Investment Recommendation & Next Steps",
+    "final_decision": "CONDITIONAL \u2014 Address key risks before investing",
+    "business_model_score": 8.0,
+    "business_model_type": "SaaS, subscription, B2B",
+    "growth_potential_score": 5.0,
+    "growth_projections": {
+      "year1": "N/A \u00e2\u20ac\u201d growth data not providedx",
+      "year2": "N/Ax",
+      "year3": "N/Ax"
+    },
+    "investment_readiness_score": 6.4,
+    "exit_potential": {
+      "timeline": "5-7 years",
+      "strategic_fit": "Moderate"
+    },
+    "funding_recommendation": {
+      "round": "Seed",
+      "ask": "Not specified",
+      "valuation": "Not specified",
+      "arr_multiple": "N/A",
+      "valuation_range": "Insufficient data"
+    },
+    "next_steps": [
+      "1. Conduct management team interviews and reference checks",
+      "2. Verify financial projections with audited statements",
+      "3. Commission independent market sizing analysis",
+      "4. Perform detailed competitive landscape mapping",
+      "5. Engage technical due diligence on IP and architecture",
+      "6. Negotiate term sheet based on analysis findings"
+    ]
+  }
+}

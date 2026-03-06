@@ -1,0 +1,83 @@
+{
+    "$schema": "https://json.schemastore.org/staticwebapp.config.json",
+    "routes": [{
+            "route": "/login",
+            "rewrite": "/.auth/login/aad"
+        },
+        {
+            "route": "/login/github",
+            "rewrite": "/.auth/login/github"
+        },
+        {
+            "route": "/login/google",
+            "rewrite": "/.auth/login/google"
+        },
+        {
+            "route": "/logout",
+            "redirect": "/.auth/logout",
+            "statusCode": 302
+        },
+        {
+            "route": "/.auth/me",
+            "allowedRoles": ["authenticated"]
+        },
+        {
+            "route": "/dashboard/*",
+            "allowedRoles": ["authenticated"]
+        },
+        {
+            "route": "/api/*",
+            "allowedRoles": ["authenticated", "anonymous"]
+        },
+        {
+            "route": "/admin/*",
+            "allowedRoles": ["admin"]
+        }
+    ],
+    "responseOverrides": {
+        "401": {
+            "redirect": "/login",
+            "statusCode": 302
+        },
+        "403": {
+            "rewrite": "/403.html"
+        }
+    },
+    "auth": {
+        "identityProviders": {
+            "azureActiveDirectory": {
+                "registration": {
+                    "openIdIssuer": "https://login.microsoftonline.com/{AZURE_AD_TENANT_ID}/v2.0",
+                    "clientIdSettingName": "AZURE_AD_CLIENT_ID",
+                    "clientSecretSettingName": "AZURE_AD_CLIENT_SECRET"
+                }
+            },
+            "github": {
+                "registration": {
+                    "clientIdSettingName": "GITHUB_CLIENT_ID",
+                    "clientSecretSettingName": "GITHUB_CLIENT_SECRET"
+                }
+            },
+            "google": {
+                "registration": {
+                    "clientIdSettingName": "GOOGLE_CLIENT_ID",
+                    "clientSecretSettingName": "GOOGLE_CLIENT_SECRET"
+                }
+            }
+        }
+    },
+    "globalHeaders": {
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "X-XSS-Protection": "1; mode=block",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://*.azure.com https://*.azurewebsites.net"
+    },
+    "navigationFallback": {
+        "rewrite": "/index.html",
+        "exclude": ["/api/*", "/.auth/*", "/assets/*"]
+    },
+    "platform": {
+        "apiRuntime": "python:3.11"
+    }
+}

@@ -1,0 +1,188 @@
+{
+  "total": 30,
+  "passed": 28,
+  "failed": 0,
+  "skipped": 2,
+  "tests": [
+    {
+      "name": "Server Health Check",
+      "status": "passed",
+      "details": "Status: 200",
+      "timestamp": "2026-02-13T02:57:05.722519"
+    },
+    {
+      "name": "API Root Endpoint",
+      "status": "passed",
+      "details": "Status: 200",
+      "timestamp": "2026-02-13T02:57:07.833556"
+    },
+    {
+      "name": "OpenAPI Docs Available",
+      "status": "passed",
+      "details": "Docs not exposed (acceptable for production)",
+      "timestamp": "2026-02-13T02:57:15.986626"
+    },
+    {
+      "name": "Auth Login Endpoint",
+      "status": "passed",
+      "details": "Status: 401 - Endpoint responding",
+      "timestamp": "2026-02-13T02:57:18.200171"
+    },
+    {
+      "name": "Auth Reject Invalid Credentials",
+      "status": "passed",
+      "details": "Status: 401",
+      "timestamp": "2026-02-13T02:57:20.372133"
+    },
+    {
+      "name": "Auth Reject Missing Fields",
+      "status": "passed",
+      "details": "Status: 422",
+      "timestamp": "2026-02-13T02:57:22.483770"
+    },
+    {
+      "name": "Auth Reject Invalid Username",
+      "status": "passed",
+      "details": "Status: 401",
+      "timestamp": "2026-02-13T02:57:24.630532"
+    },
+    {
+      "name": "Auth Register Endpoint",
+      "status": "passed",
+      "details": "Status: 201",
+      "timestamp": "2026-02-13T02:57:27.778906"
+    },
+    {
+      "name": "Auth Reject Password Mismatch",
+      "status": "passed",
+      "details": "Status: 422",
+      "timestamp": "2026-02-13T02:57:29.889278"
+    },
+    {
+      "name": "Auth Logout Endpoint",
+      "status": "passed",
+      "details": "Status: 403",
+      "timestamp": "2026-02-13T02:57:31.958725"
+    },
+    {
+      "name": "Auth /me Endpoint",
+      "status": "passed",
+      "details": "Status: 403",
+      "timestamp": "2026-02-13T02:57:34.059068"
+    },
+    {
+      "name": "Public Endpoints Accessible",
+      "status": "passed",
+      "details": "Tested /health and /",
+      "timestamp": "2026-02-13T02:57:42.532157"
+    },
+    {
+      "name": "Protected Endpoints Require Auth",
+      "status": "passed",
+      "details": "",
+      "timestamp": "2026-02-13T02:57:46.642569"
+    },
+    {
+      "name": "CORS Headers Present",
+      "status": "passed",
+      "details": "Headers checked (CORS configured)",
+      "timestamp": "2026-02-13T02:57:52.904112"
+    },
+    {
+      "name": "No Sensitive Info in Errors",
+      "status": "passed",
+      "details": "Checked for sensitive data leaks",
+      "timestamp": "2026-02-13T02:57:55.034740"
+    },
+    {
+      "name": "SQL Injection Prevention",
+      "status": "passed",
+      "details": "",
+      "timestamp": "2026-02-13T02:58:01.566377"
+    },
+    {
+      "name": "XSS Prevention",
+      "status": "passed",
+      "details": "",
+      "timestamp": "2026-02-13T02:58:05.877709"
+    },
+    {
+      "name": "Rate Limiting Check",
+      "status": "passed",
+      "details": "Sent 10 requests, got 10 responses",
+      "timestamp": "2026-02-13T02:58:27.500904"
+    },
+    {
+      "name": "HTTPS Redirect",
+      "status": "passed",
+      "details": "Skipped for localhost",
+      "timestamp": "2026-02-13T02:58:27.502984"
+    },
+    {
+      "name": "Content-Type Validation",
+      "status": "passed",
+      "details": "Status: 422",
+      "timestamp": "2026-02-13T02:58:29.755914"
+    },
+    {
+      "name": "Invalid Token Rejected",
+      "status": "passed",
+      "details": "Status: 401",
+      "timestamp": "2026-02-13T02:58:31.966726"
+    },
+    {
+      "name": "Expired Token Rejected",
+      "status": "passed",
+      "details": "Status: 401",
+      "timestamp": "2026-02-13T02:58:34.401742"
+    },
+    {
+      "name": "Token Without Bearer Rejected",
+      "status": "passed",
+      "details": "Status: 403",
+      "timestamp": "2026-02-13T02:58:36.445814"
+    },
+    {
+      "name": "Max Length Validation",
+      "status": "passed",
+      "details": "Status: 401",
+      "timestamp": "2026-02-13T02:58:38.646594"
+    },
+    {
+      "name": "Special Characters Handled",
+      "status": "passed",
+      "details": "Status: 401",
+      "timestamp": "2026-02-13T02:58:40.851575"
+    },
+    {
+      "name": "Unicode Characters Handled",
+      "status": "passed",
+      "details": "Status: 401",
+      "timestamp": "2026-02-13T02:58:43.029920"
+    },
+    {
+      "name": "Empty Values Rejected",
+      "status": "passed",
+      "details": "Status: 401",
+      "timestamp": "2026-02-13T02:58:45.183453"
+    },
+    {
+      "name": "Null Values Rejected",
+      "status": "passed",
+      "details": "Status: 422",
+      "timestamp": "2026-02-13T02:58:47.307234"
+    },
+    {
+      "name": "Method Not Allowed",
+      "status": "passed",
+      "details": "Status: 405",
+      "timestamp": "2026-02-13T02:58:49.341987"
+    },
+    {
+      "name": "Unknown Endpoint Returns 404",
+      "status": "passed",
+      "details": "Status: 404",
+      "timestamp": "2026-02-13T02:58:51.392104"
+    }
+  ]
+}
