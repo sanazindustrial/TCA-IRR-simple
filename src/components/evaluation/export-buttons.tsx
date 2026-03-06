@@ -76,7 +76,48 @@ export function ExportButtons() {
     }
   }
 
-  // Two-Page Triage Report (PDF)
+  // Helper function to add consistent page header
+  const addPageHeader = (doc: jsPDF, companyName: string, pageTitle: string) => {
+    // Header bar
+    doc.setFillColor(31, 78, 121);
+    doc.rect(0, 0, 210, 20, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text(companyName.toUpperCase(), 14, 13);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(pageTitle, 196, 13, { align: 'right' });
+    doc.setTextColor(0, 0, 0);
+  };
+
+  // Helper function to add consistent page footer
+  const addPageFooter = (doc: jsPDF, pageNum: number, totalPages: number) => {
+    const pageHeight = doc.internal.pageSize.height;
+    doc.setFillColor(245, 245, 245);
+    doc.rect(0, pageHeight - 15, 210, 15, 'F');
+    doc.setFontSize(9);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Page ${pageNum} of ${totalPages}`, 105, pageHeight - 5, { align: 'center' });
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, pageHeight - 5);
+    doc.text('TCA-IRR Platform', 196, pageHeight - 5, { align: 'right' });
+    doc.setTextColor(0, 0, 0);
+  };
+
+  // Helper function for section titles
+  const addSectionTitle = (doc: jsPDF, title: string, y: number) => {
+    doc.setFillColor(236, 240, 241);
+    doc.rect(14, y - 6, 182, 10, 'F');
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(31, 78, 121);
+    doc.text(title, 18, y);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont('helvetica', 'normal');
+    return y + 12;
+  };
+
+  // Two-Page Triage Report (PDF) - CLEANED UP
   const handleExportTriageTwoPage = () => {
     const data = getAnalysisData();
     if (!data) return;
@@ -85,76 +126,122 @@ export function ExportButtons() {
     const companyName = getCompanyName();
 
     // PAGE 1: Executive Summary & TCA Scorecard
-    doc.setFontSize(20);
-    doc.text(`Triage Report: ${companyName}`, 14, 25);
-    doc.setFontSize(11);
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 35);
-    doc.setLineWidth(0.5);
-    doc.line(14, 40, 196, 40);
+    addPageHeader(doc, companyName, 'TRIAGE REPORT');
+    
+    // Title section
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(31, 78, 121);
+    doc.text('Investment Triage Report', 105, 38, { align: 'center' });
+    doc.setTextColor(0, 0, 0);
 
-    // Executive Summary
-    doc.setFontSize(14);
-    doc.text('Executive Summary', 14, 55);
-    doc.setFontSize(10);
+    // Executive Summary Box
+    doc.setFillColor(248, 249, 250);
+    doc.setDrawColor(200, 200, 200);
+    doc.roundedRect(14, 48, 182, 35, 3, 3, 'FD');
+    
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('EXECUTIVE SUMMARY', 20, 58);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
 
     if (data.tcaData) {
       const compositeScore = data.tcaData.compositeScore.toFixed(1);
-      doc.text(`Overall TCA Score: ${compositeScore}/10`, 14, 65);
-      doc.text(`Assessment: ${compositeScore >= 7 ? 'Strong candidate for investment' : compositeScore >= 5 ? 'Moderate potential, requires further analysis' : 'High risk investment'}`, 14, 75);
+      const scoreColor = parseFloat(compositeScore) >= 7 ? [39, 174, 96] : parseFloat(compositeScore) >= 5 ? [243, 156, 18] : [231, 76, 60];
+      
+      doc.text('Overall TCA Score:', 20, 68);
+      doc.setTextColor(scoreColor[0], scoreColor[1], scoreColor[2]);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${compositeScore}/10`, 60, 68);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont('helvetica', 'normal');
+      
+      const assessment = parseFloat(compositeScore) >= 7 ? 'Strong candidate for investment' : 
+        parseFloat(compositeScore) >= 5 ? 'Moderate potential - requires further analysis' : 'High risk - not recommended';
+      doc.text(`Assessment: ${assessment}`, 20, 78);
     }
 
     // TCA Scorecard Table
+    let currentY = addSectionTitle(doc, 'TCA SCORECARD', 98);
+    
     if (data.tcaData) {
       autoTable(doc, {
-        startY: 85,
+        startY: currentY,
         head: [['Category', 'Score', 'Weight', 'Status']],
-        body: data.tcaData.categories.slice(0, 8).map(c => [
+        body: data.tcaData.categories.slice(0, 10).map(c => [
           c.category,
-          c.rawScore.toString(),
+          c.rawScore.toFixed(1),
           `${c.weight}%`,
-          c.flag === 'green' ? '✓ Good' : c.flag === 'yellow' ? '⚠ Caution' : '✗ Risk'
+          c.flag === 'green' ? 'Strong' : c.flag === 'yellow' ? 'Moderate' : 'At Risk'
         ]),
-        theme: 'grid',
-        headStyles: { fillColor: [41, 128, 185] },
-        styles: { fontSize: 9 },
+        theme: 'striped',
+        headStyles: { 
+          fillColor: [31, 78, 121], 
+          textColor: 255, 
+          fontStyle: 'bold',
+          fontSize: 10,
+          cellPadding: 4
+        },
+        bodyStyles: { 
+          fontSize: 10, 
+          cellPadding: 3.5 
+        },
+        alternateRowStyles: { 
+          fillColor: [248, 249, 250] 
+        },
+        columnStyles: {
+          0: { cellWidth: 70 },
+          1: { cellWidth: 25, halign: 'center' },
+          2: { cellWidth: 25, halign: 'center' },
+          3: { cellWidth: 35, halign: 'center' }
+        },
+        margin: { left: 14, right: 14 }
       });
     }
 
-    // Top 3 Risks Summary
+    // Key Risks Summary
     if (data.riskData) {
-      const finalY = (doc as any).lastAutoTable.finalY + 10;
-      doc.setFontSize(12);
-      doc.text('Key Risk Areas', 14, finalY);
-      doc.setFontSize(9);
-
+      const tableEndY = (doc as any).lastAutoTable.finalY + 12;
+      currentY = addSectionTitle(doc, 'KEY RISKS IDENTIFIED', tableEndY);
+      
       const highRisks = data.riskData.riskFlags.filter(r => r.flag === 'red').slice(0, 3);
+      doc.setFontSize(10);
       highRisks.forEach((risk, index) => {
-        doc.text(`${index + 1}. ${risk.domain}: ${risk.trigger}`, 14, finalY + 10 + (index * 8));
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(231, 76, 60);
+        doc.text(`${index + 1}.`, 18, currentY + (index * 12));
+        doc.setTextColor(0, 0, 0);
+        doc.text(`${risk.domain}:`, 24, currentY + (index * 12));
+        doc.setFont('helvetica', 'normal');
+        doc.text(risk.trigger.slice(0, 80), 24, currentY + (index * 12) + 5);
       });
     }
+
+    addPageFooter(doc, 1, 2);
 
     // PAGE 2: Detailed Analysis & Recommendations
     doc.addPage();
-    doc.setFontSize(16);
-    doc.text('Detailed Analysis & Recommendations', 14, 25);
-    doc.line(14, 30, 196, 30);
+    addPageHeader(doc, companyName, 'TRIAGE REPORT');
 
-    // Strengths & Opportunities
-    doc.setFontSize(12);
-    doc.text('Key Strengths', 14, 45);
-    doc.setFontSize(9);
+    currentY = addSectionTitle(doc, 'KEY STRENGTHS', 32);
+    doc.setFontSize(10);
 
     if (data.tcaData) {
-      const strengths = data.tcaData.categories.filter(c => c.flag === 'green').slice(0, 3);
+      const strengths = data.tcaData.categories.filter(c => c.flag === 'green').slice(0, 4);
       strengths.forEach((strength, index) => {
-        doc.text(`• ${strength.category}: ${strength.strengths || 'Strong performance'}`, 14, 55 + (index * 8));
+        doc.setTextColor(39, 174, 96);
+        doc.text('●', 18, currentY + (index * 10));
+        doc.setTextColor(0, 0, 0);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${strength.category}:`, 24, currentY + (index * 10));
+        doc.setFont('helvetica', 'normal');
+        doc.text(strength.strengths?.slice(0, 60) || 'Strong performance', 24, currentY + (index * 10) + 4.5);
       });
     }
 
     // Investment Recommendation
-    doc.setFontSize(12);
-    doc.text('Investment Recommendation', 14, 90);
-    doc.setFontSize(9);
+    currentY = addSectionTitle(doc, 'INVESTMENT RECOMMENDATION', 80);
 
     const recommendation = data.tcaData?.compositeScore >= 7 ?
       'RECOMMEND: Proceed to due diligence phase' :
@@ -162,30 +249,52 @@ export function ExportButtons() {
         'CONDITIONAL: Address key risks before proceeding' :
         'NOT RECOMMENDED: Significant concerns identified';
 
-    doc.text(recommendation, 14, 100);
+    const recColor = data.tcaData?.compositeScore >= 7 ? [39, 174, 96] : 
+      data.tcaData?.compositeScore >= 5 ? [243, 156, 18] : [231, 76, 60];
+    
+    doc.setFillColor(recColor[0], recColor[1], recColor[2]);
+    doc.roundedRect(14, currentY - 2, 182, 12, 2, 2, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text(recommendation, 105, currentY + 6, { align: 'center' });
+    doc.setTextColor(0, 0, 0);
+    doc.setFont('helvetica', 'normal');
 
     // Next Steps
-    doc.setFontSize(12);
-    doc.text('Recommended Next Steps', 14, 120);
-    doc.setFontSize(9);
+    currentY = addSectionTitle(doc, 'RECOMMENDED NEXT STEPS', currentY + 22);
+    doc.setFontSize(10);
+    
     const nextSteps = [
-      '1. Conduct management team interviews',
-      '2. Verify financial projections',
-      '3. Assess market opportunity size',
-      '4. Review competitive positioning'
+      { step: 'Conduct management team interviews', priority: 'High' },
+      { step: 'Verify financial projections and assumptions', priority: 'Critical' },
+      { step: 'Assess market opportunity and TAM validation', priority: 'High' },
+      { step: 'Review competitive positioning and moat', priority: 'Medium' },
+      { step: 'Conduct customer reference calls', priority: 'High' }
     ];
-    nextSteps.forEach((step, index) => {
-      doc.text(step, 14, 130 + (index * 8));
+    
+    nextSteps.forEach((item, index) => {
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${index + 1}.`, 18, currentY + (index * 9));
+      doc.setFont('helvetica', 'normal');
+      doc.text(item.step, 26, currentY + (index * 9));
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`[${item.priority}]`, 180, currentY + (index * 9));
+      doc.setFontSize(10);
+      doc.setTextColor(0, 0, 0);
     });
+
+    addPageFooter(doc, 2, 2);
 
     doc.save(`${companyName}-Triage-Report-${new Date().toISOString().split('T')[0]}.pdf`);
     toast({
-      title: 'Two-Page Triage Report Exported',
-      description: 'Your concise triage report has been downloaded.',
+      title: 'Triage Report Exported',
+      description: 'Your professional triage report has been downloaded.',
     });
   };
 
-  // Two-Page DD Report (PDF)
+  // Two-Page DD Report (PDF) - CLEANED UP
   const handleExportDDTwoPage = () => {
     const data = getAnalysisData();
     if (!data) return;
@@ -194,95 +303,181 @@ export function ExportButtons() {
     const companyName = getCompanyName();
 
     // PAGE 1: Comprehensive Analysis Summary
-    doc.setFontSize(20);
-    doc.text(`Due Diligence Report: ${companyName}`, 14, 25);
-    doc.setFontSize(11);
-    doc.text(`Generated: ${new Date().toLocaleDateString()} | Analyst: ${role}`, 14, 35);
-    doc.setLineWidth(0.5);
-    doc.line(14, 40, 196, 40);
-
-    // Investment Synopsis
-    doc.setFontSize(14);
-    doc.text('Investment Synopsis', 14, 55);
+    addPageHeader(doc, companyName, 'DUE DILIGENCE REPORT');
+    
+    // Title section
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(31, 78, 121);
+    doc.text('Due Diligence Report', 105, 38, { align: 'center' });
+    doc.setTextColor(0, 0, 0);
     doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Analyst: ${role}`, 105, 46, { align: 'center' });
+
+    // Investment Synopsis Box
+    let currentY = addSectionTitle(doc, 'INVESTMENT SYNOPSIS', 58);
 
     if (data.tcaData) {
       const score = data.tcaData.compositeScore;
-      doc.text(`Overall Investment Score: ${score.toFixed(2)}/10`, 14, 65);
-      doc.text(`Risk-Adjusted Rating: ${score >= 8 ? 'HIGH CONFIDENCE' : score >= 6 ? 'MODERATE CONFIDENCE' : 'LOW CONFIDENCE'}`, 14, 75);
+      const scoreColor = score >= 7 ? [39, 174, 96] : score >= 5 ? [243, 156, 18] : [231, 76, 60];
+      const rating = score >= 8 ? 'HIGH CONFIDENCE' : score >= 6 ? 'MODERATE CONFIDENCE' : 'LOW CONFIDENCE';
+      
+      doc.setFillColor(248, 249, 250);
+      doc.roundedRect(14, currentY - 2, 90, 22, 2, 2, 'F');
+      doc.roundedRect(106, currentY - 2, 90, 22, 2, 2, 'F');
+      
+      doc.setFontSize(10);
+      doc.text('Overall Investment Score', 20, currentY + 5);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(scoreColor[0], scoreColor[1], scoreColor[2]);
+      doc.setFontSize(16);
+      doc.text(`${score.toFixed(1)}/10`, 20, currentY + 15);
+      
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Risk-Adjusted Rating', 112, currentY + 5);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.text(rating, 112, currentY + 15);
+      doc.setFont('helvetica', 'normal');
     }
 
     // Detailed TCA Analysis
+    currentY = addSectionTitle(doc, 'TCA ANALYSIS BREAKDOWN', currentY + 32);
+    
     if (data.tcaData) {
       autoTable(doc, {
-        startY: 85,
-        head: [['Analysis Category', 'Score', 'Weight', 'Assessment', 'Key Concerns']],
+        startY: currentY,
+        head: [['Category', 'Score', 'Weight', 'Assessment', 'Key Concerns']],
         body: data.tcaData.categories.map(c => [
           c.category,
-          c.rawScore.toString(),
+          c.rawScore.toFixed(1),
           `${c.weight}%`,
-          c.flag === 'green' ? 'Strong' : c.flag === 'yellow' ? 'Moderate' : 'Weak',
-          c.concerns?.slice(0, 50) + '...' || 'None identified'
+          c.flag === 'green' ? 'Strong' : c.flag === 'yellow' ? 'Moderate' : 'At Risk',
+          c.concerns?.slice(0, 40) || 'None identified'
         ]),
-        theme: 'grid',
-        headStyles: { fillColor: [52, 73, 94] },
-        styles: { fontSize: 8 },
+        theme: 'striped',
+        headStyles: { 
+          fillColor: [31, 78, 121], 
+          textColor: 255, 
+          fontStyle: 'bold',
+          fontSize: 9,
+          cellPadding: 3
+        },
+        bodyStyles: { 
+          fontSize: 8, 
+          cellPadding: 2.5 
+        },
+        alternateRowStyles: { 
+          fillColor: [248, 249, 250] 
+        },
         columnStyles: {
-          4: { cellWidth: 40 }
-        }
+          0: { cellWidth: 45 },
+          1: { cellWidth: 18, halign: 'center' },
+          2: { cellWidth: 18, halign: 'center' },
+          3: { cellWidth: 25, halign: 'center' },
+          4: { cellWidth: 55 }
+        },
+        margin: { left: 14, right: 14 }
       });
     }
 
     // Critical Risk Assessment
     if (data.riskData) {
-      const finalY = (doc as any).lastAutoTable.finalY + 10;
-      doc.setFontSize(12);
-      doc.text('Critical Risk Assessment', 14, finalY);
-      doc.setFontSize(9);
+      const tableEndY = (doc as any).lastAutoTable.finalY + 8;
+      currentY = addSectionTitle(doc, 'CRITICAL RISKS', tableEndY);
 
       const criticalRisks = data.riskData.riskFlags.filter(r => r.flag === 'red');
-      doc.text(`${criticalRisks.length} Critical Risk(s) Identified`, 14, finalY + 10);
+      doc.setFontSize(10);
+      
+      if (criticalRisks.length > 0) {
+        doc.setTextColor(231, 76, 60);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${criticalRisks.length} Critical Risk(s) Require Attention`, 18, currentY);
+        doc.setTextColor(0, 0, 0);
+        doc.setFont('helvetica', 'normal');
+        
+        criticalRisks.slice(0, 2).forEach((risk, index) => {
+          doc.text(`• ${risk.domain}: ${risk.trigger.slice(0, 65)}`, 18, currentY + 8 + (index * 6));
+        });
+      } else {
+        doc.setTextColor(39, 174, 96);
+        doc.text('No critical risks identified', 18, currentY);
+        doc.setTextColor(0, 0, 0);
+      }
     }
+
+    addPageFooter(doc, 1, 2);
 
     // PAGE 2: Investment Decision & Strategic Analysis
     doc.addPage();
-    doc.setFontSize(16);
-    doc.text('Investment Decision Framework', 14, 25);
-    doc.line(14, 30, 196, 30);
+    addPageHeader(doc, companyName, 'DUE DILIGENCE REPORT');
 
     // Financial Analysis Summary
-    doc.setFontSize(12);
-    doc.text('Financial Health Assessment', 14, 45);
-    doc.setFontSize(9);
-
-    if (data.financialsData) {
-      doc.text(`Revenue Growth: ${data.financialsData.revenueGrowth || 'Under Review'}`, 14, 55);
-      doc.text(`Burn Rate: ${data.financialsData.burnRate || 'Under Analysis'}`, 14, 65);
-      doc.text(`Runway: ${data.financialsData.runway || 'To be determined'}`, 14, 75);
-    }
+    currentY = addSectionTitle(doc, 'FINANCIAL HEALTH ASSESSMENT', 32);
+    
+    doc.setFontSize(10);
+    const financialMetrics = [
+      { label: 'Revenue Growth', value: data.financialsData?.revenueGrowth || 'Under Review' },
+      { label: 'Monthly Burn Rate', value: data.financialsData?.burnRate || 'Under Analysis' },
+      { label: 'Cash Runway', value: data.financialsData?.runway || 'To be determined' },
+      { label: 'Gross Margin', value: data.financialsData?.grossMargin || 'Pending' }
+    ];
+    
+    financialMetrics.forEach((metric, index) => {
+      const xPos = index % 2 === 0 ? 18 : 110;
+      const yPos = currentY + Math.floor(index / 2) * 15;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(100, 100, 100);
+      doc.text(metric.label, xPos, yPos);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.text(metric.value, xPos, yPos + 6);
+    });
 
     // Strategic Fit Analysis
+    currentY = addSectionTitle(doc, 'STRATEGIC FIT MATRIX', currentY + 38);
+    
     if (data.strategicFitData) {
       autoTable(doc, {
-        startY: 85,
+        startY: currentY,
         head: [['Strategic Factor', 'Alignment', 'Impact', 'Priority']],
         body: data.strategicFitData.factors?.slice(0, 5).map(f => [
           f.factor || 'Market Alignment',
           f.alignment || 'Strong',
           f.impact || 'High',
           f.priority || 'Critical'
-        ]) || [['Market Opportunity', 'Strong', 'High', 'Critical']],
-        theme: 'grid',
-        headStyles: { fillColor: [39, 174, 96] },
-        styles: { fontSize: 9 },
+        ]) || [
+          ['Market Opportunity', 'Strong', 'High', 'Critical'],
+          ['Technology Fit', 'Moderate', 'Medium', 'High'],
+          ['Team Capability', 'Strong', 'High', 'Critical']
+        ],
+        theme: 'striped',
+        headStyles: { 
+          fillColor: [39, 174, 96], 
+          textColor: 255, 
+          fontStyle: 'bold',
+          fontSize: 10,
+          cellPadding: 4
+        },
+        bodyStyles: { 
+          fontSize: 10, 
+          cellPadding: 3.5 
+        },
+        alternateRowStyles: { 
+          fillColor: [248, 249, 250] 
+        },
+        margin: { left: 14, right: 14 }
       });
     }
 
     // Final Investment Recommendation
-    const finalY = (doc as any).lastAutoTable?.finalY + 15 || 140;
-    doc.setFontSize(14);
-    doc.text('Final Investment Recommendation', 14, finalY);
-    doc.setFontSize(10);
+    const tableEndY2 = (doc as any).lastAutoTable?.finalY + 15 || 140;
+    currentY = addSectionTitle(doc, 'FINAL INVESTMENT RECOMMENDATION', tableEndY2);
 
     const investmentDecision = data.tcaData?.compositeScore >= 7.5 ?
       'STRONG BUY: High confidence investment opportunity' :
@@ -290,408 +485,518 @@ export function ExportButtons() {
         'CONDITIONAL BUY: Proceed with specific conditions' :
         'PASS: Risk/reward profile not aligned with investment criteria';
 
-    doc.text(investmentDecision, 14, finalY + 10);
+    const decisionColor = data.tcaData?.compositeScore >= 7 ? [39, 174, 96] : 
+      data.tcaData?.compositeScore >= 5 ? [243, 156, 18] : [231, 76, 60];
+    
+    doc.setFillColor(decisionColor[0], decisionColor[1], decisionColor[2]);
+    doc.roundedRect(14, currentY - 2, 182, 12, 2, 2, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text(investmentDecision, 105, currentY + 6, { align: 'center' });
+    doc.setTextColor(0, 0, 0);
+    doc.setFont('helvetica', 'normal');
 
     // Investment Terms & Valuation
-    doc.setFontSize(12);
-    doc.text('Proposed Investment Terms', 14, finalY + 25);
-    doc.setFontSize(9);
-    doc.text('• Valuation: $[To be negotiated based on analysis]', 14, finalY + 35);
-    doc.text('• Investment Amount: $[As per fund allocation]', 14, finalY + 43);
-    doc.text('• Board Representation: [As per investment tier]', 14, finalY + 51);
+    currentY = addSectionTitle(doc, 'PROPOSED INVESTMENT TERMS', currentY + 22);
+    doc.setFontSize(10);
+    
+    const terms = [
+      { label: 'Valuation', value: '$[To be negotiated based on analysis]' },
+      { label: 'Investment Amount', value: '$[As per fund allocation]' },
+      { label: 'Board Representation', value: '[As per investment tier]' },
+      { label: 'Expected Timeline', value: '4-6 weeks due diligence' }
+    ];
+    
+    terms.forEach((term, index) => {
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${term.label}:`, 18, currentY + (index * 8));
+      doc.setFont('helvetica', 'normal');
+      doc.text(term.value, 65, currentY + (index * 8));
+    });
+
+    addPageFooter(doc, 2, 2);
 
     doc.save(`${companyName}-DD-Report-${new Date().toISOString().split('T')[0]}.pdf`);
     toast({
-      title: 'Two-Page DD Report Exported',
-      description: 'Your comprehensive due diligence report has been downloaded.',
+      title: 'DD Report Exported',
+      description: 'Your professional due diligence report has been downloaded.',
     });
   };
 
-  // Comprehensive Full Report (PDF) - ENHANCED VERSION
+  // Comprehensive Full Report (PDF) - PROFESSIONAL VERSION
   const handleExportFullReport = () => {
     const data = getAnalysisData();
     if (!data) return;
 
     const doc = new jsPDF();
     const companyName = getCompanyName();
+    const score = data.tcaData?.compositeScore || 0;
+    const scoreColor = score >= 7 ? [39, 174, 96] : score >= 5 ? [243, 156, 18] : [231, 76, 60];
+    const totalPages = 6; // Estimated total pages
 
-    // TITLE PAGE - Professional formatting with smaller fonts
+    // ========== TITLE PAGE ==========
+    // Background gradient effect
+    doc.setFillColor(31, 78, 121);
+    doc.rect(0, 0, 210, 297, 'F');
+    
+    // White content box
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(20, 60, 170, 180, 8, 8, 'F');
+    
+    // Company name
+    doc.setTextColor(31, 78, 121);
+    doc.setFontSize(28);
+    doc.setFont('helvetica', 'bold');
+    doc.text(companyName.toUpperCase(), 105, 100, { align: 'center' });
+    
+    // Report title
     doc.setFontSize(18);
-    doc.text(`COMPREHENSIVE ANALYSIS REPORT`, 105, 50, { align: 'center' });
-    doc.setFontSize(16);
-    doc.text(`${companyName}`, 105, 65, { align: 'center' });
+    doc.setTextColor(100, 100, 100);
+    doc.text('COMPREHENSIVE', 105, 120, { align: 'center' });
+    doc.text('INVESTMENT ANALYSIS', 105, 132, { align: 'center' });
+    
+    // Report type badge
+    doc.setFillColor(31, 78, 121);
+    doc.roundedRect(65, 145, 80, 14, 3, 3, 'F');
+    doc.setTextColor(255, 255, 255);
     doc.setFontSize(11);
-    doc.text(`Report Type: ${reportType.toUpperCase()}`, 105, 82, { align: 'center' });
-    doc.text(`Generated: ${new Date().toLocaleDateString()} | Analyst: ${role}`, 105, 92, { align: 'center' });
+    doc.text(`${reportType.toUpperCase()} REPORT`, 105, 154, { align: 'center' });
+    
+    // Score display
+    doc.setFillColor(scoreColor[0], scoreColor[1], scoreColor[2]);
+    doc.roundedRect(75, 170, 60, 30, 4, 4, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`${score.toFixed(1)}/10`, 105, 190, { align: 'center' });
+    
+    // Meta info
+    doc.setTextColor(100, 100, 100);
     doc.setFontSize(10);
-    doc.text(`Confidential & Proprietary Analysis`, 105, 108, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 105, 215, { align: 'center' });
+    doc.text(`Analyst: ${role}`, 105, 225, { align: 'center' });
+    
+    // Footer
+    doc.setTextColor(200, 200, 200);
+    doc.setFontSize(9);
+    doc.text('CONFIDENTIAL & PROPRIETARY', 105, 250, { align: 'center' });
+    doc.text('TCA-IRR Investment Analysis Platform', 105, 258, { align: 'center' });
 
-    // Executive Summary Box
-    doc.setDrawColor(0, 0, 0);
-    doc.setFillColor(245, 245, 245);
-    doc.roundedRect(20, 125, 170, 50, 3, 3, 'DF');
-    doc.setFontSize(12);
-    doc.text('EXECUTIVE SUMMARY', 105, 138, { align: 'center' });
-    doc.setFontSize(10);
-
-    if (data.tcaData) {
-      const score = data.tcaData.compositeScore;
-      const rating = score >= 8 ? 'EXCELLENT' : score >= 7 ? 'STRONG' : score >= 6 ? 'GOOD' : score >= 5 ? 'MODERATE' : 'WEAK';
-      doc.text(`Overall Investment Score: ${score.toFixed(2)}/10 (${rating})`, 105, 152, { align: 'center' });
-      doc.text(`Investment Recommendation: ${score >= 7 ? 'PROCEED TO DD' : score >= 5 ? 'CONDITIONAL REVIEW' : 'DECLINE'}`, 105, 165, { align: 'center' });
-    }
-
-    // TABLE OF CONTENTS
+    // ========== PAGE 2: TABLE OF CONTENTS ==========
     doc.addPage();
-    doc.setFontSize(14);
-    doc.text('TABLE OF CONTENTS', 14, 25);
-    doc.setFontSize(10);
-
+    addPageHeader(doc, companyName, 'TABLE OF CONTENTS');
+    
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(31, 78, 121);
+    doc.text('TABLE OF CONTENTS', 105, 45, { align: 'center' });
+    doc.setTextColor(0, 0, 0);
+    
     const tocItems = [
-      '1. Executive Summary ..................................... 3',
-      '2. TCA Scorecard Analysis ................................. 4',
-      '3. Risk Assessment & Mitigation .......................... 6',
-      '4. Market & Competitive Analysis ......................... 8',
-      '5. Financial Health & Projections ........................ 10',
-      '6. Technology & IP Assessment ............................ 12',
-      '7. Team & Leadership Evaluation .......................... 14',
-      '8. Strategic Fit Matrix .................................. 16',
-      '9. Growth Potential Analysis ............................. 18',
-      '10. Investment Recommendation ............................ 20',
-      '11. Due Diligence Checklist .............................. 22',
-      '12. Appendix: Raw Data & Calculations ................... 24'
+      { title: 'Executive Summary', page: 3 },
+      { title: 'TCA Scorecard Analysis', page: 3 },
+      { title: 'Risk Assessment Matrix', page: 4 },
+      { title: 'Financial Health Overview', page: 4 },
+      { title: 'Team & Leadership Assessment', page: 5 },
+      { title: 'Strategic Fit Analysis', page: 5 },
+      { title: 'Investment Recommendation', page: 6 },
+      { title: 'Due Diligence Checklist', page: 6 }
     ];
-
+    
+    doc.setFontSize(12);
     tocItems.forEach((item, index) => {
-      doc.text(item, 20, 45 + (index * 10));
+      const yPos = 70 + (index * 16);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${index + 1}.`, 30, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.text(item.title, 40, yPos);
+      
+      // Dotted line
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineDashPattern([1, 2], 0);
+      doc.line(40 + doc.getTextWidth(item.title) + 5, yPos, 165, yPos);
+      doc.setLineDashPattern([], 0);
+      
+      doc.text(`${item.page}`, 175, yPos);
+    });
+    
+    addPageFooter(doc, 2, totalPages);
+
+    // ========== PAGE 3: EXECUTIVE SUMMARY & TCA ==========
+    doc.addPage();
+    addPageHeader(doc, companyName, 'EXECUTIVE SUMMARY');
+    
+    let currentY = addSectionTitle(doc, 'EXECUTIVE SUMMARY', 32);
+
+    // Key metrics boxes
+    const metrics = [
+      { label: 'TCA Score', value: score.toFixed(1), color: scoreColor },
+      { label: 'Risk Level', value: data.riskData?.riskFlags.filter(r => r.flag === 'red').length || 0, suffix: ' Critical' },
+      { label: 'Rating', value: score >= 8 ? 'EXCELLENT' : score >= 7 ? 'STRONG' : score >= 5 ? 'MODERATE' : 'WEAK' }
+    ];
+    
+    metrics.forEach((metric, index) => {
+      const xPos = 14 + (index * 62);
+      doc.setFillColor(248, 249, 250);
+      doc.roundedRect(xPos, currentY, 58, 28, 3, 3, 'F');
+      doc.setFontSize(9);
+      doc.setTextColor(100, 100, 100);
+      doc.text(metric.label, xPos + 29, currentY + 8, { align: 'center' });
+      
+      if (metric.color) {
+        doc.setTextColor(metric.color[0], metric.color[1], metric.color[2]);
+      } else {
+        doc.setTextColor(31, 78, 121);
+      }
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${metric.value}${metric.suffix || ''}`, xPos + 29, currentY + 21, { align: 'center' });
+      doc.setTextColor(0, 0, 0);
+      doc.setFont('helvetica', 'normal');
     });
 
-    // PAGE 3: DETAILED EXECUTIVE SUMMARY
-    doc.addPage();
-    doc.setFontSize(14);
-    doc.text('1. EXECUTIVE SUMMARY', 14, 25);
-    doc.setLineWidth(0.5);
-    doc.line(14, 30, 196, 30);
-
+    // TCA Scorecard
+    currentY = addSectionTitle(doc, 'TCA SCORECARD', currentY + 40);
+    
     if (data.tcaData) {
-      // Key Metrics Summary Table
-      doc.setFontSize(11);
-      doc.text('Key Performance Metrics', 14, 42);
-
       autoTable(doc, {
-        startY: 46,
-        head: [['Metric', 'Value', 'Industry Benchmark', 'Percentile Rank']],
-        body: [
-          ['TCA Composite Score', data.tcaData.compositeScore.toFixed(2), '6.5', `${Math.round(data.tcaData.compositeScore * 10)}th`],
-          ['Technology Readiness', data.tcaData.categories.find(c => c.category.includes('Technology'))?.rawScore || 'N/A', '7.0', 'TBD'],
-          ['Market Opportunity', data.tcaData.categories.find(c => c.category.includes('Market'))?.rawScore || 'N/A', '6.8', 'TBD'],
-          ['Team Strength', data.tcaData.categories.find(c => c.category.includes('Team'))?.rawScore || 'N/A', '7.2', 'TBD'],
-          ['Financial Health', data.tcaData.categories.find(c => c.category.includes('Financial'))?.rawScore || 'N/A', '6.0', 'TBD']
-        ],
-        theme: 'grid',
-        headStyles: { fillColor: [41, 128, 185], textColor: 255 },
-        styles: { fontSize: 9 },
-      });
-
-      // Investment Synopsis
-      const currentY = (doc as any).lastAutoTable.finalY + 15;
-      doc.setFontSize(12);
-      doc.text('Investment Synopsis', 14, currentY);
-      doc.setFontSize(10);
-
-      const synopsis = [
-        `${companyName} presents a ${data.tcaData.compositeScore >= 7 ? 'compelling' : data.tcaData.compositeScore >= 5 ? 'moderate' : 'challenging'} investment opportunity with a composite TCA score of ${data.tcaData.compositeScore.toFixed(2)}/10.`,
-        `Key strengths include strong performance in ${data.tcaData.categories.filter(c => c.flag === 'green').map(c => c.category.toLowerCase()).slice(0, 2).join(' and ')}.`,
-        `Primary concerns center around ${data.tcaData.categories.filter(c => c.flag === 'red').map(c => c.category.toLowerCase()).slice(0, 2).join(' and ')}.`,
-        data.tcaData.summary
-      ];
-
-      synopsis.forEach((line, index) => {
-        const lines = doc.splitTextToSize(line, 180);
-        doc.text(lines, 14, currentY + 10 + (index * 15));
-      });
-    }
-
-    // PAGE 4-5: DETAILED TCA SCORECARD ANALYSIS
-    doc.addPage();
-    doc.setFontSize(14);
-    doc.text('2. TCA SCORECARD ANALYSIS', 14, 25);
-    doc.line(14, 30, 196, 30);
-
-    if (data.tcaData) {
-      // Comprehensive TCA Table
-      autoTable(doc, {
-        startY: 40,
-        head: [['Category', 'Raw Score', 'Weight', 'Weighted Score', 'Flag', 'Confidence']],
+        startY: currentY,
+        head: [['Category', 'Score', 'Weight', 'Contribution', 'Status']],
         body: data.tcaData.categories.map(c => [
           c.category,
-          c.rawScore.toString(),
+          c.rawScore.toFixed(1),
           `${c.weight}%`,
           ((c.rawScore * c.weight) / 100).toFixed(2),
-          c.flag.toUpperCase(),
-          c.confidence || 'High'
+          c.flag === 'green' ? 'Strong' : c.flag === 'yellow' ? 'Moderate' : 'At Risk'
         ]),
-        theme: 'grid',
-        headStyles: { fillColor: [52, 73, 94], textColor: 255 },
-        styles: { fontSize: 9 },
+        theme: 'striped',
+        headStyles: { 
+          fillColor: [31, 78, 121], 
+          textColor: 255, 
+          fontStyle: 'bold',
+          fontSize: 9,
+          cellPadding: 3
+        },
+        bodyStyles: { 
+          fontSize: 9, 
+          cellPadding: 2.5 
+        },
+        alternateRowStyles: { 
+          fillColor: [248, 249, 250] 
+        },
         columnStyles: {
-          4: {
-            cellWidth: 15,
-            halign: 'center'
-          }
-        }
-      });
-
-      // Detailed Category Analysis
-      let currentY = (doc as any).lastAutoTable.finalY + 15;
-
-      data.tcaData.categories.forEach((category, index) => {
-        if (currentY > 250) {
-          doc.addPage();
-          currentY = 25;
-        }
-
-        doc.setFontSize(12);
-        doc.text(`${index + 1}. ${category.category}`, 14, currentY);
-        doc.setFontSize(10);
-
-        // Score and status
-        doc.text(`Score: ${category.rawScore}/10 | Weight: ${category.weight}% | Status: ${category.flag.toUpperCase()}`, 14, currentY + 8);
-
-        // Strengths
-        if (category.strengths) {
-          doc.setFont('helvetica', 'bold');
-          doc.text('Strengths:', 14, currentY + 18);
-          doc.setFont('helvetica', 'normal');
-          const strengthLines = doc.splitTextToSize(category.strengths, 170);
-          doc.text(strengthLines, 14, currentY + 26);
-          currentY += 8 + strengthLines.length * 4;
-        }
-
-        // Concerns
-        if (category.concerns) {
-          doc.setFont('helvetica', 'bold');
-          doc.text('Concerns:', 14, currentY + 8);
-          doc.setFont('helvetica', 'normal');
-          const concernLines = doc.splitTextToSize(category.concerns, 170);
-          doc.text(concernLines, 14, currentY + 16);
-          currentY += 16 + concernLines.length * 4;
-        }
-
-        currentY += 10; // Space between categories
+          0: { cellWidth: 55 },
+          1: { cellWidth: 22, halign: 'center' },
+          2: { cellWidth: 22, halign: 'center' },
+          3: { cellWidth: 28, halign: 'center' },
+          4: { cellWidth: 30, halign: 'center' }
+        },
+        margin: { left: 14, right: 14 }
       });
     }
+    
+    addPageFooter(doc, 3, totalPages);
 
-    // PAGE 6-7: COMPREHENSIVE RISK ASSESSMENT
+    // ========== PAGE 4: RISK ASSESSMENT & FINANCIALS ==========
     doc.addPage();
-    doc.setFontSize(14);
-    doc.text('3. RISK ASSESSMENT & MITIGATION', 14, 25);
-    doc.line(14, 30, 196, 30);
+    addPageHeader(doc, companyName, 'RISK & FINANCIAL ANALYSIS');
+    
+    currentY = addSectionTitle(doc, 'RISK ASSESSMENT MATRIX', 32);
 
     if (data.riskData) {
-      // Risk Summary
-      doc.setFontSize(11);
-      doc.text('Risk Assessment Summary', 14, 42);
-      doc.setFontSize(9);
-      const riskSummaryLines = doc.splitTextToSize(data.riskData.riskSummary, 180);
-      doc.text(riskSummaryLines, 14, 50);
-
-      // Risk Matrix
+      // Risk counts summary
       const riskCounts = {
         red: data.riskData.riskFlags.filter(r => r.flag === 'red').length,
         yellow: data.riskData.riskFlags.filter(r => r.flag === 'yellow').length,
         green: data.riskData.riskFlags.filter(r => r.flag === 'green').length
       };
-
-      autoTable(doc, {
-        startY: 72,
-        head: [['Risk Level', 'Count', 'Percentage', 'Impact']],
-        body: [
-          ['Critical (Red)', riskCounts.red.toString(), `${((riskCounts.red / data.riskData.riskFlags.length) * 100).toFixed(1)}%`, 'High'],
-          ['Moderate (Yellow)', riskCounts.yellow.toString(), `${((riskCounts.yellow / data.riskData.riskFlags.length) * 100).toFixed(1)}%`, 'Medium'],
-          ['Low (Green)', riskCounts.green.toString(), `${((riskCounts.green / data.riskData.riskFlags.length) * 100).toFixed(1)}%`, 'Low']
-        ],
-        theme: 'grid',
-        headStyles: { fillColor: [231, 76, 60], textColor: 255 },
-        styles: { fontSize: 10 }
+      
+      // Risk indicator boxes
+      const riskIndicators = [
+        { label: 'Critical', count: riskCounts.red, color: [231, 76, 60] },
+        { label: 'Moderate', count: riskCounts.yellow, color: [243, 156, 18] },
+        { label: 'Low', count: riskCounts.green, color: [39, 174, 96] }
+      ];
+      
+      riskIndicators.forEach((indicator, index) => {
+        const xPos = 14 + (index * 62);
+        doc.setFillColor(indicator.color[0], indicator.color[1], indicator.color[2]);
+        doc.roundedRect(xPos, currentY, 58, 20, 3, 3, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(10);
+        doc.text(indicator.label, xPos + 29, currentY + 8, { align: 'center' });
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${indicator.count}`, xPos + 29, currentY + 17, { align: 'center' });
+        doc.setFont('helvetica', 'normal');
       });
-
-      // Detailed Risk Analysis
+      doc.setTextColor(0, 0, 0);
+      
+      // Risk details table
       autoTable(doc, {
-        head: [['Risk Domain', 'Level', 'Risk Trigger', 'Mitigation Strategy', 'Priority']],
-        body: data.riskData.riskFlags.map(r => [
+        startY: currentY + 28,
+        head: [['Domain', 'Level', 'Risk Trigger', 'Mitigation']],
+        body: data.riskData.riskFlags.slice(0, 8).map(r => [
           r.domain,
           r.flag.toUpperCase(),
-          r.trigger,
-          r.mitigation?.slice(0, 60) + '...' || 'Under development',
-          r.priority || 'High'
+          r.trigger.slice(0, 45),
+          r.mitigation?.slice(0, 40) || 'Under review'
         ]),
-        theme: 'grid',
-        headStyles: { fillColor: [192, 57, 43], textColor: 255 },
-        styles: { fontSize: 8 },
+        theme: 'striped',
+        headStyles: { 
+          fillColor: [231, 76, 60], 
+          textColor: 255, 
+          fontStyle: 'bold',
+          fontSize: 9,
+          cellPadding: 3
+        },
+        bodyStyles: { 
+          fontSize: 8, 
+          cellPadding: 2.5 
+        },
+        alternateRowStyles: { 
+          fillColor: [254, 243, 242] 
+        },
         columnStyles: {
-          2: { cellWidth: 35 },
-          3: { cellWidth: 40 }
-        }
+          0: { cellWidth: 35 },
+          1: { cellWidth: 18, halign: 'center' },
+          2: { cellWidth: 55 },
+          3: { cellWidth: 50 }
+        },
+        margin: { left: 14, right: 14 }
       });
     }
 
-    // Additional analysis sections for truly comprehensive report
-    const sectionsToAdd = [
-      { data: data.benchmarkData, title: '4. MARKET & COMPETITIVE ANALYSIS', key: 'benchmarkData' },
-      { data: data.financialsData, title: '5. FINANCIAL HEALTH & PROJECTIONS', key: 'financialsData' },
-      { data: data.teamData, title: '6. TEAM & LEADERSHIP EVALUATION', key: 'teamData' },
-      { data: data.strategicFitData, title: '7. STRATEGIC FIT MATRIX', key: 'strategicFitData' },
-      { data: data.growthData, title: '8. GROWTH POTENTIAL ANALYSIS', key: 'growthData' }
+    // Financial Health Section
+    const riskTableEndY = (doc as any).lastAutoTable?.finalY + 12 || currentY + 100;
+    currentY = addSectionTitle(doc, 'FINANCIAL HEALTH OVERVIEW', riskTableEndY);
+    
+    doc.setFontSize(10);
+    const financialMetrics = [
+      { label: 'Revenue Growth', value: data.financialsData?.revenueGrowth || 'Under Analysis', benchmark: '25%+ Strong' },
+      { label: 'Monthly Burn', value: data.financialsData?.burnRate || 'Under Review', benchmark: '$50K Avg' },
+      { label: 'Cash Runway', value: data.financialsData?.runway || 'TBD', benchmark: '18+ months' },
+      { label: 'Gross Margin', value: data.financialsData?.grossMargin || 'Pending', benchmark: '60%+ target' }
     ];
-
-    sectionsToAdd.forEach((section) => {
-      if (section.data) {
-        doc.addPage();
-        doc.setFontSize(14);
-        doc.text(section.title, 14, 25);
-        doc.line(14, 30, 196, 30);
-
-        // Add specific content based on data type
-        if (section.key === 'benchmarkData' && data.benchmarkData) {
-          autoTable(doc, {
-            startY: 40,
-            head: [['Metric', 'Company Value', 'Industry Average', 'Percentile Rank', 'Assessment']],
-            body: data.benchmarkData.comparisons?.map(comp => [
-              comp.metric || 'Revenue Growth',
-              comp.companyValue || 'TBD',
-              comp.industryAverage || 'TBD',
-              comp.percentile || 'TBD',
-              comp.assessment || 'Under Review'
-            ]) || [['Revenue Growth', 'TBD', 'Industry Avg', 'TBD', 'Pending Analysis']],
-            theme: 'grid',
-            headStyles: { fillColor: [46, 125, 50] }
-          });
-        }
-
-        if (section.key === 'financialsData' && data.financialsData) {
-          const financialMetrics = [
-            ['Revenue Growth Rate', data.financialsData.revenueGrowth || 'Under Analysis', '25% (Industry)', 'Target: >30%'],
-            ['Monthly Burn Rate', data.financialsData.burnRate || 'Under Review', '$50K (Avg)', 'Monitor closely'],
-            ['Runway (Months)', data.financialsData.runway || 'TBD', '18 months', 'Adequate if >12mo'],
-            ['Gross Margin', data.financialsData.grossMargin || 'Pending', '70%', 'Target: >60%'],
-            ['CAC:LTV Ratio', data.financialsData.cacLtv || 'TBD', '1:3', 'Target: 1:3 or better']
-          ];
-
-          autoTable(doc, {
-            startY: 40,
-            head: [['Financial Metric', 'Current Value', 'Industry Benchmark', 'Assessment']],
-            body: financialMetrics,
-            theme: 'grid',
-            headStyles: { fillColor: [76, 175, 80] }
-          });
-        }
-
-        if (section.key === 'growthData' && data.growthData) {
-          autoTable(doc, {
-            startY: 40,
-            head: [['Growth Factor', 'Assessment', 'Score', 'Trend Direction', 'Time Horizon']],
-            body: data.growthData.factors?.map(factor => [
-              factor.name || 'Market Expansion',
-              factor.assessment || 'Positive',
-              factor.score?.toString() || '7.5',
-              factor.trend || 'Increasing',
-              factor.timeHorizon || '12-18 months'
-            ]) || [['Market Growth', 'Strong', '8.5', 'Accelerating', '12 months']],
-            theme: 'grid',
-            headStyles: { fillColor: [103, 58, 183] }
-          });
-        }
-      }
+    
+    financialMetrics.forEach((metric, index) => {
+      const xPos = 14 + ((index % 2) * 92);
+      const yPos = currentY + Math.floor(index / 2) * 22;
+      
+      doc.setFillColor(248, 249, 250);
+      doc.roundedRect(xPos, yPos - 2, 88, 18, 2, 2, 'F');
+      
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      doc.text(metric.label, xPos + 4, yPos + 4);
+      
+      doc.setTextColor(0, 0, 0);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.text(metric.value, xPos + 4, yPos + 12);
+      
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Benchmark: ${metric.benchmark}`, xPos + 50, yPos + 12);
     });
+    doc.setTextColor(0, 0, 0);
+    
+    addPageFooter(doc, 4, totalPages);
 
-    // FINAL PAGE: INVESTMENT RECOMMENDATION & DUE DILIGENCE
+    // ========== PAGE 5: TEAM & STRATEGIC FIT ==========
     doc.addPage();
-    doc.setFontSize(16);
-    doc.text('10. INVESTMENT RECOMMENDATION & NEXT STEPS', 14, 25);
-    doc.line(14, 30, 196, 30);
+    addPageHeader(doc, companyName, 'TEAM & STRATEGY');
+    
+    currentY = addSectionTitle(doc, 'TEAM & LEADERSHIP ASSESSMENT', 32);
 
-    // Investment Decision Matrix
-    const score = data.tcaData?.compositeScore || 0;
-    const recommendation = score >= 8 ? 'STRONG BUY' : score >= 7 ? 'BUY' : score >= 6 ? 'CONDITIONAL BUY' : score >= 4 ? 'HOLD FOR REVIEW' : 'PASS';
+    if (data.teamData?.teamMembers) {
+      autoTable(doc, {
+        startY: currentY,
+        head: [['Name', 'Role', 'Experience', 'Assessment']],
+        body: data.teamData.teamMembers.slice(0, 6).map(member => [
+          member.name || 'Team Member',
+          member.role || 'Key Role',
+          member.experience || 'Experienced',
+          member.assessment || 'Strong Contributor'
+        ]),
+        theme: 'striped',
+        headStyles: { 
+          fillColor: [52, 152, 219], 
+          textColor: 255, 
+          fontStyle: 'bold',
+          fontSize: 10,
+          cellPadding: 4
+        },
+        bodyStyles: { 
+          fontSize: 9, 
+          cellPadding: 3 
+        },
+        alternateRowStyles: { 
+          fillColor: [248, 249, 250] 
+        },
+        margin: { left: 14, right: 14 }
+      });
+    }
+
+    // Strategic Fit
+    const teamTableEndY = (doc as any).lastAutoTable?.finalY + 12 || currentY + 60;
+    currentY = addSectionTitle(doc, 'STRATEGIC FIT ANALYSIS', teamTableEndY);
+
+    if (data.strategicFitData) {
+      autoTable(doc, {
+        startY: currentY,
+        head: [['Strategic Factor', 'Alignment', 'Impact', 'Priority']],
+        body: data.strategicFitData.factors?.slice(0, 6).map(f => [
+          f.factor || 'Strategic Element',
+          f.alignment || 'Strong',
+          f.impact || 'High',
+          f.priority || 'Critical'
+        ]) || [
+          ['Market Opportunity', 'Strong', 'High', 'Critical'],
+          ['Technology Fit', 'Moderate', 'Medium', 'High'],
+          ['Team Capability', 'Strong', 'High', 'Critical'],
+          ['Competitive Position', 'Strong', 'High', 'Critical']
+        ],
+        theme: 'striped',
+        headStyles: { 
+          fillColor: [39, 174, 96], 
+          textColor: 255, 
+          fontStyle: 'bold',
+          fontSize: 10,
+          cellPadding: 4
+        },
+        bodyStyles: { 
+          fontSize: 10, 
+          cellPadding: 3.5 
+        },
+        alternateRowStyles: { 
+          fillColor: [248, 249, 250] 
+        },
+        margin: { left: 14, right: 14 }
+      });
+    }
+    
+    addPageFooter(doc, 5, totalPages);
+
+    // ========== PAGE 6: INVESTMENT RECOMMENDATION ==========
+    doc.addPage();
+    addPageHeader(doc, companyName, 'INVESTMENT RECOMMENDATION');
+    
+    currentY = addSectionTitle(doc, 'INVESTMENT DECISION', 32);
+
+    // Decision box
+    const decision = score >= 8 ? 'STRONG BUY' : score >= 7 ? 'BUY' : score >= 6 ? 'CONDITIONAL BUY' : score >= 5 ? 'HOLD' : 'PASS';
     const confidence = score >= 8 ? 'Very High' : score >= 7 ? 'High' : score >= 5 ? 'Moderate' : 'Low';
+    
+    doc.setFillColor(scoreColor[0], scoreColor[1], scoreColor[2]);
+    doc.roundedRect(14, currentY, 182, 35, 4, 4, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text(decision, 105, currentY + 15, { align: 'center' });
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Confidence Level: ${confidence} | Score: ${score.toFixed(1)}/10`, 105, currentY + 28, { align: 'center' });
+    doc.setTextColor(0, 0, 0);
 
-    autoTable(doc, {
-      startY: 40,
-      head: [['Decision Framework', 'Assessment', 'Rationale']],
-      body: [
-        ['Investment Recommendation', recommendation, `Based on comprehensive TCA score of ${score.toFixed(2)}`],
-        ['Confidence Level', confidence, 'Derived from analysis completeness and data quality'],
-        ['Risk Profile', score >= 7 ? 'Acceptable' : score >= 5 ? 'Elevated' : 'High Risk', 'Based on risk assessment matrix'],
-        ['Strategic Alignment', 'Under Review', 'Requires fund strategy alignment analysis'],
-        ['Valuation Range', 'TBD - Pending Financial DD', 'Requires detailed financial model review']
-      ],
-      theme: 'striped',
-      headStyles: { fillColor: [63, 81, 181] }
+    // Key decision factors
+    currentY = addSectionTitle(doc, 'KEY DECISION FACTORS', currentY + 50);
+    
+    const factors = [
+      { factor: 'Technology & IP', assessment: data.tcaData?.categories.find(c => c.category.includes('Technology'))?.flag || 'yellow' },
+      { factor: 'Market Opportunity', assessment: data.tcaData?.categories.find(c => c.category.includes('Market'))?.flag || 'yellow' },
+      { factor: 'Team Capability', assessment: data.tcaData?.categories.find(c => c.category.includes('Team'))?.flag || 'yellow' },
+      { factor: 'Financial Health', assessment: data.tcaData?.categories.find(c => c.category.includes('Financial'))?.flag || 'yellow' }
+    ];
+    
+    factors.forEach((item, index) => {
+      const flagColor = item.assessment === 'green' ? [39, 174, 96] : item.assessment === 'yellow' ? [243, 156, 18] : [231, 76, 60];
+      doc.setFillColor(flagColor[0], flagColor[1], flagColor[2]);
+      doc.circle(22, currentY + (index * 10) - 1, 3, 'F');
+      doc.setFontSize(10);
+      doc.text(item.factor, 28, currentY + (index * 10));
     });
 
     // Due Diligence Checklist
-    const currentY = (doc as any).lastAutoTable.finalY + 20;
-    doc.setFontSize(14);
-    doc.text('Due Diligence Checklist', 14, currentY);
-
-    const ddChecklist = [
-      '□ Management presentation and Q&A session',
-      '□ Financial model validation and projections review',
-      '□ Customer reference calls and market validation',
-      '□ Technical architecture and IP assessment',
-      '□ Competitive landscape deep dive',
-      '□ Legal and regulatory compliance review',
-      '□ Background checks on key personnel',
-      '□ Reference checks with previous investors',
-      '□ Market size and TAM validation',
-      '□ Unit economics and scalability analysis'
-    ];
-
+    currentY = addSectionTitle(doc, 'DUE DILIGENCE CHECKLIST', currentY + 50);
     doc.setFontSize(10);
-    ddChecklist.forEach((item, index) => {
-      doc.text(item, 20, currentY + 15 + (index * 8));
-    });
-
-    // Footer on all pages
-    const pageCount = doc.internal.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i);
+    
+    const checklist = [
+      { item: 'Management presentation and Q&A', status: 'Pending' },
+      { item: 'Financial model validation', status: 'Pending' },
+      { item: 'Customer reference calls', status: 'Pending' },
+      { item: 'Technical architecture review', status: 'Pending' },
+      { item: 'Competitive analysis', status: 'Pending' },
+      { item: 'Legal and regulatory review', status: 'Pending' }
+    ];
+    
+    checklist.forEach((item, index) => {
+      doc.setFontSize(10);
+      doc.text(`☐ ${item.item}`, 18, currentY + (index * 8));
       doc.setFontSize(8);
-      doc.text(`${companyName} - ${reportType.toUpperCase()} Analysis Report | Page ${i} of ${pageCount} | Generated: ${new Date().toLocaleDateString()}`, 105, 285, { align: 'center' });
-    }
+      doc.setTextColor(100, 100, 100);
+      doc.text(`[${item.status}]`, 180, currentY + (index * 8));
+      doc.setTextColor(0, 0, 0);
+    });
+    
+    addPageFooter(doc, 6, totalPages);
 
-    doc.save(`${companyName}-COMPREHENSIVE-Analysis-Report-${new Date().toISOString().split('T')[0]}.pdf`);
+    doc.save(`${companyName}-Comprehensive-${reportType}-Report-${new Date().toISOString().split('T')[0]}.pdf`);
     toast({
-      title: 'Comprehensive Full Report Exported',
-      description: `Complete ${pageCount}-page analysis report with all modules and detailed assessments downloaded.`,
+      title: 'Full Report Exported',
+      description: 'Your comprehensive professional report has been downloaded.',
     });
   };
 
-  // Enhanced DOCX Export with Comprehensive Content
+  // Enhanced DOCX Export with Professional Styling
   const handleExportDocx = async () => {
     const data = getAnalysisData();
     if (!data) return;
 
     const companyName = getCompanyName();
+    const score = data.tcaData?.compositeScore || 0;
+    const rating = score >= 8 ? 'EXCELLENT' : score >= 7 ? 'STRONG' : score >= 6 ? 'GOOD' : score >= 5 ? 'MODERATE' : 'WEAK';
     const sections: Paragraph[] = [];
 
     // TITLE PAGE
     sections.push(
+      new Paragraph(""),
+      new Paragraph(""),
       new Paragraph({
-        heading: HeadingLevel.TITLE,
-        children: [new TextRun({ text: `COMPREHENSIVE ANALYSIS REPORT`, size: 28, bold: true })]
+        children: [new TextRun({ text: companyName.toUpperCase(), size: 56, bold: true, color: "1F4E79" })],
+        alignment: 'center',
+        spacing: { after: 400 }
       }),
       new Paragraph({
-        children: [new TextRun({ text: `${companyName}`, size: 24, bold: true })],
+        children: [new TextRun({ text: "COMPREHENSIVE INVESTMENT ANALYSIS", size: 32, color: "666666" })],
+        alignment: 'center',
+        spacing: { after: 200 }
+      }),
+      new Paragraph({
+        children: [new TextRun({ text: `${reportType.toUpperCase()} REPORT`, size: 24, bold: true, color: "1F4E79" })],
+        alignment: 'center',
+        spacing: { after: 600 }
+      }),
+      new Paragraph({
+        children: [new TextRun({ text: `TCA Score: ${score.toFixed(1)}/10 (${rating})`, size: 28, bold: true, color: score >= 7 ? "27AE60" : score >= 5 ? "F39C12" : "E74C3C" })],
+        alignment: 'center',
+        spacing: { after: 800 }
+      }),
+      new Paragraph({
+        children: [new TextRun({ text: `Generated: ${new Date().toLocaleDateString()}`, size: 20, italics: true, color: "888888" })],
         alignment: 'center'
       }),
       new Paragraph({
-        children: [new TextRun({ text: `${reportType.toUpperCase()} Analysis | Generated: ${new Date().toLocaleDateString()}`, size: 14 })],
-        alignment: 'center'
+        children: [new TextRun({ text: `Analyst: ${role}`, size: 20, italics: true, color: "888888" })],
+        alignment: 'center',
+        spacing: { after: 400 }
       }),
       new Paragraph({
-        children: [new TextRun({ text: `Analyst: ${role} | Confidential & Proprietary`, size: 12, italics: true })],
+        children: [new TextRun({ text: "CONFIDENTIAL & PROPRIETARY", size: 16, color: "AAAAAA" })],
         alignment: 'center'
       }),
       new Paragraph(""),
@@ -699,352 +1004,247 @@ export function ExportButtons() {
     );
 
     // EXECUTIVE SUMMARY
-    sections.push(new Paragraph({
-      heading: HeadingLevel.HEADING_1,
-      children: [new TextRun({ text: "EXECUTIVE SUMMARY", bold: true })]
-    }));
-
-    if (data.tcaData) {
-      const score = data.tcaData.compositeScore;
-      const rating = score >= 8 ? 'EXCELLENT' : score >= 7 ? 'STRONG' : score >= 6 ? 'GOOD' : score >= 5 ? 'MODERATE' : 'WEAK';
-
-      sections.push(
-        new Paragraph(`Overall Investment Score: ${score.toFixed(2)}/10 (${rating})`),
-        new Paragraph(`Investment Recommendation: ${score >= 7 ? 'PROCEED TO DUE DILIGENCE' : score >= 5 ? 'CONDITIONAL REVIEW REQUIRED' : 'DECLINE INVESTMENT'}`),
-        new Paragraph(""),
-        new Paragraph(data.tcaData.summary),
-        new Paragraph("")
-      );
-    }
-
-    // TABLE OF CONTENTS
     sections.push(
       new Paragraph({
         heading: HeadingLevel.HEADING_1,
-        children: [new TextRun({ text: "TABLE OF CONTENTS", bold: true })]
-      }),
-      new Paragraph("1. Executive Summary"),
-      new Paragraph("2. TCA Scorecard Analysis"),
-      new Paragraph("3. Risk Assessment & Mitigation Strategy"),
-      new Paragraph("4. Market & Competitive Analysis"),
-      new Paragraph("5. Financial Health & Projections"),
-      new Paragraph("6. Technology & Intellectual Property"),
-      new Paragraph("7. Team & Leadership Assessment"),
-      new Paragraph("8. Strategic Fit Analysis"),
-      new Paragraph("9. Growth Potential & Scalability"),
-      new Paragraph("10. Investment Recommendation & Terms"),
-      new Paragraph("11. Due Diligence Checklist"),
-      new Paragraph("12. Risk Mitigation Strategies"),
-      new Paragraph("13. Appendices & Supporting Data"),
-      new Paragraph("")
+        children: [new TextRun({ text: "EXECUTIVE SUMMARY", bold: true, size: 32, color: "1F4E79" })],
+        spacing: { before: 400, after: 200 }
+      })
     );
 
-    // DETAILED TCA SCORECARD ANALYSIS
-    sections.push(new Paragraph({
-      heading: HeadingLevel.HEADING_1,
-      children: [new TextRun({ text: "TCA SCORECARD ANALYSIS", bold: true })]
-    }));
-
     if (data.tcaData) {
-      sections.push(new Paragraph({
-        heading: HeadingLevel.HEADING_2,
-        children: [new TextRun({ text: "Overall Performance Metrics", bold: true })]
-      }));
+      const recommendation = score >= 7 ? 'PROCEED TO DUE DILIGENCE' : score >= 5 ? 'CONDITIONAL REVIEW REQUIRED' : 'DECLINE INVESTMENT';
 
       sections.push(
-        new Paragraph(`Composite TCA Score: ${data.tcaData.compositeScore.toFixed(2)}/10`),
-        new Paragraph(`Total Categories Analyzed: ${data.tcaData.categories.length}`),
-        new Paragraph(`Categories with Green Flag: ${data.tcaData.categories.filter(c => c.flag === 'green').length}`),
-        new Paragraph(`Categories with Yellow Flag: ${data.tcaData.categories.filter(c => c.flag === 'yellow').length}`),
-        new Paragraph(`Categories with Red Flag: ${data.tcaData.categories.filter(c => c.flag === 'red').length}`),
-        new Paragraph("")
+        new Paragraph({
+          children: [
+            new TextRun({ text: "Overall Investment Score: ", bold: true, size: 24 }),
+            new TextRun({ text: `${score.toFixed(1)}/10`, size: 24, bold: true, color: score >= 7 ? "27AE60" : score >= 5 ? "F39C12" : "E74C3C" })
+          ],
+          spacing: { after: 100 }
+        }),
+        new Paragraph({
+          children: [
+            new TextRun({ text: "Rating: ", bold: true, size: 22 }),
+            new TextRun({ text: rating, size: 22, bold: true })
+          ],
+          spacing: { after: 100 }
+        }),
+        new Paragraph({
+          children: [
+            new TextRun({ text: "Recommendation: ", bold: true, size: 22 }),
+            new TextRun({ text: recommendation, size: 22, color: score >= 7 ? "27AE60" : score >= 5 ? "F39C12" : "E74C3C" })
+          ],
+          spacing: { after: 200 }
+        }),
+        new Paragraph({
+          children: [new TextRun({ text: data.tcaData.summary || `${companyName} presents a ${score >= 7 ? 'compelling' : score >= 5 ? 'moderate' : 'challenging'} investment opportunity based on comprehensive TCA analysis.`, size: 22 })],
+          spacing: { after: 300 }
+        })
+      );
+    }
+
+    // TCA SCORECARD ANALYSIS
+    sections.push(
+      new Paragraph({
+        heading: HeadingLevel.HEADING_1,
+        children: [new TextRun({ text: "TCA SCORECARD ANALYSIS", bold: true, size: 32, color: "1F4E79" })],
+        spacing: { before: 400, after: 200 }
+      }),
+      new Paragraph({
+        heading: HeadingLevel.HEADING_2,
+        children: [new TextRun({ text: "Performance Overview", bold: true, size: 26 })],
+        spacing: { after: 150 }
+      }),
+      new Paragraph({
+        children: [new TextRun({ text: `Composite Score: ${score.toFixed(1)}/10`, size: 22, bold: true })],
+        spacing: { after: 100 }
+      }),
+      new Paragraph({
+        children: [new TextRun({ text: `Categories Analyzed: ${data.tcaData?.categories?.length || 0}`, size: 22 })],
+        spacing: { after: 50 }
+      }),
+      new Paragraph({
+        children: [
+          new TextRun({ text: `Strong (Green): ${data.tcaData?.categories?.filter(c => c.flag === 'green').length || 0}`, size: 22, color: "27AE60" }),
+          new TextRun({ text: "  |  ", size: 22 }),
+          new TextRun({ text: `Moderate (Yellow): ${data.tcaData?.categories?.filter(c => c.flag === 'yellow').length || 0}`, size: 22, color: "F39C12" }),
+          new TextRun({ text: "  |  ", size: 22 }),
+          new TextRun({ text: `At Risk (Red): ${data.tcaData?.categories?.filter(c => c.flag === 'red').length || 0}`, size: 22, color: "E74C3C" })
+        ],
+        spacing: { after: 200 }
+      })
+    );
+
+    // Category Details
+    if (data.tcaData?.categories) {
+      sections.push(
+        new Paragraph({
+          heading: HeadingLevel.HEADING_2,
+          children: [new TextRun({ text: "Category Breakdown", bold: true, size: 26 })],
+          spacing: { before: 200, after: 150 }
+        })
       );
 
-      // Detailed category analysis
-      sections.push(new Paragraph({
-        heading: HeadingLevel.HEADING_2,
-        children: [new TextRun({ text: "Detailed Category Analysis", bold: true })]
-      }));
-
-      data.tcaData.categories.forEach((category, index) => {
+      data.tcaData.categories.forEach((cat, index) => {
+        const flagColor = cat.flag === 'green' ? "27AE60" : cat.flag === 'yellow' ? "F39C12" : "E74C3C";
         sections.push(
           new Paragraph({
-            heading: HeadingLevel.HEADING_3,
-            children: [new TextRun({ text: `${index + 1}. ${category.category}`, bold: true })]
-          }),
-          new Paragraph(`Score: ${category.rawScore}/10 | Weight: ${category.weight}% | Status: ${category.flag.toUpperCase()}`),
-          new Paragraph("")
+            children: [
+              new TextRun({ text: `${index + 1}. ${cat.category}`, bold: true, size: 22 }),
+              new TextRun({ text: `  —  Score: ${cat.rawScore.toFixed(1)}/10`, size: 22 }),
+              new TextRun({ text: `  (${cat.weight}% weight)`, size: 20, color: "888888" }),
+              new TextRun({ text: `  [${cat.flag.toUpperCase()}]`, size: 20, bold: true, color: flagColor })
+            ],
+            spacing: { after: 80 }
+          })
         );
-
-        if (category.strengths) {
+        if (cat.strengths) {
           sections.push(
             new Paragraph({
-              children: [new TextRun({ text: "Strengths:", bold: true })]
-            }),
-            new Paragraph(category.strengths),
-            new Paragraph("")
+              children: [
+                new TextRun({ text: "    Strengths: ", italics: true, size: 20 }),
+                new TextRun({ text: cat.strengths.slice(0, 100), size: 20, color: "27AE60" })
+              ],
+              spacing: { after: 50 }
+            })
           );
         }
-
-        if (category.concerns) {
+        if (cat.concerns) {
           sections.push(
             new Paragraph({
-              children: [new TextRun({ text: "Areas of Concern:", bold: true })]
-            }),
-            new Paragraph(category.concerns),
-            new Paragraph("")
-          );
-        }
-
-        if (category.recommendations) {
-          sections.push(
-            new Paragraph({
-              children: [new TextRun({ text: "Recommendations:", bold: true })]
-            }),
-            new Paragraph(category.recommendations),
-            new Paragraph("")
+              children: [
+                new TextRun({ text: "    Concerns: ", italics: true, size: 20 }),
+                new TextRun({ text: cat.concerns.slice(0, 100), size: 20, color: "E74C3C" })
+              ],
+              spacing: { after: 100 }
+            })
           );
         }
       });
     }
 
-    // COMPREHENSIVE RISK ASSESSMENT
-    sections.push(new Paragraph({
-      heading: HeadingLevel.HEADING_1,
-      children: [new TextRun({ text: "RISK ASSESSMENT & MITIGATION", bold: true })]
-    }));
+    // RISK ASSESSMENT
+    sections.push(
+      new Paragraph({
+        heading: HeadingLevel.HEADING_1,
+        children: [new TextRun({ text: "RISK ASSESSMENT", bold: true, size: 32, color: "1F4E79" })],
+        spacing: { before: 400, after: 200 }
+      })
+    );
 
     if (data.riskData) {
-      sections.push(
-        new Paragraph({
-          heading: HeadingLevel.HEADING_2,
-          children: [new TextRun({ text: "Risk Assessment Summary", bold: true })]
-        }),
-        new Paragraph(data.riskData.riskSummary),
-        new Paragraph("")
-      );
-
-      // Risk breakdown by severity
-      const risksByLevel = {
-        red: data.riskData.riskFlags.filter(r => r.flag === 'red'),
-        yellow: data.riskData.riskFlags.filter(r => r.flag === 'yellow'),
-        green: data.riskData.riskFlags.filter(r => r.flag === 'green')
+      const riskCounts = {
+        red: data.riskData.riskFlags.filter(r => r.flag === 'red').length,
+        yellow: data.riskData.riskFlags.filter(r => r.flag === 'yellow').length,
+        green: data.riskData.riskFlags.filter(r => r.flag === 'green').length
       };
 
       sections.push(
         new Paragraph({
-          heading: HeadingLevel.HEADING_2,
-          children: [new TextRun({ text: "Risk Level Distribution", bold: true })]
-        }),
-        new Paragraph(`Critical Risks (Red): ${risksByLevel.red.length}`),
-        new Paragraph(`Moderate Risks (Yellow): ${risksByLevel.yellow.length}`),
-        new Paragraph(`Low Risks (Green): ${risksByLevel.green.length}`),
-        new Paragraph("")
+          children: [
+            new TextRun({ text: `Critical Risks: ${riskCounts.red}`, size: 22, bold: true, color: "E74C3C" }),
+            new TextRun({ text: "  |  ", size: 22 }),
+            new TextRun({ text: `Moderate Risks: ${riskCounts.yellow}`, size: 22, bold: true, color: "F39C12" }),
+            new TextRun({ text: "  |  ", size: 22 }),
+            new TextRun({ text: `Low Risks: ${riskCounts.green}`, size: 22, bold: true, color: "27AE60" })
+          ],
+          spacing: { after: 200 }
+        })
       );
 
-      // Detailed risk analysis
-      sections.push(new Paragraph({
-        heading: HeadingLevel.HEADING_2,
-        children: [new TextRun({ text: "Detailed Risk Analysis", bold: true })]
-      }));
-
-      data.riskData.riskFlags.forEach((risk, index) => {
+      // Critical risks detail
+      const criticalRisks = data.riskData.riskFlags.filter(r => r.flag === 'red');
+      if (criticalRisks.length > 0) {
         sections.push(
           new Paragraph({
-            heading: HeadingLevel.HEADING_3,
-            children: [new TextRun({ text: `Risk ${index + 1}: ${risk.domain}`, bold: true })]
-          }),
-          new Paragraph(`Level: ${risk.flag.toUpperCase()}`),
-          new Paragraph(`Trigger: ${risk.trigger}`),
-          new Paragraph(`Mitigation Strategy: ${risk.mitigation || 'Under development'}`),
-          new Paragraph(`Priority: ${risk.priority || 'High'}`),
-          new Paragraph("")
+            heading: HeadingLevel.HEADING_2,
+            children: [new TextRun({ text: "Critical Risks Requiring Attention", bold: true, size: 26, color: "E74C3C" })],
+            spacing: { before: 150, after: 100 }
+          })
         );
-      });
-    }
-
-    // MARKET & COMPETITIVE ANALYSIS
-    if (data.benchmarkData) {
-      sections.push(
-        new Paragraph({
-          heading: HeadingLevel.HEADING_1,
-          children: [new TextRun({ text: "MARKET & COMPETITIVE ANALYSIS", bold: true })]
-        }),
-        new Paragraph({
-          heading: HeadingLevel.HEADING_2,
-          children: [new TextRun({ text: "Benchmark Comparison", bold: true })]
-        })
-      );
-
-      data.benchmarkData.comparisons?.forEach((comp, index) => {
-        sections.push(
-          new Paragraph(`${index + 1}. ${comp.metric || 'Market Metric'}`),
-          new Paragraph(`   Company Value: ${comp.companyValue || 'Under Analysis'}`),
-          new Paragraph(`   Industry Average: ${comp.industryAverage || 'TBD'}`),
-          new Paragraph(`   Percentile Rank: ${comp.percentile || 'TBD'}`),
-          new Paragraph("")
-        );
-      });
-    }
-
-    // FINANCIAL HEALTH ANALYSIS
-    if (data.financialsData) {
-      sections.push(
-        new Paragraph({
-          heading: HeadingLevel.HEADING_1,
-          children: [new TextRun({ text: "FINANCIAL HEALTH & PROJECTIONS", bold: true })]
-        }),
-        new Paragraph({
-          heading: HeadingLevel.HEADING_2,
-          children: [new TextRun({ text: "Key Financial Metrics", bold: true })]
-        }),
-        new Paragraph(`Revenue Growth Rate: ${data.financialsData.revenueGrowth || 'Under Analysis'}`),
-        new Paragraph(`Monthly Burn Rate: ${data.financialsData.burnRate || 'Under Review'}`),
-        new Paragraph(`Cash Runway: ${data.financialsData.runway || 'To be determined'}`),
-        new Paragraph(`Gross Margin: ${data.financialsData.grossMargin || 'Pending analysis'}`),
-        new Paragraph(`Customer Acquisition Cost: ${data.financialsData.cac || 'Under review'}`),
-        new Paragraph(`Lifetime Value: ${data.financialsData.ltv || 'Under calculation'}`),
-        new Paragraph("")
-      );
-    }
-
-    // TEAM & LEADERSHIP ASSESSMENT
-    if (data.teamData) {
-      sections.push(
-        new Paragraph({
-          heading: HeadingLevel.HEADING_1,
-          children: [new TextRun({ text: "TEAM & LEADERSHIP ASSESSMENT", bold: true })]
-        }),
-        new Paragraph({
-          heading: HeadingLevel.HEADING_2,
-          children: [new TextRun({ text: "Leadership Team Analysis", bold: true })]
-        })
-      );
-
-      if (data.teamData.teamMembers) {
-        data.teamData.teamMembers.forEach((member, index) => {
+        
+        criticalRisks.slice(0, 5).forEach((risk, index) => {
           sections.push(
-            new Paragraph(`${index + 1}. ${member.name || `Team Member ${index + 1}`}`),
-            new Paragraph(`   Role: ${member.role || 'Key Team Member'}`),
-            new Paragraph(`   Experience: ${member.experience || 'Extensive background'}`),
-            new Paragraph(`   Assessment: ${member.assessment || 'Strong contributor'}`),
-            new Paragraph("")
+            new Paragraph({
+              children: [
+                new TextRun({ text: `${index + 1}. ${risk.domain}: `, bold: true, size: 22 }),
+                new TextRun({ text: risk.trigger, size: 22 })
+              ],
+              spacing: { after: 50 }
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: "   Mitigation: ", italics: true, size: 20 }),
+                new TextRun({ text: risk.mitigation || 'Under development', size: 20, color: "666666" })
+              ],
+              spacing: { after: 100 }
+            })
           );
         });
       }
-    }
-
-    // STRATEGIC FIT ANALYSIS
-    if (data.strategicFitData) {
-      sections.push(
-        new Paragraph({
-          heading: HeadingLevel.HEADING_1,
-          children: [new TextRun({ text: "STRATEGIC FIT ANALYSIS", bold: true })]
-        }),
-        new Paragraph({
-          heading: HeadingLevel.HEADING_2,
-          children: [new TextRun({ text: "Investment Alignment Assessment", bold: true })]
-        })
-      );
-
-      data.strategicFitData.factors?.forEach((factor, index) => {
-        sections.push(
-          new Paragraph(`${index + 1}. ${factor.factor || 'Strategic Factor'}`),
-          new Paragraph(`   Alignment: ${factor.alignment || 'Strong'}`),
-          new Paragraph(`   Impact: ${factor.impact || 'High'}`),
-          new Paragraph(`   Priority: ${factor.priority || 'Critical'}`),
-          new Paragraph("")
-        );
-      });
-    }
-
-    // GROWTH POTENTIAL ANALYSIS
-    if (data.growthData) {
-      sections.push(
-        new Paragraph({
-          heading: HeadingLevel.HEADING_1,
-          children: [new TextRun({ text: "GROWTH POTENTIAL & SCALABILITY", bold: true })]
-        }),
-        new Paragraph({
-          heading: HeadingLevel.HEADING_2,
-          children: [new TextRun({ text: "Growth Factor Analysis", bold: true })]
-        })
-      );
-
-      data.growthData.factors?.forEach((factor, index) => {
-        sections.push(
-          new Paragraph(`${index + 1}. ${factor.name || 'Growth Driver'}`),
-          new Paragraph(`   Assessment: ${factor.assessment || 'Positive'}`),
-          new Paragraph(`   Score: ${factor.score || '7.5'}/10`),
-          new Paragraph(`   Trend: ${factor.trend || 'Increasing'}`),
-          new Paragraph(`   Time Horizon: ${factor.timeHorizon || '12-18 months'}`),
-          new Paragraph("")
-        );
-      });
     }
 
     // INVESTMENT RECOMMENDATION
     sections.push(
       new Paragraph({
         heading: HeadingLevel.HEADING_1,
-        children: [new TextRun({ text: "INVESTMENT RECOMMENDATION", bold: true })]
-      }),
-      new Paragraph({
-        heading: HeadingLevel.HEADING_2,
-        children: [new TextRun({ text: "Final Assessment", bold: true })]
+        children: [new TextRun({ text: "INVESTMENT RECOMMENDATION", bold: true, size: 32, color: "1F4E79" })],
+        spacing: { before: 400, after: 200 }
       })
     );
 
-    const score = data.tcaData?.compositeScore || 0;
-    const recommendation = score >= 8 ? 'STRONG BUY - Proceed immediately' :
-      score >= 7 ? 'BUY - Recommended investment' :
-        score >= 6 ? 'CONDITIONAL BUY - Address specific concerns' :
-          score >= 4 ? 'HOLD - Requires significant improvements' :
-            'PASS - Does not meet investment criteria';
+    const decision = score >= 8 ? 'STRONG BUY' : score >= 7 ? 'BUY' : score >= 6 ? 'CONDITIONAL BUY' : score >= 5 ? 'HOLD' : 'PASS';
+    const confidence = score >= 8 ? 'Very High' : score >= 7 ? 'High' : score >= 5 ? 'Moderate' : 'Low';
 
     sections.push(
-      new Paragraph(`Investment Decision: ${recommendation}`),
-      new Paragraph(`Confidence Level: ${score >= 8 ? 'Very High' : score >= 7 ? 'High' : score >= 5 ? 'Moderate' : 'Low'}`),
-      new Paragraph(`Risk Profile: ${score >= 7 ? 'Acceptable' : score >= 5 ? 'Elevated' : 'High Risk'}`),
-      new Paragraph("")
+      new Paragraph({
+        children: [new TextRun({ text: decision, size: 36, bold: true, color: score >= 7 ? "27AE60" : score >= 5 ? "F39C12" : "E74C3C" })],
+        alignment: 'center',
+        spacing: { after: 150 }
+      }),
+      new Paragraph({
+        children: [new TextRun({ text: `Confidence Level: ${confidence}`, size: 24 })],
+        alignment: 'center',
+        spacing: { after: 100 }
+      }),
+      new Paragraph({
+        children: [new TextRun({ text: `Risk Profile: ${score >= 7 ? 'Acceptable' : score >= 5 ? 'Elevated' : 'High Risk'}`, size: 24 })],
+        alignment: 'center',
+        spacing: { after: 300 }
+      })
     );
 
     // DUE DILIGENCE CHECKLIST
     sections.push(
       new Paragraph({
         heading: HeadingLevel.HEADING_1,
-        children: [new TextRun({ text: "DUE DILIGENCE CHECKLIST", bold: true })]
-      }),
-      new Paragraph("□ Management presentation and leadership interviews"),
-      new Paragraph("□ Financial model validation and projection review"),
-      new Paragraph("□ Customer reference calls and market validation"),
-      new Paragraph("□ Technical architecture and IP assessment"),
-      new Paragraph("□ Competitive landscape analysis"),
-      new Paragraph("□ Legal and regulatory compliance review"),
-      new Paragraph("□ Background checks on key personnel"),
-      new Paragraph("□ Reference checks with previous investors"),
-      new Paragraph("□ Market size and TAM validation"),
-      new Paragraph("□ Unit economics and scalability analysis"),
-      new Paragraph("□ Technology risk assessment"),
-      new Paragraph("□ Business model validation"),
-      new Paragraph("")
+        children: [new TextRun({ text: "DUE DILIGENCE CHECKLIST", bold: true, size: 32, color: "1F4E79" })],
+        spacing: { before: 400, after: 200 }
+      })
     );
 
-    // APPENDICES
-    sections.push(
-      new Paragraph({
-        heading: HeadingLevel.HEADING_1,
-        children: [new TextRun({ text: "APPENDICES", bold: true })]
-      }),
-      new Paragraph({
-        heading: HeadingLevel.HEADING_2,
-        children: [new TextRun({ text: "Data Sources & Methodology", bold: true })]
-      }),
-      new Paragraph("This comprehensive analysis was conducted using the TCA-IRR Platform's 9-module assessment framework."),
-      new Paragraph("Data sources include company-provided materials, public market research, and proprietary analysis tools."),
-      new Paragraph("All scores and assessments are based on standardized evaluation criteria and industry benchmarks."),
-      new Paragraph("")
-    );
+    const checklist = [
+      'Management presentation and leadership interviews',
+      'Financial model validation and projection review',
+      'Customer reference calls and market validation',
+      'Technical architecture and IP assessment',
+      'Competitive landscape analysis',
+      'Legal and regulatory compliance review',
+      'Background checks on key personnel',
+      'Reference checks with previous investors',
+      'Market size and TAM validation',
+      'Unit economics and scalability analysis'
+    ];
+
+    checklist.forEach((item, index) => {
+      sections.push(
+        new Paragraph({
+          children: [new TextRun({ text: `☐ ${item}`, size: 22 })],
+          spacing: { after: 80 }
+        })
+      );
+    });
 
     const doc = new Document({
       sections: [{
@@ -1052,10 +1252,10 @@ export function ExportButtons() {
         properties: {
           page: {
             margin: {
-              top: 720,   // 0.5 inch
-              right: 720, // 0.5 inch
-              bottom: 720, // 0.5 inch
-              left: 720,  // 0.5 inch
+              top: 1000,
+              right: 1000,
+              bottom: 1000,
+              left: 1000,
             }
           }
         }
@@ -1063,10 +1263,10 @@ export function ExportButtons() {
     });
 
     const blob = await Packer.toBlob(doc);
-    saveAs(blob, `${companyName}-COMPREHENSIVE-${reportType}-Analysis.docx`);
+    saveAs(blob, `${companyName}-${reportType}-Analysis-Report.docx`);
     toast({
-      title: 'Comprehensive DOCX Report Exported',
-      description: `Complete ${reportType} analysis report with detailed sections has been downloaded as Word document.`
+      title: 'Word Report Exported',
+      description: 'Your professional Word document has been downloaded.'
     });
   };
 
