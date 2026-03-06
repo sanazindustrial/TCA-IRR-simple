@@ -581,3 +581,47 @@ export const sourceCategories = [
 export const sourceStatus = ['connected', 'disconnected', 'error'];
 export const sourceTypes = ['API', 'Web Scraping', 'Database', 'Feed'];
 export const sourcePricingList = ['Free', 'Freemium', 'Premium', 'Enterprise'];
+
+// Compatibility exports for data-sources page (structured format with id/name/count)
+export type SourceCategory = {
+  id: string;
+  name: string;
+  count: number;
+};
+
+// Generate structured category array with counts from externalSourcesConfig
+const allCategories = [...new Set(externalSourcesConfig.map(s => s.category))];
+export const sourceCategoriesStructured: SourceCategory[] = [
+  { id: 'all', name: 'All Categories', count: externalSourcesConfig.length },
+  ...allCategories.map(cat => ({
+    id: cat.toLowerCase().replace(/[\s&/]+/g, '-'),
+    name: cat,
+    count: externalSourcesConfig.filter(s => s.category === cat).length,
+  })).sort((a, b) => a.name.localeCompare(b.name))
+];
+
+export const sourceStatusStructured = [
+  { id: 'all', name: 'All Statuses' },
+  { id: 'connected', name: 'Connected' },
+  { id: 'disconnected', name: 'Disconnected' },
+  { id: 'active', name: 'Active' },
+  { id: 'inactive', name: 'Inactive' },
+];
+
+export const sourceTypesStructured = [
+  { id: 'all', name: 'All Types' },
+  { id: 'api', name: 'API' },
+  { id: 'website', name: 'Website' },
+  { id: 'database', name: 'Database' },
+];
+
+export const sourcePricingListStructured = [
+  { id: 'all', name: 'All Pricing' },
+  { id: 'free', name: 'Free' },
+  { id: 'freemium', name: 'Freemium' },
+  { id: 'premium', name: 'Premium' },
+  { id: 'enterprise', name: 'Enterprise' },
+];
+
+// Alias for sources export (maps externalSourcesConfig to the Source type format)
+export const sources: ExternalSource[] = externalSourcesConfig;

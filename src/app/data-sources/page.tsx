@@ -5,12 +5,12 @@ import { useState, useRef, useEffect } from 'react';
 import * as Lucide from 'lucide-react';
 import {
   sources as initialSources,
-  type Source,
-  sourceCategories,
-  sourceStatus,
-  sourceTypes,
-  sourcePricingList,
-} from '@/lib/external-sources';
+  type ExternalSource as Source,
+  sourceCategoriesStructured as sourceCategories,
+  sourceStatusStructured as sourceStatus,
+  sourceTypesStructured as sourceTypes,
+  sourcePricingListStructured as sourcePricingList,
+} from '@/lib/external-sources-config';
 import {
   ArrowLeft,
   CheckCircle2,
@@ -69,11 +69,11 @@ const StatCard = ({
 }) => (
   <Card className="flex-1 bg-card/50 backdrop-blur-sm">
     <CardContent className="p-4 flex items-center gap-4">
-       <Icon className="size-8 text-muted-foreground" />
-       <div>
+      <Icon className="size-8 text-muted-foreground" />
+      <div>
         <p className="text-sm text-muted-foreground">{title}</p>
         <p className="text-2xl font-bold">{value}</p>
-       </div>
+      </div>
     </CardContent>
   </Card>
 );
@@ -141,7 +141,7 @@ const SourceDialog = ({
           <div className="space-y-2">
             <Label>Type</Label>
             <Select value={editedSource.type} onValueChange={(v) => handleChange('type', v)}>
-              <SelectTrigger><SelectValue/></SelectTrigger>
+              <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="API">API</SelectItem>
                 <SelectItem value="Website">Website</SelectItem>
@@ -152,7 +152,7 @@ const SourceDialog = ({
           <div className="space-y-2">
             <Label>Pricing</Label>
             <Select value={editedSource.pricing} onValueChange={(v) => handleChange('pricing', v)}>
-              <SelectTrigger><SelectValue/></SelectTrigger>
+              <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="Free">Free</SelectItem>
                 <SelectItem value="Freemium">Freemium</SelectItem>
@@ -181,97 +181,98 @@ const SourceDialog = ({
 
 
 const SourceCard = ({ source, showSecrets, onActiveChange, onTest, onEdit, onDelete, onApiKeyChange }: { source: Source, showSecrets: boolean, onActiveChange: (checked: boolean) => void, onTest: () => void, onEdit: () => void, onDelete: () => void, onApiKeyChange: (value: string) => void }) => {
-    const Icon = (Lucide as any)[source.icon] || Database;
-    const isFree = source.pricing === 'Free';
-    const isConnected = source.active && (source.apiKey?.startsWith('N/A') || (source.apiKey && source.apiKey.length > 0));
-  
-    return (
-      <Card className="flex flex-col transition-all hover:shadow-lg hover:border-primary/50">
-        <CardContent className="p-4 space-y-4">
-            <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                    <Icon className="size-8 text-primary" />
-                    <div>
-                        <h3 className="font-semibold">{source.name}</h3>
-                        <p className="text-xs text-muted-foreground">{source.category}</p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-2">
-                    {isFree && <Badge variant="outline" className='text-success border-success/50'>FREE</Badge>}
-                    <Badge variant={isConnected ? 'success' : 'secondary'}>
-                        {isConnected ? 'Connected' : 'Disconnected'}
-                    </Badge>
-                </div>
+  const iconName = source.icon || 'Database';
+  const Icon = (Lucide as any)[iconName] || Database;
+  const isFree = source.pricing === 'Free';
+  const isConnected = source.active && (source.apiKey?.startsWith('N/A') || (source.apiKey && source.apiKey.length > 0));
+
+  return (
+    <Card className="flex flex-col transition-all hover:shadow-lg hover:border-primary/50">
+      <CardContent className="p-4 space-y-4">
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-3">
+            <Icon className="size-8 text-primary" />
+            <div>
+              <h3 className="font-semibold">{source.name}</h3>
+              <p className="text-xs text-muted-foreground">{source.category}</p>
             </div>
-
-            <p className="text-sm text-muted-foreground min-h-[40px]">{source.description}</p>
-            
-            <Separator />
-
-            <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                    <span className="text-muted-foreground">API URL:</span>
-                    <a href={source.apiUrl} target='_blank' rel='noopener noreferrer' className="font-mono text-xs text-accent-foreground/80 truncate hover:underline">{source.apiUrl}</a>
-                </div>
-
-                <div className="grid grid-cols-3 gap-x-2 gap-y-2 text-center">
-                    <div>
-                        <p className="text-xs text-muted-foreground">Type</p>
-                        <Badge variant="secondary">{source.type}</Badge>
-                    </div>
-                    <div>
-                        <p className="text-xs text-muted-foreground">Rate Limit</p>
-                        <p className="font-mono text-xs">{source.rateLimit}</p>
-                    </div>
-                    <div>
-                        <p className="text-xs text-muted-foreground">Success</p>
-                        <p className="font-mono text-xs">{source.successRate}%</p>
-                    </div>
-                </div>
-                 <div className="space-y-2">
-                    <Label htmlFor={`api-key-${source.id}`} className="text-xs text-muted-foreground">API Key</Label>
-                    <Input id={`api-key-${source.id}`} 
-                        type={showSecrets ? "text" : "password"} 
-                        placeholder="Enter API Key" 
-                        className="font-mono text-xs h-8"
-                        value={source.apiKey}
-                        onChange={(e) => onApiKeyChange(e.target.value)}
-                        disabled={source.apiKey?.startsWith('N/A')}
-                    />
-                </div>
-            </div>
-        </CardContent>
-        <div className="border-t mt-auto p-3 flex items-center justify-between bg-muted/30">
-             <div className="flex items-center gap-2">
-                <Switch id={`active-${source.id}`} checked={source.active} onCheckedChange={onActiveChange} />
-                <Label htmlFor={`active-${source.id}`} className="text-sm font-medium">Active</Label>
-             </div>
-             <div className="flex items-center gap-1">
-                <TooltipProvider>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" onClick={onTest}><TestTube className="size-4" /></Button>
-                        </TooltipTrigger>
-                        <TooltipContent><p>Test Connection</p></TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                           <Button variant="ghost" size="icon" onClick={onEdit}><Edit className="size-4" /></Button>
-                        </TooltipTrigger>
-                        <TooltipContent><p>Edit Source</p></TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="text-destructive/80 hover:text-destructive" onClick={onDelete}><Trash2 className="size-4" /></Button>
-                        </TooltipTrigger>
-                        <TooltipContent><p>Delete Source</p></TooltipContent>
-                    </Tooltip>
-                </TooltipProvider>
-             </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {isFree && <Badge variant="outline" className='text-success border-success/50'>FREE</Badge>}
+            <Badge variant={isConnected ? 'success' : 'secondary'}>
+              {isConnected ? 'Connected' : 'Disconnected'}
+            </Badge>
+          </div>
         </div>
-      </Card>
-    );
-  };
+
+        <p className="text-sm text-muted-foreground min-h-[40px]">{source.description}</p>
+
+        <Separator />
+
+        <div className="space-y-3 text-sm">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">API URL:</span>
+            <a href={source.apiUrl} target='_blank' rel='noopener noreferrer' className="font-mono text-xs text-accent-foreground/80 truncate hover:underline">{source.apiUrl}</a>
+          </div>
+
+          <div className="grid grid-cols-3 gap-x-2 gap-y-2 text-center">
+            <div>
+              <p className="text-xs text-muted-foreground">Type</p>
+              <Badge variant="secondary">{source.type}</Badge>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Rate Limit</p>
+              <p className="font-mono text-xs">{source.rateLimit}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Success</p>
+              <p className="font-mono text-xs">{source.successRate}%</p>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor={`api-key-${source.id}`} className="text-xs text-muted-foreground">API Key</Label>
+            <Input id={`api-key-${source.id}`}
+              type={showSecrets ? "text" : "password"}
+              placeholder="Enter API Key"
+              className="font-mono text-xs h-8"
+              value={source.apiKey}
+              onChange={(e) => onApiKeyChange(e.target.value)}
+              disabled={source.apiKey?.startsWith('N/A')}
+            />
+          </div>
+        </div>
+      </CardContent>
+      <div className="border-t mt-auto p-3 flex items-center justify-between bg-muted/30">
+        <div className="flex items-center gap-2">
+          <Switch id={`active-${source.id}`} checked={source.active} onCheckedChange={onActiveChange} />
+          <Label htmlFor={`active-${source.id}`} className="text-sm font-medium">Active</Label>
+        </div>
+        <div className="flex items-center gap-1">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" onClick={onTest}><TestTube className="size-4" /></Button>
+              </TooltipTrigger>
+              <TooltipContent><p>Test Connection</p></TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" onClick={onEdit}><Edit className="size-4" /></Button>
+              </TooltipTrigger>
+              <TooltipContent><p>Edit Source</p></TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="text-destructive/80 hover:text-destructive" onClick={onDelete}><Trash2 className="size-4" /></Button>
+              </TooltipTrigger>
+              <TooltipContent><p>Delete Source</p></TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      </div>
+    </Card>
+  );
+};
 
 export default function DataSourcesPage() {
   const [sources, setSources] = useState<Source[]>(initialSources);
@@ -290,47 +291,47 @@ export default function DataSourcesPage() {
 
 
   const handleActiveChange = (sourceId: string, checked: boolean) => {
-    setSources(prevSources => 
-        prevSources.map(s => 
-            s.id === sourceId ? {...s, active: checked} : s
-        )
+    setSources(prevSources =>
+      prevSources.map(s =>
+        s.id === sourceId ? { ...s, active: checked } : s
+      )
     );
     const sourceName = sources.find(s => s.id === sourceId)?.name;
     toast({
-        title: `Source Updated`,
-        description: `${sourceName} has been ${checked ? 'activated' : 'deactivated'}.`
+      title: `Source Updated`,
+      description: `${sourceName} has been ${checked ? 'activated' : 'deactivated'}.`
     })
   };
-  
+
   const handleApiKeyChange = (sourceId: string, value: string) => {
     setSources(prevSources =>
       prevSources.map(s => (s.id === sourceId ? { ...s, apiKey: value } : s))
     );
   };
-  
+
   const handleDeleteSource = (sourceId: string) => {
     const sourceName = sources.find(s => s.id === sourceId)?.name;
     setSources(prevSources => prevSources.filter(s => s.id !== sourceId));
     toast({
-        variant: 'destructive',
-        title: `Source Deleted`,
-        description: `${sourceName} has been removed from your configuration.`
+      variant: 'destructive',
+      title: `Source Deleted`,
+      description: `${sourceName} has been removed from your configuration.`
     })
   }
 
   const handleTestConnection = (source: Source) => {
     const isConfigured = source.apiKey?.startsWith('N/A') || (source.apiKey && source.apiKey.length > 0);
     if (isConfigured) {
-        toast({
-            title: `Testing ${source.name}`,
-            description: 'Connection successful!',
-        });
+      toast({
+        title: `Testing ${source.name}`,
+        description: 'Connection successful!',
+      });
     } else {
-        toast({
-            variant: 'destructive',
-            title: `Testing ${source.name}`,
-            description: 'Connection failed: API Key is missing.',
-        });
+      toast({
+        variant: 'destructive',
+        title: `Testing ${source.name}`,
+        description: 'Connection failed: API Key is missing.',
+      });
     }
   }
 
@@ -340,41 +341,41 @@ export default function DataSourcesPage() {
 
     const reader = new FileReader();
     reader.onload = (e) => {
-        try {
-            const content = e.target?.result;
-            if (typeof content !== 'string') {
-                throw new Error("File content is not a string.");
-            }
-            const importedSources = JSON.parse(content);
-
-            // Basic validation - check if it's an array
-            if (!Array.isArray(importedSources)) {
-                throw new Error("Invalid format: Configuration must be an array of sources.");
-            }
-
-            setSources(importedSources);
-            toast({
-                title: 'Import Successful',
-                description: `Successfully imported ${importedSources.length} sources.`,
-            });
-        } catch (error) {
-            console.error("Failed to import configuration:", error);
-            toast({
-                variant: 'destructive',
-                title: 'Import Failed',
-                description: error instanceof Error ? error.message : "Could not parse the selected file.",
-            });
+      try {
+        const content = e.target?.result;
+        if (typeof content !== 'string') {
+          throw new Error("File content is not a string.");
         }
+        const importedSources = JSON.parse(content);
+
+        // Basic validation - check if it's an array
+        if (!Array.isArray(importedSources)) {
+          throw new Error("Invalid format: Configuration must be an array of sources.");
+        }
+
+        setSources(importedSources);
+        toast({
+          title: 'Import Successful',
+          description: `Successfully imported ${importedSources.length} sources.`,
+        });
+      } catch (error) {
+        console.error("Failed to import configuration:", error);
+        toast({
+          variant: 'destructive',
+          title: 'Import Failed',
+          description: error instanceof Error ? error.message : "Could not parse the selected file.",
+        });
+      }
     };
     reader.readAsText(file);
-    
-    if(event.target) {
-        event.target.value = '';
+
+    if (event.target) {
+      event.target.value = '';
     }
   }
 
   const triggerFileSelect = () => fileInputRef.current?.click();
-  
+
   const handleOpenDialog = (type: 'add' | 'edit', source: Source | null = null) => {
     setDialogType(type);
     setDialogSource(source);
@@ -398,23 +399,24 @@ export default function DataSourcesPage() {
   };
 
   const emptySource: Source = {
-    id: '', name: '', category: '', description: '', url: '', apiUrl: '',
+    id: '', name: '', category: '', description: '', websiteUrl: '', apiUrl: '',
     apiKey: '', type: 'API', pricing: 'Free', rateLimit: '', successRate: 0,
-    avgResponse: 0, tags: [], connected: false, active: false, icon: 'Database'
+    tags: [], connected: false, active: false, icon: 'Database', features: [],
+    useCase: [], cost: ''
   };
 
 
   const filteredSources = sources.filter((source) => {
     const isConnected = source.active && (source.apiKey?.startsWith('N/A') || (source.apiKey && source.apiKey.length > 0));
-    const searchMatch = source.name.toLowerCase().includes(searchQuery.toLowerCase()) || source.description.toLowerCase().includes(searchQuery.toLowerCase()) || source.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()));
+    const searchMatch = source.name.toLowerCase().includes(searchQuery.toLowerCase()) || source.description.toLowerCase().includes(searchQuery.toLowerCase()) || (source.tags ?? []).some(t => t.toLowerCase().includes(searchQuery.toLowerCase()));
     const categoryMatch = categoryFilter === 'all' || source.category.toLowerCase().replace(/[\s&/]+/g, '-') === categoryFilter;
-    const statusMatch = 
-        statusFilter === 'all' ||
-        (statusFilter === 'connected' && isConnected) ||
-        (statusFilter === 'disconnected' && !isConnected) ||
-        (statusFilter === 'active' && source.active) ||
-        (statusFilter === 'inactive' && !source.active);
-    const typeMatch = typeFilter === 'all' || source.type.toLowerCase() === typeFilter;
+    const statusMatch =
+      statusFilter === 'all' ||
+      (statusFilter === 'connected' && isConnected) ||
+      (statusFilter === 'disconnected' && !isConnected) ||
+      (statusFilter === 'active' && source.active) ||
+      (statusFilter === 'inactive' && !source.active);
+    const typeMatch = typeFilter === 'all' || (source.type ?? '').toLowerCase() === typeFilter;
     const pricingMatch = pricingFilter === 'all' || source.pricing.toLowerCase() === pricingFilter;
     return searchMatch && categoryMatch && statusMatch && typeMatch && pricingMatch;
   });
@@ -423,7 +425,7 @@ export default function DataSourcesPage() {
   const connectedSources = sources.filter(s => s.active && (s.apiKey?.startsWith('N/A') || (s.apiKey && s.apiKey.length > 0))).length;
   const activeSources = sources.filter(s => s.active).length;
   const freeSources = sources.filter(s => s.pricing === 'Free').length;
-  const avgSuccess = totalSources > 0 ? (sources.reduce((acc, s) => acc + s.successRate, 0) / totalSources).toFixed(1) : '0.0';
+  const avgSuccess = totalSources > 0 ? (sources.reduce((acc, s) => acc + (s.successRate ?? 0), 0) / totalSources).toFixed(1) : '0.0';
 
 
   return (
@@ -447,11 +449,11 @@ export default function DataSourcesPage() {
               </p>
             </div>
             <div className='flex gap-2 flex-shrink-0 mt-2'>
-                <Button variant="outline" onClick={() => toast({ title: 'Testing All Connections', description: 'This may take a moment...' })}><TestTube className="mr-2"/> Test All</Button>
-                <Button variant="outline" onClick={() => toast({ title: 'Exporting Configuration', description: 'Your configuration file is being downloaded.' })}><Upload className="mr-2"/> Export Config</Button>
-                <Button variant="outline" onClick={triggerFileSelect}><Import className="mr-2"/> Import Config</Button>
-                <input type="file" ref={fileInputRef} onChange={handleFileImport} className="hidden" accept=".json" />
-                <Button onClick={() => handleOpenDialog('add', emptySource)}><Plus className="mr-2"/> Add Source</Button>
+              <Button variant="outline" onClick={() => toast({ title: 'Testing All Connections', description: 'This may take a moment...' })}><TestTube className="mr-2" /> Test All</Button>
+              <Button variant="outline" onClick={() => toast({ title: 'Exporting Configuration', description: 'Your configuration file is being downloaded.' })}><Upload className="mr-2" /> Export Config</Button>
+              <Button variant="outline" onClick={triggerFileSelect}><Import className="mr-2" /> Import Config</Button>
+              <input type="file" ref={fileInputRef} onChange={handleFileImport} className="hidden" accept=".json" title="Import JSON configuration file" aria-label="Import JSON configuration file" />
+              <Button onClick={() => handleOpenDialog('add', emptySource)}><Plus className="mr-2" /> Add Source</Button>
             </div>
           </div>
         </header>
@@ -512,7 +514,7 @@ export default function DataSourcesPage() {
                 ))}
               </SelectContent>
             </Select>
-             <Select value={pricingFilter} onValueChange={setPricingFilter}>
+            <Select value={pricingFilter} onValueChange={setPricingFilter}>
               <SelectTrigger className="w-full md:w-[180px]">
                 <SelectValue placeholder="All Pricing" />
               </SelectTrigger>
@@ -533,24 +535,24 @@ export default function DataSourcesPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredSources.map((source) => (
-            <SourceCard 
-                key={source.id} 
-                source={source} 
-                showSecrets={showSecrets} 
-                onActiveChange={(checked) => handleActiveChange(source.id, checked)}
-                onApiKeyChange={(value) => handleApiKeyChange(source.id, value)}
-                onTest={() => handleTestConnection(source)}
-                onEdit={() => handleOpenDialog('edit', source)}
-                onDelete={() => handleDeleteSource(source.id)}
+            <SourceCard
+              key={source.id}
+              source={source}
+              showSecrets={showSecrets}
+              onActiveChange={(checked) => handleActiveChange(source.id, checked)}
+              onApiKeyChange={(value) => handleApiKeyChange(source.id, value)}
+              onTest={() => handleTestConnection(source)}
+              onEdit={() => handleOpenDialog('edit', source)}
+              onDelete={() => handleDeleteSource(source.id)}
             />
           ))}
         </div>
         {filteredSources.length === 0 && (
-            <div className='text-center col-span-full py-16 text-muted-foreground'>
-                <Search className='mx-auto mb-2 size-8'/>
-                <h3 className="font-semibold">No sources found.</h3>
-                <p>Try adjusting your search or filter criteria.</p>
-            </div>
+          <div className='text-center col-span-full py-16 text-muted-foreground'>
+            <Search className='mx-auto mb-2 size-8' />
+            <h3 className="font-semibold">No sources found.</h3>
+            <p>Try adjusting your search or filter criteria.</p>
+          </div>
         )}
       </div>
       <SourceDialog

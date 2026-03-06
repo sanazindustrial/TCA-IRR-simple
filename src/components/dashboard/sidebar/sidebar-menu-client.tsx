@@ -225,7 +225,7 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
                                     <SidebarMenuSubItem>
                                         <SidebarMenuSubButton href="/analysis/what-if" isActive={pathname === '/analysis/what-if'}>
                                             <Lightbulb className="size-4" />
-                                            <span>What-If Analysis</span>
+                                            <span>Simulation</span>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
                                 </SidebarMenuSub>
@@ -340,6 +340,12 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
                                 <SidebarMenuButton href="/dashboard/system-config" isActive={pathname === '/dashboard/system-config'} tooltip="System Config">
                                     <Settings />
                                     <span>System Config</span>
+                                </SidebarMenuButton>
+                            </SidebarMenuItem>
+                            <SidebarMenuItem>
+                                <SidebarMenuButton href="/dashboard/module-settings" isActive={pathname === '/dashboard/module-settings'} tooltip="Module Settings">
+                                    <Layers />
+                                    <span>Module Settings</span>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
                             <SidebarMenuItem>
