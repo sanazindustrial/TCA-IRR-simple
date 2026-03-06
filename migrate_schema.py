@@ -17,20 +17,29 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Database connection settings
-DATABASE_URL = os.environ.get('DATABASE_URL', '')
 
-# Parse connection details from DATABASE_URL or use individual env vars
-if not DATABASE_URL:
-    DB_HOST = os.environ.get('DB_HOST', 'localhost')
-    DB_PORT = os.environ.get('DB_PORT', '5432')
-    DB_NAME = os.environ.get('DB_NAME', 'tca_platform')
-    DB_USER = os.environ.get('DB_USER', 'postgres')
-    DB_PASSWORD = os.environ.get('DB_PASSWORD', '')
-    DB_SSL = os.environ.get('DB_SSL', 'require')
+def get_database_url():
+    """Get database URL using the same config as the main app"""
+    # First try DATABASE_URL directly
+    database_url = os.environ.get('DATABASE_URL', '')
+    if database_url:
+        return database_url
     
-    if DB_PASSWORD:
-        DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}?sslmode={DB_SSL}"
+    # Use POSTGRES_* env vars (same as database_config.py)
+    host = os.environ.get('POSTGRES_HOST', 'tca-irr-server.postgres.database.azure.com')
+    port = os.environ.get('POSTGRES_PORT', '5432')
+    db_name = os.environ.get('POSTGRES_DB', 'tca_platform')
+    user = os.environ.get('POSTGRES_USER', 'tcairrserver')
+    password = os.environ.get('POSTGRES_PASSWORD', '')
+    ssl_mode = os.environ.get('POSTGRES_SSL', 'require')
+    
+    if password:
+        return f"postgresql://{user}:{password}@{host}:{port}/{db_name}?sslmode={ssl_mode}"
+    
+    return ''
+
+
+DATABASE_URL = get_database_url()
 
 
 async def get_table_columns(conn, table_name: str) -> set:

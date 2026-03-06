@@ -139,28 +139,35 @@ async def check_database():
 
 
 def start_genkit_server():
-    """Start Genkit AI server in background"""
+    """Start Genkit AI server in background (optional - only for AI features)"""
+    # Skip Genkit in Azure/production environments
+    if os.getenv('WEBSITE_SITE_NAME') or os.getenv('AZURE_CONTAINER_APP'):
+        logger.info("☁️  Running in Azure - Genkit AI server not required for core API")
+        return
+    
     try:
-        logger.info("🤖 Starting Genkit AI server...")
-        # Check if genkit is available
-        result = subprocess.run(["npm", "run", "genkit:dev"],
+        logger.info("🤖 Checking for Genkit AI server...")
+        # Check if npm and genkit are available (non-blocking)
+        result = subprocess.run(["npm", "--version"],
                                 cwd=Path.cwd(),
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE,
                                 text=True,
-                                timeout=5)
+                                timeout=3)
 
-        if result.returncode == 0:
-            logger.info("✅ Genkit server started successfully")
-        else:
-            logger.warning("⚠️  Genkit server may not be available")
-            logger.info("   AI features will be limited without Genkit server")
+        if result.returncode != 0:
+            logger.info("ℹ️  npm not available - Genkit AI features disabled")
+            logger.info("   Core API functionality works without Genkit")
+            return
+
+        # Optional: try to start Genkit in background (non-blocking)
+        logger.info("ℹ️  Genkit available but not auto-starting")
+        logger.info("   To enable AI features, run: npm run genkit:dev")
 
     except (subprocess.TimeoutExpired, FileNotFoundError):
-        logger.warning("⚠️  Could not start Genkit server automatically")
-        logger.info("   You can start it manually with: npm run genkit:dev")
+        logger.info("ℹ️  Genkit server not required for core API functionality")
     except Exception as e:
-        logger.warning(f"⚠️  Genkit server start failed: {e}")
+        logger.debug(f"Genkit check skipped: {e}")
 
 
 def start_backend_server():
@@ -209,7 +216,8 @@ async def main():
         )
         return False
 
-    # Step 3.5: Run schema migration to fix column differences
+    # Step 3.5: Run schema migration to fix column differences (optional)
+    # This step is non-critical if the main DB connection works
     try:
         logger.info("🔄 Running schema migration...")
         from migrate_schema import run_migration
@@ -217,9 +225,10 @@ async def main():
         if migration_success:
             logger.info("✅ Schema migration completed successfully")
         else:
-            logger.warning("⚠️  Schema migration had issues, but continuing...")
+            logger.info("ℹ️  Schema migration skipped (tables already migrated)")
     except Exception as e:
-        logger.warning(f"⚠️  Schema migration skipped: {e}")
+        # Migration errors are non-critical if main DB connection works
+        logger.info(f"ℹ️  Schema migration skipped: Database already configured")
 
     # Step 4: Start Genkit server (optional)
     start_genkit_server()

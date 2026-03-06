@@ -21,7 +21,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import type { ComprehensiveAnalysisOutput } from '@/ai/flows/schemas';
 import Loading from '@/app/loading';
-import { ArrowLeft, Calculator, Check, Eye, Lock, SkipForward, SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, Calculator, Check, Eye, Lock, Play, SkipForward, SlidersHorizontal, ToggleLeft, ToggleRight, FileText } from 'lucide-react';
 import Link from 'next/link';
 import {
   AlertDialog,
@@ -32,6 +32,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 import { runAnalysis } from '@/app/analysis/actions';
 
@@ -39,16 +42,90 @@ interface ScoreRow {
   id: string;
   category: string;
   score: number;
+}
+
+interface ModuleConfig {
+  id: string;
+  name: string;
+  description: string;
+  enabled: boolean;
+  simulated: boolean;
+}
+
+// Module definitions with metadata
+const MODULE_DEFINITIONS: Record<string, { name: string; description: string }> = {
+  tca: { name: 'TCA Scorecard', description: 'Core technology capability assessment' },
+  risk: { name: 'Risk Assessment', description: 'Risk factors and mitigation analysis' },
+  macro: { name: 'Macro Trend Analysis', description: 'PESTEL framework analysis' },
+  benchmark: { name: 'Benchmark Comparison', description: 'Industry benchmark overlay' },
+  growth: { name: 'Growth Classification', description: 'Growth trajectory analysis' },
+  gap: { name: 'Gap Analysis', description: 'Capability gap heatmap' },
+  founderFit: { name: 'Founder Fit Analysis', description: 'Funding readiness assessment' },
+  team: { name: 'Team Assessment', description: 'Team effectiveness evaluation' },
+  strategicFit: { name: 'Strategic Fit Matrix', description: 'Strategic alignment scoring' },
 };
 
-const EditableScoreTable = ({ title, data, onScoreChange }: { title: string, data: ScoreRow[], onScoreChange: (id: string, newScore: number) => void }) => {
+const EditableScoreTable = ({
+  title,
+  data,
+  onScoreChange,
+  moduleConfig,
+  onToggleEnabled,
+  onToggleSimulated,
+  isAdmin
+}: {
+  title: string,
+  data: ScoreRow[],
+  onScoreChange: (id: string, newScore: number) => void,
+  moduleConfig?: ModuleConfig,
+  onToggleEnabled?: (enabled: boolean) => void,
+  onToggleSimulated?: (simulated: boolean) => void,
+  isAdmin?: boolean
+}) => {
+  const isDisabled = moduleConfig && !moduleConfig.enabled;
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg flex items-center gap-2">
-          <SlidersHorizontal className="text-primary size-5" />
-          {title}
-        </CardTitle>
+    <Card className={cn(
+      "transition-all duration-200",
+      isDisabled && "opacity-50 bg-muted/30"
+    )}>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <SlidersHorizontal className="text-primary size-5" />
+            {title}
+          </CardTitle>
+          {isAdmin && moduleConfig && (
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Skip</span>
+                <Switch
+                  checked={!moduleConfig.enabled}
+                  onCheckedChange={(checked) => onToggleEnabled?.(!checked)}
+                  className="data-[state=checked]:bg-orange-500"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Simulate</span>
+                <Switch
+                  checked={moduleConfig.simulated}
+                  onCheckedChange={(checked) => onToggleSimulated?.(checked)}
+                  disabled={!moduleConfig.enabled}
+                  className="data-[state=checked]:bg-green-500"
+                />
+              </div>
+              {!moduleConfig.enabled && (
+                <Badge variant="secondary" className="bg-orange-100 text-orange-700">Skipped</Badge>
+              )}
+              {moduleConfig.enabled && moduleConfig.simulated && (
+                <Badge variant="secondary" className="bg-green-100 text-green-700">Simulating</Badge>
+              )}
+            </div>
+          )}
+        </div>
+        {moduleConfig && (
+          <p className="text-sm text-muted-foreground">{moduleConfig.description}</p>
+        )}
       </CardHeader>
       <CardContent>
         <Table>
@@ -60,7 +137,7 @@ const EditableScoreTable = ({ title, data, onScoreChange }: { title: string, dat
           </TableHeader>
           <TableBody>
             {data.map((row) => (
-              <TableRow key={row.id}>
+              <TableRow key={row.id} className={isDisabled ? "opacity-60" : ""}>
                 <TableCell className="font-medium">{row.category}</TableCell>
                 <TableCell className="text-right">
                   <Input
@@ -71,6 +148,7 @@ const EditableScoreTable = ({ title, data, onScoreChange }: { title: string, dat
                     max="10"
                     step="0.1"
                     className="h-8 text-right"
+                    disabled={isDisabled}
                   />
                 </TableCell>
               </TableRow>
@@ -82,10 +160,79 @@ const EditableScoreTable = ({ title, data, onScoreChange }: { title: string, dat
   );
 };
 
-const SummaryCard = ({ scores }: { scores: number[] }) => {
+// Vertical Module Tab Navigation
+const ModuleTabNav = ({
+  modules,
+  activeModule,
+  onSelectModule,
+  moduleConfigs,
+  isAdmin,
+  onToggleEnabled,
+  onToggleSimulated
+}: {
+  modules: string[],
+  activeModule: string,
+  onSelectModule: (id: string) => void,
+  moduleConfigs: Record<string, ModuleConfig>,
+  isAdmin: boolean,
+  onToggleEnabled: (id: string, enabled: boolean) => void,
+  onToggleSimulated: (id: string, simulated: boolean) => void
+}) => {
+  return (
+    <div className="space-y-2">
+      <h3 className="text-sm font-semibold text-muted-foreground mb-3 px-2">MODULES</h3>
+      {modules.map((moduleId, index) => {
+        const config = moduleConfigs[moduleId];
+        const def = MODULE_DEFINITIONS[moduleId];
+        const isActive = activeModule === moduleId;
+        const isEnabled = config?.enabled ?? true;
+
+        return (
+          <button
+            key={moduleId}
+            onClick={() => onSelectModule(moduleId)}
+            className={cn(
+              "w-full text-left px-3 py-2 rounded-lg transition-all duration-150",
+              "flex items-center justify-between gap-2",
+              isActive
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "hover:bg-muted/80",
+              !isEnabled && "opacity-50"
+            )}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <span className={cn(
+                "flex-shrink-0 w-6 h-6 rounded-full text-xs flex items-center justify-center font-medium",
+                isActive ? "bg-primary-foreground/20" : "bg-primary/10 text-primary"
+              )}>
+                {index + 1}
+              </span>
+              <span className="truncate text-sm font-medium">{def?.name || moduleId}</span>
+            </div>
+            {!isEnabled && (
+              <SkipForward className="size-4 text-orange-500 flex-shrink-0" />
+            )}
+            {isEnabled && config?.simulated && (
+              <Play className="size-4 text-green-500 flex-shrink-0" />
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+const SummaryCard = ({ scores, moduleConfigs, enabledCount, totalCount }: {
+  scores: number[],
+  moduleConfigs: Record<string, ModuleConfig>,
+  enabledCount: number,
+  totalCount: number
+}) => {
   const sum = scores.reduce((a, b) => a + b, 0);
   const average = scores.length > 0 ? sum / scores.length : 0;
   const stdDev = scores.length > 0 ? Math.sqrt(scores.map(x => Math.pow(x - average, 2)).reduce((a, b) => a + b) / scores.length) : 0;
+  const simulatedCount = Object.values(moduleConfigs).filter(m => m.enabled && m.simulated).length;
+  const skippedCount = Object.values(moduleConfigs).filter(m => !m.enabled).length;
 
   return (
     <Card className="sticky top-4">
@@ -93,8 +240,8 @@ const SummaryCard = ({ scores }: { scores: number[] }) => {
         <CardTitle className="flex items-center gap-2"><Calculator /> What-If Summary</CardTitle>
         <CardDescription>Scores update in real-time as you edit.</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+      <CardContent className="space-y-3">
+        <div className="flex items-center justify-between p-3 rounded-lg bg-primary/10">
           <p className="font-medium">Composite Score</p>
           <p className="text-2xl font-bold text-primary">{average.toFixed(2)}/10</p>
         </div>
@@ -106,9 +253,18 @@ const SummaryCard = ({ scores }: { scores: number[] }) => {
           <p className="font-medium">Standard Deviation</p>
           <p className="text-xl font-bold">{stdDev.toFixed(2)}</p>
         </div>
-        <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-          <p className="font-medium">Total Modules</p>
-          <p className="text-xl font-bold">{Math.ceil(scores.length / 3)}</p>
+        <hr className="my-2" />
+        <div className="flex items-center justify-between p-2">
+          <p className="text-sm text-muted-foreground">Active Modules</p>
+          <Badge variant="outline">{enabledCount} / {totalCount}</Badge>
+        </div>
+        <div className="flex items-center justify-between p-2">
+          <p className="text-sm text-muted-foreground">Simulating</p>
+          <Badge className="bg-green-100 text-green-700">{simulatedCount}</Badge>
+        </div>
+        <div className="flex items-center justify-between p-2">
+          <p className="text-sm text-muted-foreground">Skipped</p>
+          <Badge className="bg-orange-100 text-orange-700">{skippedCount}</Badge>
         </div>
       </CardContent>
     </Card>
@@ -118,11 +274,20 @@ const SummaryCard = ({ scores }: { scores: number[] }) => {
 export default function WhatIfAnalysisPage() {
   const [analysisData, setAnalysisData] = useState<ComprehensiveAnalysisOutput | null>(null);
   const [editableScores, setEditableScores] = useState<Record<string, ScoreRow[]>>({});
+  const [moduleConfigs, setModuleConfigs] = useState<Record<string, ModuleConfig>>({});
+  const [activeModule, setActiveModule] = useState<string>('tca');
   const [isLoading, setIsLoading] = useState(true);
   const [showWelcome, setShowWelcome] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const router = useRouter();
   const { toast } = useToast();
+
+  // Check if user is admin
+  useEffect(() => {
+    const userRole = localStorage.getItem('userRole') || sessionStorage.getItem('userRole');
+    setIsAdmin(userRole === 'admin' || userRole === 'Admin');
+  }, []);
 
   useEffect(() => {
     const loadAnalysisData = async () => {
@@ -291,8 +456,23 @@ export default function WhatIfAnalysisPage() {
             ];
           }
 
-          // Set the scores and show the analysis
+          // Initialize module configs for all modules
+          const configs: Record<string, ModuleConfig> = {};
+          Object.keys(initialScores).forEach((moduleId) => {
+            const def = MODULE_DEFINITIONS[moduleId] || { name: moduleId, description: '' };
+            configs[moduleId] = {
+              id: moduleId,
+              name: def.name,
+              description: def.description,
+              enabled: true,
+              simulated: true, // Default to simulating all modules
+            };
+          });
+
+          // Set the scores, configs, and show the analysis
           setEditableScores(initialScores);
+          setModuleConfigs(configs);
+          setActiveModule(Object.keys(initialScores)[0] || 'tca');
           setShowWelcome(false);
           console.log('Analysis data loaded successfully with', Object.keys(initialScores).length, 'modules');
         } else {
@@ -326,6 +506,27 @@ export default function WhatIfAnalysisPage() {
       ...prev,
       [moduleId]: prev[moduleId].map(row => row.id === rowId ? { ...row, score: newScore } : row)
     }));
+  };
+
+  // Toggle module enabled/skipped state (admin only)
+  const handleToggleEnabled = (moduleId: string, enabled: boolean) => {
+    setModuleConfigs(prev => ({
+      ...prev,
+      [moduleId]: { ...prev[moduleId], enabled }
+    }));
+  };
+
+  // Toggle module simulated state (admin only)
+  const handleToggleSimulated = (moduleId: string, simulated: boolean) => {
+    setModuleConfigs(prev => ({
+      ...prev,
+      [moduleId]: { ...prev[moduleId], simulated }
+    }));
+  };
+
+  // Handle module tab selection
+  const handleModuleSelect = (moduleId: string) => {
+    setActiveModule(moduleId);
   };
 
   const handleProceed = async () => {
@@ -457,31 +658,71 @@ export default function WhatIfAnalysisPage() {
                 Adjust scores from {moduleCount} active modules to simulate outcomes before generating your triage report.
               </p>
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-3 items-center">
+              {/* Admin Toggle */}
+              <div className="flex items-center gap-2 mr-4 px-3 py-2 bg-muted rounded-lg">
+                <label className="text-sm font-medium">Admin Mode</label>
+                <Switch checked={isAdmin} onCheckedChange={setIsAdmin} />
+              </div>
               <Button variant="outline" size="lg" onClick={handleSkip} disabled={isLoading}>
                 <SkipForward className="mr-2" /> Skip What-If
               </Button>
               <Button size="lg" onClick={handleProceed} disabled={isLoading}>
-                <Lock className="mr-2" /> Lock Scores & Generate Report
+                <FileText className="mr-2" /> Generate Report
               </Button>
             </div>
           </div>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-8">
-            {editableScores.tca && <EditableScoreTable title="Module 1: TCA Scorecard" data={editableScores.tca} onScoreChange={(id, score) => handleScoreChange('tca', id, score)} />}
-            {editableScores.risk && <EditableScoreTable title="Module 2: Risk Assessment" data={editableScores.risk} onScoreChange={(id, score) => handleScoreChange('risk', id, score)} />}
-            {editableScores.macro && <EditableScoreTable title="Module 3: Macro Trend Analysis" data={editableScores.macro} onScoreChange={(id, score) => handleScoreChange('macro', id, score)} />}
-            {editableScores.benchmark && <EditableScoreTable title="Module 4: Benchmark Comparison" data={editableScores.benchmark} onScoreChange={(id, score) => handleScoreChange('benchmark', id, score)} />}
-            {editableScores.growth && <EditableScoreTable title="Module 5: Growth Classification" data={editableScores.growth} onScoreChange={(id, score) => handleScoreChange('growth', id, score)} />}
-            {editableScores.gap && <EditableScoreTable title="Module 6: Gap Analysis" data={editableScores.gap} onScoreChange={(id, score) => handleScoreChange('gap', id, score)} />}
-            {editableScores.founderFit && <EditableScoreTable title="Module 7: Founder Fit Analysis" data={editableScores.founderFit} onScoreChange={(id, score) => handleScoreChange('founderFit', id, score)} />}
-            {editableScores.team && <EditableScoreTable title="Module 8: Team Assessment" data={editableScores.team} onScoreChange={(id, score) => handleScoreChange('team', id, score)} />}
-            {editableScores.strategicFit && <EditableScoreTable title="Module 9: Strategic Fit Matrix" data={editableScores.strategicFit} onScoreChange={(id, score) => handleScoreChange('strategicFit', id, score)} />}
+        <div className="grid grid-cols-12 gap-6">
+          {/* Left Sidebar - Module Navigation */}
+          <div className="col-span-3">
+            <ModuleTabNav
+              modules={Object.keys(editableScores)}
+              moduleConfigs={moduleConfigs}
+              activeModule={activeModule}
+              onSelectModule={handleModuleSelect}
+              isAdmin={isAdmin}
+              onToggleEnabled={handleToggleEnabled}
+              onToggleSimulated={handleToggleSimulated}
+            />
           </div>
-          <div>
-            <SummaryCard scores={allScores} />
+
+          {/* Center - Active Module Editor */}
+          <div className="col-span-6 space-y-6">
+            {activeModule && editableScores[activeModule] && moduleConfigs[activeModule]?.enabled && (
+              <EditableScoreTable
+                title={`${MODULE_DEFINITIONS[activeModule]?.name || activeModule}`}
+                data={editableScores[activeModule]}
+                onScoreChange={(id, score) => handleScoreChange(activeModule, id, score)}
+                moduleConfig={moduleConfigs[activeModule]}
+                isAdmin={isAdmin}
+                onToggleEnabled={(enabled) => handleToggleEnabled(activeModule, enabled)}
+                onToggleSimulated={(simulated) => handleToggleSimulated(activeModule, simulated)}
+              />
+            )}
+            {activeModule && moduleConfigs[activeModule] && !moduleConfigs[activeModule].enabled && (
+              <Card className="border-dashed border-2 border-muted-foreground/20">
+                <CardContent className="py-12 text-center">
+                  <ToggleLeft className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold text-muted-foreground">Module Skipped</h3>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    {MODULE_DEFINITIONS[activeModule]?.name} is currently skipped.
+                    {isAdmin && " Enable it from admin controls to include in analysis."}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          {/* Right Sidebar - Summary */}
+          <div className="col-span-3">
+            <SummaryCard
+              scores={allScores}
+              moduleConfigs={moduleConfigs}
+              enabledCount={Object.values(moduleConfigs).filter(m => m.enabled).length}
+              totalCount={Object.keys(moduleConfigs).length}
+            />
           </div>
         </div>
       </div>
@@ -491,7 +732,8 @@ export default function WhatIfAnalysisPage() {
             <AlertDialogTitle className="flex items-center gap-2"><Eye /> Welcome to What-If Analysis</AlertDialogTitle>
             <AlertDialogDescription>
               This page displays all {moduleCount} analysis modules that were run. You can manually adjust any scores to simulate different scenarios.
-              When ready, click "Lock Scores & Generate Triage Report" to finalize your analysis and view the comprehensive triage report.
+              {isAdmin && " As an admin, you can skip modules or toggle simulation mode."}
+              When ready, click "Generate Report" to finalize your analysis and view the comprehensive triage report.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
