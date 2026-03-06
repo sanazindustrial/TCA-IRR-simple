@@ -1,8 +1,8 @@
 """Endpoints module initialization"""
 
 # Import all endpoint modules to ensure they're available
-from . import (auth, users, companies, analysis, investments, tca, admin)
+from . import (auth, users, companies, analysis, investments, tca, admin, dashboard, ssd)
 
 __all__ = [
-    "auth", "users", "companies", "analysis", "investments", "tca", "admin"
+    "auth", "users", "companies", "analysis", "investments", "tca", "admin", "dashboard", "ssd"
 ]
