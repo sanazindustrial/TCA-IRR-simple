@@ -1,0 +1,92 @@
+{
+  "timestamp": "2026-02-16T03:36:22.728Z",
+  "summary": {
+    "total": 14,
+    "passed": 14,
+    "failed": 0
+  },
+  "upload_ids": [
+    "d8e9ea8c-c8a3-4d95-b493-620c74a0e1e3",
+    "9a457666-d445-46c2-b087-6d621ac3368e",
+    "58a3068c-e5bb-4514-abb2-ed957f85fd01",
+    "d45292d5-bb28-4002-9215-e29dc18c4f6e",
+    "ec5c3956-2a0f-43e2-bc90-9fe6f919ca21",
+    "6df1315c-0bdc-47f8-9437-04cd32a516a3",
+    "7f622bf8-69c8-4f25-8d3e-0c646dfcfc61",
+    "94c68992-c798-4555-b0ff-1be880c78f11",
+    "75a1d16c-b42b-436e-8064-f8586d6f8608",
+    "7566b9cd-7b05-4159-ad41-38c00e3e718b"
+  ],
+  "tests": [
+    {
+      "name": "Health Check",
+      "status": "PASS",
+      "detail": "Backend healthy, DB healthy"
+    },
+    {
+      "name": "File Upload (single)",
+      "status": "PASS",
+      "detail": "Persisted as upload_id=d8e9ea8c…"
+    },
+    {
+      "name": "File Upload (multi)",
+      "status": "PASS",
+      "detail": "3 files persisted"
+    },
+    {
+      "name": "URL Fetch",
+      "status": "PASS",
+      "detail": "2 URLs persisted"
+    },
+    {
+      "name": "Text Submit",
+      "status": "PASS",
+      "detail": "Persisted, word_count=30"
+    },
+    {
+      "name": "JSON Upload (realistic-analysis-data.json)",
+      "status": "PASS",
+      "detail": "Persisted"
+    },
+    {
+      "name": "JSON Upload (e2e-analysis-result.json)",
+      "status": "PASS",
+      "detail": "Persisted"
+    },
+    {
+      "name": "JSON Upload (test-report-upload-analysis.json)",
+      "status": "PASS",
+      "detail": "Persisted"
+    },
+    {
+      "name": "List Uploads",
+      "status": "PASS",
+      "detail": "10 uploads in allupload table"
+    },
+    {
+      "name": "Get Upload by ID",
+      "status": "PASS",
+      "detail": "Found, extracted_data present=true, company=TestCorp"
+    },
+    {
+      "name": "Filter by Status",
+      "status": "PASS",
+      "detail": "10 completed uploads"
+    },
+    {
+      "name": "JSONB Extracted Data",
+      "status": "PASS",
+      "detail": "financial_data.revenue=500000, key_metrics.mrr=25000"
+    },
+    {
+      "name": "Delete Upload",
+      "status": "PASS",
+      "detail": "Deleted 7566b9cd…"
+    },
+    {
+      "name": "Delete Verify",
+      "status": "PASS",
+      "detail": "Correctly returns 404 after delete"
+    }
+  ]
+}
