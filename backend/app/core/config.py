@@ -90,8 +90,13 @@ class Settings(BaseSettings):
 
     # CORS Settings
     cors_origins: List[str] = [
-        "http://localhost:3000", "https://tca-irr-app.azurewebsites.net",
-        "https://localhost:3000"
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "https://localhost:3000",
+        "https://tca-irr.azurewebsites.net",
+        "https://tca-irr-app.azurewebsites.net",
+        "https://tcairrapiccontainer.azurewebsites.net",
+        "*"
     ]
 
     @field_validator("environment")
