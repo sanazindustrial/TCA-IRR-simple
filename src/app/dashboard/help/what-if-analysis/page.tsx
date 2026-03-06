@@ -92,8 +92,8 @@ const EditableScoreTable = ({ title, data, onScoreChange, isEditable }: { title:
     <Card>
       <CardHeader>
         <CardTitle className="text-lg flex items-center gap-2">
-            <SlidersHorizontal className="text-primary size-5"/>
-            {title}
+          <SlidersHorizontal className="text-primary size-5" />
+          {title}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -128,8 +128,8 @@ const EditableScoreTable = ({ title, data, onScoreChange, isEditable }: { title:
           </TableBody>
           <TableFooter>
             <TableRow>
-                <TableCell className="font-semibold">Module Average</TableCell>
-                <TableCell className="text-right font-bold text-lg text-primary">{moduleAverage.toFixed(2)}</TableCell>
+              <TableCell className="font-semibold">Module Average</TableCell>
+              <TableCell className="text-right font-bold text-lg text-primary">{moduleAverage.toFixed(2)}</TableCell>
             </TableRow>
           </TableFooter>
         </Table>
@@ -139,38 +139,40 @@ const EditableScoreTable = ({ title, data, onScoreChange, isEditable }: { title:
 };
 
 const SummaryCard = ({ scores, framework }: { scores: number[], framework: 'general' | 'medtech' }) => {
-    const sum = scores.reduce((a, b) => a + b, 0);
-    const average = scores.length > 0 ? sum / scores.length : 0;
-    const stdDev = scores.length > 0 ? Math.sqrt(scores.map(x => Math.pow(x - average, 2)).reduce((a, b) => a + b) / scores.length) : 0;
-    
-    return (
-        <Card className="sticky top-4">
-            <CardHeader>
-                <div className="flex justify-between items-center">
-                    <CardTitle className="flex items-center gap-2"><Calculator/> What-If Summary</CardTitle>
-                    <Badge variant="outline">{framework === 'general' ? 'General Framework' : 'MedTech Framework'}</Badge>
-                </div>
-                <CardDescription>Scores update in real-time as you edit.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                 <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                    <p className="font-medium">Composite Score</p>
-                    <p className="text-2xl font-bold text-primary">{average.toFixed(2)}</p>
-                </div>
-                 <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                    <p className="font-medium">Average Score</p>
-                    <p className="text-xl font-bold">{average.toFixed(2)}</p>
-                </div>
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                    <p className="font-medium">Standard Deviation</p>
-                    <p className="text-xl font-bold">{stdDev.toFixed(2)}</p>
-                </div>
-            </CardContent>
-        </Card>
-    );
+  const sum = scores.reduce((a, b) => a + b, 0);
+  const average = scores.length > 0 ? sum / scores.length : 0;
+  const stdDev = scores.length > 0 ? Math.sqrt(scores.map(x => Math.pow(x - average, 2)).reduce((a, b) => a + b) / scores.length) : 0;
+
+  return (
+    <Card className="sticky top-4">
+      <CardHeader>
+        <div className="flex justify-between items-center">
+          <CardTitle className="flex items-center gap-2"><Calculator /> Simulation Summary</CardTitle>
+          <Badge variant="outline">{framework === 'general' ? 'General Framework' : 'MedTech Framework'}</Badge>
+        </div>
+        <CardDescription>Module scores calculated separately. TCA is primary outcome.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* TCA Score - Primary */}
+        <div className="p-4 rounded-lg bg-primary/15 border-2 border-primary">
+          <p className="text-sm font-medium text-primary mb-1">TCA Score (Primary)</p>
+          <p className="text-3xl font-bold text-primary">{average.toFixed(2)}/10</p>
+          <p className="text-xs text-muted-foreground mt-1">12 Categories Assessment</p>
+        </div>
+        <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+          <p className="font-medium">Average Score</p>
+          <p className="text-xl font-bold">{average.toFixed(2)}</p>
+        </div>
+        <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+          <p className="font-medium">Standard Deviation</p>
+          <p className="text-xl font-bold">{stdDev.toFixed(2)}</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
 };
 
-export default function WhatIfAnalysisGuidePage() {
+export default function SimulationGuidePage() {
   const [editableScores, setEditableScores] = useState<Record<string, ScoreRow[]>>({});
   const [user, setUser] = useState<User | null>(null);
   const [isPrivilegedView, setIsPrivilegedView] = useState(true);
@@ -181,45 +183,45 @@ export default function WhatIfAnalysisGuidePage() {
     const storedUser = localStorage.getItem('loggedInUser');
     let userRole = 'user';
     if (storedUser) {
-        try {
-            const parsedUser: User = JSON.parse(storedUser);
-            setUser(parsedUser);
-            userRole = parsedUser.role.toLowerCase();
-        } catch (e) {
-            console.error("Failed to parse user from storage");
-        }
+      try {
+        const parsedUser: User = JSON.parse(storedUser);
+        setUser(parsedUser);
+        userRole = parsedUser.role.toLowerCase();
+      } catch (e) {
+        console.error("Failed to parse user from storage");
+      }
     }
     setIsPrivilegedView(userRole === 'admin' || userRole === 'reviewer');
 
     // Initialize scores based on all categories
     const allScores: Record<string, ScoreRow[]> = {};
     for (const moduleId in allModuleCategories) {
-        allScores[moduleId] = allModuleCategories[moduleId].categories.map(category => {
-            const isMissing = !initialCompanyScores[moduleId]?.[category];
-            const score = isMissing ? Math.floor(Math.random() * 5) + 1 : initialCompanyScores[moduleId][category];
-            return {
-                id: `${moduleId}-${category.replace(/\s/g, '-')}`,
-                category: category,
-                score: score,
-                isMissing: isMissing
-            };
-        });
+      allScores[moduleId] = allModuleCategories[moduleId].categories.map(category => {
+        const isMissing = !initialCompanyScores[moduleId]?.[category];
+        const score = isMissing ? Math.floor(Math.random() * 5) + 1 : initialCompanyScores[moduleId][category];
+        return {
+          id: `${moduleId}-${category.replace(/\s/g, '-')}`,
+          category: category,
+          score: score,
+          isMissing: isMissing
+        };
+      });
     }
     setEditableScores(allScores);
 
   }, []);
 
   const handleScoreChange = (moduleId: string, rowId: string, newScore: number) => {
-      setEditableScores(prev => ({
-          ...prev,
-          [moduleId]: prev[moduleId].map(row => row.id === rowId ? { ...row, score: newScore } : row)
-      }));
+    setEditableScores(prev => ({
+      ...prev,
+      [moduleId]: prev[moduleId].map(row => row.id === rowId ? { ...row, score: newScore } : row)
+    }));
   };
-  
+
   const handleProceed = () => {
     toast({
-        title: 'Scores Locked (Demo)',
-        description: 'In a real scenario, these scores would be saved and you would proceed to the triage report.',
+      title: 'Scores Locked (Demo)',
+      description: 'In a real scenario, these scores would be saved and you would proceed to the triage report.',
     });
   }
 
@@ -229,54 +231,54 @@ export default function WhatIfAnalysisGuidePage() {
     <div className="container mx-auto p-4 md:p-8">
       <header className="mb-8">
         <Link href="/dashboard/help" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary mb-4">
-            <ArrowLeft className="size-4" />
-            Back to Help & Support
+          <ArrowLeft className="size-4" />
+          Back to Help & Support
         </Link>
         <div className="flex justify-between items-center">
-            <div>
-                <h1 className="text-4xl font-bold font-headline text-primary tracking-tight">
-                Guide: What-If Analysis
-                </h1>
-                <p className="mt-2 text-lg text-muted-foreground max-w-3xl">
-                This is a demo page. Adjust scores from active modules to simulate outcomes before finalizing a report.
-                </p>
+          <div>
+            <h1 className="text-4xl font-bold font-headline text-primary tracking-tight">
+              Guide: Simulation
+            </h1>
+            <p className="mt-2 text-lg text-muted-foreground max-w-3xl">
+              This is a demo page. Adjust scores from active modules. TCA Score (12 categories) is the primary outcome.
+            </p>
+          </div>
+          <div className='space-y-2 text-right'>
+            <div className="flex items-center justify-end gap-4">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="framework-switcher" className={framework === 'general' ? 'text-primary' : ''}>General</Label>
+                <Switch id="framework-switcher" checked={framework === 'medtech'} onCheckedChange={(checked) => setFramework(checked ? 'medtech' : 'general')} />
+                <Label htmlFor="framework-switcher" className={framework === 'medtech' ? 'text-primary' : ''}>MedTech</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="role-switcher" className={!isPrivilegedView ? 'text-primary' : ''}>Standard View</Label>
+                <Switch id="role-switcher" checked={isPrivilegedView} onCheckedChange={setIsPrivilegedView} />
+                <Label htmlFor="role-switcher" className={isPrivilegedView ? 'text-primary' : ''}>Admin/Reviewer View</Label>
+              </div>
             </div>
-            <div className='space-y-2 text-right'>
-                <div className="flex items-center justify-end gap-4">
-                    <div className="flex items-center gap-2">
-                        <Label htmlFor="framework-switcher" className={framework === 'general' ? 'text-primary' : ''}>General</Label>
-                        <Switch id="framework-switcher" checked={framework === 'medtech'} onCheckedChange={(checked) => setFramework(checked ? 'medtech' : 'general')} />
-                        <Label htmlFor="framework-switcher" className={framework === 'medtech' ? 'text-primary' : ''}>MedTech</Label>
-                    </div>
-                     <div className="flex items-center gap-2">
-                        <Label htmlFor="role-switcher" className={!isPrivilegedView ? 'text-primary' : ''}>Standard View</Label>
-                        <Switch id="role-switcher" checked={isPrivilegedView} onCheckedChange={setIsPrivilegedView} />
-                        <Label htmlFor="role-switcher" className={isPrivilegedView ? 'text-primary' : ''}>Admin/Reviewer View</Label>
-                    </div>
-                </div>
-                {isPrivilegedView ? (
-                    <Button size="lg" onClick={handleProceed}><Lock className="mr-2"/> Lock Score & Proceed to Triage Report</Button>
-                ): (
-                    <Button size="lg"><Users className="mr-2"/> Run Report</Button>
-                )}
-            </div>
+            {isPrivilegedView ? (
+              <Button size="lg" onClick={handleProceed}><Lock className="mr-2" /> Lock Score & Proceed to Triage Report</Button>
+            ) : (
+              <Button size="lg"><Users className="mr-2" /> Run Report</Button>
+            )}
+          </div>
         </div>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
-            {Object.entries(editableScores).map(([moduleId, data]) => (
-                <EditableScoreTable
-                    key={moduleId}
-                    title={allModuleCategories[moduleId].title}
-                    data={data}
-                    onScoreChange={(id, score) => handleScoreChange(moduleId, id, score)}
-                    isEditable={isPrivilegedView}
-                />
-            ))}
+          {Object.entries(editableScores).map(([moduleId, data]) => (
+            <EditableScoreTable
+              key={moduleId}
+              title={allModuleCategories[moduleId].title}
+              data={data}
+              onScoreChange={(id, score) => handleScoreChange(moduleId, id, score)}
+              isEditable={isPrivilegedView}
+            />
+          ))}
         </div>
         <div>
-            <SummaryCard scores={allScores} framework={framework}/>
+          <SummaryCard scores={allScores} framework={framework} />
         </div>
       </div>
     </div>

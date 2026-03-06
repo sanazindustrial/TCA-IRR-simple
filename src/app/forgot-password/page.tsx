@@ -10,7 +10,7 @@ import Link from 'next/link';
 import { KeyRound, Mail, ArrowLeft, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://tca-irr-backend.azurewebsites.net/api/v1';
 
 export default function ForgotPasswordPage() {
     const [email, setEmail] = useState('');

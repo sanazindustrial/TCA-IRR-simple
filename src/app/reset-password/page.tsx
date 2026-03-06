@@ -9,7 +9,7 @@ import Link from 'next/link';
 import { KeyRound, Lock, ArrowLeft, Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://tca-irr-backend.azurewebsites.net/api/v1';
 
 export default function ResetPasswordPage() {
     const [password, setPassword] = useState('');
@@ -35,7 +35,7 @@ export default function ResetPasswordPage() {
             try {
                 const response = await fetch(`${API_BASE_URL}/auth/reset-password/validate/${token}`);
                 const data = await response.json();
-                
+
                 if (response.ok && data.valid) {
                     setIsTokenValid(true);
                     setMaskedEmail(data.email);
@@ -54,7 +54,7 @@ export default function ResetPasswordPage() {
 
     const handlePasswordReset = async (e: React.FormEvent) => {
         e.preventDefault();
-        
+
         if (!password || !confirmPassword) {
             toast({
                 variant: 'destructive',
@@ -97,7 +97,7 @@ export default function ResetPasswordPage() {
             });
 
             const data = await response.json();
-            
+
             if (response.ok) {
                 toast({
                     title: 'Password Reset Successful',
@@ -190,14 +190,14 @@ export default function ResetPasswordPage() {
                             <Label htmlFor="password">New Password</Label>
                             <div className="relative">
                                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                                <Input 
-                                    id="password" 
-                                    type="password" 
-                                    placeholder="Enter new password" 
-                                    required 
-                                    className="pl-10" 
-                                    value={password} 
-                                    onChange={e => setPassword(e.target.value)} 
+                                <Input
+                                    id="password"
+                                    type="password"
+                                    placeholder="Enter new password"
+                                    required
+                                    className="pl-10"
+                                    value={password}
+                                    onChange={e => setPassword(e.target.value)}
                                     disabled={isLoading}
                                     minLength={8}
                                 />
@@ -210,14 +210,14 @@ export default function ResetPasswordPage() {
                             <Label htmlFor="confirmPassword">Confirm Password</Label>
                             <div className="relative">
                                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                                <Input 
-                                    id="confirmPassword" 
-                                    type="password" 
-                                    placeholder="Confirm new password" 
-                                    required 
-                                    className="pl-10" 
-                                    value={confirmPassword} 
-                                    onChange={e => setConfirmPassword(e.target.value)} 
+                                <Input
+                                    id="confirmPassword"
+                                    type="password"
+                                    placeholder="Confirm new password"
+                                    required
+                                    className="pl-10"
+                                    value={confirmPassword}
+                                    onChange={e => setConfirmPassword(e.target.value)}
                                     disabled={isLoading}
                                 />
                             </div>

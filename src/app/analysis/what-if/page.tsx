@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
@@ -21,7 +21,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import type { ComprehensiveAnalysisOutput } from '@/ai/flows/schemas';
 import Loading from '@/app/loading';
-import { ArrowLeft, Calculator, Check, Eye, Lock, Play, SkipForward, SlidersHorizontal, ToggleLeft, ToggleRight, FileText } from 'lucide-react';
+import { ArrowLeft, Calculator, Check, Eye, Lock, Play, SkipForward, SlidersHorizontal, ToggleLeft, ToggleRight, FileText, Settings } from 'lucide-react';
 import Link from 'next/link';
 import {
   AlertDialog,
@@ -32,11 +32,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 import { runAnalysis } from '@/app/analysis/actions';
+import { settingsApi, SettingsVersion, MODULE_DEFINITIONS as API_MODULE_DEFS } from '@/lib/settings-api';
 
 interface ScoreRow {
   id: string;
@@ -50,9 +58,10 @@ interface ModuleConfig {
   description: string;
   enabled: boolean;
   simulated: boolean;
+  weight?: number;
 }
 
-// Module definitions with metadata and weights
+// Default module definitions (used as fallback)
 const MODULE_DEFINITIONS: Record<string, { name: string; description: string; weight: number }> = {
   tca: { name: 'TCA Scorecard', description: 'Core technology capability assessment', weight: 20 },
   risk: { name: 'Risk Assessment', description: 'Risk factors and mitigation analysis', weight: 15 },
@@ -281,25 +290,51 @@ const SummaryCard = ({ scores, moduleConfigs, enabledCount, totalCount, editable
   const runCount = simulationHistory.length;
   const avgOverRuns = runCount > 0 ? simulationHistory.reduce((a, b) => a + b, 0) / runCount : weightedAverage;
 
+  // Calculate individual module scores
+  const moduleScores: Record<string, number> = {};
+  Object.entries(editableScores).forEach(([moduleId, rows]) => {
+    const config = moduleConfigs[moduleId];
+    if (config?.enabled && rows.length > 0) {
+      moduleScores[moduleId] = rows.reduce((sum, r) => sum + r.score, 0) / rows.length;
+    }
+  });
+
+  // TCA Score is the primary outcome for simulation
+  const tcaScore = moduleScores['tca'] || 0;
+
   return (
     <Card className="sticky top-4">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2"><Calculator /> What-If Summary</CardTitle>
-        <CardDescription>Weighted scores based on module importance.</CardDescription>
+        <CardTitle className="flex items-center gap-2"><Calculator /> Simulation Summary</CardTitle>
+        <CardDescription>Module scores calculated separately.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="flex items-center justify-between p-3 rounded-lg bg-primary/10">
-          <p className="font-medium">Weighted Score</p>
-          <p className="text-2xl font-bold text-primary">{weightedAverage.toFixed(2)}/10</p>
+        {/* TCA Score - Primary Outcome */}
+        <div className="p-4 rounded-lg bg-primary/15 border-2 border-primary">
+          <p className="text-sm font-medium text-primary mb-1">TCA Score (Primary)</p>
+          <p className="text-3xl font-bold text-primary">{tcaScore.toFixed(2)}/10</p>
+          <p className="text-xs text-muted-foreground mt-1">12 Categories Assessment</p>
         </div>
-        <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-          <p className="font-medium">Simple Average</p>
-          <p className="text-xl font-bold">{simpleAverage.toFixed(2)}</p>
+
+        {/* Individual Module Scores */}
+        <div className="space-y-2">
+          <p className="text-sm font-semibold text-muted-foreground">Module Scores</p>
+          {Object.entries(moduleScores).filter(([id]) => id !== 'tca').map(([moduleId, score]) => (
+            <div key={moduleId} className="flex items-center justify-between p-2 rounded-lg bg-muted/30">
+              <p className="text-sm">{MODULE_DEFINITIONS[moduleId]?.name || moduleId}</p>
+              <Badge variant="outline" className="font-mono">{score.toFixed(2)}</Badge>
+            </div>
+          ))}
         </div>
-        <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-          <p className="font-medium">Standard Deviation</p>
-          <p className="text-xl font-bold">{stdDev.toFixed(2)}</p>
+
+        <hr className="my-2" />
+
+        {/* Weighted Score for comparison */}
+        <div className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+          <p className="text-sm">Weighted Average</p>
+          <p className="font-bold">{weightedAverage.toFixed(2)}/10</p>
         </div>
+
         {runCount > 0 && (
           <div className="flex items-center justify-between p-3 rounded-lg bg-green-50 border border-green-200">
             <div>
@@ -309,14 +344,11 @@ const SummaryCard = ({ scores, moduleConfigs, enabledCount, totalCount, editable
             <p className="text-xl font-bold text-green-700">{avgOverRuns.toFixed(2)}</p>
           </div>
         )}
+
         <hr className="my-2" />
         <div className="flex items-center justify-between p-2">
           <p className="text-sm text-muted-foreground">Active Modules</p>
           <Badge variant="outline">{enabledCount} / {totalCount}</Badge>
-        </div>
-        <div className="flex items-center justify-between p-2">
-          <p className="text-sm text-muted-foreground">Total Weight</p>
-          <Badge variant="outline">{totalWeight}%</Badge>
         </div>
         <div className="flex items-center justify-between p-2">
           <p className="text-sm text-muted-foreground">Simulating</p>
@@ -331,7 +363,7 @@ const SummaryCard = ({ scores, moduleConfigs, enabledCount, totalCount, editable
   );
 };
 
-export default function WhatIfAnalysisPage() {
+export default function SimulationPage() {
   const [analysisData, setAnalysisData] = useState<ComprehensiveAnalysisOutput | null>(null);
   const [editableScores, setEditableScores] = useState<Record<string, ScoreRow[]>>({});
   const [moduleConfigs, setModuleConfigs] = useState<Record<string, ModuleConfig>>({});
@@ -341,14 +373,52 @@ export default function WhatIfAnalysisPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [simulationHistory, setSimulationHistory] = useState<number[]>([]);
 
+  // Settings version state
+  const [settingsVersions, setSettingsVersions] = useState<SettingsVersion[]>([]);
+  const [selectedVersion, setSelectedVersion] = useState<SettingsVersion | null>(null);
+  const [moduleWeights, setModuleWeights] = useState<Record<string, number>>({});
+
   const router = useRouter();
   const { toast } = useToast();
+
+  // Load settings versions
+  const loadSettingsVersions = useCallback(async () => {
+    try {
+      const versions = await settingsApi.getVersions(false);
+      setSettingsVersions(versions);
+
+      // Try to get active version
+      const activeVersion = await settingsApi.getActiveVersion();
+      if (activeVersion) {
+        setSelectedVersion(activeVersion);
+        // Set module weights from the selected version
+        const weights: Record<string, number> = {};
+        activeVersion.module_settings?.forEach(ms => {
+          weights[ms.module_id] = ms.weight;
+        });
+        setModuleWeights(weights);
+      }
+    } catch (error) {
+      console.log('Using local module weights (API unavailable):', error);
+      // Use default weights from MODULE_DEFINITIONS
+      const weights: Record<string, number> = {};
+      Object.entries(MODULE_DEFINITIONS).forEach(([id, def]) => {
+        weights[id] = def.weight;
+      });
+      setModuleWeights(weights);
+    }
+  }, []);
 
   // Check if user is admin
   useEffect(() => {
     const userRole = localStorage.getItem('userRole') || sessionStorage.getItem('userRole');
     setIsAdmin(userRole === 'admin' || userRole === 'Admin');
   }, []);
+
+  // Load settings versions on mount
+  useEffect(() => {
+    loadSettingsVersions();
+  }, [loadSettingsVersions]);
 
   useEffect(() => {
     const loadAnalysisData = async () => {
@@ -540,7 +610,7 @@ export default function WhatIfAnalysisPage() {
           console.error('No analysis data available');
           toast({
             title: 'No Analysis Data',
-            description: 'Please run an analysis first to use What-If scenarios.',
+            description: 'Please run an analysis first to use Simulation.',
             variant: 'destructive'
           });
           router.push('/analysis');
@@ -640,30 +710,66 @@ export default function WhatIfAnalysisPage() {
         });
       }
 
-      // Calculate overall composite score from all modules
-      const allModuleScores = Object.values(editableScores).flat().map(s => s.score);
-      const overallScore = allModuleScores.length > 0 ? allModuleScores.reduce((a, b) => a + b, 0) / allModuleScores.length : 0;
+      // Calculate individual module scores separately
+      const moduleScores: Record<string, number> = {};
+      Object.entries(editableScores).forEach(([moduleId, rows]) => {
+        if (moduleConfigs[moduleId]?.enabled && rows.length > 0) {
+          moduleScores[moduleId] = rows.reduce((sum, r) => sum + r.score, 0) / rows.length;
+        }
+      });
 
-      // Add what-if metadata for triage report generation
+      // TCA Score is the primary outcome (calculated from 12 categories)
+      const tcaScore = moduleScores['tca'] || 0;
+
+      // Add simulation metadata for triage report generation
       const finalData = {
         ...updatedData,
-        whatIfAnalysis: {
+        simulationAnalysis: {
           adjustedScores: editableScores,
-          overallCompositeScore: overallScore,
+          moduleScores: moduleScores,
+          tcaScore: tcaScore,
           timestamp: new Date().toISOString(),
           modulesAnalyzed: Object.keys(editableScores).length,
-          locked: true
+          locked: true,
+          settingsVersionId: selectedVersion?.id,
+          settingsVersionName: selectedVersion?.version_name
         }
       };
 
       // Save to localStorage
       localStorage.setItem('analysisResult', JSON.stringify(finalData));
-      localStorage.setItem('whatIfAdjusted', 'true');
+      localStorage.setItem('simulationAdjusted', 'true');
       localStorage.setItem('triageReportReady', 'true');
 
+      // Save simulation run to API (if settings version is available)
+      if (selectedVersion?.id) {
+        try {
+          // Get company name from session storage or analysis data
+          const companySessionData = sessionStorage.getItem('companyData');
+          let companyName = 'Unknown Company';
+          if (companySessionData) {
+            try {
+              const parsed = JSON.parse(companySessionData);
+              companyName = parsed.companyName || 'Unknown Company';
+            } catch (e) {
+              // ignore parse error
+            }
+          }
+          
+          await settingsApi.runSimulation({
+            settings_version_id: selectedVersion.id,
+            company_name: companyName,
+            adjusted_scores: editableScores
+          });
+        } catch (apiError) {
+          console.log('Could not save simulation to API:', apiError);
+          // Continue anyway - local storage has the data
+        }
+      }
+
       toast({
-        title: '✅ Scores Locked Successfully',
-        description: `All ${Object.keys(editableScores).length} modules adjusted. Composite: ${overallScore.toFixed(2)}/10. Generating triage report...`,
+        title: '✅ Simulation Complete',
+        description: `TCA Score: ${tcaScore.toFixed(2)}/10. ${Object.keys(moduleScores).length} modules calculated. Generating report...`,
       });
 
       // Redirect to result page to show the triage report
@@ -683,12 +789,12 @@ export default function WhatIfAnalysisPage() {
   }
 
   const handleSkip = () => {
-    // Skip what-if analysis and proceed directly with original scores
-    localStorage.setItem('whatIfAdjusted', 'false');
+    // Skip simulation and proceed directly with original scores
+    localStorage.setItem('simulationAdjusted', 'false');
     localStorage.setItem('triageReportReady', 'true');
 
     toast({
-      title: 'What-If Skipped',
+      title: 'Simulation Skipped',
       description: 'Proceeding with original analysis scores.',
     });
 
@@ -713,20 +819,55 @@ export default function WhatIfAnalysisPage() {
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-4xl font-bold font-headline text-primary tracking-tight">
-                What-If Analysis
+                Simulation
               </h1>
               <p className="mt-2 text-lg text-muted-foreground max-w-3xl">
-                Adjust scores from {moduleCount} active modules to simulate outcomes before generating your triage report.
+                Adjust scores from {moduleCount} active modules. TCA score (12 categories) is the primary outcome.
               </p>
             </div>
             <div className="flex gap-3 items-center">
+              {/* Settings Version Selector */}
+              {settingsVersions.length > 0 && (
+                <div className="flex items-center gap-2 mr-2">
+                  <Settings className="size-4 text-muted-foreground" />
+                  <Select
+                    value={selectedVersion?.id?.toString() || ''}
+                    onValueChange={async (value) => {
+                      const version = await settingsApi.getVersion(parseInt(value));
+                      if (version) {
+                        setSelectedVersion(version);
+                        const weights: Record<string, number> = {};
+                        version.module_settings?.forEach(ms => {
+                          weights[ms.module_id] = ms.weight;
+                        });
+                        setModuleWeights(weights);
+                        toast({
+                          title: 'Settings Version Changed',
+                          description: `Now using "${version.version_name}"`,
+                        });
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Select version" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {settingsVersions.map(v => (
+                        <SelectItem key={v.id} value={v.id.toString()}>
+                          {v.version_name} {v.is_active && '(Active)'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               {/* Admin Toggle */}
               <div className="flex items-center gap-2 mr-4 px-3 py-2 bg-muted rounded-lg">
                 <label className="text-sm font-medium">Admin Mode</label>
                 <Switch checked={isAdmin} onCheckedChange={setIsAdmin} />
               </div>
               <Button variant="outline" size="lg" onClick={handleSkip} disabled={isLoading}>
-                <SkipForward className="mr-2" /> Skip What-If
+                <SkipForward className="mr-2" /> Skip Simulation
               </Button>
               <Button size="lg" onClick={handleProceed} disabled={isLoading}>
                 <FileText className="mr-2" /> Generate Report
@@ -838,11 +979,12 @@ export default function WhatIfAnalysisPage() {
       <AlertDialog open={showWelcome} onOpenChange={setShowWelcome}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2"><Eye /> Welcome to What-If Analysis</AlertDialogTitle>
+            <AlertDialogTitle className="flex items-center gap-2"><Eye /> Welcome to Simulation</AlertDialogTitle>
             <AlertDialogDescription>
-              This page displays all {moduleCount} analysis modules that were run. You can manually adjust any scores to simulate different scenarios.
-              {isAdmin && " As an admin, you can skip modules or toggle simulation mode."}
-              When ready, click "Generate Report" to finalize your analysis and view the comprehensive triage report.
+              This page displays all {moduleCount} analysis modules. Each module is calculated separately.
+              TCA Score (12 categories) is the primary outcome for simulation.
+              {isAdmin && " As an admin, you can skip modules or toggle settings."}
+              When ready, click "Generate Report" to finalize your analysis.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
