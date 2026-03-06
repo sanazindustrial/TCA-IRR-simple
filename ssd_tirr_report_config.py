@@ -25,8 +25,8 @@ from typing import Dict, Any, List
 # ─────────────────────────────────────────────────────────────────────
 REPORT_META = {
     "report_type": "triage",
-    "version": "2.0.0",
-    "total_pages": 6,
+    "version": "3.0.0",
+    "total_pages": 10,
     "branding": {
         "title_prefix": "TCA Investment Risk Rating",
         "subtitle": "Triage Report — SSD Integration",
@@ -35,7 +35,7 @@ REPORT_META = {
         "color_primary": "#1E3A5F",
         "color_accent": "#2F855A",
     },
-    "generated_by": "TCA TIRR Analysis Engine v2.0",
+    "generated_by": "TCA TIRR Analysis Engine v3.0",
 }
 
 
@@ -84,7 +84,7 @@ def get_recommendation(score: float) -> Dict[str, str]:
 
 
 # ─────────────────────────────────────────────────────────────────────
-# 3. PAGE CONFIGURATION  (6-page triage report)
+# 3. PAGE CONFIGURATION  (10-page triage report)
 # ─────────────────────────────────────────────────────────────────────
 PAGE_CONFIG: Dict[str, Dict[str, Any]] = {
     "page_1_executive_summary": {
@@ -101,8 +101,25 @@ PAGE_CONFIG: Dict[str, Dict[str, Any]] = {
         ],
         "show_score_gauge": True,           # visual gauge widget in UI
     },
-    "page_2_tca_scorecard": {
+    "page_2_company_profile": {
         "page_number": 2,
+        "title": "Company Profile & Overview",
+        "sections": [
+            "company_name",
+            "legal_name",
+            "website",
+            "industry_vertical",
+            "development_stage",
+            "business_model",
+            "location",                     # city, state, country
+            "one_line_description",
+            "company_description",
+            "product_description",
+            "number_of_employees",
+        ],
+    },
+    "page_3_tca_scorecard": {
+        "page_number": 3,
         "title": "TCA Scorecard — Category Breakdown",
         "sections": [
             "composite_score",
@@ -112,8 +129,8 @@ PAGE_CONFIG: Dict[str, Dict[str, Any]] = {
         ],
         "chart_type": "radar",              # radar | bar | table
     },
-    "page_3_risk_assessment": {
-        "page_number": 3,
+    "page_4_risk_assessment": {
+        "page_number": 4,
         "title": "Risk Assessment & Flags",
         "sections": [
             "overall_risk_score",
@@ -129,37 +146,81 @@ PAGE_CONFIG: Dict[str, Dict[str, Any]] = {
             "low": "#38A169",
         },
     },
-    "page_4_market_and_team": {
-        "page_number": 4,
-        "title": "Market Opportunity & Team Assessment",
-        "sections": [
-            # Market
-            "market_score", "tam", "sam", "som",
-            "growth_rate", "competitive_position", "competitive_advantages",
-            # Team
-            "team_score", "team_completeness", "founders", "team_gaps",
-        ],
-    },
-    "page_5_financials_and_tech": {
+    "page_5_market_opportunity": {
         "page_number": 5,
-        "title": "Financial Health & Technology Assessment",
+        "title": "Market Opportunity Analysis",
         "sections": [
-            # Financials
-            "financial_score", "revenue", "mrr", "burn_rate",
-            "runway_months", "ltv_cac_ratio", "gross_margin",
-            # Technology
-            "technology_score", "trl", "ip_strength", "tech_stack",
+            "market_score",
+            "tam",
+            "sam",
+            "som",
+            "growth_rate",
+            "competitive_position",
+            "competitive_advantages",
+            "market_trends",
         ],
     },
-    "page_6_recommendations": {
+    "page_6_team_assessment": {
         "page_number": 6,
+        "title": "Team Assessment",
+        "sections": [
+            "team_score",
+            "team_completeness",
+            "founders",
+            "founder_background",
+            "team_gaps",
+            "leadership_assessment",
+        ],
+    },
+    "page_7_financials": {
+        "page_number": 7,
+        "title": "Financial Health Analysis",
+        "sections": [
+            "financial_score",
+            "revenue",
+            "mrr",
+            "arr",
+            "burn_rate",
+            "runway_months",
+            "ltv_cac_ratio",
+            "gross_margin",
+            "customer_metrics",
+        ],
+    },
+    "page_8_technology": {
+        "page_number": 8,
+        "title": "Technology & IP Assessment",
+        "sections": [
+            "technology_score",
+            "trl",
+            "ip_strength",
+            "tech_stack",
+            "scalability",
+            "tech_differentiation",
+        ],
+    },
+    "page_9_business_model": {
+        "page_number": 9,
+        "title": "Business Model & Growth Strategy",
+        "sections": [
+            "business_model_score",
+            "business_model_type",
+            "growth_potential_score",
+            "growth_projections",
+            "revenue_streams",
+            "customer_acquisition",
+            "exit_potential",
+        ],
+    },
+    "page_10_recommendations": {
+        "page_number": 10,
         "title": "Investment Recommendation & Next Steps",
         "sections": [
             "final_decision",
-            "business_model_score", "business_model_type",
-            "growth_potential_score", "growth_projections",
-            "investment_readiness_score", "exit_potential",
+            "investment_readiness_score",
             "funding_recommendation",
+            "key_opportunities",
+            "key_risks_summary",
             "next_steps",
         ],
         "default_next_steps": [

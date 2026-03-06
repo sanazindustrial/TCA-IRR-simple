@@ -315,8 +315,11 @@ def _ssd_build_key_metrics(payload: SSDStartupData) -> Dict[str, Any]:
 
 
 def _calculate_tca_score(payload: SSDStartupData) -> Dict[str, Any]:
-    """Calculate a TCA score based on the SSD data."""
-    score = 50.0  # Base score
+    """
+    Calculate a TCA score based on the SSD data.
+    Returns a score in the range 1-10 (not 0-100).
+    """
+    score = 5.0  # Base score on 1-10 scale
     risk_flags = []
     strengths = []
     
@@ -326,67 +329,67 @@ def _calculate_tca_score(payload: SSDStartupData) -> Dict[str, Any]:
     rm = payload.revenueMetrics or SSDRevenueMetrics()
     ms = payload.marketSize or SSDMarketSize()
     
-    # Revenue scoring
+    # Revenue scoring (+1.0 / +0.5 to score)
     if fi.annualRevenue >= 1_000_000:
-        score += 10
+        score += 1.0
         strengths.append("Strong annual revenue ($1M+)")
     elif fi.annualRevenue >= 100_000:
-        score += 5
+        score += 0.5
         strengths.append("Decent revenue traction")
     else:
         risk_flags.append("Low revenue - early stage")
     
-    # MRR check
+    # MRR check (+0.8 to score)
     if rm.monthlyRecurringRevenue and rm.monthlyRecurringRevenue >= 50_000:
-        score += 8
+        score += 0.8
         strengths.append("Strong MRR (>$50K)")
     
-    # LTV/CAC ratio
+    # LTV/CAC ratio (+1.0 / -0.5 to score)
     if cm.customerAcquisitionCost and cm.customerLifetimeValue:
         ratio = cm.customerLifetimeValue / cm.customerAcquisitionCost if cm.customerAcquisitionCost > 0 else 0
         if ratio >= 3:
-            score += 10
+            score += 1.0
             strengths.append(f"Healthy LTV/CAC ratio ({ratio:.1f}x)")
         elif ratio < 1:
-            score -= 5
+            score -= 0.5
             risk_flags.append(f"Unfavorable LTV/CAC ratio ({ratio:.1f}x)")
     
-    # Churn assessment
+    # Churn assessment (+0.8 / -0.5 to score)
     if cm.churn is not None:
         if cm.churn < 5:
-            score += 8
+            score += 0.8
             strengths.append("Low churn (<5%)")
         elif cm.churn > 15:
-            score -= 5
+            score -= 0.5
             risk_flags.append(f"High churn rate ({cm.churn}%)")
     
-    # Market size
+    # Market size (+0.7 to score)
     if ms.totalAvailableMarket and ms.totalAvailableMarket >= 1_000_000_000:
-        score += 7
+        score += 0.7
         strengths.append("Large TAM ($1B+)")
     
-    # Team size
+    # Team size (+0.5 to score)
     if ci.numberOfEmployees and ci.numberOfEmployees >= 10:
-        score += 5
+        score += 0.5
         strengths.append("Strong team (10+ employees)")
     
-    # Burn rate / runway
+    # Burn rate / runway (+0.8 / -1.0 to score)
     if rm.burnRate and fi.currentlyRaised:
         runway = fi.currentlyRaised / rm.burnRate if rm.burnRate > 0 else 0
         if runway >= 18:
-            score += 8
+            score += 0.8
             strengths.append(f"Strong runway ({runway:.0f} months)")
         elif runway < 6:
-            score -= 10
+            score -= 1.0
             risk_flags.append(f"Short runway ({runway:.0f} months)")
     
-    # Cap score
-    score = max(0, min(100, score))
+    # Cap score to 1-10 range
+    score = max(1.0, min(10.0, score))
     
-    # Determine recommendation
-    if score >= 70:
+    # Determine recommendation based on 1-10 scale
+    if score >= 7.0:
         recommendation = "INVEST"
-    elif score >= 50:
+    elif score >= 5.0:
         recommendation = "CONSIDER"
     else:
         recommendation = "PASS"

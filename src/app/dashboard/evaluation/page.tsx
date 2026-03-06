@@ -28,6 +28,18 @@ type AutosaveData = {
     reportType: ReportType;
     companyName: string;
     companyDescription: string;
+    // SSD 4.1.2 Company Information Fields
+    website: string;
+    industryVertical: string;
+    developmentStage: string;
+    businessModel: string;
+    country: string;
+    state: string;
+    city: string;
+    oneLineDescription: string;
+    productDescription: string;
+    legalName: string;
+    numberOfEmployees: string;
     savedAt: number;
 };
 
@@ -109,6 +121,18 @@ export default function EvaluationPage() {
     // State for company information
     const [companyName, setCompanyName] = useState<string>('');
     const [companyDescription, setCompanyDescription] = useState<string>('');
+    // SSD 4.1.2 Company Information Fields
+    const [website, setWebsite] = useState<string>('');
+    const [industryVertical, setIndustryVertical] = useState<string>('');
+    const [developmentStage, setDevelopmentStage] = useState<string>('');
+    const [businessModel, setBusinessModel] = useState<string>('');
+    const [country, setCountry] = useState<string>('');
+    const [state, setState] = useState<string>('');
+    const [city, setCity] = useState<string>('');
+    const [oneLineDescription, setOneLineDescription] = useState<string>('');
+    const [productDescription, setProductDescription] = useState<string>('');
+    const [legalName, setLegalName] = useState<string>('');
+    const [numberOfEmployees, setNumberOfEmployees] = useState<string>('');
 
     // Restore autosaved data on mount
     useEffect(() => {
@@ -126,6 +150,18 @@ export default function EvaluationPage() {
                     if (parsed.reportType) setReportType(parsed.reportType);
                     if (parsed.companyName) setCompanyName(parsed.companyName);
                     if (parsed.companyDescription) setCompanyDescription(parsed.companyDescription);
+                    // Restore SSD 4.1.2 fields
+                    if (parsed.website) setWebsite(parsed.website);
+                    if (parsed.industryVertical) setIndustryVertical(parsed.industryVertical);
+                    if (parsed.developmentStage) setDevelopmentStage(parsed.developmentStage);
+                    if (parsed.businessModel) setBusinessModel(parsed.businessModel);
+                    if (parsed.country) setCountry(parsed.country);
+                    if (parsed.state) setState(parsed.state);
+                    if (parsed.city) setCity(parsed.city);
+                    if (parsed.oneLineDescription) setOneLineDescription(parsed.oneLineDescription);
+                    if (parsed.productDescription) setProductDescription(parsed.productDescription);
+                    if (parsed.legalName) setLegalName(parsed.legalName);
+                    if (parsed.numberOfEmployees) setNumberOfEmployees(parsed.numberOfEmployees);
 
                     // Show toast if data was restored
                     const hasData = parsed.uploadedFiles?.length > 0 || parsed.importedUrls?.length > 0 || parsed.submittedTexts?.length > 0 || parsed.companyName || parsed.companyDescription;
@@ -155,6 +191,18 @@ export default function EvaluationPage() {
             reportType,
             companyName,
             companyDescription,
+            // SSD 4.1.2 Company Information Fields
+            website,
+            industryVertical,
+            developmentStage,
+            businessModel,
+            country,
+            state,
+            city,
+            oneLineDescription,
+            productDescription,
+            legalName,
+            numberOfEmployees,
             savedAt: Date.now(),
         };
 
@@ -163,7 +211,7 @@ export default function EvaluationPage() {
         } catch (e) {
             console.warn('Failed to autosave:', e);
         }
-    }, [uploadedFiles, importedUrls, submittedTexts, framework, reportType, companyName, companyDescription, isInitialized]);
+    }, [uploadedFiles, importedUrls, submittedTexts, framework, reportType, companyName, companyDescription, website, industryVertical, developmentStage, businessModel, country, state, city, oneLineDescription, productDescription, legalName, numberOfEmployees, isInitialized]);
 
     // Clear autosave after successful analysis
     const clearAutosave = useCallback(() => {
@@ -179,6 +227,18 @@ export default function EvaluationPage() {
         setReportType('triage');
         setCompanyName('');
         setCompanyDescription('');
+        // Clear SSD 4.1.2 fields
+        setWebsite('');
+        setIndustryVertical('');
+        setDevelopmentStage('');
+        setBusinessModel('');
+        setCountry('');
+        setState('');
+        setCity('');
+        setOneLineDescription('');
+        setProductDescription('');
+        setLegalName('');
+        setNumberOfEmployees('');
         clearAutosave();
         toast({
             title: 'Data Cleared',

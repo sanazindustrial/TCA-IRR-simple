@@ -5,6 +5,45 @@ import React, { createContext, useContext, useMemo, useState } from 'react';
 import type { ReportType, UserRole } from '@/app/analysis/result/page';
 import type { UploadedFile } from '@/components/analysis/document-submission';
 
+// Extended company information fields matching SSD spec 4.1.2
+export type CompanyInformationData = {
+    companyName: string;
+    website: string;
+    industryVertical: string;
+    developmentStage: string;
+    businessModel: string;
+    country: string;
+    state: string;
+    city: string;
+    oneLineDescription: string;
+    companyDescription: string;
+    productDescription: string;
+    pitchDeckPath: string;
+    legalName: string;
+    numberOfEmployees: number | null;
+};
+
+// Contact information fields matching SSD spec 4.1.1
+export type ContactInformationData = {
+    email: string;
+    phoneNumber: string;
+    firstName: string;
+    lastName: string;
+    jobTitle: string;
+    linkedInUrl: string;
+};
+
+// Financial information fields matching SSD spec 4.1.3
+export type FinancialInformationData = {
+    fundingType: string;
+    annualRevenue: number | null;
+    preMoneyValuation: number | null;
+    postMoneyValuation: number | null;
+    offeringType: string;
+    targetRaise: number | null;
+    currentlyRaised: number | null;
+};
+
 type EvaluationContextType = {
     role: UserRole;
     reportType: ReportType;
@@ -26,6 +65,15 @@ type EvaluationContextType = {
     setCompanyNameAction?: React.Dispatch<React.SetStateAction<string>>;
     companyDescription?: string;
     setCompanyDescriptionAction?: React.Dispatch<React.SetStateAction<string>>;
+    // Extended company information
+    companyInfo?: CompanyInformationData;
+    setCompanyInfoAction?: React.Dispatch<React.SetStateAction<CompanyInformationData>>;
+    // Contact information
+    contactInfo?: ContactInformationData;
+    setContactInfoAction?: React.Dispatch<React.SetStateAction<ContactInformationData>>;
+    // Financial information
+    financialInfo?: FinancialInformationData;
+    setFinancialInfoAction?: React.Dispatch<React.SetStateAction<FinancialInformationData>>;
 };
 
 const EvaluationContext = createContext<EvaluationContextType | null>(null);
@@ -58,6 +106,15 @@ type EvaluationProviderProps = {
     setCompanyNameAction?: React.Dispatch<React.SetStateAction<string>>;
     companyDescription?: string;
     setCompanyDescriptionAction?: React.Dispatch<React.SetStateAction<string>>;
+    // Extended company information
+    companyInfo?: CompanyInformationData;
+    setCompanyInfoAction?: React.Dispatch<React.SetStateAction<CompanyInformationData>>;
+    // Contact information
+    contactInfo?: ContactInformationData;
+    setContactInfoAction?: React.Dispatch<React.SetStateAction<ContactInformationData>>;
+    // Financial information
+    financialInfo?: FinancialInformationData;
+    setFinancialInfoAction?: React.Dispatch<React.SetStateAction<FinancialInformationData>>;
 };
 
 export function EvaluationProvider({
@@ -79,6 +136,12 @@ export function EvaluationProvider({
     setCompanyNameAction,
     companyDescription,
     setCompanyDescriptionAction,
+    companyInfo,
+    setCompanyInfoAction,
+    contactInfo,
+    setContactInfoAction,
+    financialInfo,
+    setFinancialInfoAction,
 }: EvaluationProviderProps) {
     const isPrivilegedUser = useMemo(() => role === 'admin' || role === 'reviewer', [role]);
     const isEditable = useMemo(() => isPrivilegedUser, [isPrivilegedUser]);
@@ -103,6 +166,12 @@ export function EvaluationProvider({
         setCompanyNameAction,
         companyDescription,
         setCompanyDescriptionAction,
+        companyInfo,
+        setCompanyInfoAction,
+        contactInfo,
+        setContactInfoAction,
+        financialInfo,
+        setFinancialInfoAction,
     };
 
     return (

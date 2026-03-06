@@ -1,5 +1,6 @@
 
 'use client';
+import React, { useState } from 'react';
 import {
   FileText,
   FileJson,
@@ -10,7 +11,9 @@ import {
   Mail,
   StickyNote,
   Presentation,
+  Eye,
 } from 'lucide-react';
+import { ReportPreview } from './report-preview';
 import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
 import {
@@ -38,6 +41,7 @@ import { useEvaluationContext } from './evaluation-provider';
 export function ExportButtons() {
   const { toast } = useToast();
   const { role, reportType } = useEvaluationContext();
+  const [showPreview, setShowPreview] = useState(false);
 
   const getAnalysisData = (): ComprehensiveAnalysisOutput | null => {
     try {
@@ -1644,106 +1648,123 @@ export function ExportButtons() {
   };
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="flex items-center gap-2">
-          <Download className="size-4" />
-          Export & Share
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-64" align="end">
-        <DropdownMenuLabel className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-          Quick Export ({reportType.toUpperCase()})
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
+    <>
+      <ReportPreview
+        isOpen={showPreview}
+        onClose={() => setShowPreview(false)}
+        analysisData={getAnalysisData() || {} as any}
+        companyName={getCompanyName()}
+        onExportPDF={handleExportFullReport}
+        onExportJSON={handleDownloadZip}
+      />
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm" className="flex items-center gap-2">
+            <Download className="size-4" />
+            Export & Share
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className="w-64" align="end">
+          {/* Preview Report Button */}
+          <DropdownMenuItem onClick={() => setShowPreview(true)} className="flex items-center gap-3 py-2 text-primary font-medium">
+            <Eye className="size-4" />
+            <span>Preview Report</span>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
 
-        {/* Two-Page Reports */}
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="flex items-center gap-3 py-2">
-            <StickyNote className="size-4 text-muted-foreground" />
-            <span>Two-Page Reports</span>
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="w-56">
-            <DropdownMenuItem onClick={handleExportTriageTwoPage} className="flex items-center gap-3 py-2">
-              <FileText className="size-4 text-green-600" />
-              <span>Triage Summary (2 pages)</span>
-            </DropdownMenuItem>
-            {(role === 'admin' || role === 'reviewer') && (
-              <DropdownMenuItem onClick={handleExportDDTwoPage} className="flex items-center gap-3 py-2">
-                <FileText className="size-4 text-blue-600" />
-                <span>DD Summary (2 pages)</span>
+          <DropdownMenuLabel className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            Quick Export ({reportType.toUpperCase()})
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+
+          {/* Two-Page Reports */}
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger className="flex items-center gap-3 py-2">
+              <StickyNote className="size-4 text-muted-foreground" />
+              <span>Two-Page Reports</span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="w-56">
+              <DropdownMenuItem onClick={handleExportTriageTwoPage} className="flex items-center gap-3 py-2">
+                <FileText className="size-4 text-green-600" />
+                <span>Triage Summary (2 pages)</span>
               </DropdownMenuItem>
-            )}
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
+              {(role === 'admin' || role === 'reviewer') && (
+                <DropdownMenuItem onClick={handleExportDDTwoPage} className="flex items-center gap-3 py-2">
+                  <FileText className="size-4 text-blue-600" />
+                  <span>DD Summary (2 pages)</span>
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
 
-        {/* Full Comprehensive Reports */}
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="flex items-center gap-3 py-2">
-            <FileText className="size-4 text-muted-foreground" />
-            <span>Full Comprehensive Reports</span>
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="w-64">
-            <DropdownMenuItem onClick={handleExportFullReport} className="flex items-center gap-3 py-2">
-              <FileText className="size-4 text-red-600" />
-              <div className="flex flex-col">
-                <span>Complete Analysis PDF</span>
-                <span className="text-xs text-muted-foreground">20+ pages with all modules</span>
-              </div>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleExportDocx} className="flex items-center gap-3 py-2">
-              <FileText className="size-4 text-blue-600" />
-              <div className="flex flex-col">
-                <span>Full Word Document</span>
-                <span className="text-xs text-muted-foreground">Comprehensive with all sections</span>
-              </div>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleExportPptx} className="flex items-center gap-3 py-2">
-              <Presentation className="size-4 text-orange-600" />
-              <div className="flex flex-col">
-                <span>Full PowerPoint Deck</span>
-                <span className="text-xs text-muted-foreground">8+ slides with detailed analysis</span>
-              </div>
-            </DropdownMenuItem>
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
+          {/* Full Comprehensive Reports */}
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger className="flex items-center gap-3 py-2">
+              <FileText className="size-4 text-muted-foreground" />
+              <span>Full Comprehensive Reports</span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="w-64">
+              <DropdownMenuItem onClick={handleExportFullReport} className="flex items-center gap-3 py-2">
+                <FileText className="size-4 text-red-600" />
+                <div className="flex flex-col">
+                  <span>Complete Analysis PDF</span>
+                  <span className="text-xs text-muted-foreground">20+ pages with all modules</span>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportDocx} className="flex items-center gap-3 py-2">
+                <FileText className="size-4 text-blue-600" />
+                <div className="flex flex-col">
+                  <span>Full Word Document</span>
+                  <span className="text-xs text-muted-foreground">Comprehensive with all sections</span>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportPptx} className="flex items-center gap-3 py-2">
+                <Presentation className="size-4 text-orange-600" />
+                <div className="flex flex-col">
+                  <span>Full PowerPoint Deck</span>
+                  <span className="text-xs text-muted-foreground">8+ slides with detailed analysis</span>
+                </div>
+              </DropdownMenuItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
 
-        <DropdownMenuSeparator />
+          <DropdownMenuSeparator />
 
-        {/* Comprehensive Data Downloads */}
-        <DropdownMenuLabel className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-          Complete Data & Analytics
-        </DropdownMenuLabel>
-        <DropdownMenuItem onClick={handleDownloadZip} className="flex items-center gap-3 py-2">
-          <FileJson className="size-4 text-purple-600" />
-          <div className="flex flex-col">
-            <span>Complete Analysis Package</span>
-            <span className="text-xs text-muted-foreground">ZIP with all data & modules</span>
-          </div>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={handleExportXlsx} className="flex items-center gap-3 py-2">
-          <FileSpreadsheet className="size-4 text-green-600" />
-          <div className="flex flex-col">
-            <span>Comprehensive Data Export</span>
-            <span className="text-xs text-muted-foreground">Excel workbook (10 sheets)</span>
-          </div>
-        </DropdownMenuItem>
+          {/* Comprehensive Data Downloads */}
+          <DropdownMenuLabel className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            Complete Data & Analytics
+          </DropdownMenuLabel>
+          <DropdownMenuItem onClick={handleDownloadZip} className="flex items-center gap-3 py-2">
+            <FileJson className="size-4 text-purple-600" />
+            <div className="flex flex-col">
+              <span>Complete Analysis Package</span>
+              <span className="text-xs text-muted-foreground">ZIP with all data & modules</span>
+            </div>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={handleExportXlsx} className="flex items-center gap-3 py-2">
+            <FileSpreadsheet className="size-4 text-green-600" />
+            <div className="flex flex-col">
+              <span>Comprehensive Data Export</span>
+              <span className="text-xs text-muted-foreground">Excel workbook (10 sheets)</span>
+            </div>
+          </DropdownMenuItem>
 
-        <DropdownMenuSeparator />
+          <DropdownMenuSeparator />
 
-        {/* Sharing Options */}
-        <DropdownMenuLabel className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-          Share & Collaborate
-        </DropdownMenuLabel>
-        <DropdownMenuItem onClick={() => handleShare('link')} className="flex items-center gap-3 py-2">
-          <Share2 className="size-4 text-muted-foreground" />
-          <span>Copy Report Link</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => handleShare('email')} className="flex items-center gap-3 py-2">
-          <Mail className="size-4 text-muted-foreground" />
-          <span>Email Report</span>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          {/* Sharing Options */}
+          <DropdownMenuLabel className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            Share & Collaborate
+          </DropdownMenuLabel>
+          <DropdownMenuItem onClick={() => handleShare('link')} className="flex items-center gap-3 py-2">
+            <Share2 className="size-4 text-muted-foreground" />
+            <span>Copy Report Link</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handleShare('email')} className="flex items-center gap-3 py-2">
+            <Mail className="size-4 text-muted-foreground" />
+            <span>Email Report</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
   );
 }
