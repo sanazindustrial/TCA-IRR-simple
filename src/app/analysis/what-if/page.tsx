@@ -52,17 +52,17 @@ interface ModuleConfig {
   simulated: boolean;
 }
 
-// Module definitions with metadata
-const MODULE_DEFINITIONS: Record<string, { name: string; description: string }> = {
-  tca: { name: 'TCA Scorecard', description: 'Core technology capability assessment' },
-  risk: { name: 'Risk Assessment', description: 'Risk factors and mitigation analysis' },
-  macro: { name: 'Macro Trend Analysis', description: 'PESTEL framework analysis' },
-  benchmark: { name: 'Benchmark Comparison', description: 'Industry benchmark overlay' },
-  growth: { name: 'Growth Classification', description: 'Growth trajectory analysis' },
-  gap: { name: 'Gap Analysis', description: 'Capability gap heatmap' },
-  founderFit: { name: 'Founder Fit Analysis', description: 'Funding readiness assessment' },
-  team: { name: 'Team Assessment', description: 'Team effectiveness evaluation' },
-  strategicFit: { name: 'Strategic Fit Matrix', description: 'Strategic alignment scoring' },
+// Module definitions with metadata and weights
+const MODULE_DEFINITIONS: Record<string, { name: string; description: string; weight: number }> = {
+  tca: { name: 'TCA Scorecard', description: 'Core technology capability assessment', weight: 20 },
+  risk: { name: 'Risk Assessment', description: 'Risk factors and mitigation analysis', weight: 15 },
+  macro: { name: 'Macro Trend Analysis', description: 'PESTEL framework analysis', weight: 10 },
+  benchmark: { name: 'Benchmark Comparison', description: 'Industry benchmark overlay', weight: 10 },
+  growth: { name: 'Growth Classification', description: 'Growth trajectory analysis', weight: 10 },
+  gap: { name: 'Gap Analysis', description: 'Capability gap heatmap', weight: 10 },
+  founderFit: { name: 'Founder Fit Analysis', description: 'Funding readiness assessment', weight: 10 },
+  team: { name: 'Team Assessment', description: 'Team effectiveness evaluation', weight: 10 },
+  strategicFit: { name: 'Strategic Fit Matrix', description: 'Strategic alignment scoring', weight: 5 },
 };
 
 const EditableScoreTable = ({
@@ -72,7 +72,8 @@ const EditableScoreTable = ({
   moduleConfig,
   onToggleEnabled,
   onToggleSimulated,
-  isAdmin
+  isAdmin,
+  moduleId
 }: {
   title: string,
   data: ScoreRow[],
@@ -80,9 +81,12 @@ const EditableScoreTable = ({
   moduleConfig?: ModuleConfig,
   onToggleEnabled?: (enabled: boolean) => void,
   onToggleSimulated?: (simulated: boolean) => void,
-  isAdmin?: boolean
+  isAdmin?: boolean,
+  moduleId?: string
 }) => {
   const isDisabled = moduleConfig && !moduleConfig.enabled;
+  const moduleWeight = moduleId ? MODULE_DEFINITIONS[moduleId]?.weight : undefined;
+  const moduleAvg = data.length > 0 ? data.reduce((sum, r) => sum + r.score, 0) / data.length : 0;
 
   return (
     <Card className={cn(
@@ -91,10 +95,15 @@ const EditableScoreTable = ({
     )}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <SlidersHorizontal className="text-primary size-5" />
-            {title}
-          </CardTitle>
+          <div className="flex items-center gap-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <SlidersHorizontal className="text-primary size-5" />
+              {title}
+            </CardTitle>
+            {moduleWeight && (
+              <Badge variant="outline" className="ml-2">Weight: {moduleWeight}%</Badge>
+            )}
+          </div>
           {isAdmin && moduleConfig && (
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
@@ -168,7 +177,8 @@ const ModuleTabNav = ({
   moduleConfigs,
   isAdmin,
   onToggleEnabled,
-  onToggleSimulated
+  onToggleSimulated,
+  editableScores
 }: {
   modules: string[],
   activeModule: string,
@@ -176,16 +186,19 @@ const ModuleTabNav = ({
   moduleConfigs: Record<string, ModuleConfig>,
   isAdmin: boolean,
   onToggleEnabled: (id: string, enabled: boolean) => void,
-  onToggleSimulated: (id: string, simulated: boolean) => void
+  onToggleSimulated: (id: string, simulated: boolean) => void,
+  editableScores: Record<string, ScoreRow[]>
 }) => {
   return (
     <div className="space-y-2">
-      <h3 className="text-sm font-semibold text-muted-foreground mb-3 px-2">MODULES</h3>
+      <h3 className="text-sm font-semibold text-muted-foreground mb-3 px-2">MODULES (Total Weight: 100%)</h3>
       {modules.map((moduleId, index) => {
         const config = moduleConfigs[moduleId];
         const def = MODULE_DEFINITIONS[moduleId];
         const isActive = activeModule === moduleId;
         const isEnabled = config?.enabled ?? true;
+        const moduleScores = editableScores[moduleId] || [];
+        const moduleAvg = moduleScores.length > 0 ? moduleScores.reduce((sum, r) => sum + r.score, 0) / moduleScores.length : 0;
 
         return (
           <button
@@ -207,7 +220,15 @@ const ModuleTabNav = ({
               )}>
                 {index + 1}
               </span>
-              <span className="truncate text-sm font-medium">{def?.name || moduleId}</span>
+              <div className="min-w-0">
+                <span className="truncate text-sm font-medium block">{def?.name || moduleId}</span>
+                <span className={cn(
+                  "text-xs",
+                  isActive ? "text-primary-foreground/70" : "text-muted-foreground"
+                )}>
+                  {def?.weight}% • Avg: {moduleAvg.toFixed(1)}
+                </span>
+              </div>
             </div>
             {!isEnabled && (
               <SkipForward className="size-4 text-orange-500 flex-shrink-0" />
@@ -222,41 +243,80 @@ const ModuleTabNav = ({
   );
 };
 
-const SummaryCard = ({ scores, moduleConfigs, enabledCount, totalCount }: {
+const SummaryCard = ({ scores, moduleConfigs, enabledCount, totalCount, editableScores, simulationHistory }: {
   scores: number[],
   moduleConfigs: Record<string, ModuleConfig>,
   enabledCount: number,
-  totalCount: number
+  totalCount: number,
+  editableScores: Record<string, ScoreRow[]>,
+  simulationHistory: number[]
 }) => {
-  const sum = scores.reduce((a, b) => a + b, 0);
-  const average = scores.length > 0 ? sum / scores.length : 0;
-  const stdDev = scores.length > 0 ? Math.sqrt(scores.map(x => Math.pow(x - average, 2)).reduce((a, b) => a + b) / scores.length) : 0;
+  // Calculate weighted average based on module weights
+  let totalWeightedScore = 0;
+  let totalWeight = 0;
+
+  Object.entries(editableScores).forEach(([moduleId, rows]) => {
+    const config = moduleConfigs[moduleId];
+    if (config?.enabled) {
+      const moduleWeight = MODULE_DEFINITIONS[moduleId]?.weight || 10;
+      const moduleAvg = rows.length > 0 ? rows.reduce((sum, r) => sum + r.score, 0) / rows.length : 0;
+      totalWeightedScore += moduleAvg * moduleWeight;
+      totalWeight += moduleWeight;
+    }
+  });
+
+  const weightedAverage = totalWeight > 0 ? totalWeightedScore / totalWeight : 0;
+
+  // Simple average for comparison
+  const enabledScores = Object.entries(editableScores)
+    .filter(([moduleId]) => moduleConfigs[moduleId]?.enabled)
+    .flatMap(([_, rows]) => rows.map(r => r.score));
+  const simpleAverage = enabledScores.length > 0 ? enabledScores.reduce((a, b) => a + b, 0) / enabledScores.length : 0;
+  const stdDev = enabledScores.length > 0 ? Math.sqrt(enabledScores.map(x => Math.pow(x - simpleAverage, 2)).reduce((a, b) => a + b, 0) / enabledScores.length) : 0;
+
   const simulatedCount = Object.values(moduleConfigs).filter(m => m.enabled && m.simulated).length;
   const skippedCount = Object.values(moduleConfigs).filter(m => !m.enabled).length;
+
+  // Calculate 30-run average from simulation history
+  const runCount = simulationHistory.length;
+  const avgOverRuns = runCount > 0 ? simulationHistory.reduce((a, b) => a + b, 0) / runCount : weightedAverage;
 
   return (
     <Card className="sticky top-4">
       <CardHeader>
         <CardTitle className="flex items-center gap-2"><Calculator /> What-If Summary</CardTitle>
-        <CardDescription>Scores update in real-time as you edit.</CardDescription>
+        <CardDescription>Weighted scores based on module importance.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex items-center justify-between p-3 rounded-lg bg-primary/10">
-          <p className="font-medium">Composite Score</p>
-          <p className="text-2xl font-bold text-primary">{average.toFixed(2)}/10</p>
+          <p className="font-medium">Weighted Score</p>
+          <p className="text-2xl font-bold text-primary">{weightedAverage.toFixed(2)}/10</p>
         </div>
         <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-          <p className="font-medium">Average Score</p>
-          <p className="text-xl font-bold">{average.toFixed(2)}</p>
+          <p className="font-medium">Simple Average</p>
+          <p className="text-xl font-bold">{simpleAverage.toFixed(2)}</p>
         </div>
         <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
           <p className="font-medium">Standard Deviation</p>
           <p className="text-xl font-bold">{stdDev.toFixed(2)}</p>
         </div>
+        {runCount > 0 && (
+          <div className="flex items-center justify-between p-3 rounded-lg bg-green-50 border border-green-200">
+            <div>
+              <p className="font-medium text-green-700">Avg over {runCount} Runs</p>
+              <p className="text-xs text-green-600">Simulation history</p>
+            </div>
+            <p className="text-xl font-bold text-green-700">{avgOverRuns.toFixed(2)}</p>
+          </div>
+        )}
         <hr className="my-2" />
         <div className="flex items-center justify-between p-2">
           <p className="text-sm text-muted-foreground">Active Modules</p>
           <Badge variant="outline">{enabledCount} / {totalCount}</Badge>
+        </div>
+        <div className="flex items-center justify-between p-2">
+          <p className="text-sm text-muted-foreground">Total Weight</p>
+          <Badge variant="outline">{totalWeight}%</Badge>
         </div>
         <div className="flex items-center justify-between p-2">
           <p className="text-sm text-muted-foreground">Simulating</p>
@@ -279,6 +339,7 @@ export default function WhatIfAnalysisPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [showWelcome, setShowWelcome] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [simulationHistory, setSimulationHistory] = useState<number[]>([]);
 
   const router = useRouter();
   const { toast } = useToast();
@@ -685,6 +746,7 @@ export default function WhatIfAnalysisPage() {
               isAdmin={isAdmin}
               onToggleEnabled={handleToggleEnabled}
               onToggleSimulated={handleToggleSimulated}
+              editableScores={editableScores}
             />
           </div>
 
@@ -699,6 +761,7 @@ export default function WhatIfAnalysisPage() {
                 isAdmin={isAdmin}
                 onToggleEnabled={(enabled) => handleToggleEnabled(activeModule, enabled)}
                 onToggleSimulated={(simulated) => handleToggleSimulated(activeModule, simulated)}
+                moduleId={activeModule}
               />
             )}
             {activeModule && moduleConfigs[activeModule] && !moduleConfigs[activeModule].enabled && (
@@ -722,7 +785,53 @@ export default function WhatIfAnalysisPage() {
               moduleConfigs={moduleConfigs}
               enabledCount={Object.values(moduleConfigs).filter(m => m.enabled).length}
               totalCount={Object.keys(moduleConfigs).length}
+              editableScores={editableScores}
+              simulationHistory={simulationHistory}
             />
+            {/* Run Simulation Button */}
+            <Button
+              className="w-full mt-4"
+              variant="outline"
+              onClick={() => {
+                // Calculate current weighted score
+                let totalWeightedScore = 0;
+                let totalWeight = 0;
+                Object.entries(editableScores).forEach(([moduleId, rows]) => {
+                  const config = moduleConfigs[moduleId];
+                  if (config?.enabled) {
+                    const moduleWeight = MODULE_DEFINITIONS[moduleId]?.weight || 10;
+                    const moduleAvg = rows.length > 0 ? rows.reduce((sum, r) => sum + r.score, 0) / rows.length : 0;
+                    totalWeightedScore += moduleAvg * moduleWeight;
+                    totalWeight += moduleWeight;
+                  }
+                });
+                const weightedAverage = totalWeight > 0 ? totalWeightedScore / totalWeight : 0;
+
+                // Add to history (max 30 runs)
+                setSimulationHistory(prev => {
+                  const newHistory = [...prev, weightedAverage];
+                  return newHistory.slice(-30); // Keep last 30
+                });
+
+                toast({
+                  title: 'Simulation Recorded',
+                  description: `Score ${weightedAverage.toFixed(2)} added to history (${Math.min(simulationHistory.length + 1, 30)}/30 runs)`,
+                });
+              }}
+            >
+              <Play className="mr-2 size-4" />
+              Record Simulation ({simulationHistory.length}/30)
+            </Button>
+            {simulationHistory.length > 0 && (
+              <Button
+                className="w-full mt-2"
+                variant="ghost"
+                size="sm"
+                onClick={() => setSimulationHistory([])}
+              >
+                Clear History
+              </Button>
+            )}
           </div>
         </div>
       </div>
