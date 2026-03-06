@@ -29,27 +29,29 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 
 const defaultTriageSectionsAdmin = [
-    { id: 'quick-summary', title: 'Quick Summary', active: true, description: "" },
-    { id: 'tca-scorecard', title: 'TCA Scorecard', active: true, description: "" },
-    { id: 'tca-ai-analysis-table', title: 'TCA AI Analysis Table', active: true, description: "" },
-    { id: 'tca-ai-interpretation-summary', title: 'TCA AI Interpretation Summary', active: true, description: "" },
-    { id: 'weighted-score-breakdown', title: 'Weighted Score Breakdown', active: true, description: "" },
-    { id: 'risk-flag-summary-table', title: 'Risk Flag Summary Table', active: true, description: "" },
-    { id: 'flag-analysis-narrative', title: 'Flag Analysis Narrative', active: true, description: "" },
-    { id: 'ceo-questions', title: 'CEO Questions', active: true, description: "" },
-    { id: 'final-recommendation', title: 'Final Recommendation', active: true, description: "" },
+    { id: 'executive-summary', title: 'Page 1: Executive Summary', active: true, description: 'Overall investment recommendation, key highlights, and company overview' },
+    { id: 'tca-scorecard', title: 'Page 2: TCA Scorecard', active: true, description: 'Composite score with category breakdown' },
+    { id: 'tca-ai-analysis-table', title: 'Page 3: TCA AI Analysis', active: true, description: 'Detailed AI-powered analysis table' },
+    { id: 'tca-ai-interpretation-summary', title: 'Page 4: AI Interpretation', active: true, description: 'AI interpretation and insights summary' },
+    { id: 'weighted-score-breakdown', title: 'Page 5: Weighted Scores', active: true, description: 'Weighted score breakdown by category' },
+    { id: 'risk-flag-summary-table', title: 'Page 6: Risk Flags', active: true, description: 'Risk flag summary with severity levels' },
+    { id: 'flag-analysis-narrative', title: 'Page 7: Flag Analysis', active: true, description: 'Detailed narrative analysis of flags' },
+    { id: 'market-team-analysis', title: 'Page 8: Market & Team', active: true, description: 'Market opportunity and team strength analysis' },
+    { id: 'ceo-questions', title: 'Page 9: CEO Questions', active: true, description: 'Strategic questions for the CEO' },
+    { id: 'final-recommendation', title: 'Page 10: Final Recommendation', active: true, description: 'Investment decision and next steps' },
 ];
 
 const defaultTriageSectionsStandard = [
-    { id: 'quick-summary', title: 'Quick Summary', active: true, description: "" },
-    { id: 'tca-scorecard', title: 'TCA Scorecard', active: true, description: "" },
-    { id: 'tca-ai-analysis-table', title: 'TCA AI Analysis Table', active: true, description: "" },
-    { id: 'tca-ai-interpretation-summary', title: 'TCA AI Interpretation Summary', active: true, description: "" },
-    { id: 'weighted-score-breakdown', title: 'Weighted Score Breakdown', active: true, description: "" },
-    { id: 'risk-flag-summary-table', title: 'Risk Flag Summary Table', active: true, description: "" },
-    { id: 'flag-analysis-narrative', title: 'Flag Analysis Narrative', active: true, description: "" },
-    { id: 'ceo-questions', title: 'CEO Questions', active: true, description: "" },
-    { id: 'final-recommendation', title: 'Final Recommendation', active: true, description: "" },
+    { id: 'executive-summary', title: 'Page 1: Executive Summary', active: true, description: 'Overall investment recommendation, key highlights, and company overview' },
+    { id: 'tca-scorecard', title: 'Page 2: TCA Scorecard', active: true, description: 'Composite score with category breakdown' },
+    { id: 'tca-ai-analysis-table', title: 'Page 3: TCA AI Analysis', active: true, description: 'Detailed AI-powered analysis table' },
+    { id: 'tca-ai-interpretation-summary', title: 'Page 4: AI Interpretation', active: true, description: 'AI interpretation and insights summary' },
+    { id: 'weighted-score-breakdown', title: 'Page 5: Weighted Scores', active: true, description: 'Weighted score breakdown by category' },
+    { id: 'risk-flag-summary-table', title: 'Page 6: Risk Flags', active: true, description: 'Risk flag summary with severity levels' },
+    { id: 'flag-analysis-narrative', title: 'Page 7: Flag Analysis', active: true, description: 'Detailed narrative analysis of flags' },
+    { id: 'market-team-analysis', title: 'Page 8: Market & Team', active: true, description: 'Market opportunity and team strength analysis' },
+    { id: 'ceo-questions', title: 'Page 9: CEO Questions', active: true, description: 'Strategic questions for the CEO' },
+    { id: 'final-recommendation', title: 'Page 10: Final Recommendation', active: true, description: 'Investment decision and next steps' },
 ];
 
 const defaultDdSections = [
@@ -76,15 +78,14 @@ const defaultDdSections = [
 const defaultSsdSections: ReportSection[] = [
     { id: 'ssd-page-1', title: 'Page 1: Executive Summary', active: true, description: 'Overall score, investment recommendation, analysis completeness, company snapshot' },
     { id: 'ssd-page-2', title: 'Page 2: TCA Scorecard', active: true, description: 'Composite score, category breakdown, top strengths, areas of concern' },
-    { id: 'ssd-page-3', title: 'Page 3: TCA AI Interpretation Summary', active: true, description: "" },
-    { id: 'ssd-page-4', title: 'Page 4: Weighted Score Breakdown', active: true, description: "" },
+    { id: 'ssd-page-3', title: 'Page 3: TCA AI Interpretation', active: true, description: 'AI-powered analysis insights and interpretation of key metrics' },
+    { id: 'ssd-page-4', title: 'Page 4: Weighted Score Breakdown', active: true, description: 'Detailed breakdown of weighted scores by evaluation category' },
     { id: 'ssd-page-5', title: 'Page 5: Risk Assessment', active: true, description: 'Risk score, flags count, severity levels, risk domains' },
-    { id: 'ssd-page-6', title: 'Page 6: Flag Analysis Narrative', active: true, description: "" },
+    { id: 'ssd-page-6', title: 'Page 6: Flag Analysis Narrative', active: true, description: 'In-depth narrative analysis of identified risk flags' },
     { id: 'ssd-page-7', title: 'Page 7: Market & Team', active: true, description: 'Market score, TAM/SAM/SOM, team score, founders, gaps' },
     { id: 'ssd-page-8', title: 'Page 8: Financials & Technology', active: true, description: 'Financial score, revenue, burn rate, runway, technology score, IP' },
-    { id: 'ssd-page-9', title: 'Page 9: CEO Questions', active: true, description: "" },
-    { id: 'ssd-page-10', title: 'Page 10: Recommendation', active: true, description: 'Final decision, funding recommendation, next steps' },
-
+    { id: 'ssd-page-9', title: 'Page 9: CEO Questions', active: true, description: 'Strategic questions for CEO and leadership team' },
+    { id: 'ssd-page-10', title: 'Page 10: Final Recommendation', active: true, description: 'Final decision, funding recommendation, next steps' },
 ];
 
 // ─── SSD Scoring Thresholds ──────────────────────────────────────────
@@ -345,17 +346,25 @@ export default function ReportConfigurationPage() {
         setSsdTestStatus('testing');
         setSsdTestResult('');
         try {
-            // Use the centralized API configuration
-            const response = await fetch(`${API_CONFIG.BASE_URL}/health`);
+            // Use the centralized API configuration with CORS
+            const response = await fetch(`${API_CONFIG.BASE_URL}/health`, {
+                method: 'GET',
+                mode: 'cors',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
             if (response.ok) {
+                const data = await response.json();
                 setSsdTestStatus('success');
-                setSsdTestResult(`Backend connection successful! SSD integration endpoint is available at ${API_CONFIG.BASE_URL}/api/ssd/tirr`);
+                setSsdTestResult(`Backend connection successful! Status: ${data.status}, Database: ${data.database}. SSD endpoint: ${API_CONFIG.BASE_URL}/api/ssd/tirr`);
             } else {
-                throw new Error('Backend not responding');
+                throw new Error(`Backend responded with status: ${response.status}`);
             }
-        } catch {
+        } catch (error) {
             setSsdTestStatus('error');
-            setSsdTestResult(`Failed to connect to backend at ${API_CONFIG.BASE_URL}. Make sure the server is running.`);
+            const errMsg = error instanceof Error ? error.message : 'Unknown error';
+            setSsdTestResult(`Failed to connect to backend at ${API_CONFIG.BASE_URL}. Error: ${errMsg}`);
         }
     };
 
@@ -614,8 +623,8 @@ export default function ReportConfigurationPage() {
                                 <div className="mt-4 flex justify-between items-center p-3 rounded-lg bg-muted/50">
                                     <span className="font-medium">Total Weight:</span>
                                     <span className={`text-lg font-bold ${tcaScorecardCategories.filter(c => c.enabled).reduce((sum, c) => sum + c.weight, 0) === 100
-                                            ? 'text-green-600'
-                                            : 'text-red-600'
+                                        ? 'text-green-600'
+                                        : 'text-red-600'
                                         }`}>
                                         {tcaScorecardCategories.filter(c => c.enabled).reduce((sum, c) => sum + c.weight, 0)}%
                                     </span>
