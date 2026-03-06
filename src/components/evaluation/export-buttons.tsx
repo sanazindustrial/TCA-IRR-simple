@@ -315,37 +315,37 @@ export function ExportButtons() {
     const doc = new jsPDF();
     const companyName = getCompanyName();
 
-    // TITLE PAGE
-    doc.setFontSize(24);
+    // TITLE PAGE - Professional formatting with smaller fonts
+    doc.setFontSize(18);
     doc.text(`COMPREHENSIVE ANALYSIS REPORT`, 105, 50, { align: 'center' });
-    doc.setFontSize(20);
-    doc.text(`${companyName}`, 105, 70, { align: 'center' });
-    doc.setFontSize(14);
-    doc.text(`Report Type: ${reportType.toUpperCase()}`, 105, 90, { align: 'center' });
-    doc.text(`Generated: ${new Date().toLocaleDateString()} | Analyst: ${role}`, 105, 100, { align: 'center' });
-    doc.setFontSize(12);
-    doc.text(`Confidential & Proprietary Analysis`, 105, 120, { align: 'center' });
+    doc.setFontSize(16);
+    doc.text(`${companyName}`, 105, 65, { align: 'center' });
+    doc.setFontSize(11);
+    doc.text(`Report Type: ${reportType.toUpperCase()}`, 105, 82, { align: 'center' });
+    doc.text(`Generated: ${new Date().toLocaleDateString()} | Analyst: ${role}`, 105, 92, { align: 'center' });
+    doc.setFontSize(10);
+    doc.text(`Confidential & Proprietary Analysis`, 105, 108, { align: 'center' });
 
     // Executive Summary Box
     doc.setDrawColor(0, 0, 0);
     doc.setFillColor(245, 245, 245);
-    doc.roundedRect(20, 140, 170, 60, 3, 3, 'DF');
-    doc.setFontSize(14);
-    doc.text('EXECUTIVE SUMMARY', 105, 155, { align: 'center' });
-    doc.setFontSize(11);
+    doc.roundedRect(20, 125, 170, 50, 3, 3, 'DF');
+    doc.setFontSize(12);
+    doc.text('EXECUTIVE SUMMARY', 105, 138, { align: 'center' });
+    doc.setFontSize(10);
 
     if (data.tcaData) {
       const score = data.tcaData.compositeScore;
       const rating = score >= 8 ? 'EXCELLENT' : score >= 7 ? 'STRONG' : score >= 6 ? 'GOOD' : score >= 5 ? 'MODERATE' : 'WEAK';
-      doc.text(`Overall Investment Score: ${score.toFixed(2)}/10 (${rating})`, 105, 170, { align: 'center' });
-      doc.text(`Investment Recommendation: ${score >= 7 ? 'PROCEED TO DD' : score >= 5 ? 'CONDITIONAL REVIEW' : 'DECLINE'}`, 105, 185, { align: 'center' });
+      doc.text(`Overall Investment Score: ${score.toFixed(2)}/10 (${rating})`, 105, 152, { align: 'center' });
+      doc.text(`Investment Recommendation: ${score >= 7 ? 'PROCEED TO DD' : score >= 5 ? 'CONDITIONAL REVIEW' : 'DECLINE'}`, 105, 165, { align: 'center' });
     }
 
     // TABLE OF CONTENTS
     doc.addPage();
-    doc.setFontSize(16);
+    doc.setFontSize(14);
     doc.text('TABLE OF CONTENTS', 14, 25);
-    doc.setFontSize(11);
+    doc.setFontSize(10);
 
     const tocItems = [
       '1. Executive Summary ..................................... 3',
@@ -368,18 +368,18 @@ export function ExportButtons() {
 
     // PAGE 3: DETAILED EXECUTIVE SUMMARY
     doc.addPage();
-    doc.setFontSize(16);
+    doc.setFontSize(14);
     doc.text('1. EXECUTIVE SUMMARY', 14, 25);
     doc.setLineWidth(0.5);
     doc.line(14, 30, 196, 30);
 
     if (data.tcaData) {
       // Key Metrics Summary Table
-      doc.setFontSize(12);
-      doc.text('Key Performance Metrics', 14, 45);
+      doc.setFontSize(11);
+      doc.text('Key Performance Metrics', 14, 42);
 
       autoTable(doc, {
-        startY: 50,
+        startY: 46,
         head: [['Metric', 'Value', 'Industry Benchmark', 'Percentile Rank']],
         body: [
           ['TCA Composite Score', data.tcaData.compositeScore.toFixed(2), '6.5', `${Math.round(data.tcaData.compositeScore * 10)}th`],
@@ -414,7 +414,7 @@ export function ExportButtons() {
 
     // PAGE 4-5: DETAILED TCA SCORECARD ANALYSIS
     doc.addPage();
-    doc.setFontSize(16);
+    doc.setFontSize(14);
     doc.text('2. TCA SCORECARD ANALYSIS', 14, 25);
     doc.line(14, 30, 196, 30);
 
@@ -484,17 +484,17 @@ export function ExportButtons() {
 
     // PAGE 6-7: COMPREHENSIVE RISK ASSESSMENT
     doc.addPage();
-    doc.setFontSize(16);
+    doc.setFontSize(14);
     doc.text('3. RISK ASSESSMENT & MITIGATION', 14, 25);
     doc.line(14, 30, 196, 30);
 
     if (data.riskData) {
       // Risk Summary
-      doc.setFontSize(12);
-      doc.text('Risk Assessment Summary', 14, 45);
-      doc.setFontSize(10);
+      doc.setFontSize(11);
+      doc.text('Risk Assessment Summary', 14, 42);
+      doc.setFontSize(9);
       const riskSummaryLines = doc.splitTextToSize(data.riskData.riskSummary, 180);
-      doc.text(riskSummaryLines, 14, 55);
+      doc.text(riskSummaryLines, 14, 50);
 
       // Risk Matrix
       const riskCounts = {
@@ -504,7 +504,7 @@ export function ExportButtons() {
       };
 
       autoTable(doc, {
-        startY: 80,
+        startY: 72,
         head: [['Risk Level', 'Count', 'Percentage', 'Impact']],
         body: [
           ['Critical (Red)', riskCounts.red.toString(), `${((riskCounts.red / data.riskData.riskFlags.length) * 100).toFixed(1)}%`, 'High'],
@@ -548,7 +548,7 @@ export function ExportButtons() {
     sectionsToAdd.forEach((section) => {
       if (section.data) {
         doc.addPage();
-        doc.setFontSize(16);
+        doc.setFontSize(14);
         doc.text(section.title, 14, 25);
         doc.line(14, 30, 196, 30);
 

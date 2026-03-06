@@ -53,6 +53,7 @@ import Loading from '../../loading';
 
 // Sample Data and Types
 import { sampleAnalysisData, type ComprehensiveAnalysisOutput } from '@/lib/sample-data';
+import { normalizeAnalysisData } from '@/lib/normalize-tca-data';
 
 // Type Definitions
 export type UserRole = 'user' | 'admin' | 'reviewer';

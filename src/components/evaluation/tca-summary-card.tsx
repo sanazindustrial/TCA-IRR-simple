@@ -28,7 +28,26 @@ const getTier = (score: number) => {
 
 export function TcaSummaryCard({ initialData }: TcaSummaryCardProps) {
   const { isPrivilegedUser, isEditable } = useEvaluationContext();
-  const [data, setData] = useState(initialData);
+
+  // Normalize composite score if it appears incorrect (>10 means calculation error)
+  const normalizedData = React.useMemo(() => {
+    if (!initialData) return initialData;
+
+    let compositeScore = initialData.compositeScore;
+
+    // If score > 10, it's likely the sum of weighted * 10 instead of weighted
+    // Recalculate from categories if available
+    if (compositeScore > 10 && initialData.categories) {
+      compositeScore = initialData.categories.reduce((sum, cat) => {
+        const correctWeighted = cat.rawScore * (cat.weight / 100);
+        return sum + correctWeighted;
+      }, 0);
+    }
+
+    return { ...initialData, compositeScore };
+  }, [initialData]);
+
+  const [data, setData] = useState(normalizedData);
 
   if (!data) return null;
 

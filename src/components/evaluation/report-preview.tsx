@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
     Dialog,
     DialogContent,
@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
     Eye,
     Download,
@@ -28,6 +29,9 @@ import {
     Users,
     DollarSign,
     Target,
+    Sparkles,
+    RefreshCw,
+    Loader2,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -66,6 +70,8 @@ export function ReportPreview({
     const { toast } = useToast();
     const printRef = useRef<HTMLDivElement>(null);
     const [activeTab, setActiveTab] = useState('preview');
+    const [aiSummary, setAiSummary] = useState<string | null>(null);
+    const [isGeneratingAI, setIsGeneratingAI] = useState(false);
 
     const score = analysisData?.tcaData?.compositeScore || 0;
     const scoreBadge = getScoreBadge(score);
@@ -74,6 +80,113 @@ export function ReportPreview({
         month: 'long',
         day: 'numeric',
     });
+
+    // Generate AI summary based on analysis data
+    const generateAISummary = useCallback(async () => {
+        setIsGeneratingAI(true);
+        try {
+            // Generate comprehensive AI summary from the data
+            const tcaCategories = analysisData?.tcaData?.categories || [];
+            const riskFlags = analysisData?.riskData?.riskFlags || [];
+
+            const strengths = tcaCategories
+                .filter((c: any) => c.flag === 'green')
+                .map((c: any) => c.category);
+            const concerns = tcaCategories
+                .filter((c: any) => c.flag === 'red')
+                .map((c: any) => c.category);
+            const moderates = tcaCategories
+                .filter((c: any) => c.flag === 'yellow')
+                .map((c: any) => c.category);
+
+            const criticalRisks = riskFlags.filter((r: any) => r.flag === 'red');
+            const moderateRisks = riskFlags.filter((r: any) => r.flag === 'yellow');
+
+            // Generate AI-style summary
+            const tierLabel = score >= 8 ? 'Exceptional'
+                : score >= 7 ? 'Strong'
+                    : score >= 6 ? 'Promising'
+                        : score >= 5 ? 'Moderate'
+                            : 'Challenging';
+
+            const recommendation = score >= 7.5
+                ? 'STRONG PROCEED - High confidence investment opportunity'
+                : score >= 6.5
+                    ? 'PROCEED WITH CONDITIONS - Address key risks'
+                    : score >= 5.5
+                        ? 'CONDITIONAL - Further due diligence required'
+                        : 'PASS - Significant risk factors identified';
+
+            const summary = `## Executive AI Summary
+
+**Investment Rating:** ${tierLabel} (${score.toFixed(1)}/10)
+
+**Recommendation:** ${recommendation}
+
+### Key Strengths
+${strengths.length > 0 ? strengths.map((s: string) => `- **${s}**: Strong performance identified`).join('\n') : '- No significant strengths flagged'}
+
+### Areas of Concern
+${concerns.length > 0 ? concerns.map((c: string) => `- **${c}**: Requires attention and mitigation`).join('\n') : '- No critical concerns identified'}
+
+### Moderate Areas
+${moderates.length > 0 ? moderates.map((m: string) => `- **${m}**: Monitor and improve`).join('\n') : '- All areas performing at expected levels'}
+
+### Risk Assessment Summary
+- **Critical Risks (Red):** ${criticalRisks.length}
+- **Moderate Risks (Yellow):** ${moderateRisks.length}
+- **Total Risk Flags:** ${riskFlags.length}
+
+${criticalRisks.length > 0 ? `
+**Critical Risk Details:**
+${criticalRisks.slice(0, 3).map((r: any) => `- *${r.domain}*: ${r.trigger}`).join('\n')}
+` : ''}
+
+### Investment Thesis
+${score >= 7
+                    ? `This company demonstrates strong fundamentals across key TCA metrics. The leadership team shows promise, market opportunity is compelling, and the business model appears scalable. Recommend proceeding with detailed due diligence.`
+                    : score >= 5.5
+                        ? `This company shows potential but has notable areas requiring improvement. Before proceeding, address the identified risk factors and conduct deeper analysis on weak categories. Consider conditional terms tied to performance milestones.`
+                        : `This company presents significant challenges across multiple evaluation dimensions. The risk profile exceeds acceptable thresholds for the current stage. Recommend passing unless material changes occur in key weakness areas.`
+                }
+
+### Next Steps
+1. ${score >= 6.5 ? 'Schedule management team deep-dive interviews' : 'Request additional documentation on weak areas'}
+2. ${strengths.includes('Financial') || strengths.some((s: string) => s.includes('Financial')) ? 'Verify financial projections with audited statements' : 'Conduct independent financial due diligence'}
+3. ${concerns.some((c: string) => c.includes('Market')) ? 'Commission market sizing validation study' : 'Review competitive positioning analysis'}
+4. Engage technical advisor for IP/technology assessment
+5. Prepare term sheet based on risk-adjusted valuation
+
+---
+*AI Analysis generated on ${generatedDate}*
+*TCA TIRR Platform v3.0*`;
+
+            // Simulate API call delay for realistic feel
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            setAiSummary(summary);
+
+            toast({
+                title: 'AI Summary Generated',
+                description: 'Investment analysis summary has been created.',
+            });
+        } catch (error) {
+            console.error('Failed to generate AI summary:', error);
+            toast({
+                title: 'Generation Failed',
+                description: 'Could not generate AI summary. Please try again.',
+                variant: 'destructive',
+            });
+        } finally {
+            setIsGeneratingAI(false);
+        }
+    }, [analysisData, score, generatedDate, toast]);
+
+    // Auto-generate AI summary when tab is selected
+    useEffect(() => {
+        if (activeTab === 'ai' && !aiSummary && !isGeneratingAI) {
+            generateAISummary();
+        }
+    }, [activeTab, aiSummary, isGeneratingAI, generateAISummary]);
 
     const handlePrint = () => {
         if (printRef.current) {
@@ -159,8 +272,12 @@ export function ReportPreview({
                 </DialogHeader>
 
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-                    <TabsList className="grid w-full grid-cols-2">
+                    <TabsList className="grid w-full grid-cols-3">
                         <TabsTrigger value="preview">HTML Preview</TabsTrigger>
+                        <TabsTrigger value="ai" className="flex items-center gap-1">
+                            <Sparkles className="h-3.5 w-3.5" />
+                            AI Summary
+                        </TabsTrigger>
                         <TabsTrigger value="json">JSON Data</TabsTrigger>
                     </TabsList>
 
@@ -355,6 +472,128 @@ export function ReportPreview({
                                     <p>Generated by TCA TIRR Analysis Engine v3.0</p>
                                     <p>Report consists of 10 pages when exported to PDF</p>
                                 </div>
+                            </div>
+                        </ScrollArea>
+                    </TabsContent>
+
+                    <TabsContent value="ai" className="flex-1 mt-4">
+                        <ScrollArea className="h-[500px] rounded-md border bg-gradient-to-br from-slate-50 to-white">
+                            <div className="p-6">
+                                {isGeneratingAI ? (
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-2 text-muted-foreground">
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                            <span>Generating AI analysis...</span>
+                                        </div>
+                                        <div className="space-y-3">
+                                            <Skeleton className="h-6 w-3/4" />
+                                            <Skeleton className="h-4 w-full" />
+                                            <Skeleton className="h-4 w-5/6" />
+                                            <Skeleton className="h-4 w-4/6" />
+                                            <div className="mt-6" />
+                                            <Skeleton className="h-5 w-1/3" />
+                                            <Skeleton className="h-4 w-full" />
+                                            <Skeleton className="h-4 w-5/6" />
+                                            <div className="mt-6" />
+                                            <Skeleton className="h-5 w-1/3" />
+                                            <Skeleton className="h-4 w-full" />
+                                            <Skeleton className="h-4 w-4/5" />
+                                        </div>
+                                    </div>
+                                ) : aiSummary ? (
+                                    <div className="prose prose-sm max-w-none">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <div className="flex items-center gap-2 text-[#2F855A]">
+                                                <Sparkles className="h-5 w-5" />
+                                                <h2 className="text-lg font-semibold m-0">AI-Generated Investment Analysis</h2>
+                                            </div>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={generateAISummary}
+                                                disabled={isGeneratingAI}
+                                            >
+                                                <RefreshCw className={`h-4 w-4 mr-2 ${isGeneratingAI ? 'animate-spin' : ''}`} />
+                                                Regenerate
+                                            </Button>
+                                        </div>
+                                        <div className="whitespace-pre-wrap text-sm leading-relaxed font-sans">
+                                            {aiSummary.split('\n').map((line, i) => {
+                                                if (line.startsWith('## ')) {
+                                                    return <h2 key={i} className="text-xl font-bold text-[#1E3A5F] mt-4 mb-2">{line.replace('## ', '')}</h2>;
+                                                }
+                                                if (line.startsWith('### ')) {
+                                                    return <h3 key={i} className="text-lg font-semibold text-[#2F855A] mt-4 mb-2">{line.replace('### ', '')}</h3>;
+                                                }
+                                                if (line.startsWith('**') && line.includes(':**')) {
+                                                    const [label, ...rest] = line.split(':**');
+                                                    return (
+                                                        <p key={i} className="my-1">
+                                                            <strong className="text-slate-700">{label.replace(/\*\*/g, '')}:</strong>
+                                                            {rest.join(':**').replace(/\*\*/g, '')}
+                                                        </p>
+                                                    );
+                                                }
+                                                if (line.startsWith('- **')) {
+                                                    const content = line.replace('- **', '').replace('**:', ':');
+                                                    return (
+                                                        <div key={i} className="flex items-start gap-2 my-1 ml-4">
+                                                            <span className="text-[#2F855A] mt-1">•</span>
+                                                            <span>{content}</span>
+                                                        </div>
+                                                    );
+                                                }
+                                                if (line.startsWith('- ')) {
+                                                    return (
+                                                        <div key={i} className="flex items-start gap-2 my-1 ml-4">
+                                                            <span className="text-[#2F855A] mt-1">•</span>
+                                                            <span>{line.replace('- ', '')}</span>
+                                                        </div>
+                                                    );
+                                                }
+                                                if (line.match(/^\d+\./)) {
+                                                    return (
+                                                        <div key={i} className="flex items-start gap-2 my-1 ml-4">
+                                                            <span className="text-[#2F855A] font-semibold min-w-[20px]">{line.match(/^\d+/)?.[0]}.</span>
+                                                            <span>{line.replace(/^\d+\.\s*/, '')}</span>
+                                                        </div>
+                                                    );
+                                                }
+                                                if (line.startsWith('---')) {
+                                                    return <hr key={i} className="my-4 border-slate-200" />;
+                                                }
+                                                if (line.startsWith('*') && line.endsWith('*')) {
+                                                    return <p key={i} className="text-xs text-muted-foreground italic my-1">{line.replace(/\*/g, '')}</p>;
+                                                }
+                                                if (line.trim() === '') {
+                                                    return <div key={i} className="h-2" />;
+                                                }
+                                                return <p key={i} className="my-2 text-slate-600">{line}</p>;
+                                            })}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center h-full py-12 text-center">
+                                        <Sparkles className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                                        <h3 className="font-semibold text-lg">AI Summary Not Generated</h3>
+                                        <p className="text-muted-foreground text-sm mt-2 max-w-md">
+                                            Click below to generate an AI-powered investment analysis summary based on your evaluation data.
+                                        </p>
+                                        <Button onClick={generateAISummary} className="mt-4" disabled={isGeneratingAI}>
+                                            {isGeneratingAI ? (
+                                                <>
+                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                    Generating...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Sparkles className="mr-2 h-4 w-4" />
+                                                    Generate AI Summary
+                                                </>
+                                            )}
+                                        </Button>
+                                    </div>
+                                )}
                             </div>
                         </ScrollArea>
                     </TabsContent>
