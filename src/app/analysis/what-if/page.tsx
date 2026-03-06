@@ -195,7 +195,7 @@ export default function WhatIfAnalysisPage() {
             initialScores['tca'] = data.tcaData.categories.map(c => ({
               id: c.category,
               category: c.category,
-              score: c.rawScore || c.score || 5.0
+              score: c.rawScore || 5.0
             }));
             console.log(`Loaded ${initialScores.tca.length} TCA categories with real scores`);
           } else {
@@ -212,18 +212,11 @@ export default function WhatIfAnalysisPage() {
           // Module 2: Risk Assessment - Use REAL risk data
           if (data.riskData?.riskFlags && data.riskData.riskFlags.length > 0) {
             initialScores['risk'] = data.riskData.riskFlags.map((r, index) => ({
-              id: r.domain || r.category || `risk_${index}`,
-              category: r.domain || r.category || `Risk ${index + 1}`,
+              id: r.domain || `risk_${index}`,
+              category: r.domain || `Risk ${index + 1}`,
               score: r.flag === 'green' ? 8 : r.flag === 'yellow' ? 6 : 4
             }));
             console.log(`Loaded ${initialScores.risk.length} risk factors`);
-          } else if (data.riskData?.riskLevel) {
-            // Generate risk scores from overall risk level
-            const riskScore = data.riskData.riskLevel === 'LOW' ? 8 :
-              data.riskData.riskLevel === 'MEDIUM' ? 6 : 4;
-            initialScores['risk'] = [
-              { id: 'overall-risk', category: 'Overall Risk Assessment', score: riskScore }
-            ];
           } else {
             // Generate calculated risk assessment based on TCA scores
             const avgTcaScore = initialScores.tca.reduce((sum, cat) => sum + cat.score, 0) / initialScores.tca.length;
@@ -265,11 +258,7 @@ export default function WhatIfAnalysisPage() {
             }
           }
 
-          if (data.growthData?.growthTier) {
-            initialScores['growth'] = [
-              { id: 'growth-tier', category: 'Growth Classification', score: data.growthData.growthTier }
-            ];
-          }
+          // Note: growthData schema is empty, skip growth module
 
           if (data.gapData?.heatmap) {
             initialScores['gap'] = data.gapData.heatmap.map(g => ({
