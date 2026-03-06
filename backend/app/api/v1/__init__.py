@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 from .endpoints import (auth, users, companies, analysis, investments, admin,
-                        tca, dashboard)
+                        tca, dashboard, ssd)
 
 api_router = APIRouter()
 
@@ -25,3 +25,6 @@ api_router.include_router(dashboard.router,
 api_router.include_router(admin.router,
                           prefix="/admin",
                           tags=["Administration"])
+api_router.include_router(ssd.router,
+                          prefix="/ssd",
+                          tags=["SSD Integration"])
