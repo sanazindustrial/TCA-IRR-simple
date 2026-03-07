@@ -542,3 +542,128 @@ def _analyze_team_strength(company_data: Dict[str, Any]) -> str:
         return "Core team assembled with key skills represented"
     else:
         return "Early-stage team requiring strategic hiring"
+
+
+# ============ Company Info Extraction Endpoint ============
+
+@router.post("/extract-company-info", response_model=Dict[str, Any])
+async def extract_company_info(request_data: Dict[str, Any]):
+    """
+    Extract company information from document content using AI/NLP.
+    Used by frontend to auto-fill company information form after document upload.
+    """
+    import re
+    
+    content = request_data.get("content", "")
+    framework = request_data.get("framework", "general")
+    
+    if not content:
+        return {"error": "No content provided"}
+    
+    extracted = {}
+    
+    # Extract company name patterns
+    name_patterns = [
+        r"(?:company[:\s]+|about\s+)([A-Z][A-Za-z0-9\s&]{2,50})",
+        r"^([A-Z][A-Za-z0-9\s&]{2,30})\s*[-–—]\s*(?:pitch|deck|presentation)",
+        r"(?:welcome to|introducing)\s+([A-Z][A-Za-z0-9\s&]{2,30})",
+    ]
+    for pattern in name_patterns:
+        match = re.search(pattern, content, re.IGNORECASE | re.MULTILINE)
+        if match:
+            extracted["company_name"] = match.group(1).strip()[:100]
+            break
+    
+    # Extract website
+    website_match = re.search(r'https?://(?:www\.)?([a-zA-Z0-9-]+\.[a-zA-Z]{2,})', content)
+    if website_match:
+        extracted["website"] = f"https://{website_match.group(1)}"
+    
+    # Extract description patterns
+    desc_patterns = [
+        r"(?:we are|is a|company that)\s+([^.]{20,300}\.)",
+        r"(?:our mission|mission:)\s+([^.]{20,300}\.)",
+        r"(?:about us|overview:)\s+([^.]{20,300}\.)",
+    ]
+    for pattern in desc_patterns:
+        match = re.search(pattern, content, re.IGNORECASE)
+        if match:
+            extracted["description"] = match.group(1).strip()[:500]
+            break
+    
+    # Extract employee count
+    emp_match = re.search(r'(\d{1,5})\s*(?:employees|team members|people)', content, re.IGNORECASE)
+    if emp_match:
+        extracted["number_of_employees"] = int(emp_match.group(1))
+    
+    # Extract location
+    location_patterns = [
+        r"(?:based in|headquarters?|located in)\s+([A-Za-z\s,]+)",
+        r"([A-Za-z]+),\s*(CA|NY|TX|WA|MA|FL|USA|UK|US)",
+    ]
+    for pattern in location_patterns:
+        match = re.search(pattern, content, re.IGNORECASE)
+        if match:
+            location = match.group(1).strip()
+            parts = location.split(",")
+            if len(parts) >= 1:
+                extracted["city"] = parts[0].strip()[:50]
+            if len(parts) >= 2:
+                extracted["state"] = parts[1].strip()[:50]
+            break
+    
+    # Extract funding stage
+    stage_keywords = {
+        "pre-seed": "Pre-seed",
+        "seed": "Seed",
+        "series a": "Series A",
+        "series b": "Series B",
+        "series c": "Series C+",
+        "growth": "Growth",
+    }
+    for keyword, stage in stage_keywords.items():
+        if keyword in content.lower():
+            extracted["development_stage"] = stage
+            break
+    
+    # Extract industry vertical
+    industry_keywords = {
+        "saas": "Software/SaaS",
+        "fintech": "FinTech",
+        "healthtech": "HealthTech/MedTech",
+        "medtech": "HealthTech/MedTech",
+        "biotech": "BioTech",
+        "ecommerce": "E-commerce",
+        "edtech": "EdTech",
+        "cleantech": "CleanTech/GreenTech",
+        "proptech": "PropTech",
+        "artificial intelligence": "AI/ML",
+        "machine learning": "AI/ML",
+        "cybersecurity": "Cybersecurity",
+    }
+    for keyword, industry in industry_keywords.items():
+        if keyword in content.lower():
+            extracted["industry_vertical"] = industry
+            break
+    
+    # Extract business model
+    model_keywords = {
+        "b2b saas": "B2B SaaS",
+        "b2c saas": "B2C SaaS",
+        "marketplace": "Marketplace",
+        "subscription": "Subscription",
+        "freemium": "Freemium",
+        "platform": "Platform",
+    }
+    for keyword, model in model_keywords.items():
+        if keyword in content.lower():
+            extracted["business_model"] = model
+            break
+    
+    # If MedTech framework, set accordingly
+    if framework == "medtech" and not extracted.get("industry_vertical"):
+        extracted["industry_vertical"] = "HealthTech/MedTech"
+    
+    logger.info(f"Extracted company info: {list(extracted.keys())}")
+    
+    return extracted

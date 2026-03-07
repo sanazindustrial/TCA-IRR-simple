@@ -44,7 +44,12 @@ type AutosaveData = {
 };
 
 
-function AnalysisSetup({ onClearAllData }: { onClearAllData: () => void }) {
+function AnalysisSetup({ onClearAllData, onExtractFromDocuments, isExtracting, extractionComplete }: {
+    onClearAllData: () => void;
+    onExtractFromDocuments: () => void;
+    isExtracting: boolean;
+    extractionComplete: boolean;
+}) {
     const {
         framework,
         onFrameworkChangeAction,
@@ -61,24 +66,86 @@ function AnalysisSetup({ onClearAllData }: { onClearAllData: () => void }) {
         companyDescription = '',
     } = useEvaluationContext();
 
-    const hasData = uploadedFiles.length > 0 || importedUrls.length > 0 || submittedTexts.length > 0 || companyName.length > 0 || companyDescription.length > 0;
+    const hasDocuments = uploadedFiles.length > 0 || importedUrls.length > 0 || submittedTexts.length > 0;
+    const hasData = hasDocuments || companyName.length > 0 || companyDescription.length > 0;
+    const canRunAnalysis = extractionComplete || !hasDocuments;
 
     return (
         <div className="space-y-8 mb-12">
-            <CompanyInformation
-                framework={framework}
-                onFrameworkChange={onFrameworkChangeAction}
-            />
-            <DocumentSubmission
-                uploadedFiles={uploadedFiles}
-                setUploadedFiles={setUploadedFilesAction || (() => { })}
-                importedUrls={importedUrls}
-                setImportedUrls={setImportedUrlsAction || (() => { })}
-                submittedTexts={submittedTexts}
-                setSubmittedTexts={setSubmittedTextsAction || (() => { })}
-            />
-            <ExternalDataSources framework={framework} />
-            {isPrivilegedUser && <ModuleConfiguration framework={framework} />}
+            {/* Step 1: Upload Documents First */}
+            <div className="relative">
+                <div className="absolute -left-4 top-0 flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground font-bold text-sm">
+                    1
+                </div>
+                <DocumentSubmission
+                    uploadedFiles={uploadedFiles}
+                    setUploadedFiles={setUploadedFilesAction || (() => { })}
+                    importedUrls={importedUrls}
+                    setImportedUrls={setImportedUrlsAction || (() => { })}
+                    submittedTexts={submittedTexts}
+                    setSubmittedTexts={setSubmittedTextsAction || (() => { })}
+                />
+            </div>
+
+            {/* Extract Data Button */}
+            {hasDocuments && !extractionComplete && (
+                <div className="flex justify-center">
+                    <Button
+                        size="lg"
+                        onClick={onExtractFromDocuments}
+                        disabled={isExtracting}
+                        className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                    >
+                        {isExtracting ? (
+                            <>
+                                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent mr-2" />
+                                Extracting Company Info...
+                            </>
+                        ) : (
+                            '🤖 Extract Company Info from Documents'
+                        )}
+                    </Button>
+                </div>
+            )}
+
+            {/* Step 2: Company Information (Auto-filled after extraction) */}
+            <div className="relative">
+                <div className="absolute -left-4 top-0 flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground font-bold text-sm">
+                    2
+                </div>
+                {extractionComplete && (
+                    <div className="mb-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                        <p className="text-green-700 dark:text-green-300 text-sm flex items-center gap-2">
+                            <span className="text-lg">✅</span>
+                            <span>Company information extracted from documents. Please review and confirm the details below.</span>
+                        </p>
+                    </div>
+                )}
+                <CompanyInformation
+                    framework={framework}
+                    onFrameworkChange={onFrameworkChangeAction}
+                />
+            </div>
+
+            {/* Step 3: External Data Sources (Admin/Reviewer only) */}
+            {isPrivilegedUser && (
+                <div className="relative">
+                    <div className="absolute -left-4 top-0 flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground font-bold text-sm">
+                        3
+                    </div>
+                    <ExternalDataSources framework={framework} />
+                </div>
+            )}
+
+            {/* Step 4: Module Configuration (Admin/Reviewer only) */}
+            {isPrivilegedUser && (
+                <div className="relative">
+                    <div className="absolute -left-4 top-0 flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground font-bold text-sm">
+                        4
+                    </div>
+                    <ModuleConfiguration framework={framework} />
+                </div>
+            )}
 
             <div className="flex justify-between items-center gap-4">
                 <div className="text-sm text-muted-foreground">
@@ -95,7 +162,11 @@ function AnalysisSetup({ onClearAllData }: { onClearAllData: () => void }) {
                             Clear All Data
                         </Button>
                     )}
-                    <Button size="lg" onClick={handleRunAnalysisAction} disabled={isLoading}>
+                    <Button
+                        size="lg"
+                        onClick={handleRunAnalysisAction}
+                        disabled={isLoading || (hasDocuments && !canRunAnalysis)}
+                    >
                         {isLoading ? 'Running...' : 'Run Analysis'}
                     </Button>
                 </div>
@@ -133,6 +204,117 @@ export default function EvaluationPage() {
     const [productDescription, setProductDescription] = useState<string>('');
     const [legalName, setLegalName] = useState<string>('');
     const [numberOfEmployees, setNumberOfEmployees] = useState<string>('');
+
+    // State for AI extraction
+    const [isExtracting, setIsExtracting] = useState(false);
+    const [extractionComplete, setExtractionComplete] = useState(false);
+
+    // Extract company info from uploaded documents
+    const handleExtractFromDocuments = async () => {
+        setIsExtracting(true);
+        try {
+            // Get processed files from localStorage (set by document-submission component)
+            const processedFiles = JSON.parse(localStorage.getItem('processedFiles') || '[]');
+            const processedUrls = JSON.parse(localStorage.getItem('processedUrls') || '[]');
+            const processedTexts = JSON.parse(localStorage.getItem('processedTexts') || '[]');
+
+            // Combine all text content for extraction
+            const allContent = [
+                ...processedFiles.map((f: { extracted_data?: { text_content?: string } }) => f.extracted_data?.text_content || ''),
+                ...processedUrls.map((u: { extracted_data?: { text_content?: string } }) => u.extracted_data?.text_content || ''),
+                ...processedTexts.map((t: { content?: string }) => t.content || ''),
+                ...submittedTexts,
+            ].join('\n\n');
+
+            // Call backend extraction API
+            const response = await fetch('https://tcairrapiccontainer.azurewebsites.net/api/v1/analysis/extract-company-info', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    content: allContent,
+                    framework,
+                }),
+            });
+
+            if (response.ok) {
+                const extractedData = await response.json();
+
+                // Auto-fill company information fields
+                if (extractedData.company_name) setCompanyName(extractedData.company_name);
+                if (extractedData.legal_name) setLegalName(extractedData.legal_name);
+                if (extractedData.website) setWebsite(extractedData.website);
+                if (extractedData.description) setCompanyDescription(extractedData.description);
+                if (extractedData.one_line_description) setOneLineDescription(extractedData.one_line_description);
+                if (extractedData.product_description) setProductDescription(extractedData.product_description);
+                if (extractedData.industry_vertical) setIndustryVertical(extractedData.industry_vertical);
+                if (extractedData.development_stage) setDevelopmentStage(extractedData.development_stage);
+                if (extractedData.business_model) setBusinessModel(extractedData.business_model);
+                if (extractedData.country) setCountry(extractedData.country);
+                if (extractedData.state) setState(extractedData.state);
+                if (extractedData.city) setCity(extractedData.city);
+                if (extractedData.number_of_employees) setNumberOfEmployees(extractedData.number_of_employees.toString());
+
+                toast({
+                    title: 'Extraction Complete!',
+                    description: 'Company information has been extracted. Please review and confirm the details.',
+                });
+            } else {
+                // Fallback: Extract basic info from content using patterns
+                const extractedName = extractNameFromContent(allContent);
+                const extractedDescription = extractDescriptionFromContent(allContent);
+
+                if (extractedName) setCompanyName(extractedName);
+                if (extractedDescription) setCompanyDescription(extractedDescription);
+
+                toast({
+                    title: 'Basic Extraction Complete',
+                    description: 'Some information was extracted. Please review and complete missing fields.',
+                });
+            }
+
+            setExtractionComplete(true);
+        } catch (error) {
+            console.error('Extraction failed:', error);
+            toast({
+                variant: 'destructive',
+                title: 'Extraction Failed',
+                description: 'Could not extract company info. Please fill in the details manually.',
+            });
+        } finally {
+            setIsExtracting(false);
+        }
+    };
+
+    // Helper functions for basic extraction fallback
+    const extractNameFromContent = (content: string): string => {
+        // Look for common patterns
+        const patterns = [
+            /company[:\s]+([A-Z][A-Za-z0-9\s&]+)/i,
+            /^([A-Z][A-Za-z0-9\s&]+)\s*[-–—]\s*(pitch|deck|presentation)/im,
+            /about\s+([A-Z][A-Za-z0-9\s&]+)/i,
+        ];
+        for (const pattern of patterns) {
+            const match = content.match(pattern);
+            if (match?.[1]) return match[1].trim().slice(0, 100);
+        }
+        return '';
+    };
+
+    const extractDescriptionFromContent = (content: string): string => {
+        // Look for description patterns
+        const patterns = [
+            /(?:we are|is a|company that)\s+([^.]+\.)/i,
+            /(?:our mission|mission:)\s+([^.]+\.)/i,
+            /(?:what we do|overview:)\s+([^.]+\.)/i,
+        ];
+        for (const pattern of patterns) {
+            const match = content.match(pattern);
+            if (match?.[1]) return match[1].trim().slice(0, 500);
+        }
+        // Return first substantial paragraph
+        const paragraphs = content.split(/\n\n+/).filter(p => p.length > 50 && p.length < 500);
+        return paragraphs[0] || '';
+    };
 
     // Restore autosaved data on mount
     useEffect(() => {
@@ -239,6 +421,9 @@ export default function EvaluationPage() {
         setProductDescription('');
         setLegalName('');
         setNumberOfEmployees('');
+        // Reset extraction state
+        setExtractionComplete(false);
+        setIsExtracting(false);
         clearAutosave();
         toast({
             title: 'Data Cleared',
@@ -285,13 +470,45 @@ export default function EvaluationPage() {
             description: `Processing ${uploadedFiles.length} files, ${importedUrls.length} URLs, and ${submittedTexts.length} text inputs.`,
         });
         try {
+            // Save company info to database before analysis
+            const companyData = {
+                company_name: companyName,
+                legal_name: legalName,
+                website,
+                description: companyDescription,
+                one_line_description: oneLineDescription,
+                product_description: productDescription,
+                industry_vertical: industryVertical,
+                development_stage: developmentStage,
+                business_model: businessModel,
+                country,
+                state,
+                city,
+                number_of_employees: numberOfEmployees ? parseInt(numberOfEmployees) : null,
+                framework,
+            };
+
+            // Save to company history in database
+            try {
+                await fetch('https://tcairrapiccontainer.azurewebsites.net/api/v1/companies', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(companyData),
+                });
+                console.log('Company data saved to database');
+            } catch (saveError) {
+                console.warn('Failed to save company data to database:', saveError);
+                // Continue with analysis even if save fails
+            }
+
             // Pass real user data to runAnalysis
             const userData = {
                 uploadedFiles,
                 importedUrls,
                 submittedTexts,
-                companyName: 'User Company', // TODO: Get from company information form
-                companyDescription: submittedTexts[0] || 'User-provided company description'
+                companyName: companyName || 'Unknown Company',
+                companyDescription: companyDescription || submittedTexts[0] || 'User-provided company description',
+                companyData, // Include all company fields
             };
 
             const comprehensiveData = await runAnalysis(framework, userData);
@@ -394,7 +611,12 @@ export default function EvaluationPage() {
                                 <p className="mt-4 text-muted-foreground">Loading...</p>
                             </div>
                         </div>
-                    ) : <AnalysisSetup onClearAllData={clearAllData} />}
+                    ) : <AnalysisSetup
+                        onClearAllData={clearAllData}
+                        onExtractFromDocuments={handleExtractFromDocuments}
+                        isExtracting={isExtracting}
+                        extractionComplete={extractionComplete}
+                    />}
                 </div>
             </main>
         </EvaluationProvider>
