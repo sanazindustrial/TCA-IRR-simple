@@ -127,7 +127,7 @@ export function ExportButtons() {
 
     // PAGE 1: Executive Summary & TCA Scorecard
     addPageHeader(doc, companyName, 'TRIAGE REPORT');
-    
+
     // Title section
     doc.setFontSize(22);
     doc.setFont('helvetica', 'bold');
@@ -139,7 +139,7 @@ export function ExportButtons() {
     doc.setFillColor(248, 249, 250);
     doc.setDrawColor(200, 200, 200);
     doc.roundedRect(14, 48, 182, 35, 3, 3, 'FD');
-    
+
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
     doc.text('EXECUTIVE SUMMARY', 20, 58);
@@ -149,22 +149,22 @@ export function ExportButtons() {
     if (data.tcaData) {
       const compositeScore = data.tcaData.compositeScore.toFixed(1);
       const scoreColor = parseFloat(compositeScore) >= 7 ? [39, 174, 96] : parseFloat(compositeScore) >= 5 ? [243, 156, 18] : [231, 76, 60];
-      
+
       doc.text('Overall TCA Score:', 20, 68);
       doc.setTextColor(scoreColor[0], scoreColor[1], scoreColor[2]);
       doc.setFont('helvetica', 'bold');
       doc.text(`${compositeScore}/10`, 60, 68);
       doc.setTextColor(0, 0, 0);
       doc.setFont('helvetica', 'normal');
-      
-      const assessment = parseFloat(compositeScore) >= 7 ? 'Strong candidate for investment' : 
+
+      const assessment = parseFloat(compositeScore) >= 7 ? 'Strong candidate for investment' :
         parseFloat(compositeScore) >= 5 ? 'Moderate potential - requires further analysis' : 'High risk - not recommended';
       doc.text(`Assessment: ${assessment}`, 20, 78);
     }
 
     // TCA Scorecard Table
     let currentY = addSectionTitle(doc, 'TCA SCORECARD', 98);
-    
+
     if (data.tcaData) {
       autoTable(doc, {
         startY: currentY,
@@ -176,19 +176,19 @@ export function ExportButtons() {
           c.flag === 'green' ? 'Strong' : c.flag === 'yellow' ? 'Moderate' : 'At Risk'
         ]),
         theme: 'striped',
-        headStyles: { 
-          fillColor: [31, 78, 121], 
-          textColor: 255, 
+        headStyles: {
+          fillColor: [31, 78, 121],
+          textColor: 255,
           fontStyle: 'bold',
           fontSize: 10,
           cellPadding: 4
         },
-        bodyStyles: { 
-          fontSize: 10, 
-          cellPadding: 3.5 
+        bodyStyles: {
+          fontSize: 10,
+          cellPadding: 3.5
         },
-        alternateRowStyles: { 
-          fillColor: [248, 249, 250] 
+        alternateRowStyles: {
+          fillColor: [248, 249, 250]
         },
         columnStyles: {
           0: { cellWidth: 70 },
@@ -204,7 +204,7 @@ export function ExportButtons() {
     if (data.riskData) {
       const tableEndY = (doc as any).lastAutoTable.finalY + 12;
       currentY = addSectionTitle(doc, 'KEY RISKS IDENTIFIED', tableEndY);
-      
+
       const highRisks = data.riskData.riskFlags.filter(r => r.flag === 'red').slice(0, 3);
       doc.setFontSize(10);
       highRisks.forEach((risk, index) => {
@@ -249,9 +249,9 @@ export function ExportButtons() {
         'CONDITIONAL: Address key risks before proceeding' :
         'NOT RECOMMENDED: Significant concerns identified';
 
-    const recColor = data.tcaData?.compositeScore >= 7 ? [39, 174, 96] : 
+    const recColor = data.tcaData?.compositeScore >= 7 ? [39, 174, 96] :
       data.tcaData?.compositeScore >= 5 ? [243, 156, 18] : [231, 76, 60];
-    
+
     doc.setFillColor(recColor[0], recColor[1], recColor[2]);
     doc.roundedRect(14, currentY - 2, 182, 12, 2, 2, 'F');
     doc.setTextColor(255, 255, 255);
@@ -264,7 +264,7 @@ export function ExportButtons() {
     // Next Steps
     currentY = addSectionTitle(doc, 'RECOMMENDED NEXT STEPS', currentY + 22);
     doc.setFontSize(10);
-    
+
     const nextSteps = [
       { step: 'Conduct management team interviews', priority: 'High' },
       { step: 'Verify financial projections and assumptions', priority: 'Critical' },
@@ -272,7 +272,7 @@ export function ExportButtons() {
       { step: 'Review competitive positioning and moat', priority: 'Medium' },
       { step: 'Conduct customer reference calls', priority: 'High' }
     ];
-    
+
     nextSteps.forEach((item, index) => {
       doc.setFont('helvetica', 'bold');
       doc.text(`${index + 1}.`, 18, currentY + (index * 9));
@@ -304,7 +304,7 @@ export function ExportButtons() {
 
     // PAGE 1: Comprehensive Analysis Summary
     addPageHeader(doc, companyName, 'DUE DILIGENCE REPORT');
-    
+
     // Title section
     doc.setFontSize(22);
     doc.setFont('helvetica', 'bold');
@@ -322,18 +322,18 @@ export function ExportButtons() {
       const score = data.tcaData.compositeScore;
       const scoreColor = score >= 7 ? [39, 174, 96] : score >= 5 ? [243, 156, 18] : [231, 76, 60];
       const rating = score >= 8 ? 'HIGH CONFIDENCE' : score >= 6 ? 'MODERATE CONFIDENCE' : 'LOW CONFIDENCE';
-      
+
       doc.setFillColor(248, 249, 250);
       doc.roundedRect(14, currentY - 2, 90, 22, 2, 2, 'F');
       doc.roundedRect(106, currentY - 2, 90, 22, 2, 2, 'F');
-      
+
       doc.setFontSize(10);
       doc.text('Overall Investment Score', 20, currentY + 5);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(scoreColor[0], scoreColor[1], scoreColor[2]);
       doc.setFontSize(16);
       doc.text(`${score.toFixed(1)}/10`, 20, currentY + 15);
-      
+
       doc.setTextColor(0, 0, 0);
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
@@ -346,7 +346,7 @@ export function ExportButtons() {
 
     // Detailed TCA Analysis
     currentY = addSectionTitle(doc, 'TCA ANALYSIS BREAKDOWN', currentY + 32);
-    
+
     if (data.tcaData) {
       autoTable(doc, {
         startY: currentY,
@@ -359,19 +359,19 @@ export function ExportButtons() {
           c.concerns?.slice(0, 40) || 'None identified'
         ]),
         theme: 'striped',
-        headStyles: { 
-          fillColor: [31, 78, 121], 
-          textColor: 255, 
+        headStyles: {
+          fillColor: [31, 78, 121],
+          textColor: 255,
           fontStyle: 'bold',
           fontSize: 9,
           cellPadding: 3
         },
-        bodyStyles: { 
-          fontSize: 8, 
-          cellPadding: 2.5 
+        bodyStyles: {
+          fontSize: 8,
+          cellPadding: 2.5
         },
-        alternateRowStyles: { 
-          fillColor: [248, 249, 250] 
+        alternateRowStyles: {
+          fillColor: [248, 249, 250]
         },
         columnStyles: {
           0: { cellWidth: 45 },
@@ -391,14 +391,14 @@ export function ExportButtons() {
 
       const criticalRisks = data.riskData.riskFlags.filter(r => r.flag === 'red');
       doc.setFontSize(10);
-      
+
       if (criticalRisks.length > 0) {
         doc.setTextColor(231, 76, 60);
         doc.setFont('helvetica', 'bold');
         doc.text(`${criticalRisks.length} Critical Risk(s) Require Attention`, 18, currentY);
         doc.setTextColor(0, 0, 0);
         doc.setFont('helvetica', 'normal');
-        
+
         criticalRisks.slice(0, 2).forEach((risk, index) => {
           doc.text(`• ${risk.domain}: ${risk.trigger.slice(0, 65)}`, 18, currentY + 8 + (index * 6));
         });
@@ -417,7 +417,7 @@ export function ExportButtons() {
 
     // Financial Analysis Summary
     currentY = addSectionTitle(doc, 'FINANCIAL HEALTH ASSESSMENT', 32);
-    
+
     doc.setFontSize(10);
     const financialMetrics = [
       { label: 'Revenue Growth', value: data.financialsData?.revenueGrowth || 'Under Review' },
@@ -425,7 +425,7 @@ export function ExportButtons() {
       { label: 'Cash Runway', value: data.financialsData?.runway || 'To be determined' },
       { label: 'Gross Margin', value: data.financialsData?.grossMargin || 'Pending' }
     ];
-    
+
     financialMetrics.forEach((metric, index) => {
       const xPos = index % 2 === 0 ? 18 : 110;
       const yPos = currentY + Math.floor(index / 2) * 15;
@@ -441,7 +441,7 @@ export function ExportButtons() {
 
     // Strategic Fit Analysis
     currentY = addSectionTitle(doc, 'STRATEGIC FIT MATRIX', currentY + 38);
-    
+
     if (data.strategicFitData) {
       autoTable(doc, {
         startY: currentY,
@@ -452,24 +452,24 @@ export function ExportButtons() {
           f.impact || 'High',
           f.priority || 'Critical'
         ]) || [
-          ['Market Opportunity', 'Strong', 'High', 'Critical'],
-          ['Technology Fit', 'Moderate', 'Medium', 'High'],
-          ['Team Capability', 'Strong', 'High', 'Critical']
-        ],
+            ['Market Opportunity', 'Strong', 'High', 'Critical'],
+            ['Technology Fit', 'Moderate', 'Medium', 'High'],
+            ['Team Capability', 'Strong', 'High', 'Critical']
+          ],
         theme: 'striped',
-        headStyles: { 
-          fillColor: [39, 174, 96], 
-          textColor: 255, 
+        headStyles: {
+          fillColor: [39, 174, 96],
+          textColor: 255,
           fontStyle: 'bold',
           fontSize: 10,
           cellPadding: 4
         },
-        bodyStyles: { 
-          fontSize: 10, 
-          cellPadding: 3.5 
+        bodyStyles: {
+          fontSize: 10,
+          cellPadding: 3.5
         },
-        alternateRowStyles: { 
-          fillColor: [248, 249, 250] 
+        alternateRowStyles: {
+          fillColor: [248, 249, 250]
         },
         margin: { left: 14, right: 14 }
       });
@@ -485,9 +485,9 @@ export function ExportButtons() {
         'CONDITIONAL BUY: Proceed with specific conditions' :
         'PASS: Risk/reward profile not aligned with investment criteria';
 
-    const decisionColor = data.tcaData?.compositeScore >= 7 ? [39, 174, 96] : 
+    const decisionColor = data.tcaData?.compositeScore >= 7 ? [39, 174, 96] :
       data.tcaData?.compositeScore >= 5 ? [243, 156, 18] : [231, 76, 60];
-    
+
     doc.setFillColor(decisionColor[0], decisionColor[1], decisionColor[2]);
     doc.roundedRect(14, currentY - 2, 182, 12, 2, 2, 'F');
     doc.setTextColor(255, 255, 255);
@@ -500,14 +500,14 @@ export function ExportButtons() {
     // Investment Terms & Valuation
     currentY = addSectionTitle(doc, 'PROPOSED INVESTMENT TERMS', currentY + 22);
     doc.setFontSize(10);
-    
+
     const terms = [
       { label: 'Valuation', value: '$[To be negotiated based on analysis]' },
       { label: 'Investment Amount', value: '$[As per fund allocation]' },
       { label: 'Board Representation', value: '[As per investment tier]' },
       { label: 'Expected Timeline', value: '4-6 weeks due diligence' }
     ];
-    
+
     terms.forEach((term, index) => {
       doc.setFont('helvetica', 'bold');
       doc.text(`${term.label}:`, 18, currentY + (index * 8));
@@ -539,30 +539,30 @@ export function ExportButtons() {
     // Background gradient effect
     doc.setFillColor(31, 78, 121);
     doc.rect(0, 0, 210, 297, 'F');
-    
+
     // White content box
     doc.setFillColor(255, 255, 255);
     doc.roundedRect(20, 60, 170, 180, 8, 8, 'F');
-    
+
     // Company name
     doc.setTextColor(31, 78, 121);
     doc.setFontSize(28);
     doc.setFont('helvetica', 'bold');
     doc.text(companyName.toUpperCase(), 105, 100, { align: 'center' });
-    
+
     // Report title
     doc.setFontSize(18);
     doc.setTextColor(100, 100, 100);
     doc.text('COMPREHENSIVE', 105, 120, { align: 'center' });
     doc.text('INVESTMENT ANALYSIS', 105, 132, { align: 'center' });
-    
+
     // Report type badge
     doc.setFillColor(31, 78, 121);
     doc.roundedRect(65, 145, 80, 14, 3, 3, 'F');
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(11);
     doc.text(`${reportType.toUpperCase()} REPORT`, 105, 154, { align: 'center' });
-    
+
     // Score display
     doc.setFillColor(scoreColor[0], scoreColor[1], scoreColor[2]);
     doc.roundedRect(75, 170, 60, 30, 4, 4, 'F');
@@ -570,14 +570,14 @@ export function ExportButtons() {
     doc.setFontSize(22);
     doc.setFont('helvetica', 'bold');
     doc.text(`${score.toFixed(1)}/10`, 105, 190, { align: 'center' });
-    
+
     // Meta info
     doc.setTextColor(100, 100, 100);
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.text(`Generated: ${new Date().toLocaleDateString()}`, 105, 215, { align: 'center' });
     doc.text(`Analyst: ${role}`, 105, 225, { align: 'center' });
-    
+
     // Footer
     doc.setTextColor(200, 200, 200);
     doc.setFontSize(9);
@@ -587,13 +587,13 @@ export function ExportButtons() {
     // ========== PAGE 2: TABLE OF CONTENTS ==========
     doc.addPage();
     addPageHeader(doc, companyName, 'TABLE OF CONTENTS');
-    
+
     doc.setFontSize(20);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(31, 78, 121);
     doc.text('TABLE OF CONTENTS', 105, 45, { align: 'center' });
     doc.setTextColor(0, 0, 0);
-    
+
     const tocItems = [
       { title: 'Executive Summary', page: 3 },
       { title: 'TCA Scorecard Analysis', page: 3 },
@@ -604,7 +604,7 @@ export function ExportButtons() {
       { title: 'Investment Recommendation', page: 6 },
       { title: 'Due Diligence Checklist', page: 6 }
     ];
-    
+
     doc.setFontSize(12);
     tocItems.forEach((item, index) => {
       const yPos = 70 + (index * 16);
@@ -612,22 +612,22 @@ export function ExportButtons() {
       doc.text(`${index + 1}.`, 30, yPos);
       doc.setFont('helvetica', 'normal');
       doc.text(item.title, 40, yPos);
-      
+
       // Dotted line
       doc.setDrawColor(200, 200, 200);
       doc.setLineDashPattern([1, 2], 0);
       doc.line(40 + doc.getTextWidth(item.title) + 5, yPos, 165, yPos);
       doc.setLineDashPattern([], 0);
-      
+
       doc.text(`${item.page}`, 175, yPos);
     });
-    
+
     addPageFooter(doc, 2, totalPages);
 
     // ========== PAGE 3: EXECUTIVE SUMMARY & TCA ==========
     doc.addPage();
     addPageHeader(doc, companyName, 'EXECUTIVE SUMMARY');
-    
+
     let currentY = addSectionTitle(doc, 'EXECUTIVE SUMMARY', 32);
 
     // Key metrics boxes
@@ -636,7 +636,7 @@ export function ExportButtons() {
       { label: 'Risk Level', value: data.riskData?.riskFlags.filter(r => r.flag === 'red').length || 0, suffix: ' Critical' },
       { label: 'Rating', value: score >= 8 ? 'EXCELLENT' : score >= 7 ? 'STRONG' : score >= 5 ? 'MODERATE' : 'WEAK' }
     ];
-    
+
     metrics.forEach((metric, index) => {
       const xPos = 14 + (index * 62);
       doc.setFillColor(248, 249, 250);
@@ -644,7 +644,7 @@ export function ExportButtons() {
       doc.setFontSize(9);
       doc.setTextColor(100, 100, 100);
       doc.text(metric.label, xPos + 29, currentY + 8, { align: 'center' });
-      
+
       if (metric.color) {
         doc.setTextColor(metric.color[0], metric.color[1], metric.color[2]);
       } else {
@@ -659,7 +659,7 @@ export function ExportButtons() {
 
     // TCA Scorecard
     currentY = addSectionTitle(doc, 'TCA SCORECARD', currentY + 40);
-    
+
     if (data.tcaData) {
       autoTable(doc, {
         startY: currentY,
@@ -672,19 +672,19 @@ export function ExportButtons() {
           c.flag === 'green' ? 'Strong' : c.flag === 'yellow' ? 'Moderate' : 'At Risk'
         ]),
         theme: 'striped',
-        headStyles: { 
-          fillColor: [31, 78, 121], 
-          textColor: 255, 
+        headStyles: {
+          fillColor: [31, 78, 121],
+          textColor: 255,
           fontStyle: 'bold',
           fontSize: 9,
           cellPadding: 3
         },
-        bodyStyles: { 
-          fontSize: 9, 
-          cellPadding: 2.5 
+        bodyStyles: {
+          fontSize: 9,
+          cellPadding: 2.5
         },
-        alternateRowStyles: { 
-          fillColor: [248, 249, 250] 
+        alternateRowStyles: {
+          fillColor: [248, 249, 250]
         },
         columnStyles: {
           0: { cellWidth: 55 },
@@ -696,13 +696,13 @@ export function ExportButtons() {
         margin: { left: 14, right: 14 }
       });
     }
-    
+
     addPageFooter(doc, 3, totalPages);
 
     // ========== PAGE 4: RISK ASSESSMENT & FINANCIALS ==========
     doc.addPage();
     addPageHeader(doc, companyName, 'RISK & FINANCIAL ANALYSIS');
-    
+
     currentY = addSectionTitle(doc, 'RISK ASSESSMENT MATRIX', 32);
 
     if (data.riskData) {
@@ -712,14 +712,14 @@ export function ExportButtons() {
         yellow: data.riskData.riskFlags.filter(r => r.flag === 'yellow').length,
         green: data.riskData.riskFlags.filter(r => r.flag === 'green').length
       };
-      
+
       // Risk indicator boxes
       const riskIndicators = [
         { label: 'Critical', count: riskCounts.red, color: [231, 76, 60] },
         { label: 'Moderate', count: riskCounts.yellow, color: [243, 156, 18] },
         { label: 'Low', count: riskCounts.green, color: [39, 174, 96] }
       ];
-      
+
       riskIndicators.forEach((indicator, index) => {
         const xPos = 14 + (index * 62);
         doc.setFillColor(indicator.color[0], indicator.color[1], indicator.color[2]);
@@ -733,7 +733,7 @@ export function ExportButtons() {
         doc.setFont('helvetica', 'normal');
       });
       doc.setTextColor(0, 0, 0);
-      
+
       // Risk details table
       autoTable(doc, {
         startY: currentY + 28,
@@ -745,19 +745,19 @@ export function ExportButtons() {
           r.mitigation?.slice(0, 40) || 'Under review'
         ]),
         theme: 'striped',
-        headStyles: { 
-          fillColor: [231, 76, 60], 
-          textColor: 255, 
+        headStyles: {
+          fillColor: [231, 76, 60],
+          textColor: 255,
           fontStyle: 'bold',
           fontSize: 9,
           cellPadding: 3
         },
-        bodyStyles: { 
-          fontSize: 8, 
-          cellPadding: 2.5 
+        bodyStyles: {
+          fontSize: 8,
+          cellPadding: 2.5
         },
-        alternateRowStyles: { 
-          fillColor: [254, 243, 242] 
+        alternateRowStyles: {
+          fillColor: [254, 243, 242]
         },
         columnStyles: {
           0: { cellWidth: 35 },
@@ -772,7 +772,7 @@ export function ExportButtons() {
     // Financial Health Section
     const riskTableEndY = (doc as any).lastAutoTable?.finalY + 12 || currentY + 100;
     currentY = addSectionTitle(doc, 'FINANCIAL HEALTH OVERVIEW', riskTableEndY);
-    
+
     doc.setFontSize(10);
     const financialMetrics = [
       { label: 'Revenue Growth', value: data.financialsData?.revenueGrowth || 'Under Analysis', benchmark: '25%+ Strong' },
@@ -780,37 +780,37 @@ export function ExportButtons() {
       { label: 'Cash Runway', value: data.financialsData?.runway || 'TBD', benchmark: '18+ months' },
       { label: 'Gross Margin', value: data.financialsData?.grossMargin || 'Pending', benchmark: '60%+ target' }
     ];
-    
+
     financialMetrics.forEach((metric, index) => {
       const xPos = 14 + ((index % 2) * 92);
       const yPos = currentY + Math.floor(index / 2) * 22;
-      
+
       doc.setFillColor(248, 249, 250);
       doc.roundedRect(xPos, yPos - 2, 88, 18, 2, 2, 'F');
-      
+
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
       doc.setTextColor(100, 100, 100);
       doc.text(metric.label, xPos + 4, yPos + 4);
-      
+
       doc.setTextColor(0, 0, 0);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(11);
       doc.text(metric.value, xPos + 4, yPos + 12);
-      
+
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(7);
       doc.setTextColor(100, 100, 100);
       doc.text(`Benchmark: ${metric.benchmark}`, xPos + 50, yPos + 12);
     });
     doc.setTextColor(0, 0, 0);
-    
+
     addPageFooter(doc, 4, totalPages);
 
     // ========== PAGE 5: TEAM & STRATEGIC FIT ==========
     doc.addPage();
     addPageHeader(doc, companyName, 'TEAM & STRATEGY');
-    
+
     currentY = addSectionTitle(doc, 'TEAM & LEADERSHIP ASSESSMENT', 32);
 
     if (data.teamData?.teamMembers) {
@@ -824,19 +824,19 @@ export function ExportButtons() {
           member.assessment || 'Strong Contributor'
         ]),
         theme: 'striped',
-        headStyles: { 
-          fillColor: [52, 152, 219], 
-          textColor: 255, 
+        headStyles: {
+          fillColor: [52, 152, 219],
+          textColor: 255,
           fontStyle: 'bold',
           fontSize: 10,
           cellPadding: 4
         },
-        bodyStyles: { 
-          fontSize: 9, 
-          cellPadding: 3 
+        bodyStyles: {
+          fontSize: 9,
+          cellPadding: 3
         },
-        alternateRowStyles: { 
-          fillColor: [248, 249, 250] 
+        alternateRowStyles: {
+          fillColor: [248, 249, 250]
         },
         margin: { left: 14, right: 14 }
       });
@@ -856,42 +856,42 @@ export function ExportButtons() {
           f.impact || 'High',
           f.priority || 'Critical'
         ]) || [
-          ['Market Opportunity', 'Strong', 'High', 'Critical'],
-          ['Technology Fit', 'Moderate', 'Medium', 'High'],
-          ['Team Capability', 'Strong', 'High', 'Critical'],
-          ['Competitive Position', 'Strong', 'High', 'Critical']
-        ],
+            ['Market Opportunity', 'Strong', 'High', 'Critical'],
+            ['Technology Fit', 'Moderate', 'Medium', 'High'],
+            ['Team Capability', 'Strong', 'High', 'Critical'],
+            ['Competitive Position', 'Strong', 'High', 'Critical']
+          ],
         theme: 'striped',
-        headStyles: { 
-          fillColor: [39, 174, 96], 
-          textColor: 255, 
+        headStyles: {
+          fillColor: [39, 174, 96],
+          textColor: 255,
           fontStyle: 'bold',
           fontSize: 10,
           cellPadding: 4
         },
-        bodyStyles: { 
-          fontSize: 10, 
-          cellPadding: 3.5 
+        bodyStyles: {
+          fontSize: 10,
+          cellPadding: 3.5
         },
-        alternateRowStyles: { 
-          fillColor: [248, 249, 250] 
+        alternateRowStyles: {
+          fillColor: [248, 249, 250]
         },
         margin: { left: 14, right: 14 }
       });
     }
-    
+
     addPageFooter(doc, 5, totalPages);
 
     // ========== PAGE 6: INVESTMENT RECOMMENDATION ==========
     doc.addPage();
     addPageHeader(doc, companyName, 'INVESTMENT RECOMMENDATION');
-    
+
     currentY = addSectionTitle(doc, 'INVESTMENT DECISION', 32);
 
     // Decision box
     const decision = score >= 8 ? 'STRONG BUY' : score >= 7 ? 'BUY' : score >= 6 ? 'CONDITIONAL BUY' : score >= 5 ? 'HOLD' : 'PASS';
     const confidence = score >= 8 ? 'Very High' : score >= 7 ? 'High' : score >= 5 ? 'Moderate' : 'Low';
-    
+
     doc.setFillColor(scoreColor[0], scoreColor[1], scoreColor[2]);
     doc.roundedRect(14, currentY, 182, 35, 4, 4, 'F');
     doc.setTextColor(255, 255, 255);
@@ -905,14 +905,14 @@ export function ExportButtons() {
 
     // Key decision factors
     currentY = addSectionTitle(doc, 'KEY DECISION FACTORS', currentY + 50);
-    
+
     const factors = [
       { factor: 'Technology & IP', assessment: data.tcaData?.categories.find(c => c.category.includes('Technology'))?.flag || 'yellow' },
       { factor: 'Market Opportunity', assessment: data.tcaData?.categories.find(c => c.category.includes('Market'))?.flag || 'yellow' },
       { factor: 'Team Capability', assessment: data.tcaData?.categories.find(c => c.category.includes('Team'))?.flag || 'yellow' },
       { factor: 'Financial Health', assessment: data.tcaData?.categories.find(c => c.category.includes('Financial'))?.flag || 'yellow' }
     ];
-    
+
     factors.forEach((item, index) => {
       const flagColor = item.assessment === 'green' ? [39, 174, 96] : item.assessment === 'yellow' ? [243, 156, 18] : [231, 76, 60];
       doc.setFillColor(flagColor[0], flagColor[1], flagColor[2]);
@@ -924,7 +924,7 @@ export function ExportButtons() {
     // Due Diligence Checklist
     currentY = addSectionTitle(doc, 'DUE DILIGENCE CHECKLIST', currentY + 50);
     doc.setFontSize(10);
-    
+
     const checklist = [
       { item: 'Management presentation and Q&A', status: 'Pending' },
       { item: 'Financial model validation', status: 'Pending' },
@@ -933,7 +933,7 @@ export function ExportButtons() {
       { item: 'Competitive analysis', status: 'Pending' },
       { item: 'Legal and regulatory review', status: 'Pending' }
     ];
-    
+
     checklist.forEach((item, index) => {
       doc.setFontSize(10);
       doc.text(`☐ ${item.item}`, 18, currentY + (index * 8));
@@ -942,7 +942,7 @@ export function ExportButtons() {
       doc.text(`[${item.status}]`, 180, currentY + (index * 8));
       doc.setTextColor(0, 0, 0);
     });
-    
+
     addPageFooter(doc, 6, totalPages);
 
     doc.save(`${companyName}-Comprehensive-${reportType}-Report-${new Date().toISOString().split('T')[0]}.pdf`);
@@ -1163,7 +1163,7 @@ export function ExportButtons() {
             spacing: { before: 150, after: 100 }
           })
         );
-        
+
         criticalRisks.slice(0, 5).forEach((risk, index) => {
           sections.push(
             new Paragraph({
