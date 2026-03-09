@@ -58,41 +58,43 @@ export function DocumentSubmission({
       }));
       setUploadedFiles((prev) => [...prev, ...newFiles]);
 
-      // Process files with backend (if available)
-      try {
-        const fileData = files.map(file => ({
-          name: file.name,
-          size: file.size,
-          type: file.type
-        }));
-
-        const response = await fetch('https://tca-irr-api.azurewebsites.net/api/files/upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ files: fileData })
-        });
-
-        if (response.ok) {
-          const result = await response.json();
-          console.log('Files processed:', result);
-          // Store processed file data in localStorage for analysis
-          localStorage.setItem('processedFiles', JSON.stringify(result.processed_files));
+      // Process files locally - read text content from text-based files
+      const processedFiles = await Promise.all(files.map(async (file) => {
+        let textContent = '';
+        
+        // Read text content for supported file types
+        if (file.type === 'text/plain' || file.name.endsWith('.txt') || file.name.endsWith('.csv')) {
+          try {
+            textContent = await file.text();
+          } catch (e) {
+            console.warn('Could not read text file:', file.name);
+          }
+        } else if (file.type === 'application/json' || file.name.endsWith('.json')) {
+          try {
+            textContent = await file.text();
+          } catch (e) {
+            console.warn('Could not read JSON file:', file.name);
+          }
+        } else {
+          // For binary files (PDF, DOCX, etc), store a marker that indicates server processing is needed
+          textContent = `[Binary file: ${file.name} - size: ${file.size} bytes. PDF/DOCX content will be extracted when processing is available.]`;
         }
-      } catch (error) {
-        console.warn('Backend file processing unavailable, using local processing:', error);
-        // Fallback to local processing
-        const localProcessed = files.map(file => ({
+        
+        return {
           name: file.name,
           size: file.size,
           type: file.type,
           extracted_data: {
-            text_content: `Local processing: ${file.name} content...`,
+            text_content: textContent,
             financial_data: { revenue: 0, burn_rate: 0, runway_months: 0 },
             key_metrics: { team_size: 0, customers: 0, mrr: 0 }
           }
-        }));
-        localStorage.setItem('processedFiles', JSON.stringify(localProcessed));
-      }
+        };
+      }));
+      
+      // Store processed file data in localStorage for analysis
+      const existingFiles = JSON.parse(localStorage.getItem('processedFiles') || '[]');
+      localStorage.setItem('processedFiles', JSON.stringify([...existingFiles, ...processedFiles]));
     }
   };
 
@@ -106,33 +108,18 @@ export function DocumentSubmission({
       setImportedUrls((prev) => [...prev, ...urls]);
       setUrlInput('');
 
-      // Process URLs with backend (if available)
-      try {
-        const response = await fetch('https://tca-irr-api.azurewebsites.net/api/urls/fetch', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ urls })
-        });
-
-        if (response.ok) {
-          const result = await response.json();
-          console.log('URLs processed:', result);
-          // Store processed URL data in localStorage for analysis
-          localStorage.setItem('processedUrls', JSON.stringify(result.processed_urls));
+      // Store URL data locally for analysis - actual content fetching would need CORS-compatible endpoint
+      const localProcessed = urls.map(url => ({
+        url,
+        title: `URL Import: ${url}`,
+        extracted_data: {
+          text_content: `[URL content from ${url} - requires server-side fetching for full content extraction]`,
+          metadata: { domain: url.split('/')[2] || url, content_type: 'text/html', word_count: 0 }
         }
-      } catch (error) {
-        console.warn('Backend URL processing unavailable, using local processing:', error);
-        // Fallback to local processing
-        const localProcessed = urls.map(url => ({
-          url,
-          title: `Local processing: ${url}`,
-          extracted_data: {
-            text_content: `Local processing: content from ${url}...`,
-            metadata: { domain: url.split('/')[2] || url, content_type: 'text/html', word_count: 500 }
-          }
-        }));
-        localStorage.setItem('processedUrls', JSON.stringify(localProcessed));
-      }
+      }));
+      
+      const existingUrls = JSON.parse(localStorage.getItem('processedUrls') || '[]');
+      localStorage.setItem('processedUrls', JSON.stringify([...existingUrls, ...localProcessed]));
     }
   };
 

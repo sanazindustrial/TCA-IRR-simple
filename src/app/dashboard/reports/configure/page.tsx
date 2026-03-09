@@ -274,7 +274,7 @@ export default function ReportConfigurationPage() {
 
     // SSD Integration settings
     const [ssdCallbackUrl, setSsdCallbackUrl] = useState('');
-    const [ssdEndpointUrl, setSsdEndpointUrl] = useState('/api/ssd/tirr');
+    const [ssdEndpointUrl, setSsdEndpointUrl] = useState('/api/v1/ssd/tirr');
     const [ssdTestStatus, setSsdTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
     const [ssdTestResult, setSsdTestResult] = useState<string>('');
     const [ssdThresholds, setSsdThresholds] = useState(defaultSsdThresholds);
@@ -393,7 +393,7 @@ export default function ReportConfigurationPage() {
             if (response.ok) {
                 const data = await response.json();
                 setSsdTestStatus('success');
-                setSsdTestResult(`Backend connection successful! Status: ${data.status}, Database: ${data.database}. SSD endpoint: ${API_CONFIG.BASE_URL}/api/ssd/tirr`);
+                setSsdTestResult(`Backend connection successful! Status: ${data.status}, Database: ${data.database}. SSD endpoint: ${API_CONFIG.BASE_URL}/api/v1/ssd/tirr`);
             } else {
                 throw new Error(`Backend responded with status: ${response.status}`);
             }
@@ -555,7 +555,7 @@ export default function ReportConfigurationPage() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
                                         <Label htmlFor="ssd-endpoint">Endpoint URL</Label>
-                                        <Input id="ssd-endpoint" value={ssdEndpointUrl} onChange={(e) => setSsdEndpointUrl(e.target.value)} placeholder="/api/ssd/tirr" />
+                                        <Input id="ssd-endpoint" value={ssdEndpointUrl} onChange={(e) => setSsdEndpointUrl(e.target.value)} placeholder="/api/v1/ssd/tirr" />
                                         <p className="text-xs text-muted-foreground mt-1">The endpoint that receives SSD payloads (POST)</p>
                                     </div>
                                     <div>
