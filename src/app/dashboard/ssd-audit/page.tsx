@@ -168,7 +168,7 @@ export default function SsdAuditLogPage() {
     const fetchLogs = async () => {
         try {
             const statusParam = filterStatus !== 'all' ? `?status=${filterStatus}` : '';
-            const response = await fetch(`${API_BASE}/api/ssd/audit/logs${statusParam}`);
+            const response = await fetch(`${API_BASE}/api/v1/ssd/audit/logs${statusParam}`);
             if (!response.ok) {
                 if (response.status === 404) {
                     // Endpoint not deployed yet
@@ -194,7 +194,7 @@ export default function SsdAuditLogPage() {
 
     const fetchStats = async () => {
         try {
-            const response = await fetch(`${API_BASE}/api/ssd/audit/stats`);
+            const response = await fetch(`${API_BASE}/api/v1/ssd/audit/stats`);
             if (!response.ok) {
                 if (response.status === 404) {
                     console.warn('SSD stats endpoint not available (404)');
@@ -211,7 +211,7 @@ export default function SsdAuditLogPage() {
 
     const fetchLogDetails = async (trackingId: string) => {
         try {
-            const response = await fetch(`${API_BASE}/api/ssd/audit/logs/${trackingId}`);
+            const response = await fetch(`${API_BASE}/api/v1/ssd/audit/logs/${trackingId}`);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
@@ -237,7 +237,7 @@ export default function SsdAuditLogPage() {
     const handleDelete = async (trackingId: string) => {
         if (!confirm('Are you sure you want to delete this audit log and associated report?')) return;
         try {
-            await fetch(`${API_BASE}/api/ssd/audit/logs/${trackingId}`, { method: 'DELETE' });
+            await fetch(`${API_BASE}/api/v1/ssd/audit/logs/${trackingId}`, { method: 'DELETE' });
             toast({ title: 'Deleted', description: 'Audit log deleted successfully' });
             await fetchLogs();
         } catch (error) {
@@ -252,7 +252,7 @@ export default function SsdAuditLogPage() {
 
     const downloadReport = async (trackingId: string) => {
         try {
-            const response = await fetch(`${API_BASE}/api/ssd/audit/logs/${trackingId}/report`);
+            const response = await fetch(`${API_BASE}/api/v1/ssd/audit/logs/${trackingId}/report`);
             const data = await response.json();
             const blob = new Blob([JSON.stringify(data.report, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);

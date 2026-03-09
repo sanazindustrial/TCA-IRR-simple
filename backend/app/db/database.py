@@ -35,6 +35,10 @@ class DatabaseManager:
                     f"Creating database pool (attempt {attempt + 1}/{max_retries})..."
                 )
 
+                # Determine SSL configuration
+                ssl_mode = getattr(settings, 'postgres_ssl_mode', 'require')
+                ssl_context = True if ssl_mode in ('require', 'verify-full', 'verify-ca') else False
+                
                 self.pool = await asyncpg.create_pool(
                     host=settings.postgres_host,
                     port=settings.postgres_port,
@@ -47,8 +51,8 @@ class DatabaseManager:
                     max_inactive_connection_lifetime=settings.
                     db_pool_max_inactive_time,
                     command_timeout=60,
-                    server_settings={"jit": "off"
-                                     }  # Better performance for small queries
+                    server_settings={"jit": "off"},  # Better performance for small queries
+                    ssl=ssl_context  # Enable SSL for Azure PostgreSQL
                 )
 
                 # Test the connection

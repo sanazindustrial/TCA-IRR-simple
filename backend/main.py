@@ -114,19 +114,21 @@ def create_application() -> FastAPI:
                            max_requests=1000,
                            window_seconds=60)
 
-    # Configure CORS
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.cors_origins,
-        allow_credentials=True,
-        allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
-        allow_headers=["*"],
-    )
-
-    # Add trusted host middleware for production
+    # Add trusted host middleware for production (must be before CORS)
     if settings.is_production:
         app.add_middleware(TrustedHostMiddleware,
                            allowed_hosts=settings.allowed_hosts)
+
+    # Configure CORS - must be added LAST so it runs FIRST
+    # This ensures CORS headers are added to all responses
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],  # Allow all origins for now
+        allow_credentials=True,
+        allow_methods=["*"],  # Allow all methods
+        allow_headers=["*"],  # Allow all headers
+        expose_headers=["*"],
+    )
 
     # Include API routes
     app.include_router(api_router, prefix=settings.api_v1_prefix)

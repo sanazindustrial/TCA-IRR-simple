@@ -67,11 +67,18 @@ def run_production_server():
 
     logger = logging.getLogger(__name__)
     logger.info("Starting TCA Investment Analysis Platform...")
+    logger.info(f"Environment: {os.getenv('ENVIRONMENT', 'unknown')}")
+    logger.info(f"Port: {os.getenv('PORT', 8000)}")
+    logger.info(f"DB Host: {os.getenv('POSTGRES_HOST', 'not set')}")
 
-    # Check dependencies
-    if not asyncio.run(check_dependencies()):
-        logger.error("Dependency check failed. Exiting.")
-        sys.exit(1)
+    # Check dependencies but don't fail if database check fails
+    # App will handle errors at runtime
+    try:
+        deps_ok = asyncio.run(check_dependencies())
+        if not deps_ok:
+            logger.warning("Dependency check failed, but continuing startup...")
+    except Exception as e:
+        logger.warning(f"Dependency check error: {e}, continuing startup...")
 
     # Start the server
     try:
