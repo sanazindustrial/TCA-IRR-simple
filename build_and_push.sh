@@ -6,6 +6,8 @@ TAG="latest"
 DOCKER_REGISTRY=" tcairrresgistry-a4bahwbpegfve2gq.azurecr.io"
 
 # Build the Docker image
+echo "do 'az login' first if not logged in"
+
 echo "Building Docker image..."
 docker build -t $IMAGE_NAME:$TAG .
 
