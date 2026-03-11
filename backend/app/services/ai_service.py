@@ -321,19 +321,25 @@ class AIFlowsClient:
                 f"Failed to analyze founder fit: {str(e)}")
 
     async def health_check(self) -> Dict[str, Any]:
-        """Check AI service health"""
+        """Check AI service health - returns degraded if Genkit not available (fallback mode active)"""
         try:
-            async with httpx.AsyncClient(timeout=10) as client:
+            async with httpx.AsyncClient(timeout=5) as client:
                 response = await client.get(f"{self.base_url}/health")
                 response.raise_for_status()
                 return {
                     "status": "healthy",
                     "response_time": response.elapsed.total_seconds(),
-                    "version": response.json().get("version", "unknown")
+                    "version": response.json().get("version", "unknown"),
+                    "mode": "live"
                 }
         except Exception as e:
-            logger.error(f"AI service health check failed: {e}")
-            return {"status": "unhealthy", "error": str(e)}
+            logger.warning(f"AI service health check failed (fallback mode active): {e}")
+            return {
+                "status": "degraded",
+                "mode": "fallback",
+                "message": "AI service unavailable - using fallback responses",
+                "genkit_host": self.base_url
+            }
 
 
 class AnalysisProcessor:
