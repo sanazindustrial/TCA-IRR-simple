@@ -281,9 +281,6 @@ function ReportView({
 }
 
 // Main Page Component
-// Mark this page as dynamic
-export const dynamic = 'force-dynamic';
-
 export default function AnalysisResultPage({
     searchParams
 }: {

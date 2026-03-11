@@ -35,6 +35,21 @@ type DocumentSubmissionProps = {
   setSubmittedTexts: React.Dispatch<React.SetStateAction<string[]>>;
 }
 
+// Helper function to convert file to base64
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      const result = reader.result as string;
+      // Remove data URL prefix (e.g., "data:application/pdf;base64,")
+      const base64 = result.split(',')[1] || result;
+      resolve(base64);
+    };
+    reader.onerror = reject;
+  });
+};
+
 export function DocumentSubmission({
   uploadedFiles,
   setUploadedFiles,
@@ -45,6 +60,7 @@ export function DocumentSubmission({
 }: DocumentSubmissionProps) {
   const [urlInput, setUrlInput] = useState('');
   const [textInput, setTextInput] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -57,12 +73,13 @@ export function DocumentSubmission({
         size: file.size,
       }));
       setUploadedFiles((prev) => [...prev, ...newFiles]);
+      setIsProcessing(true);
 
-      // Process files locally - read text content from text-based files
+      // Process files - extract text from PDFs via backend API
       const processedFiles = await Promise.all(files.map(async (file) => {
         let textContent = '';
-        
-        // Read text content for supported file types
+
+        // For text-based files, read directly
         if (file.type === 'text/plain' || file.name.endsWith('.txt') || file.name.endsWith('.csv')) {
           try {
             textContent = await file.text();
@@ -75,11 +92,36 @@ export function DocumentSubmission({
           } catch (e) {
             console.warn('Could not read JSON file:', file.name);
           }
+        } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf') ||
+          file.type.includes('word') || file.name.endsWith('.docx') || file.name.endsWith('.doc')) {
+          // For PDFs and Word docs, send to backend for text extraction
+          try {
+            const base64Content = await fileToBase64(file);
+            const response = await fetch('https://tcairrapiccontainer.azurewebsites.net/api/v1/analysis/extract-text-from-file', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                content: base64Content,
+                filename: file.name,
+              }),
+            });
+
+            if (response.ok) {
+              const result = await response.json();
+              textContent = result.text_content || '';
+              console.log(`Extracted ${textContent.length} characters from ${file.name}`);
+            } else {
+              console.warn('Backend extraction failed for:', file.name);
+              textContent = `[File extraction pending: ${file.name}]`;
+            }
+          } catch (e) {
+            console.warn('Could not extract text from:', file.name, e);
+            textContent = `[File extraction failed: ${file.name}]`;
+          }
         } else {
-          // For binary files (PDF, DOCX, etc), store a marker that indicates server processing is needed
-          textContent = `[Binary file: ${file.name} - size: ${file.size} bytes. PDF/DOCX content will be extracted when processing is available.]`;
+          textContent = `[Unsupported file type: ${file.name}]`;
         }
-        
+
         return {
           name: file.name,
           size: file.size,
@@ -91,10 +133,11 @@ export function DocumentSubmission({
           }
         };
       }));
-      
+
       // Store processed file data in localStorage for analysis
       const existingFiles = JSON.parse(localStorage.getItem('processedFiles') || '[]');
       localStorage.setItem('processedFiles', JSON.stringify([...existingFiles, ...processedFiles]));
+      setIsProcessing(false);
     }
   };
 
@@ -117,7 +160,7 @@ export function DocumentSubmission({
           metadata: { domain: url.split('/')[2] || url, content_type: 'text/html', word_count: 0 }
         }
       }));
-      
+
       const existingUrls = JSON.parse(localStorage.getItem('processedUrls') || '[]');
       localStorage.setItem('processedUrls', JSON.stringify([...existingUrls, ...localProcessed]));
     }
@@ -206,8 +249,14 @@ export function DocumentSubmission({
             </div>
             {uploadedFiles.length > 0 && (
               <div className="mt-4 space-y-2">
-                <h4 className="font-semibold text-muted-foreground">
+                <h4 className="font-semibold text-muted-foreground flex items-center gap-2">
                   Uploaded Files
+                  {isProcessing && (
+                    <span className="inline-flex items-center gap-1 text-sm font-normal text-blue-600">
+                      <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-solid border-current border-r-transparent" />
+                      Extracting text...
+                    </span>
+                  )}
                 </h4>
                 <ul className="space-y-2">
                   {uploadedFiles.map((file, index) => (

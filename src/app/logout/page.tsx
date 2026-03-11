@@ -5,9 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 
-// Force dynamic rendering to prevent SSR issues
-export const dynamic = 'force-dynamic';
-
 function LoadingSpinner() {
     return (
         <div className="flex items-center justify-center min-h-screen bg-background">
