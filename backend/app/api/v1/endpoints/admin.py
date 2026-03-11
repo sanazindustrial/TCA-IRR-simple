@@ -265,7 +265,7 @@ async def maintenance_mode(
 @router.get("/logs")
 async def get_system_logs(
     lines: int = Query(100, ge=1, le=1000),
-    level: str = Query("INFO", regex="^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$"),
+    level: str = Query("INFO", pattern="^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$"),
     current_user: dict = Depends(require_admin)
 ):
     """Get system logs"""
