@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { EvaluationProvider, useEvaluationContext } from '@/components/evaluation/evaluation-provider';
+import { EvaluationProvider, useEvaluationContext, type CompanyInformationData } from '@/components/evaluation/evaluation-provider';
 import { useRouter } from 'next/navigation';
 import { runAnalysis } from '@/app/analysis/actions';
 import { sampleAnalysisData } from '@/lib/sample-data';
@@ -26,21 +26,26 @@ type AutosaveData = {
     submittedTexts: string[];
     framework: 'general' | 'medtech';
     reportType: ReportType;
-    companyName: string;
-    companyDescription: string;
-    // SSD 4.1.2 Company Information Fields
-    website: string;
-    industryVertical: string;
-    developmentStage: string;
-    businessModel: string;
-    country: string;
-    state: string;
-    city: string;
-    oneLineDescription: string;
-    productDescription: string;
-    legalName: string;
-    numberOfEmployees: string;
+    companyInfo: CompanyInformationData;
     savedAt: number;
+};
+
+// Default company info
+const DEFAULT_COMPANY_INFO: CompanyInformationData = {
+    companyName: '',
+    website: '',
+    industryVertical: '',
+    developmentStage: '',
+    businessModel: '',
+    country: '',
+    state: '',
+    city: '',
+    oneLineDescription: '',
+    companyDescription: '',
+    productDescription: '',
+    pitchDeckPath: '',
+    legalName: '',
+    numberOfEmployees: null,
 };
 
 
@@ -62,12 +67,12 @@ function AnalysisSetup({ onClearAllData, onExtractFromDocuments, isExtracting, e
         setImportedUrlsAction,
         submittedTexts = [],
         setSubmittedTextsAction,
-        companyName = '',
-        companyDescription = '',
+        companyInfo,
     } = useEvaluationContext();
 
     const hasDocuments = uploadedFiles.length > 0 || importedUrls.length > 0 || submittedTexts.length > 0;
-    const hasData = hasDocuments || companyName.length > 0 || companyDescription.length > 0;
+    const hasCompanyData = (companyInfo?.companyName?.length ?? 0) > 0 || (companyInfo?.companyDescription?.length ?? 0) > 0;
+    const hasData = hasDocuments || hasCompanyData;
     const canRunAnalysis = extractionComplete || !hasDocuments;
 
     return (
@@ -189,21 +194,13 @@ export default function EvaluationPage() {
     const [importedUrls, setImportedUrls] = useState<string[]>([]);
     const [submittedTexts, setSubmittedTexts] = useState<string[]>([]);
 
-    // State for company information
-    const [companyName, setCompanyName] = useState<string>('');
-    const [companyDescription, setCompanyDescription] = useState<string>('');
-    // SSD 4.1.2 Company Information Fields
-    const [website, setWebsite] = useState<string>('');
-    const [industryVertical, setIndustryVertical] = useState<string>('');
-    const [developmentStage, setDevelopmentStage] = useState<string>('');
-    const [businessModel, setBusinessModel] = useState<string>('');
-    const [country, setCountry] = useState<string>('');
-    const [state, setState] = useState<string>('');
-    const [city, setCity] = useState<string>('');
-    const [oneLineDescription, setOneLineDescription] = useState<string>('');
-    const [productDescription, setProductDescription] = useState<string>('');
-    const [legalName, setLegalName] = useState<string>('');
-    const [numberOfEmployees, setNumberOfEmployees] = useState<string>('');
+    // State for company information (unified object for all fields)
+    const [companyInfo, setCompanyInfo] = useState<CompanyInformationData>(DEFAULT_COMPANY_INFO);
+
+    // Helper to update company info fields
+    const updateCompanyInfo = useCallback((updates: Partial<CompanyInformationData>) => {
+        setCompanyInfo(prev => ({ ...prev, ...updates }));
+    }, []);
 
     // State for AI extraction
     const [isExtracting, setIsExtracting] = useState(false);
@@ -239,20 +236,22 @@ export default function EvaluationPage() {
             if (response.ok) {
                 const extractedData = await response.json();
 
-                // Auto-fill company information fields
-                if (extractedData.company_name) setCompanyName(extractedData.company_name);
-                if (extractedData.legal_name) setLegalName(extractedData.legal_name);
-                if (extractedData.website) setWebsite(extractedData.website);
-                if (extractedData.description) setCompanyDescription(extractedData.description);
-                if (extractedData.one_line_description) setOneLineDescription(extractedData.one_line_description);
-                if (extractedData.product_description) setProductDescription(extractedData.product_description);
-                if (extractedData.industry_vertical) setIndustryVertical(extractedData.industry_vertical);
-                if (extractedData.development_stage) setDevelopmentStage(extractedData.development_stage);
-                if (extractedData.business_model) setBusinessModel(extractedData.business_model);
-                if (extractedData.country) setCountry(extractedData.country);
-                if (extractedData.state) setState(extractedData.state);
-                if (extractedData.city) setCity(extractedData.city);
-                if (extractedData.number_of_employees) setNumberOfEmployees(extractedData.number_of_employees.toString());
+                // Auto-fill company information fields using unified state update
+                updateCompanyInfo({
+                    companyName: extractedData.company_name || companyInfo.companyName,
+                    legalName: extractedData.legal_name || companyInfo.legalName,
+                    website: extractedData.website || companyInfo.website,
+                    companyDescription: extractedData.description || companyInfo.companyDescription,
+                    oneLineDescription: extractedData.one_line_description || companyInfo.oneLineDescription,
+                    productDescription: extractedData.product_description || companyInfo.productDescription,
+                    industryVertical: extractedData.industry_vertical || companyInfo.industryVertical,
+                    developmentStage: extractedData.development_stage || companyInfo.developmentStage,
+                    businessModel: extractedData.business_model || companyInfo.businessModel,
+                    country: extractedData.country || companyInfo.country,
+                    state: extractedData.state || companyInfo.state,
+                    city: extractedData.city || companyInfo.city,
+                    numberOfEmployees: extractedData.number_of_employees || companyInfo.numberOfEmployees,
+                });
 
                 toast({
                     title: 'Extraction Complete!',
@@ -263,8 +262,10 @@ export default function EvaluationPage() {
                 const extractedName = extractNameFromContent(allContent);
                 const extractedDescription = extractDescriptionFromContent(allContent);
 
-                if (extractedName) setCompanyName(extractedName);
-                if (extractedDescription) setCompanyDescription(extractedDescription);
+                updateCompanyInfo({
+                    companyName: extractedName || companyInfo.companyName,
+                    companyDescription: extractedDescription || companyInfo.companyDescription,
+                });
 
                 toast({
                     title: 'Basic Extraction Complete',
@@ -330,23 +331,13 @@ export default function EvaluationPage() {
                     if (parsed.submittedTexts?.length > 0) setSubmittedTexts(parsed.submittedTexts);
                     if (parsed.framework) setFramework(parsed.framework);
                     if (parsed.reportType) setReportType(parsed.reportType);
-                    if (parsed.companyName) setCompanyName(parsed.companyName);
-                    if (parsed.companyDescription) setCompanyDescription(parsed.companyDescription);
-                    // Restore SSD 4.1.2 fields
-                    if (parsed.website) setWebsite(parsed.website);
-                    if (parsed.industryVertical) setIndustryVertical(parsed.industryVertical);
-                    if (parsed.developmentStage) setDevelopmentStage(parsed.developmentStage);
-                    if (parsed.businessModel) setBusinessModel(parsed.businessModel);
-                    if (parsed.country) setCountry(parsed.country);
-                    if (parsed.state) setState(parsed.state);
-                    if (parsed.city) setCity(parsed.city);
-                    if (parsed.oneLineDescription) setOneLineDescription(parsed.oneLineDescription);
-                    if (parsed.productDescription) setProductDescription(parsed.productDescription);
-                    if (parsed.legalName) setLegalName(parsed.legalName);
-                    if (parsed.numberOfEmployees) setNumberOfEmployees(parsed.numberOfEmployees);
+                    // Restore company info as unified object
+                    if (parsed.companyInfo) {
+                        setCompanyInfo(parsed.companyInfo);
+                    }
 
                     // Show toast if data was restored
-                    const hasData = parsed.uploadedFiles?.length > 0 || parsed.importedUrls?.length > 0 || parsed.submittedTexts?.length > 0 || parsed.companyName || parsed.companyDescription;
+                    const hasData = parsed.uploadedFiles?.length > 0 || parsed.importedUrls?.length > 0 || parsed.submittedTexts?.length > 0 || parsed.companyInfo?.companyName;
                     if (hasData) {
                         toast({
                             title: 'Data Restored',
@@ -371,20 +362,7 @@ export default function EvaluationPage() {
             submittedTexts,
             framework,
             reportType,
-            companyName,
-            companyDescription,
-            // SSD 4.1.2 Company Information Fields
-            website,
-            industryVertical,
-            developmentStage,
-            businessModel,
-            country,
-            state,
-            city,
-            oneLineDescription,
-            productDescription,
-            legalName,
-            numberOfEmployees,
+            companyInfo,
             savedAt: Date.now(),
         };
 
@@ -393,7 +371,7 @@ export default function EvaluationPage() {
         } catch (e) {
             console.warn('Failed to autosave:', e);
         }
-    }, [uploadedFiles, importedUrls, submittedTexts, framework, reportType, companyName, companyDescription, website, industryVertical, developmentStage, businessModel, country, state, city, oneLineDescription, productDescription, legalName, numberOfEmployees, isInitialized]);
+    }, [uploadedFiles, importedUrls, submittedTexts, framework, reportType, companyInfo, isInitialized]);
 
     // Clear autosave after successful analysis
     const clearAutosave = useCallback(() => {
@@ -407,20 +385,8 @@ export default function EvaluationPage() {
         setSubmittedTexts([]);
         setFramework('general');
         setReportType('triage');
-        setCompanyName('');
-        setCompanyDescription('');
-        // Clear SSD 4.1.2 fields
-        setWebsite('');
-        setIndustryVertical('');
-        setDevelopmentStage('');
-        setBusinessModel('');
-        setCountry('');
-        setState('');
-        setCity('');
-        setOneLineDescription('');
-        setProductDescription('');
-        setLegalName('');
-        setNumberOfEmployees('');
+        // Reset company info to default
+        setCompanyInfo(DEFAULT_COMPANY_INFO);
         // Reset extraction state
         setExtractionComplete(false);
         setIsExtracting(false);
@@ -472,19 +438,19 @@ export default function EvaluationPage() {
         try {
             // Save company info to database before analysis
             const companyData = {
-                company_name: companyName,
-                legal_name: legalName,
-                website,
-                description: companyDescription,
-                one_line_description: oneLineDescription,
-                product_description: productDescription,
-                industry_vertical: industryVertical,
-                development_stage: developmentStage,
-                business_model: businessModel,
-                country,
-                state,
-                city,
-                number_of_employees: numberOfEmployees ? parseInt(numberOfEmployees) : null,
+                company_name: companyInfo.companyName,
+                legal_name: companyInfo.legalName,
+                website: companyInfo.website,
+                description: companyInfo.companyDescription,
+                one_line_description: companyInfo.oneLineDescription,
+                product_description: companyInfo.productDescription,
+                industry_vertical: companyInfo.industryVertical,
+                development_stage: companyInfo.developmentStage,
+                business_model: companyInfo.businessModel,
+                country: companyInfo.country,
+                state: companyInfo.state,
+                city: companyInfo.city,
+                number_of_employees: companyInfo.numberOfEmployees,
                 framework,
             };
 
@@ -506,8 +472,8 @@ export default function EvaluationPage() {
                 uploadedFiles,
                 importedUrls,
                 submittedTexts,
-                companyName: companyName || 'Unknown Company',
-                companyDescription: companyDescription || submittedTexts[0] || 'User-provided company description',
+                companyName: companyInfo.companyName || 'Unknown Company',
+                companyDescription: companyInfo.companyDescription || submittedTexts[0] || 'User-provided company description',
                 companyData, // Include all company fields
             };
 
@@ -569,10 +535,18 @@ export default function EvaluationPage() {
             setImportedUrlsAction={setImportedUrls}
             submittedTexts={submittedTexts}
             setSubmittedTextsAction={setSubmittedTexts}
-            companyName={companyName}
-            setCompanyNameAction={setCompanyName}
-            companyDescription={companyDescription}
-            setCompanyDescriptionAction={setCompanyDescription}
+            companyName={companyInfo.companyName}
+            setCompanyNameAction={(name: string | ((prev: string) => string)) => {
+                const newName = typeof name === 'function' ? name(companyInfo.companyName) : name;
+                setCompanyInfo(prev => ({ ...prev, companyName: newName }));
+            }}
+            companyDescription={companyInfo.companyDescription}
+            setCompanyDescriptionAction={(desc: string | ((prev: string) => string)) => {
+                const newDesc = typeof desc === 'function' ? desc(companyInfo.companyDescription) : desc;
+                setCompanyInfo(prev => ({ ...prev, companyDescription: newDesc }));
+            }}
+            companyInfo={companyInfo}
+            setCompanyInfoAction={setCompanyInfo}
         >
             <main className="bg-background text-foreground">
                 <div className="container mx-auto p-4 md:p-8">

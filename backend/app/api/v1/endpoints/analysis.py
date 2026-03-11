@@ -562,11 +562,13 @@ async def extract_company_info(request_data: Dict[str, Any]):
     
     extracted = {}
     
-    # Extract company name patterns
+    # Extract company name patterns - stop at newline or punctuation
     name_patterns = [
-        r"(?:company[:\s]+|about\s+)([A-Z][A-Za-z0-9\s&]{2,50})",
+        r"(?:company\s*name|legal\s*name|startup\s*name)[:\s]+([A-Za-z0-9\s&.,'-]+?)(?:\n|$|Website|Founded|Industry)",
+        r"(?:company|startup)[:\s]+([A-Z][A-Za-z0-9\s&.,'-]+?)(?:\n|$|Website|Founded)",
         r"^([A-Z][A-Za-z0-9\s&]{2,30})\s*[-–—]\s*(?:pitch|deck|presentation)",
-        r"(?:welcome to|introducing)\s+([A-Z][A-Za-z0-9\s&]{2,30})",
+        r"(?:welcome to|introducing|about)\s+([A-Z][A-Za-z0-9\s&]{2,30})",
+        r"(?:^|\n)([A-Z][A-Za-z0-9\s&]{2,25}(?:\s+(?:Inc|LLC|Ltd|Corp|Co))\.?)\s*(?:\n|$)",
     ]
     for pattern in name_patterns:
         match = re.search(pattern, content, re.IGNORECASE | re.MULTILINE)
@@ -575,9 +577,14 @@ async def extract_company_info(request_data: Dict[str, Any]):
             break
     
     # Extract website
-    website_match = re.search(r'https?://(?:www\.)?([a-zA-Z0-9-]+\.[a-zA-Z]{2,})', content)
+    website_match = re.search(r'(https?://[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(?:/[^\s]*)?)', content)
     if website_match:
-        extracted["website"] = f"https://{website_match.group(1)}"
+        extracted["website"] = website_match.group(1).rstrip('.,)')
+    else:
+        # Try without protocol
+        website_match = re.search(r'(?:website|url|site)[:\s]+((?:www\.)?[a-zA-Z0-9-]+\.[a-zA-Z]{2,})', content, re.IGNORECASE)
+        if website_match:
+            extracted["website"] = f"https://{website_match.group(1)}"
     
     # Extract description patterns
     desc_patterns = [
@@ -667,3 +674,154 @@ async def extract_company_info(request_data: Dict[str, Any]):
     logger.info(f"Extracted company info: {list(extracted.keys())}")
     
     return extracted
+
+
+# ============ File Upload & Text Extraction Endpoint ============
+
+@router.post("/extract-text-from-file", response_model=Dict[str, Any])
+async def extract_text_from_file(
+    file: bytes = None,
+    file_data: Dict[str, Any] = None,
+):
+    """
+    Extract text content from uploaded files (PDF, DOCX, etc.)
+    Accepts either raw file bytes or base64-encoded file data.
+    """
+    import base64
+    import io
+    
+    try:
+        content = ""
+        file_bytes = None
+        filename = "unknown"
+        
+        if file_data:
+            # Handle base64 encoded file
+            file_bytes = base64.b64decode(file_data.get("content", ""))
+            filename = file_data.get("filename", "unknown")
+        elif file:
+            file_bytes = file
+        
+        if not file_bytes:
+            return {"error": "No file data provided", "text_content": ""}
+        
+        # Try to extract text based on file type
+        if filename.lower().endswith('.pdf'):
+            # Use PyMuPDF for PDF extraction if available
+            try:
+                import fitz  # PyMuPDF
+                pdf_doc = fitz.open(stream=file_bytes, filetype="pdf")
+                text_parts = []
+                for page_num in range(len(pdf_doc)):
+                    page = pdf_doc.load_page(page_num)
+                    text_parts.append(page.get_text())
+                pdf_doc.close()
+                content = "\n".join(text_parts)
+            except ImportError:
+                # Fallback: try pdfplumber
+                try:
+                    import pdfplumber
+                    with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+                        text_parts = []
+                        for page in pdf.pages:
+                            text = page.extract_text()
+                            if text:
+                                text_parts.append(text)
+                        content = "\n".join(text_parts)
+                except ImportError:
+                    content = "[PDF extraction requires PyMuPDF or pdfplumber]"
+                except Exception as e:
+                    content = f"[PDF extraction failed: {str(e)}]"
+            except Exception as e:
+                content = f"[PDF extraction failed: {str(e)}]"
+                
+        elif filename.lower().endswith(('.docx', '.doc')):
+            try:
+                import docx
+                doc = docx.Document(io.BytesIO(file_bytes))
+                content = "\n".join([para.text for para in doc.paragraphs])
+            except ImportError:
+                content = "[DOCX extraction requires python-docx]"
+            except Exception as e:
+                content = f"[DOCX extraction failed: {str(e)}]"
+        
+        elif filename.lower().endswith(('.xlsx', '.xls')):
+            # Excel file extraction
+            try:
+                import openpyxl
+                workbook = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
+                text_parts = []
+                for sheet_name in workbook.sheetnames:
+                    sheet = workbook[sheet_name]
+                    text_parts.append(f"=== Sheet: {sheet_name} ===")
+                    for row in sheet.iter_rows(values_only=True):
+                        row_text = "\t".join([str(cell) if cell is not None else "" for cell in row])
+                        if row_text.strip():
+                            text_parts.append(row_text)
+                content = "\n".join(text_parts)
+            except ImportError:
+                # Fallback: try pandas
+                try:
+                    import pandas as pd
+                    excel_file = pd.ExcelFile(io.BytesIO(file_bytes))
+                    text_parts = []
+                    for sheet_name in excel_file.sheet_names:
+                        df = pd.read_excel(excel_file, sheet_name=sheet_name)
+                        text_parts.append(f"=== Sheet: {sheet_name} ===")
+                        text_parts.append(df.to_string())
+                    content = "\n".join(text_parts)
+                except ImportError:
+                    content = "[Excel extraction requires openpyxl or pandas]"
+                except Exception as e:
+                    content = f"[Excel extraction failed: {str(e)}]"
+            except Exception as e:
+                content = f"[Excel extraction failed: {str(e)}]"
+        
+        elif filename.lower().endswith('.pptx'):
+            # PowerPoint file extraction
+            try:
+                from pptx import Presentation
+                prs = Presentation(io.BytesIO(file_bytes))
+                text_parts = []
+                for slide_num, slide in enumerate(prs.slides, 1):
+                    slide_text = [f"=== Slide {slide_num} ==="]
+                    for shape in slide.shapes:
+                        if hasattr(shape, "text") and shape.text:
+                            slide_text.append(shape.text)
+                    text_parts.extend(slide_text)
+                content = "\n".join(text_parts)
+            except ImportError:
+                content = "[PowerPoint extraction requires python-pptx]"
+            except Exception as e:
+                content = f"[PowerPoint extraction failed: {str(e)}]"
+        
+        elif filename.lower().endswith('.rtf'):
+            # RTF file extraction
+            try:
+                from striprtf.striprtf import rtf_to_text
+                content = rtf_to_text(file_bytes.decode('utf-8', errors='ignore'))
+            except ImportError:
+                content = "[RTF extraction requires striprtf]"
+            except Exception as e:
+                content = f"[RTF extraction failed: {str(e)}]"
+                
+        elif filename.lower().endswith(('.txt', '.csv', '.json', '.md', '.yaml', '.yml')):
+            try:
+                content = file_bytes.decode('utf-8')
+            except UnicodeDecodeError:
+                content = file_bytes.decode('latin-1')
+        else:
+            content = f"[Unsupported file type: {filename}]"
+        
+        logger.info(f"Extracted {len(content)} characters from {filename}")
+        
+        return {
+            "filename": filename,
+            "text_content": content,
+            "char_count": len(content),
+            "word_count": len(content.split()) if content else 0,
+        }
+        
+    except Exception as e:
+        logger.error(f"File text extraction failed: {e}")
+        return {"error": str(e), "text_content": ""}
