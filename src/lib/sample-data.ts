@@ -281,17 +281,147 @@ export const sampleAnalysisData: ComprehensiveAnalysisOutput = {
         summary: 'Strong potential with excellent leadership and product-market fit. The 12-category analysis reveals a well-rounded startup with key strengths in leadership, technology, and market potential. Areas for improvement include go-to-market strategy and scalability.'
     },
     riskData: {
-        riskSummary: 'Primary risks are market competition and go-to-market execution.',
+        riskSummary: 'Comprehensive 14-domain risk assessment completed. Primary risks are market competition and regulatory compliance. Overall risk profile is manageable.',
         riskFlags: [
+            {
+                domain: 'Regulatory / Compliance',
+                flag: 'yellow',
+                trigger: 'FDA approval process is lengthy and uncertain.',
+                description: 'Regulatory pathway requires 510(k) or PMA submission.',
+                impact: 'Medium',
+                mitigation: 'Engage regulatory consultant early, establish compliance timeline.',
+                aiRecommendation: 'Begin pre-submission meetings with FDA.',
+                thresholds: 'Yellow if >12 month approval timeline.'
+            },
+            {
+                domain: 'Clinical / Safety / Product Safety',
+                flag: 'green',
+                trigger: 'Product has completed initial safety testing.',
+                description: 'Clinical safety data is favorable from pilot studies.',
+                impact: 'Low',
+                mitigation: 'Continue monitoring adverse events, maintain documentation.',
+                aiRecommendation: 'Expand clinical validation studies.',
+                thresholds: 'Green if <2% adverse event rate.'
+            },
+            {
+                domain: 'Liability / Legal Exposure',
+                flag: 'green',
+                trigger: 'Appropriate insurance coverage in place.',
+                description: 'Legal structure is sound with proper IP protection.',
+                impact: 'Low',
+                mitigation: 'Maintain D&O and product liability insurance.',
+                aiRecommendation: 'Review contracts with legal counsel quarterly.',
+                thresholds: 'Green if adequate coverage maintained.'
+            },
+            {
+                domain: 'Technical Execution Risk',
+                flag: 'yellow',
+                trigger: 'Complex technology stack requires specialized talent.',
+                description: 'Development timeline may be extended.',
+                impact: 'Medium',
+                mitigation: 'Build redundancy in technical team, modular architecture.',
+                aiRecommendation: 'Consider outsourcing non-core components.',
+                thresholds: 'Yellow if single point of failure in tech.'
+            },
             {
                 domain: 'Market Risk',
                 flag: 'yellow',
                 trigger: 'Incumbent competitors are well-funded.',
                 description: 'The market has 3-4 established players.',
                 impact: 'Medium',
-                mitigation: 'Focus on a niche vertical to establish a strong foothold.',
+                mitigation: 'Focus on a niche vertical to establish foothold.',
                 aiRecommendation: 'Niche-down strategy is advised.',
                 thresholds: 'Yellow if >2 major competitors.'
+            },
+            {
+                domain: 'Go-To-Market (GTM) Risk',
+                flag: 'red',
+                trigger: 'Sales strategy not fully validated.',
+                description: 'Customer acquisition costs are high and unpredictable.',
+                impact: 'High',
+                mitigation: 'Test multiple channels, establish channel partnerships.',
+                aiRecommendation: 'Develop detailed sales playbook before scale.',
+                thresholds: 'Red if CAC > 3x industry average.'
+            },
+            {
+                domain: 'Financial Risk',
+                flag: 'yellow',
+                trigger: 'Burn rate requires additional funding within 12 months.',
+                description: 'Runway is limited, requiring Series A within 9-12 months.',
+                impact: 'Medium',
+                mitigation: 'Control expenses, achieve key milestones for fundraising.',
+                aiRecommendation: 'Begin investor conversations early.',
+                thresholds: 'Yellow if <18 months runway.'
+            },
+            {
+                domain: 'Team / Execution Risk',
+                flag: 'yellow',
+                trigger: 'Key person dependencies identified.',
+                description: 'CEO and CTO are critical to operations.',
+                impact: 'Medium',
+                mitigation: 'Develop succession plans, cross-train team members.',
+                aiRecommendation: 'Document critical processes, expand leadership team.',
+                thresholds: 'Yellow if >2 key person dependencies.'
+            },
+            {
+                domain: 'IP / Defensibility Risk',
+                flag: 'green',
+                trigger: 'Strong patent portfolio filed.',
+                description: '5 patents pending, 2 granted.',
+                impact: 'Low',
+                mitigation: 'Continue patent filing strategy, monitor competitors.',
+                aiRecommendation: 'Expand international protection.',
+                thresholds: 'Green if >3 patents in portfolio.'
+            },
+            {
+                domain: 'Data Privacy / Governance',
+                flag: 'green',
+                trigger: 'HIPAA compliance framework established.',
+                description: 'Data governance policies documented and followed.',
+                impact: 'Low',
+                mitigation: 'Regular privacy audits, staff training.',
+                aiRecommendation: 'Consider SOC 2 certification.',
+                thresholds: 'Green if compliance framework in place.'
+            },
+            {
+                domain: 'Security / Cyber Risk',
+                flag: 'yellow',
+                trigger: 'Security assessment reveals minor vulnerabilities.',
+                description: 'Penetration testing identified improvements needed.',
+                impact: 'Medium',
+                mitigation: 'Implement security roadmap, regular audits.',
+                aiRecommendation: 'Hire dedicated security resource.',
+                thresholds: 'Yellow if any medium-severity findings.'
+            },
+            {
+                domain: 'Operational / Supply Chain',
+                flag: 'green',
+                trigger: 'Multiple supplier relationships established.',
+                description: 'No single supplier dependencies identified.',
+                impact: 'Low',
+                mitigation: 'Maintain backup supplier relationships.',
+                aiRecommendation: 'Negotiate long-term contracts with key suppliers.',
+                thresholds: 'Green if >2 suppliers per critical component.'
+            },
+            {
+                domain: 'Ethical / Societal Risk',
+                flag: 'green',
+                trigger: 'Product aligns with positive societal impact.',
+                description: 'No ethical concerns identified with product use.',
+                impact: 'Low',
+                mitigation: 'Monitor for unintended consequences, establish ethics board.',
+                aiRecommendation: 'Document ethical guidelines and review annually.',
+                thresholds: 'Green if no ethical concerns raised.'
+            },
+            {
+                domain: 'Adoption / Customer Retention Risk',
+                flag: 'yellow',
+                trigger: 'Customer retention metrics are early-stage.',
+                description: 'Limited data on long-term customer retention.',
+                impact: 'Medium',
+                mitigation: 'Implement customer success program, track NPS.',
+                aiRecommendation: 'Focus on customer onboarding and support.',
+                thresholds: 'Yellow if <85% retention rate.'
             }
         ]
     },
