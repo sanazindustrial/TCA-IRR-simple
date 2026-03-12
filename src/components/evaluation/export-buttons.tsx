@@ -44,6 +44,10 @@ export function ExportButtons() {
   const [showPreview, setShowPreview] = useState(false);
 
   const getAnalysisData = (): ComprehensiveAnalysisOutput | null => {
+    // Guard: Only access localStorage in browser environment
+    if (typeof window === 'undefined') {
+      return null;
+    }
     try {
       const storedData = localStorage.getItem('analysisResult');
       if (!storedData) {
@@ -1590,7 +1594,7 @@ export function ExportButtons() {
         reportType,
         role,
         moduleWeights: data.tcaData?.categories.map(c => ({ category: c.category, weight: c.weight })),
-        analysisFramework: localStorage.getItem('analysisFramework') || 'general',
+        analysisFramework: typeof window !== 'undefined' ? localStorage.getItem('analysisFramework') || 'general' : 'general',
         exportTimestamp: new Date().toISOString()
       };
       configFolder.file('analysis-config.json', JSON.stringify(config, null, 2));
