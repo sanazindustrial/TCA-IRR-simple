@@ -221,11 +221,11 @@ export default function ModuleControlDeck() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         <Card>
             <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2"><MessageSquareQuote /> Reviewer Tools</CardTitle>
+                <CardTitle className="text-lg flex items-center gap-2"><MessageSquareQuote /> Analyst Tools</CardTitle>
             </CardHeader>
             <CardContent>
                 <Button asChild className="w-full justify-start">
-                    <Link href="/analysis/modules/reviewer"><MessageSquareQuote/> Reviewer Analysis & Manual Input</Link>
+                    <Link href="/analysis/modules/Analyst"><MessageSquareQuote/> Analyst Analysis & Manual Input</Link>
                 </Button>
             </CardContent>
         </Card>
@@ -322,3 +322,5 @@ export default function ModuleControlDeck() {
     </div>
   );
 }
+
+

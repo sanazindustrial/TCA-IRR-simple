@@ -22,10 +22,10 @@ const mockUsers: User[] = [
     },
     {
         id: '2',
-        name: 'Reviewer User',
-        email: 'reviewer@example.com',
-        role: 'Reviewer',
-        avatarUrl: 'https://picsum.photos/seed/reviewer/100/100'
+        name: 'Analyst User',
+        email: 'analyst@example.com',
+        role: 'Analyst',
+        avatarUrl: 'https://picsum.photos/seed/analyst/100/100'
     },
     {
         id: '3',

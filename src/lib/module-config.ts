@@ -2,7 +2,7 @@
 import * as React from 'react';
 import { useState, useEffect, useCallback } from 'react';
 // Define types locally if not available from module-configuration
-export type UserRole = 'admin' | 'reviewer' | 'analyst' | 'viewer';
+export type UserRole = 'admin' | 'analyst' | 'analyst' | 'viewer';
 export type ReportType = 'triage' | 'due-diligence';
 export type Framework = 'general' | 'medtech' | 'biotech' | 'fintech';
 
@@ -86,7 +86,7 @@ export class ConfigurationManager {
      * Get the configuration key based on user context
      */
     static getConfigKey(role: UserRole, reportType: ReportType, framework?: Framework): string {
-        const isPrivileged = role === 'admin' || role === 'reviewer';
+        const isPrivileged = role === 'admin' || role === 'analyst';
 
         if (reportType === 'triage') {
             return isPrivileged ? CONFIG_KEYS.TRIAGE_ADMIN : CONFIG_KEYS.TRIAGE_STANDARD;
@@ -99,7 +99,7 @@ export class ConfigurationManager {
      * Get default configuration for context
      */
     static getDefaultConfig(role: UserRole, reportType: ReportType, framework?: Framework): string[] {
-        const isPrivileged = role === 'admin' || role === 'reviewer';
+        const isPrivileged = role === 'admin' || role === 'analyst';
 
         if (reportType === 'triage') {
             return DEFAULT_CONFIGS[isPrivileged ? 'triage-admin' : 'triage-standard'];

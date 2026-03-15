@@ -22,12 +22,12 @@ import Link from 'next/link';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useRouter } from 'next/navigation';
 import { ConsistencyCheck } from '@/components/evaluation/consistency-check';
-import { ReviewerComments } from '@/components/evaluation/reviewer-comments';
+import { AnalystComments } from '@/components/evaluation/Analyst-comments';
 import { FinalRecommendation } from '@/components/evaluation/final-recommendation';
 import { QuickSummary } from '@/components/evaluation/quick-summary';
 import { ExecutiveSummary } from '@/components/evaluation/executive-summary';
 import { TcaSummaryCard } from '@/components/evaluation/tca-summary-card';
-import { ReviewerAIDeviation } from '@/components/evaluation/reviewer-ai-deviation';
+import { AnalystAIDeviation } from '@/components/evaluation/Analyst-ai-deviation';
 import { WeightedScoreBreakdown } from '@/components/evaluation/weighted-score-breakdown';
 import { CompetitiveLandscape } from '@/components/evaluation/competitive-landscape';
 import { RegulatoryComplianceReview } from '@/components/evaluation/regulatory-compliance-review';
@@ -38,7 +38,7 @@ import { ExitStrategyRoadmap } from '@/components/evaluation/exit-strategy-roadm
 import { TermSheetTriggerAnalysis } from '@/components/evaluation/term-sheet-trigger-analysis';
 import { Appendix } from '@/components/evaluation/appendix';
 
-export type UserRole = 'user' | 'admin' | 'reviewer';
+export type UserRole = 'user' | 'admin' | 'analyst';
 export type ReportType = 'triage' | 'dd';
 type ReportSection = { id: string; title: string; active: boolean; };
 
@@ -179,8 +179,8 @@ function ReportView({ analysisData, isPreview = false, visibleSections }: { anal
         'dd-exit-strategy': <ExitStrategyRoadmap />,
         'dd-term-sheet': <TermSheetTriggerAnalysis />,
         'dd-final-risk-summary': analysisData.riskData && <RiskFlags initialData={analysisData.riskData} />,
-        'dd-reviewer-comments': <ReviewerComments />,
-        'dd-reviewer-ai-deviation': <ReviewerAIDeviation />,
+        'dd-Analyst-comments': <AnalystComments />,
+        'dd-Analyst-ai-deviation': <AnalystAIDeviation />,
         'dd-final-recommendation': <FinalRecommendation />,
         'dd-conclusion': <FinalRecommendation />, // Assuming this is part of final recommendation
         'dd-appendix': <Appendix />,
@@ -238,7 +238,7 @@ export default function DetailedReportGuidePage() {
     if (storedUser) {
         const user = JSON.parse(storedUser);
         const role = user.role?.toLowerCase();
-        if (role !== 'admin' && role !== 'reviewer') {
+        if (role !== 'admin' && role !== 'analyst') {
             router.push('/unauthorized');
             return;
         }

@@ -78,7 +78,7 @@ const fallbackReportsData: ReportData[] = [
     score: 7.8,
     confidence: 91.5,
     recommendation: 'Recommend',
-    user: { name: 'Reviewer User', email: 'reviewer@tca.com' },
+    user: { name: 'Analyst User', email: 'analyst@tca.com' },
     created_at: '10/23/2025',
     createdAt: '10/23/2025',
     updated_at: '10/23/2025'
@@ -123,7 +123,7 @@ const fallbackReportsData: ReportData[] = [
     score: 8.9,
     confidence: 94.0,
     recommendation: 'Invest',
-    user: { name: 'Reviewer User', email: 'reviewer@tca.com' },
+    user: { name: 'Analyst User', email: 'analyst@tca.com' },
     created_at: '10/20/2025',
     createdAt: '10/20/2025',
     updated_at: '10/20/2025'
@@ -305,7 +305,7 @@ export default function ReportsPage() {
         const user = JSON.parse(storedUser);
         const userRole = user.role?.toLowerCase() || 'user';
         setRole(userRole);
-        setPrivilegedUser(userRole === 'admin' || userRole === 'reviewer');
+        setPrivilegedUser(userRole === 'admin' || userRole === 'analyst');
       } catch (e) {
         setRole('user');
         setPrivilegedUser(false);
@@ -349,7 +349,7 @@ export default function ReportsPage() {
               {isPrivilegedUser ? 'Evaluation Reports & Approval Center' : 'My Evaluation Reports'}
             </h1>
             <div className="flex items-center gap-4">
-              {(role === 'admin' || role === 'reviewer') && (
+              {(role === 'admin' || role === 'analyst') && (
                 <div className="flex items-center space-x-2">
                   <Label htmlFor="role-switcher" className={!isPrivilegedUser ? 'text-primary' : ''}>User</Label>
                   <Switch
@@ -360,7 +360,7 @@ export default function ReportsPage() {
                       setPrivilegedUser(checked);
                     }}
                   />
-                  <Label htmlFor="role-switcher" className={isPrivilegedUser ? 'text-primary' : ''}>Admin / Reviewer</Label>
+                  <Label htmlFor="role-switcher" className={isPrivilegedUser ? 'text-primary' : ''}>Admin / Analyst</Label>
                 </div>
               )}
               {isPrivilegedUser && <Button variant="outline" onClick={handleRefresh}><RefreshCw className="mr-2 size-4" /> Refresh</Button>}
@@ -403,23 +403,23 @@ export default function ReportsPage() {
               </div>
               {isPrivilegedUser && (
                 <>
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val === 'all' ? '' : val)}>
                     <SelectTrigger className="md:w-[180px]">
                       <SelectValue placeholder="All Status" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All Status</SelectItem>
+                      <SelectItem value="all">All Status</SelectItem>
                       <SelectItem value="completed">Completed</SelectItem>
                       <SelectItem value="pending">Pending</SelectItem>
                       <SelectItem value="processing">Processing</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Select value={typeFilter} onValueChange={setTypeFilter}>
+                  <Select value={typeFilter} onValueChange={(val) => setTypeFilter(val === 'all' ? '' : val)}>
                     <SelectTrigger className="md:w-[180px]">
                       <SelectValue placeholder="All Types" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All Types</SelectItem>
+                      <SelectItem value="all">All Types</SelectItem>
                       <SelectItem value="triage">Triage</SelectItem>
                       <SelectItem value="dd">Due Diligence</SelectItem>
                     </SelectContent>

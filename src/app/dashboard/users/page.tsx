@@ -60,9 +60,9 @@ const initialUsers = [
   },
   {
     id: 'usr_5',
-    name: 'Reviewer User',
-    email: 'reviewer@tca.com',
-    role: 'Reviewer',
+    name: 'Analyst User',
+    email: 'analyst@tca.com',
+    role: 'analyst',
     triageReports: 25,
     ddReports: 5,
     permissions: 'Review and analysis functions',
@@ -99,9 +99,9 @@ const initialUsers = [
   },
   {
     id: 'usr_2',
-    name: 'Reviewer One',
-    email: 'reviewer1@startupcompass.ai',
-    role: 'Reviewer',
+    name: 'Analyst One',
+    email: 'Analyst1@startupcompass.ai',
+    role: 'analyst',
     triageReports: 10,
     ddReports: 2,
     permissions: 'View, Edit',
@@ -232,7 +232,7 @@ export default function UserManagementPage() {
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="Admin">Admin</SelectItem>
-                                <SelectItem value="Reviewer">Reviewer</SelectItem>
+                                <SelectItem value="Analyst">Analyst</SelectItem>
                                 <SelectItem value="User">User</SelectItem>
                                 <SelectItem value="AI Adopter">AI Adopter</SelectItem>
                             </SelectContent>
@@ -266,7 +266,7 @@ export default function UserManagementPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="reviewer">Reviewer</SelectItem>
+                <SelectItem value="Analyst">Analyst</SelectItem>
                 <SelectItem value="user">User</SelectItem>
                 <SelectItem value="ai-adopter">AI Adopter</SelectItem>
               </SelectContent>
@@ -303,7 +303,7 @@ export default function UserManagementPage() {
                   const avatar = PlaceHolderImages.find(p => p.id === user.avatarId);
                   const roleVariant = user.role === 'Admin' 
                     ? 'destructive' 
-                    : user.role === 'Reviewer' 
+                    : user.role === 'analyst' 
                     ? 'warning' 
                     : user.role === 'AI Adopter'
                     ? 'default'
@@ -393,3 +393,5 @@ export default function UserManagementPage() {
     </div>
   );
 }
+
+

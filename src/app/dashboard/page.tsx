@@ -53,7 +53,7 @@ export default function DashboardHome() {
           <CardHeader>
             <CardTitle className="flex items-center gap-3">
               <Send className="text-primary" />
-              Submit a Request
+              Submit a Request to Admin
             </CardTitle>
             <CardDescription>
               Need help? Request additional reports, suggest a feature, or report a technical issue.
@@ -61,7 +61,7 @@ export default function DashboardHome() {
           </CardHeader>
           <CardContent>
             <Button asChild size="lg" variant="outline" className="w-full">
-              <Link href="/dashboard/request">Submit Request</Link>
+              <Link href="/dashboard/request">Submit Request to Admin</Link>
             </Button>
           </CardContent>
         </Card>

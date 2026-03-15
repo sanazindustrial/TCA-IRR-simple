@@ -49,7 +49,7 @@ export function GrowthClassifier() {
   }
 
 
-  const isPrivilegedUser = role === 'admin' || role === 'reviewer';
+  const isPrivilegedUser = role === 'admin' || role === 'analyst';
 
   return (
     <DashboardCard
@@ -135,7 +135,7 @@ export function GrowthClassifier() {
                 <div className="p-4 bg-muted/50 rounded-lg">
                   <h5 className="font-semibold text-sm flex items-center gap-2 mb-2">
                     <Lock className="size-4 text-warning" />
-                    6-Model DSS Matrix (Admin/Reviewer Only)
+                    6-Model DSS Matrix (Admin/Analyst Only)
                   </h5>
                   <div className="grid grid-cols-3 gap-x-4 gap-y-1 text-sm">
                     <div className="font-semibold text-muted-foreground">Model</div>

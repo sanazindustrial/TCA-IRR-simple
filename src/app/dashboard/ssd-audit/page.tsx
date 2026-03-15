@@ -172,7 +172,7 @@ export default function SsdAuditLogPage() {
             if (!response.ok) {
                 if (response.status === 404) {
                     // Endpoint not deployed yet
-                    console.warn('SSD audit endpoint not available (404)');
+                    console.warn('Startup Steroid audit endpoint not available (404)');
                     setApiAvailable(false);
                     setLogs([]);
                     return;
@@ -197,7 +197,7 @@ export default function SsdAuditLogPage() {
             const response = await fetch(`${API_BASE}/api/v1/ssd/audit/stats`);
             if (!response.ok) {
                 if (response.status === 404) {
-                    console.warn('SSD stats endpoint not available (404)');
+                    console.warn('Startup Steroid stats endpoint not available (404)');
                     return;
                 }
                 throw new Error(`HTTP ${response.status}`);
@@ -283,8 +283,8 @@ export default function SsdAuditLogPage() {
                         <ArrowLeft className="size-4" />
                         Back to Report Configuration
                     </Link>
-                    <h1 className="text-3xl font-bold">SSD Integration Audit Logs</h1>
-                    <p className="text-muted-foreground">Monitor and review SSD → TCA TIRR integration requests, responses, and reports</p>
+                    <h1 className="text-3xl font-bold">Startup Steroid Integration Audit Logs</h1>
+                    <p className="text-muted-foreground">Monitor and review Startup Steroid → TCA TIRR integration requests, responses, and reports</p>
                 </div>
                 <Button onClick={handleRefresh} disabled={refreshing}>
                     <RefreshCw className={`size-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
@@ -386,7 +386,7 @@ export default function SsdAuditLogPage() {
                     <div className="flex justify-between items-center">
                         <div>
                             <CardTitle>Audit Log Entries</CardTitle>
-                            <CardDescription>All SSD → TCA TIRR integration requests with full audit trail</CardDescription>
+                            <CardDescription>All Startup Steroid → TCA TIRR integration requests with full audit trail</CardDescription>
                         </div>
                         <div className="flex gap-2">
                             <select
@@ -412,15 +412,15 @@ export default function SsdAuditLogPage() {
                     ) : !apiAvailable ? (
                         <div className="text-center py-8 text-muted-foreground">
                             <AlertTriangle className="size-12 mx-auto mb-4 text-yellow-500 opacity-70" />
-                            <p className="font-medium">SSD Integration Not Available</p>
-                            <p className="text-sm mt-2">The SSD integration backend is pending deployment.</p>
+                            <p className="font-medium">Startup Steroid Integration Not Available</p>
+                            <p className="text-sm mt-2">The Startup Steroid integration backend is pending deployment.</p>
                             <p className="text-sm">Please contact your administrator to deploy the latest backend code.</p>
                         </div>
                     ) : logs.length === 0 ? (
                         <div className="text-center py-8 text-muted-foreground">
                             <FileText className="size-12 mx-auto mb-4 opacity-50" />
                             <p>No audit logs found</p>
-                            <p className="text-sm">SSD integration requests will appear here</p>
+                            <p className="text-sm">Startup Steroid integration requests will appear here</p>
                         </div>
                     ) : (
                         <Table>
@@ -605,3 +605,4 @@ export default function SsdAuditLogPage() {
         </div>
     );
 }
+

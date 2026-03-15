@@ -18,7 +18,6 @@ class UserRole(str, Enum):
     """User roles in the system"""
     USER = "user"
     ADMIN = "admin"
-    REVIEWER = "reviewer"
     ANALYST = "analyst"
 
 
@@ -111,7 +110,7 @@ class UserResponse(UserBase):
 
 class UserLogin(BaseModel):
     """User login model"""
-    username: str
+    email: str = Field(..., description="User email address")
     password: str
 
 

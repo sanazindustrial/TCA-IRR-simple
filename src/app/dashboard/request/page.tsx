@@ -3,32 +3,32 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  CardFooter
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+    CardFooter
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import {
-  Send,
-  FileText,
-  ShieldCheck,
-  RefreshCw,
-  Database,
-  Lightbulb,
-  HelpCircle,
-  Bug,
+    Send,
+    FileText,
+    ShieldCheck,
+    RefreshCw,
+    Database,
+    Lightbulb,
+    HelpCircle,
+    Bug,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { User } from '@/lib/users';
@@ -108,7 +108,7 @@ export default function SubmitRequestPage() {
                 title: 'Request Submitted',
                 description: 'Your request has been sent to the admin team for review.',
             });
-            
+
             // Reset form
             setRequestTitle('general_question');
             setPriority('Medium');
@@ -122,66 +122,66 @@ export default function SubmitRequestPage() {
         }
     };
 
-  return (
-    <div className="container mx-auto p-4 md:p-8 max-w-4xl">
-       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-3 text-2xl">
-            <Send />
-            User Submit Request
-          </CardTitle>
-          <CardDescription>
-            Request additional reports, features, support, or report issues.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                    <Label htmlFor="request-title">Request Title *</Label>
-                    <Select value={requestTitle} onValueChange={handleRequestTitleChange}>
-                        <SelectTrigger id="request-title">
-                            <SelectValue placeholder="Select a request category..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {requestCategories.map(category => (
-                                <SelectItem key={category.id} value={category.id}>
-                                  <div className="flex items-center gap-2">
-                                    <category.icon className="size-4 text-muted-foreground" />
-                                    <span>{category.title}</span>
-                                  </div>
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-                 <div className="space-y-2">
-                    <Label htmlFor="priority">Priority Level</Label>
-                    <Select value={priority} onValueChange={setPriority}>
-                    <SelectTrigger id="priority">
-                        <SelectValue placeholder="Select priority" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="Low">Low</SelectItem>
-                        <SelectItem value="Medium">Medium</SelectItem>
-                        <SelectItem value="High">High</SelectItem>
-                        <SelectItem value="Critical">Critical</SelectItem>
-                    </SelectContent>
-                    </Select>
-                </div>
-            </div>
-            <div className="space-y-2">
-                <Label htmlFor="description">Detailed Description *</Label>
-                <Textarea id="description" placeholder="Please provide detailed information about your question/request..." rows={10} value={description} onChange={e => setDescription(e.target.value)} />
-                <p className="text-xs text-muted-foreground">Selecting a request title will populate this field with a helpful template.</p>
-            </div>
-        </CardContent>
-        <CardFooter>
-            <Button size="lg" className="w-full" onClick={handleSubmit}>
-                <Send className="mr-2"/>
-                Submit Request
-            </Button>
-        </CardFooter>
-       </Card>
-    </div>
-  );
+    return (
+        <div className="container mx-auto p-4 md:p-8 max-w-4xl">
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-3 text-2xl">
+                        <Send />
+                        Submit Request to Admin
+                    </CardTitle>
+                    <CardDescription>
+                        Request additional reports, features, support, or report issues.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                            <Label htmlFor="request-title">Request Title *</Label>
+                            <Select value={requestTitle} onValueChange={handleRequestTitleChange}>
+                                <SelectTrigger id="request-title">
+                                    <SelectValue placeholder="Select a request category..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {requestCategories.map(category => (
+                                        <SelectItem key={category.id} value={category.id}>
+                                            <div className="flex items-center gap-2">
+                                                <category.icon className="size-4 text-muted-foreground" />
+                                                <span>{category.title}</span>
+                                            </div>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="priority">Priority Level</Label>
+                            <Select value={priority} onValueChange={setPriority}>
+                                <SelectTrigger id="priority">
+                                    <SelectValue placeholder="Select priority" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Low">Low</SelectItem>
+                                    <SelectItem value="Medium">Medium</SelectItem>
+                                    <SelectItem value="High">High</SelectItem>
+                                    <SelectItem value="Critical">Critical</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="description">Detailed Description *</Label>
+                        <Textarea id="description" placeholder="Please provide detailed information about your question/request..." rows={10} value={description} onChange={e => setDescription(e.target.value)} />
+                        <p className="text-xs text-muted-foreground">Selecting a request title will populate this field with a helpful template.</p>
+                    </div>
+                </CardContent>
+                <CardFooter>
+                    <Button size="lg" className="w-full" onClick={handleSubmit}>
+                        <Send className="mr-2" />
+                        Submit Request to Admin
+                    </Button>
+                </CardFooter>
+            </Card>
+        </div>
+    );
 }

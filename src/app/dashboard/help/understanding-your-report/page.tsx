@@ -17,49 +17,49 @@ const triageReportSections = [
     { num: 6, title: "Flag Analysis Narrative", description: "GPT-generated narrative of risk flags and triggers", visibility: "🔓 All" },
     { num: 7, title: "Macro Trend Alignment Table", description: "Comparison with macro PESTEL signals, sector outlook", visibility: "🔓 All" },
     { num: 8, title: "Benchmark Overlay", description: "Score vs sector average, percentile, deviation, and gap analysis.", visibility: "🔓 All" },
-    { num: 9, title: "Growth Classifier Matrix", description: "6-model DSS, detailed calculator (🔐 Admin/Reviewer Only), best/base/worst scenarios, and classification score.", visibility: "🔓 All" },
+    { num: 9, title: "Growth Classifier Matrix", description: "6-model DSS, detailed calculator (🔐 Admin/Analyst Only), best/base/worst scenarios, and classification score.", visibility: "🔓 All" },
     { num: 10, title: "Historical Comparison Strategy Fit Matrix", description: "Score trend (Δ vs last), performance direction", visibility: "🔓 All" },
-    { num: 11, title: "Consistency Check, quality, and statistics", description: "Text coherence, score-comment match, pitch vs score stability, and more.", visibility: "🔐 Admin/Reviewer Only" },
+    { num: 11, title: "Consistency Check, quality, and statistics", description: "Text coherence, score-comment match, pitch vs score stability, and more.", visibility: "🔐 Admin/Analyst Only" },
     { num: 12, title: "Founder Fit + Team Assessment Table", description: "GPT review of founder/team alignment, fit, and gaps.", visibility: "🔓 All" },
-    { num: 13, title: "Reviewer Comments & Sentiment Analysis", description: "Human reviewer input summary, sentiment, and tone.", visibility: "🔓 All (🚫 if N/A)" },
-    { num: 14, title: "Reviewer–AI Deviation Chart", description: "Score deviation (AI vs reviewer), rationale, and visuals.", visibility: "🔓 All" },
-    { num: 15, title: "Reviewer Theme Analysis (NLP + Manual)", description: "GPT & manual themes (team, IP, GTM), keyword extraction, tone, topic cluster.", visibility: "🔓 All" },
+    { num: 13, title: "Analyst Comments & Sentiment Analysis", description: "Human Analyst input summary, sentiment, and tone.", visibility: "🔓 All (🚫 if N/A)" },
+    { num: 14, title: "Analyst–AI Deviation Chart", description: "Score deviation (AI vs Analyst), rationale, and visuals.", visibility: "🔓 All" },
+    { num: 15, title: "Analyst Theme Analysis (NLP + Manual)", description: "GPT & manual themes (team, IP, GTM), keyword extraction, tone, topic cluster.", visibility: "🔓 All" },
     { num: 16, title: "Final Flag Summary & Threshold Table", description: "Full table of triggers, thresholds, and mitigation guidance per risk domain.", visibility: "🔓 All" },
-    { num: 17, title: "Final Recommendation", description: "AI and reviewer recommendation with rationale", visibility: "🔓 All" },
-    { num: 18, title: "Admin Final Approval Panel", description: "[🔘 Prescreen] [🔘 Full Screening] [🟥 Reject] buttons to lock outcome", visibility: "🔐 Admin/Reviewer Only" },
+    { num: 17, title: "Final Recommendation", description: "AI and Analyst recommendation with rationale", visibility: "🔓 All" },
+    { num: 18, title: "Admin Final Approval Panel", description: "[🔘 Prescreen] [🔘 Full Screening] [🟥 Reject] buttons to lock outcome", visibility: "🔐 Admin/Analyst Only" },
     { num: 19, title: "Export & Superset Links", description: "PDF / DOCX / MD / XLSX / JSON downloads + Superset chart link (if enabled)", visibility: "🔓 All" },
     { num: 20, title: "Appendix", description: "JSON view of weights, flags, benchmark rules, classifier settings, detailed recommendation, and summary notes.", visibility: "🔓 All" },
 ];
 
 const ddReportSections = [
-    { num: 0, title: "Executive Summary", description: "Startup overview, score highlights, top 3 risks, and strengths", visibility: "🔐 Admin/Reviewer" },
-    { num: 1, title: "TCA AI Table – 12 Categories", description: "Same table as triage, extended with notes if changed", visibility: "🔐 Admin/Reviewer" },
-    { num: 2, title: "Weighted Score Breakdown", description: "Sector-specific weighted outcome", visibility: "🔐 Admin/Reviewer" },
-    { num: 3, title: "Risk Flag Table (14 Domains)", description: "Flag color, trigger, threshold, GPT mitigation plans", visibility: "🔐 Admin/Reviewer" },
-    { num: 4, title: "Macro Trend + Benchmark Comparison", description: "Overlays with macro & industry trendlines", visibility: "🔐 Admin/Reviewer" },
-    { num: 5, title: "Growth Classifier Matrix", description: "6-model logic, base/best/worst, sector fit, team alignment", visibility: "🔐 Admin/Reviewer" },
-    { num: 6, title: "Reviewer Analysis & Sentiment", description: "Aggregated sentiment, score rationale, and summary of reviewers", visibility: "🔐 Admin/Reviewer" },
-    { num: 7, title: "Reviewer–AI Score Deviation", description: "Comparison chart of scoring deviations", visibility: "🔐 Admin/Reviewer" },
-    { num: 8, title: "Reviewer Themes (GPT + Manual)", description: "NLP + manual clustering (e.g. GTM, TAM, IP)", visibility: "🔐 Admin/Reviewer" },
-    { num: 9, title: "Consistency Check", description: "Logical alignment of narrative vs score vs feedback", visibility: "🔐 Admin/Reviewer" },
-    { num: 10, title: "Founder Fit + Team Analysis", description: "Extended GPT summary of team history, gaps, fit", visibility: "🔐 Admin/Reviewer" },
-    { num: 11, title: "Competitive Landscape", description: "Top competitors, positioning, GPT M&A and defensibility insights", visibility: "🔐 Admin/Reviewer" },
-    { num: 12, title: "Regulatory / Compliance Review", description: "FDA/CE status, regulatory milestones, risk & timeline", visibility: "🔐 Admin/Reviewer" },
-    { num: 13, title: "Go-to-Market & Commercial Strategy", description: "Customer pipeline, LOIs, distribution, CPT codes if applicable", visibility: "🔐 Admin/Reviewer" },
-    { num: 14, title: "IP & Technology Review", description: "Patent filings, freedom to operate, barriers to entry", visibility: "🔐 Admin/Reviewer" },
-    { num: 15, title: "Financials & Burn Rate", description: "Runway, revenue growth, CAC/LTV, breakeven roadmap", visibility: "🔐 Admin/Reviewer" },
-    { num: 16, title: "Exit Strategy Roadmap", description: "M&A landscape, IPO viability, exit multiples, ideal acquirers", visibility: "🔐 Admin/Reviewer" },
-    { num: 17, title: "Term Sheet Trigger Analysis", description: "Ideal valuation, dilution logic, SAFE/Equity notes", visibility: "🔐 Admin/Reviewer" },
-    { num: 18, title: "Final Flag Summary + Risk Table", description: "An extended version of the triage risk table", visibility: "🔐 Admin/Reviewer" },
-    { num: 19, title: "Final Recommendation", description: "Human decision based on deep data + AI view", visibility: "🔐 Admin/Reviewer" },
-    { num: 20, title: "Conclusion and summary note", description: "Summary of risk, points of improvement, TCA recommendation, and detailed conclusion.", visibility: "🔐 Admin/Reviewer" },
-    { num: 21, title: "Appendix: DD Artifacts & Config Snapshot", description: "CEO call notes, customer interviews, uploaded docs, config JSON snapshot", visibility: "🔐 Admin/Reviewer" },
-    { num: 22, title: "Export & Superset Links", description: "PDF / DOCX / MD / XLSX / JSON downloads + Superset chart link (if enabled)", visibility: "🔐 Admin/Reviewer" }
+    { num: 0, title: "Executive Summary", description: "Startup overview, score highlights, top 3 risks, and strengths", visibility: "🔐 Admin/Analyst" },
+    { num: 1, title: "TCA AI Table – 12 Categories", description: "Same table as triage, extended with notes if changed", visibility: "🔐 Admin/Analyst" },
+    { num: 2, title: "Weighted Score Breakdown", description: "Sector-specific weighted outcome", visibility: "🔐 Admin/Analyst" },
+    { num: 3, title: "Risk Flag Table (14 Domains)", description: "Flag color, trigger, threshold, GPT mitigation plans", visibility: "🔐 Admin/Analyst" },
+    { num: 4, title: "Macro Trend + Benchmark Comparison", description: "Overlays with macro & industry trendlines", visibility: "🔐 Admin/Analyst" },
+    { num: 5, title: "Growth Classifier Matrix", description: "6-model logic, base/best/worst, sector fit, team alignment", visibility: "🔐 Admin/Analyst" },
+    { num: 6, title: "Analyst Analysis & Sentiment", description: "Aggregated sentiment, score rationale, and summary of Analysts", visibility: "🔐 Admin/Analyst" },
+    { num: 7, title: "Analyst–AI Score Deviation", description: "Comparison chart of scoring deviations", visibility: "🔐 Admin/Analyst" },
+    { num: 8, title: "Analyst Themes (GPT + Manual)", description: "NLP + manual clustering (e.g. GTM, TAM, IP)", visibility: "🔐 Admin/Analyst" },
+    { num: 9, title: "Consistency Check", description: "Logical alignment of narrative vs score vs feedback", visibility: "🔐 Admin/Analyst" },
+    { num: 10, title: "Founder Fit + Team Analysis", description: "Extended GPT summary of team history, gaps, fit", visibility: "🔐 Admin/Analyst" },
+    { num: 11, title: "Competitive Landscape", description: "Top competitors, positioning, GPT M&A and defensibility insights", visibility: "🔐 Admin/Analyst" },
+    { num: 12, title: "Regulatory / Compliance Review", description: "FDA/CE status, regulatory milestones, risk & timeline", visibility: "🔐 Admin/Analyst" },
+    { num: 13, title: "Go-to-Market & Commercial Strategy", description: "Customer pipeline, LOIs, distribution, CPT codes if applicable", visibility: "🔐 Admin/Analyst" },
+    { num: 14, title: "IP & Technology Review", description: "Patent filings, freedom to operate, barriers to entry", visibility: "🔐 Admin/Analyst" },
+    { num: 15, title: "Financials & Burn Rate", description: "Runway, revenue growth, CAC/LTV, breakeven roadmap", visibility: "🔐 Admin/Analyst" },
+    { num: 16, title: "Exit Strategy Roadmap", description: "M&A landscape, IPO viability, exit multiples, ideal acquirers", visibility: "🔐 Admin/Analyst" },
+    { num: 17, title: "Term Sheet Trigger Analysis", description: "Ideal valuation, dilution logic, SAFE/Equity notes", visibility: "🔐 Admin/Analyst" },
+    { num: 18, title: "Final Flag Summary + Risk Table", description: "An extended version of the triage risk table", visibility: "🔐 Admin/Analyst" },
+    { num: 19, title: "Final Recommendation", description: "Human decision based on deep data + AI view", visibility: "🔐 Admin/Analyst" },
+    { num: 20, title: "Conclusion and summary note", description: "Summary of risk, points of improvement, TCA recommendation, and detailed conclusion.", visibility: "🔐 Admin/Analyst" },
+    { num: 21, title: "Appendix: DD Artifacts & Config Snapshot", description: "CEO call notes, customer interviews, uploaded docs, config JSON snapshot", visibility: "🔐 Admin/Analyst" },
+    { num: 22, title: "Export & Superset Links", description: "PDF / DOCX / MD / XLSX / JSON downloads + Superset chart link (if enabled)", visibility: "🔐 Admin/Analyst" }
 ];
 
 export default function UnderstandingReportGuidePage() {
   const [userRole, setUserRole] = useState('user');
-  const isPrivilegedUser = userRole === 'admin' || userRole === 'reviewer';
+  const isPrivilegedUser = userRole === 'admin' || userRole === 'analyst';
 
   useEffect(() => {
     const storedUser = localStorage.getItem('loggedInUser');
@@ -101,7 +101,7 @@ export default function UnderstandingReportGuidePage() {
                         <Link href="/dashboard/help/triage-report">View Sample Triage Report</Link>
                     </Button>
                 </div>
-                <div className='text-sm text-muted-foreground pt-2'><b>Visibility Legend:</b> 🔓 Visible to all | 🔐 Visible only to Admin / Reviewer | 🚫 Hidden if data not available</div>
+                <div className='text-sm text-muted-foreground pt-2'><b>Visibility Legend:</b> 🔓 Visible to all | 🔐 Visible only to Admin / Analyst | 🚫 Hidden if data not available</div>
             </CardHeader>
             <CardContent>
                 <Table>
@@ -132,7 +132,7 @@ export default function UnderstandingReportGuidePage() {
                 <CardHeader>
                     <div className="flex justify-between items-center">
                         <div>
-                            <CardTitle className="flex items-center gap-2 text-2xl"><Eye/>Decoding the Due Diligence (DD) Report <Badge variant="outline">Admin/Reviewer Only</Badge></CardTitle>
+                            <CardTitle className="flex items-center gap-2 text-2xl"><Eye/>Decoding the Due Diligence (DD) Report <Badge variant="outline">Admin/Analyst Only</Badge></CardTitle>
                             <CardDescription>A detailed breakdown of the comprehensive DD report (typically 25-100 pages), which includes all analysis modules and deeper insights. This is triggered after admin approval for Full Screening.</CardDescription>
                         </div>
                         <Button asChild>

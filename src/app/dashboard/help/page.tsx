@@ -48,15 +48,15 @@ import type { User } from '@/lib/users';
 import { useToast } from '@/hooks/use-toast';
 
 const allGuides = [
-    { title: "Getting Started Guide", description: "A complete walkthrough of your first analysis.", icon: Book, href: "/dashboard/help/getting-started", roles: ['user', 'reviewer', 'admin'] },
-    { title: "Understanding Your Report", description: "Learn what each section of the analysis means.", icon: Book, href: "/dashboard/help/understanding-your-report", roles: ['user', 'reviewer', 'admin'] },
-    { title: "Module Guides", description: "A detailed breakdown of all 9 analysis modules.", icon: Book, href: "/dashboard/help/module-guides", roles: ['user', 'reviewer', 'admin'] },
-    { title: "Reviewer Analysis Guide", description: "How to use the reviewer input and analysis tools.", icon: MessageSquare, href: "/dashboard/help/reviewer-analysis", roles: ['reviewer', 'admin'] },
-    { title: "What-If Analysis Guide", description: "Simulate outcomes by adjusting scores before finalizing.", icon: Calculator, href: "/dashboard/help/what-if-analysis", roles: ['reviewer', 'admin'] },
-    { title: "Detailed DD Report Guide", description: "An in-depth look at the Due Diligence report sections.", icon: FileSearch, href: "/dashboard/help/detailed-report", roles: ['reviewer', 'admin'] },
-    { title: "Configuring Modules", description: "Customize module weights, scoring, and logic.", icon: SlidersHorizontal, href: "/dashboard/help/admin-configuration", roles: ['reviewer', 'admin'] },
-    { title: "Add a New Data Source", description: "Connect new external data sources to the platform.", icon: PlusCircle, href: "/dashboard/help/add-new-source", roles: ['reviewer', 'admin'] },
-    { title: "Cost Management & Analytics", description: "Understand and manage platform costs.", icon: DollarSign, href: "/dashboard/help/cost-analysis", roles: ['reviewer', 'admin'] },
+    { title: "Getting Started Guide", description: "A complete walkthrough of your first analysis.", icon: Book, href: "/dashboard/help/getting-started", roles: ['user', 'analyst', 'admin'] },
+    { title: "Understanding Your Report", description: "Learn what each section of the analysis means.", icon: Book, href: "/dashboard/help/understanding-your-report", roles: ['user', 'analyst', 'admin'] },
+    { title: "Module Guides", description: "A detailed breakdown of all 9 analysis modules.", icon: Book, href: "/dashboard/help/module-guides", roles: ['user', 'analyst', 'admin'] },
+    { title: "Analyst Analysis Guide", description: "How to use the Analyst input and analysis tools.", icon: MessageSquare, href: "/dashboard/help/Analyst-analysis", roles: ['analyst', 'admin'] },
+    { title: "What-If Analysis Guide", description: "Simulate outcomes by adjusting scores before finalizing.", icon: Calculator, href: "/dashboard/help/what-if-analysis", roles: ['analyst', 'admin'] },
+    { title: "Detailed DD Report Guide", description: "An in-depth look at the Due Diligence report sections.", icon: FileSearch, href: "/dashboard/help/detailed-report", roles: ['analyst', 'admin'] },
+    { title: "Configuring Modules", description: "Customize module weights, scoring, and logic.", icon: SlidersHorizontal, href: "/dashboard/help/admin-configuration", roles: ['analyst', 'admin'] },
+    { title: "Add a New Data Source", description: "Connect new external data sources to the platform.", icon: PlusCircle, href: "/dashboard/help/add-new-source", roles: ['analyst', 'admin'] },
+    { title: "Cost Management & Analytics", description: "Understand and manage platform costs.", icon: DollarSign, href: "/dashboard/help/cost-analysis", roles: ['analyst', 'admin'] },
 ];
 
 
@@ -69,12 +69,12 @@ const faqs = [
   {
     question: 'What is the difference between a Triage and a Due Diligence report?',
     answer:
-      'A Triage report is a high-level summary designed for initial screening. A Due Diligence (DD) report is a much more in-depth analysis across all modules and is typically used for later-stage evaluation. DD reports are only available to Admin and Reviewer roles.',
+      'A Triage report is a high-level summary designed for initial screening. A Due Diligence (DD) report is a much more in-depth analysis across all modules and is typically used for later-stage evaluation. DD reports are only available to Admin and Analyst roles.',
   },
   {
     question: 'How can I improve the accuracy of the AI analysis?',
     answer:
-      'The more high-quality data you provide, the better. Ensure your uploaded documents are clear, complete, and up-to-date. For Privileged Users, providing detailed manual reviewer comments also helps fine-tune the AI for future analyses.',
+      'The more high-quality data you provide, the better. Ensure your uploaded documents are clear, complete, and up-to-date. For Privileged Users, providing detailed manual Analyst comments also helps fine-tune the AI for future analyses.',
   },
   {
     question: 'Where can I find my past reports?',

@@ -1,8 +1,13 @@
 // Module registry for all available analysis modules
-import type { ModuleConfig, ReportType, Framework } from '@/components/analysis/module-configuration';
+import type { ModuleConfig, ReportType, Framework, ModuleReportType } from '@/components/analysis/module-configuration';
 
 // Define UserRole type locally since it's not exported from module-configuration
-type UserRole = 'user' | 'admin' | 'reviewer';
+type UserRole = 'user' | 'admin' | 'analyst';
+
+// Helper to map ReportType to ModuleReportType (filter out 'comprehensive')
+function toModuleReportType(reportType: ReportType): 'triage' | 'dd' {
+    return reportType === 'comprehensive' ? 'dd' : reportType;
+}
 
 /**
  * Central registry of all available analysis modules
@@ -15,7 +20,7 @@ export const MODULE_REGISTRY: ModuleConfig[] = [
         name: 'Quick Summary',
         description: 'Executive overview with key findings and recommendations',
         category: 'core',
-        requiredRole: ['user', 'admin', 'reviewer'],
+        requiredRole: ['user', 'admin', 'analyst'],
         reportTypes: ['triage', 'dd'],
         frameworks: ['general', 'medtech'],
         status: 'active'
@@ -25,7 +30,7 @@ export const MODULE_REGISTRY: ModuleConfig[] = [
         name: 'Executive Summary',
         description: 'Comprehensive executive-level analysis with detailed insights',
         category: 'core',
-        requiredRole: ['admin', 'reviewer'],
+        requiredRole: ['admin', 'analyst'],
         reportTypes: ['triage', 'dd'],
         frameworks: ['general', 'medtech'],
         status: 'active'
@@ -35,7 +40,7 @@ export const MODULE_REGISTRY: ModuleConfig[] = [
         name: 'TCA Scorecard',
         description: 'Technology Commercialization Assessment with weighted scores',
         category: 'core',
-        requiredRole: ['user', 'admin', 'reviewer'],
+        requiredRole: ['user', 'admin', 'analyst'],
         reportTypes: ['triage', 'dd'],
         frameworks: ['general', 'medtech'],
         status: 'active'
@@ -47,7 +52,7 @@ export const MODULE_REGISTRY: ModuleConfig[] = [
         name: 'Risk Flags & Mitigation',
         description: 'Comprehensive risk assessment with mitigation strategies',
         category: 'analysis',
-        requiredRole: ['user', 'admin', 'reviewer'],
+        requiredRole: ['user', 'admin', 'analyst'],
         reportTypes: ['triage', 'dd'],
         frameworks: ['general', 'medtech'],
         status: 'active'
@@ -57,7 +62,7 @@ export const MODULE_REGISTRY: ModuleConfig[] = [
         name: 'Macro Trend Alignment',
         description: 'PESTEL analysis and alignment with macro market trends',
         category: 'analysis',
-        requiredRole: ['admin', 'reviewer'],
+        requiredRole: ['admin', 'analyst'],
         reportTypes: ['triage', 'dd'],
         frameworks: ['general', 'medtech'],
         status: 'active'
@@ -67,7 +72,7 @@ export const MODULE_REGISTRY: ModuleConfig[] = [
         name: 'Benchmark Comparison',
         description: 'Industry benchmarks and competitive positioning analysis',
         category: 'analysis',
-        requiredRole: ['admin', 'reviewer'],
+        requiredRole: ['admin', 'analyst'],
         reportTypes: ['dd'],
         frameworks: ['general', 'medtech'],
         status: 'active'
@@ -77,7 +82,7 @@ export const MODULE_REGISTRY: ModuleConfig[] = [
         name: 'Growth Classifier',
         description: 'AI-powered growth potential classification and scenarios',
         category: 'analysis',
-        requiredRole: ['admin', 'reviewer'],
+        requiredRole: ['admin', 'analyst'],
         reportTypes: ['dd'],
         frameworks: ['general', 'medtech'],
         status: 'active'
@@ -87,7 +92,7 @@ export const MODULE_REGISTRY: ModuleConfig[] = [
         name: 'Gap Analysis',
         description: 'Identify performance gaps and improvement roadmap',
         category: 'analysis',
-        requiredRole: ['admin', 'reviewer'],
+        requiredRole: ['admin', 'analyst'],
         reportTypes: ['dd'],
         frameworks: ['general', 'medtech'],
         status: 'active'
@@ -99,7 +104,7 @@ export const MODULE_REGISTRY: ModuleConfig[] = [
         name: 'Team Assessment',
         description: 'Founding team analysis and organizational capabilities',
         category: 'strategic',
-        requiredRole: ['admin', 'reviewer'],
+        requiredRole: ['admin', 'analyst'],
         reportTypes: ['dd'],
         frameworks: ['general', 'medtech'],
         status: 'active'
@@ -109,7 +114,7 @@ export const MODULE_REGISTRY: ModuleConfig[] = [
         name: 'Funder Fit Analysis',
         description: 'Investment readiness and funder matching analysis',
         category: 'strategic',
-        requiredRole: ['admin', 'reviewer'],
+        requiredRole: ['admin', 'analyst'],
         reportTypes: ['dd'],
         frameworks: ['general', 'medtech'],
         status: 'active'
@@ -119,7 +124,7 @@ export const MODULE_REGISTRY: ModuleConfig[] = [
         name: 'Strategic Fit Matrix',
         description: 'Strategic alignment and partnership fit analysis',
         category: 'strategic',
-        requiredRole: ['admin', 'reviewer'],
+        requiredRole: ['admin', 'analyst'],
         reportTypes: ['dd'],
         frameworks: ['general', 'medtech'],
         status: 'active'
@@ -131,7 +136,7 @@ export const MODULE_REGISTRY: ModuleConfig[] = [
         name: 'Regulatory Compliance Review',
         description: 'FDA and international regulatory compliance assessment',
         category: 'compliance',
-        requiredRole: ['admin', 'reviewer'],
+        requiredRole: ['admin', 'analyst'],
         reportTypes: ['dd'],
         frameworks: ['medtech'],
         status: 'active'
@@ -141,7 +146,7 @@ export const MODULE_REGISTRY: ModuleConfig[] = [
         name: 'Clinical Pathway Analysis',
         description: 'Clinical trial pathway and regulatory roadmap analysis',
         category: 'compliance',
-        requiredRole: ['admin', 'reviewer'],
+        requiredRole: ['admin', 'analyst'],
         reportTypes: ['dd'],
         frameworks: ['medtech'],
         status: 'active'
@@ -153,7 +158,7 @@ export const MODULE_REGISTRY: ModuleConfig[] = [
         name: 'Competitive Landscape',
         description: 'Detailed competitive analysis and positioning',
         category: 'analysis',
-        requiredRole: ['admin', 'reviewer'],
+        requiredRole: ['admin', 'analyst'],
         reportTypes: ['dd'],
         frameworks: ['general', 'medtech'],
         status: 'inactive'
@@ -163,7 +168,7 @@ export const MODULE_REGISTRY: ModuleConfig[] = [
         name: 'IP & Technology Review',
         description: 'Intellectual property and technology stack analysis',
         category: 'analysis',
-        requiredRole: ['admin', 'reviewer'],
+        requiredRole: ['admin', 'analyst'],
         reportTypes: ['dd'],
         frameworks: ['general', 'medtech'],
         status: 'inactive'
@@ -173,7 +178,7 @@ export const MODULE_REGISTRY: ModuleConfig[] = [
         name: 'Financial Analysis & Burn Rate',
         description: 'Financial health and runway analysis',
         category: 'analysis',
-        requiredRole: ['admin', 'reviewer'],
+        requiredRole: ['admin', 'analyst'],
         reportTypes: ['dd'],
         frameworks: ['general', 'medtech'],
         status: 'inactive'
@@ -183,7 +188,7 @@ export const MODULE_REGISTRY: ModuleConfig[] = [
         name: 'Go-to-Market Strategy',
         description: 'GTM strategy evaluation and recommendations',
         category: 'strategic',
-        requiredRole: ['admin', 'reviewer'],
+        requiredRole: ['admin', 'analyst'],
         reportTypes: ['dd'],
         frameworks: ['general', 'medtech'],
         status: 'inactive'
@@ -193,7 +198,7 @@ export const MODULE_REGISTRY: ModuleConfig[] = [
         name: 'Exit Strategy & Roadmap',
         description: 'Exit potential and strategic roadmap analysis',
         category: 'strategic',
-        requiredRole: ['admin', 'reviewer'],
+        requiredRole: ['admin', 'analyst'],
         reportTypes: ['dd'],
         frameworks: ['general', 'medtech'],
         status: 'inactive'
@@ -212,9 +217,10 @@ export class ModuleRegistry {
         reportType: ReportType,
         framework: Framework
     ): ModuleConfig[] {
+        const moduleReportType = toModuleReportType(reportType);
         return MODULE_REGISTRY.filter(module =>
             module.requiredRole && module.requiredRole.includes(role) &&
-            module.reportTypes && module.reportTypes.includes(reportType) &&
+            module.reportTypes && module.reportTypes.includes(moduleReportType) &&
             module.frameworks && module.frameworks.includes(framework)
         );
     }
@@ -235,7 +241,8 @@ export class ModuleRegistry {
             modules = modules.filter(module => module.requiredRole && module.requiredRole.includes(role));
         }
         if (reportType && modules.length > 0) {
-            modules = modules.filter(module => module.reportTypes && module.reportTypes.includes(reportType));
+            const moduleReportType = toModuleReportType(reportType);
+            modules = modules.filter(module => module.reportTypes && module.reportTypes.includes(moduleReportType));
         }
         if (framework && modules.length > 0) {
             modules = modules.filter(module => module.frameworks && module.frameworks.includes(framework));
@@ -263,8 +270,9 @@ export class ModuleRegistry {
         const module = this.getModuleById(moduleId);
         if (!module) return false;
 
+        const moduleReportType = toModuleReportType(reportType);
         return (!module.requiredRole || module.requiredRole.includes(role)) &&
-            (!module.reportTypes || module.reportTypes.includes(reportType)) &&
+            (!module.reportTypes || module.reportTypes.includes(moduleReportType)) &&
             (!module.frameworks || module.frameworks.includes(framework));
     }
 
@@ -287,7 +295,7 @@ export class ModuleRegistry {
         reportType: ReportType,
         framework: Framework
     ): string[] {
-        const isPrivileged = role === 'admin' || role === 'reviewer';
+        const isPrivileged = role === 'admin' || role === 'analyst';
 
         if (reportType === 'triage') {
             return isPrivileged

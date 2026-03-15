@@ -79,6 +79,11 @@ class Settings(BaseSettings):
     # AI Integration Settings
     genkit_host: str = "http://localhost:3100"
     genkit_timeout: int = 300
+    
+    # OpenAI Settings (fallback when Genkit unavailable)
+    openai_api_key: Optional[str] = None
+    openai_model: str = "gpt-4o"
+    openai_timeout: int = 120
 
     # External API Settings
     external_api_timeout: int = 30

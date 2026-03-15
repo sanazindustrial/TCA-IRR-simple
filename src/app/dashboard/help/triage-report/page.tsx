@@ -20,17 +20,17 @@ import { QuickSummary } from '@/components/evaluation/quick-summary';
 import { ExecutiveSummary } from '@/components/evaluation/executive-summary';
 import { TcaSummaryCard } from '@/components/evaluation/tca-summary-card';
 import { ConsistencyCheck } from '@/components/evaluation/consistency-check';
-import { ReviewerComments } from '@/components/evaluation/reviewer-comments';
+import { AnalystComments } from '@/components/evaluation/Analyst-comments';
 import { FinalRecommendation } from '@/components/evaluation/final-recommendation';
 import { useEffect, useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ReviewerAIDeviation } from '@/components/evaluation/reviewer-ai-deviation';
+import { AnalystAIDeviation } from '@/components/evaluation/Analyst-ai-deviation';
 
 
-export type UserRole = 'user' | 'admin' | 'reviewer';
+export type UserRole = 'user' | 'admin' | 'analyst';
 export type ReportType = 'triage' | 'dd';
 type ReportSection = { id: string; title: string; active: boolean; };
 
@@ -171,7 +171,7 @@ function ReportView({ analysisData, visibleSections }: { analysisData: Comprehen
         'gap-analysis': analysisData.gapData && Object.keys(analysisData.gapData).length > 0 && <GapAnalysis />,
         'funder-fit-analysis': analysisData.founderFitData && Object.keys(analysisData.founderFitData).length > 0 && <FunderFitAnalysis />,
         'team-assessment': analysisData.teamData && Object.keys(analysisData.teamData).length > 0 && <TeamAssessment />,
-        'reviewer-comments': <ReviewerComments />,
+        'Analyst-comments': <AnalystComments />,
         'final-recommendation': <FinalRecommendation />,
         'admin-approval-panel': (
             <Card>
@@ -226,7 +226,7 @@ export default function TriageReportPage() {
   const { toast } = useToast();
   const [role, setRole] = useState<UserRole>('user');
   const [visibleSections, setVisibleSections] = useState<ReportSection[]>([]);
-  const isPrivilegedUser = role === 'admin' || role === 'reviewer';
+  const isPrivilegedUser = role === 'admin' || role === 'analyst';
 
   useEffect(() => {
       // Load config based on role
@@ -277,7 +277,7 @@ export default function TriageReportPage() {
                             checked={isPrivilegedUser} 
                             onCheckedChange={(checked) => setRole(checked ? 'admin' : 'user')}
                         />
-                        <Label htmlFor="role-switcher" className={isPrivilegedUser ? 'text-primary font-semibold' : ''}>Admin / Reviewer</Label>
+                        <Label htmlFor="role-switcher" className={isPrivilegedUser ? 'text-primary font-semibold' : ''}>Admin / Analyst</Label>
                     </div>
                     <h1 className="text-4xl md:text-5xl font-bold font-headline text-primary tracking-tight">
                         Sample Triage Report

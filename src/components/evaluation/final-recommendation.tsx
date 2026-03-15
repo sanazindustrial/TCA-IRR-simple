@@ -10,7 +10,7 @@ import { useState } from 'react';
 import { Textarea } from '../ui/textarea';
 
 const initialRec = "The AI analysis indicates a strong investment opportunity. The startup scores highly on Product-Market Fit and Team Strength. While there are moderate risks in the GTM strategy, the potential for high growth outweighs the concerns. The recommendation is to proceed to the next stage of due diligence.";
-const initialReviewerRec = "I concur with the AI. The founding team is exceptional, and their traction is impressive for a seed-stage company. The market is large and growing. We should schedule a follow-up meeting with the founders to dive deeper into their financial projections.";
+const initialAnalystRec = "I concur with the AI. The founding team is exceptional, and their traction is impressive for a seed-stage company. The market is large and growing. We should schedule a follow-up meeting with the founders to dive deeper into their financial projections.";
 const initialActionPlan = `**Immediate (Next 7 Days):**
 - [HIGH] Schedule follow-up meeting with founders to deep-dive on Go-to-Market strategy and customer acquisition channels.
 - [HIGH] Request detailed, 24-month financial model including burn-down chart and key hiring plan.
@@ -26,7 +26,7 @@ export function FinalRecommendation() {
   const { isEditable } = useEvaluationContext();
 
   const [aiRec, setAiRec] = useState(initialRec);
-  const [reviewerRec, setReviewerRec] = useState(initialReviewerRec);
+  const [AnalystRec, setAnalystRec] = useState(initialAnalystRec);
   const [actionPlan, setActionPlan] = useState(initialActionPlan);
   const [conclusion, setConclusion] = useState(initialConclusion);
 
@@ -34,7 +34,7 @@ export function FinalRecommendation() {
     <DashboardCard
       title="Final Recommendation"
       icon={GitBranch}
-      description="The final AI and reviewer recommendations with a concluding summary."
+      description="The final AI and Analyst recommendations with a concluding summary."
     >
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div className="p-6 bg-muted/50 rounded-lg">
@@ -49,12 +49,12 @@ export function FinalRecommendation() {
         </div>
         <div className="p-6 bg-muted/50 rounded-lg">
           <h3 className="font-semibold text-lg flex items-center gap-2">
-            <ThumbsUp className="text-success" /> Reviewer Recommendation: Recommend
+            <ThumbsUp className="text-success" /> Analyst Recommendation: Recommend
           </h3>
            {isEditable ? (
-              <Textarea value={reviewerRec} onChange={(e) => setReviewerRec(e.target.value)} rows={6} className="mt-2 text-base"/>
+              <Textarea value={AnalystRec} onChange={(e) => setAnalystRec(e.target.value)} rows={6} className="mt-2 text-base"/>
           ) : (
-            <p className="text-muted-foreground mt-2">{reviewerRec}</p>
+            <p className="text-muted-foreground mt-2">{AnalystRec}</p>
           )}
         </div>
       </div>
@@ -86,3 +86,5 @@ export function FinalRecommendation() {
     </DashboardCard>
   );
 }
+
+

@@ -15,7 +15,7 @@ export const CSP_HEADERS = {
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "font-src 'self' https://fonts.gstatic.com",
         "img-src 'self' data: https:",
-        "connect-src 'self' https://tcairrapiccontainer.azurewebsites.net ws://localhost:3000",
+        "connect-src 'self' https://tcairrapiccontainer.azurewebsites.net https://tca-irr-api.azurewebsites.net https://*.azurewebsites.net ws://localhost:3000 wss://localhost:3000",
         "frame-ancestors 'none'",
         "base-uri 'self'",
         "form-action 'self'",
@@ -386,7 +386,7 @@ export const SecurityValidation = {
      * Validate user role
      */
     isValidRole(role: string): boolean {
-        return ['user', 'reviewer', 'admin'].includes(role.toLowerCase());
+        return ['user', 'analyst', 'admin'].includes(role.toLowerCase());
     },
 
     /**

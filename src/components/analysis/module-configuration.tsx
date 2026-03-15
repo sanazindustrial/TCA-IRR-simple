@@ -18,9 +18,14 @@ export type ModuleConfig = {
   name: string;
   description: string;
   status: 'active' | 'inactive';
+  category?: 'core' | 'analysis' | 'specialized' | 'review' | 'medtech' | 'strategic' | 'compliance';
+  requiredRole?: ('user' | 'admin' | 'analyst')[];
+  reportTypes?: ('triage' | 'dd')[];
+  frameworks?: ('general' | 'medtech')[];
 };
 
 export type ReportType = 'triage' | 'dd' | 'comprehensive';
+export type ModuleReportType = 'triage' | 'dd';
 export type Framework = 'general' | 'medtech';
 
 type Module = ModuleConfig;

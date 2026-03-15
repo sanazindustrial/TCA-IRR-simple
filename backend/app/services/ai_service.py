@@ -1,12 +1,23 @@
 """
 Enhanced AI integration service for TCA analysis
+Supports both Genkit and OpenAI (with automatic fallback)
 """
 
 import asyncio
 import httpx
 import logging
+import json
+import os
 from typing import Dict, Any, Optional, List
 from datetime import datetime
+
+# OpenAI Integration
+try:
+    from openai import AsyncOpenAI
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+    AsyncOpenAI = None
 
 from app.core.config import settings
 from app.models.schemas import (TCAScorecard, BenchmarkComparison,
@@ -24,13 +35,32 @@ class AIIntegrationError(Exception):
 
 
 class AIFlowsClient:
-    """Enhanced AI flows client with proper error handling and retries"""
+    """Enhanced AI flows client with Genkit + OpenAI fallback support"""
 
     def __init__(self):
         self.base_url = settings.genkit_host
         self.timeout = settings.genkit_timeout
         self.max_retries = 3
         self.retry_delay = 2
+        
+        # Initialize OpenAI client if API key available
+        self.openai_client = None
+        self.openai_available = False
+        openai_key = getattr(settings, 'openai_api_key', None) or os.environ.get('OPENAI_API_KEY')
+        
+        if OPENAI_AVAILABLE and openai_key:
+            try:
+                self.openai_client = AsyncOpenAI(api_key=openai_key)
+                self.openai_available = True
+                self.openai_model = getattr(settings, 'openai_model', 'gpt-4o')
+                logger.info(f"OpenAI client initialized with model: {self.openai_model}")
+            except Exception as e:
+                logger.warning(f"Failed to initialize OpenAI client: {e}")
+        else:
+            if not OPENAI_AVAILABLE:
+                logger.info("OpenAI SDK not installed")
+            elif not openai_key:
+                logger.info("OPENAI_API_KEY not configured")
 
     async def _make_request(self,
                             flow_name: str,
@@ -70,28 +100,37 @@ class AIFlowsClient:
 
         except httpx.HTTPStatusError as e:
             logger.warning(
-                f"AI request failed with status {e.response.status_code}: {e.response.text}, using fallback"
+                f"AI request failed with status {e.response.status_code}: {e.response.text}, trying OpenAI fallback"
             )
-            return self._generate_fallback_response(flow_name, data)
+            return await self._generate_fallback_response(flow_name, data)
 
         except httpx.ConnectError as e:
             logger.warning(
-                f"Cannot connect to Genkit service, using fallback: {e}")
-            return self._generate_fallback_response(flow_name, data)
+                f"Cannot connect to Genkit service, trying OpenAI fallback: {e}")
+            return await self._generate_fallback_response(flow_name, data)
 
         except Exception as e:
             logger.warning(
-                f"Unexpected error in AI request: {e}, using fallback")
+                f"Unexpected error in AI request: {e}, trying fallback")
             if retry_count < self.max_retries:
                 await asyncio.sleep(self.retry_delay * (retry_count + 1))
                 return await self._make_request(flow_name, data,
                                                 retry_count + 1)
-            return self._generate_fallback_response(flow_name, data)
+            return await self._generate_fallback_response(flow_name, data)
 
-    def _generate_fallback_response(self, flow_name: str,
+    async def _generate_fallback_response(self, flow_name: str,
                                     data: Dict[str, Any]) -> Dict[str, Any]:
-        """Generate fallback response when AI service is unavailable"""
-        logger.info(f"Generating fallback response for {flow_name}")
+        """Generate fallback response - tries OpenAI first, then local fallback"""
+        
+        # Try OpenAI if available
+        if self.openai_available and self.openai_client:
+            try:
+                logger.info(f"Attempting OpenAI fallback for {flow_name}")
+                return await self._call_openai(flow_name, data)
+            except Exception as e:
+                logger.warning(f"OpenAI fallback failed: {e}, using local fallback")
+        
+        logger.info(f"Using local fallback response for {flow_name}")
 
         if flow_name == "generateTCAScorecard":
             return self._generate_fallback_scorecard(data)
@@ -105,6 +144,127 @@ class AIFlowsClient:
                 f"AI service unavailable, using local analysis for {flow_name}",
                 "data": data
             }
+
+    async def _call_openai(self, flow_name: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Call OpenAI API for analysis"""
+        
+        # Build system prompt based on flow type
+        system_prompts = {
+            "generateTCAScorecard": """You are an expert investment analyst specializing in startup evaluation and TCA (Thematic Category Assessment) scoring.
+Analyze the provided company data and generate a comprehensive TCA scorecard with scores 0-100 for each category.
+Return your response as valid JSON with this structure:
+{
+    "company_name": "string",
+    "industry": "string",
+    "overall_score": number,
+    "recommendation": "STRONG_PASS" | "PASS" | "CONSIDER" | "NEUTRAL" | "CONCERN" | "REJECT",
+    "categories": {
+        "market_opportunity": {"score": number, "weight": 0.15, "analysis": "string"},
+        "competitive_advantage": {"score": number, "weight": 0.12, "analysis": "string"},
+        "team_quality": {"score": number, "weight": 0.18, "analysis": "string"},
+        "product_readiness": {"score": number, "weight": 0.10, "analysis": "string"},
+        "business_model": {"score": number, "weight": 0.12, "analysis": "string"},
+        "financial_projections": {"score": number, "weight": 0.08, "analysis": "string"},
+        "go_to_market": {"score": number, "weight": 0.10, "analysis": "string"},
+        "scalability": {"score": number, "weight": 0.08, "analysis": "string"},
+        "risk_factors": {"score": number, "weight": 0.07, "analysis": "string"}
+    },
+    "key_insights": ["string"],
+    "next_steps": ["string"]
+}""",
+            "generateComprehensiveAnalysis": """You are an expert investment analyst conducting comprehensive due diligence on startups.
+Analyze the provided company data and generate a detailed investment analysis.
+Return your response as valid JSON with this structure:
+{
+    "executive_summary": "string",
+    "overall_score": number,
+    "recommendation": "STRONG_PASS" | "PASS" | "CONSIDER" | "NEUTRAL" | "CONCERN" | "REJECT",
+    "detailed_analysis": {
+        "strengths": ["string"],
+        "weaknesses": ["string"],
+        "opportunities": ["string"],
+        "threats": ["string"]
+    },
+    "market_analysis": {"score": number, "summary": "string"},
+    "team_assessment": {"score": number, "summary": "string"},
+    "financial_health": {"score": number, "summary": "string"},
+    "risk_assessment": {"overall_risk": "LOW" | "MEDIUM" | "HIGH", "key_risks": ["string"]},
+    "recommendations": ["string"]
+}""",
+            "generateRiskFlagsAndMitigation": """You are a risk assessment specialist analyzing investment risks.
+Analyze the provided company data and identify risk factors with mitigation strategies.
+Return your response as valid JSON with this structure:
+{
+    "risk_assessment": {
+        "risk_level": "LOW" | "MEDIUM" | "HIGH" | "CRITICAL",
+        "risk_score": number,
+        "risk_categories": {
+            "market": {"score": number, "flags": ["string"]},
+            "technology": {"score": number, "flags": ["string"]},
+            "financial": {"score": number, "flags": ["string"]},
+            "team": {"score": number, "flags": ["string"]},
+            "regulatory": {"score": number, "flags": ["string"]}
+        },
+        "major_risks": ["string"],
+        "mitigation_plan": ["string"],
+        "monitoring_metrics": ["string"]
+    }
+}""",
+            "generateFounderFitAnalysis": """You are an expert in founder and team assessment for venture investments.
+Analyze the provided founder/team data and assess their potential.
+Return your response as valid JSON with this structure:
+{
+    "founder_analysis": {
+        "founder_score": number,
+        "experience_rating": "EXCEPTIONAL" | "STRONG" | "ADEQUATE" | "DEVELOPING" | "CONCERNING",
+        "track_record": {"summary": "string", "key_achievements": ["string"]},
+        "leadership_assessment": {"score": number, "analysis": "string"},
+        "team_dynamics": {"score": number, "analysis": "string"},
+        "recommendations": ["string"]
+    }
+}""",
+            "generateBenchmarkComparison": """You are an investment analyst comparing a company against industry benchmarks.
+Analyze the provided company data and compare against industry standards.
+Return your response as valid JSON with this structure:
+{
+    "comparison": {
+        "company_metrics": {"growth_rate": number, "efficiency": number, "market_share": number},
+        "industry_averages": {"growth_rate": number, "efficiency": number, "market_share": number},
+        "percentile_rankings": {"growth": number, "efficiency": number, "market_position": number},
+        "competitive_position": "LEADER" | "CHALLENGER" | "FOLLOWER" | "NICHE",
+        "key_differentiators": ["string"],
+        "improvement_areas": ["string"]
+    }
+}"""
+        }
+        
+        system_prompt = system_prompts.get(flow_name, system_prompts["generateComprehensiveAnalysis"])
+        user_content = f"Company Data:\n{json.dumps(data, indent=2)}\n\nProvide analysis as valid JSON:"
+        
+        try:
+            response = await self.openai_client.chat.completions.create(
+                model=self.openai_model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_content}
+                ],
+                temperature=0.7,
+                max_tokens=4000,
+                response_format={"type": "json_object"}
+            )
+            
+            result_text = response.choices[0].message.content
+            result = json.loads(result_text)
+            
+            logger.info(f"OpenAI analysis completed successfully for {flow_name}")
+            return result
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse OpenAI response as JSON: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"OpenAI API call failed: {e}")
+            raise
 
     def _generate_fallback_scorecard(self, data: Dict[str,
                                                       Any]) -> Dict[str, Any]:
@@ -321,24 +481,46 @@ class AIFlowsClient:
                 f"Failed to analyze founder fit: {str(e)}")
 
     async def health_check(self) -> Dict[str, Any]:
-        """Check AI service health - returns degraded if Genkit not available (fallback mode active)"""
+        """Check AI service health - healthy if either Genkit or OpenAI is available"""
+        genkit_available = False
+        genkit_error = None
+        
+        # Check Genkit availability
         try:
             async with httpx.AsyncClient(timeout=5) as client:
                 response = await client.get(f"{self.base_url}/health")
                 response.raise_for_status()
-                return {
-                    "status": "healthy",
-                    "response_time": response.elapsed.total_seconds(),
-                    "version": response.json().get("version", "unknown"),
-                    "mode": "live"
-                }
+                genkit_available = True
         except Exception as e:
-            logger.warning(f"AI service health check failed (fallback mode active): {e}")
+            genkit_error = str(e)
+            logger.info(f"Genkit not available: {e}")
+        
+        # Determine overall status
+        if genkit_available:
+            return {
+                "status": "healthy",
+                "mode": "genkit",
+                "genkit_available": True,
+                "openai_available": self.openai_available,
+                "message": "AI service operational via Genkit"
+            }
+        elif self.openai_available:
+            return {
+                "status": "healthy",
+                "mode": "openai_fallback",
+                "genkit_available": False,
+                "openai_available": True,
+                "openai_model": self.openai_model,
+                "message": "AI service operational via OpenAI fallback"
+            }
+        else:
             return {
                 "status": "degraded",
-                "mode": "fallback",
-                "message": "AI service unavailable - using fallback responses",
-                "genkit_host": self.base_url
+                "mode": "local_fallback",
+                "genkit_available": False,
+                "openai_available": False,
+                "message": "AI service using local fallback responses only",
+                "genkit_error": genkit_error
             }
 
 

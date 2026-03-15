@@ -1,4 +1,4 @@
-#!/usr/bin/env pwsh
+g#!/usr/bin/env pwsh
 # Simple deploy script for TCA-IRR Backend
 
 $ResourceGroup = "tca-platform-rg"
@@ -68,7 +68,7 @@ Start-Sleep -Seconds 15
 Write-Host "Verifying deployment..." -ForegroundColor Yellow
 
 try {
-    $response = Invoke-RestMethod -Uri "https://$AppName.azurewebsites.net/health" -Method GET -TimeoutSec 30
+    $null = Invoke-RestMethod -Uri "https://$AppName.azurewebsites.net/health" -Method GET -TimeoutSec 30
     Write-Host "Health check passed!" -ForegroundColor Green
 }
 catch {

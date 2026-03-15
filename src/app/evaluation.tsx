@@ -19,7 +19,7 @@ type AnalysisPageProps = {
   ) => Promise<ComprehensiveAnalysisOutput>;
 };
 
-export type UserRole = 'user' | 'admin' | 'reviewer';
+export type UserRole = 'user' | 'admin' | 'analyst';
 export type ReportType = 'triage' | 'dd';
 
 
@@ -107,7 +107,7 @@ export default function AnalysisPage({ runAnalysisAction }: AnalysisPageProps) {
     }
   };
 
-  const isPrivilegedUser = role === 'admin' || role === 'reviewer';
+  const isPrivilegedUser = role === 'admin' || role === 'analyst';
 
 
   return (
@@ -129,7 +129,7 @@ export default function AnalysisPage({ runAnalysisAction }: AnalysisPageProps) {
       <main className="bg-background text-foreground">
         <div className="container mx-auto p-4 md:p-8">
           <header className="text-center mb-12">
-            {(role === 'admin' || role === 'reviewer') && (
+            {(role === 'admin' || role === 'analyst') && (
               <div className="flex justify-center items-center gap-4 mb-4">
                 <Label htmlFor="role-switcher" className={!isPrivilegedUser ? 'text-primary' : ''}>Standard User</Label>
                 <Switch
@@ -143,7 +143,7 @@ export default function AnalysisPage({ runAnalysisAction }: AnalysisPageProps) {
                     }
                   }}
                 />
-                <Label htmlFor="role-switcher" className={isPrivilegedUser ? 'text-primary' : ''}>Admin / Reviewer</Label>
+                <Label htmlFor="role-switcher" className={isPrivilegedUser ? 'text-primary' : ''}>Admin / Analyst</Label>
               </div>
             )}
             <div className='relative'>

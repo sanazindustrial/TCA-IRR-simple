@@ -82,14 +82,14 @@ export type ComprehensiveAnalysisOutput = {
         heatmap: Array<{
             category: string;
             gap: number;
-            priority: string;
+            priority: 'High' | 'Medium' | 'Low';
             trend: number;
-            direction: string;
+            direction: 'up' | 'down' | 'stable';
         }>;
         roadmap: Array<{
             area: string;
             action: string;
-            type: string;
+            type: 'Priority Area' | 'Quick Win' | 'Improvement Roadmap';
         }>;
         interpretation: string;
     };
@@ -106,6 +106,7 @@ export type ComprehensiveAnalysisOutput = {
     teamData: {
         teamScore: number;
         members: Array<{
+            id: string;
             name: string;
             role: string;
             experience: string;
@@ -507,6 +508,7 @@ export const sampleAnalysisData: ComprehensiveAnalysisOutput = {
         teamScore: 7.5,
         members: [
             {
+                id: 'member-1',
                 name: 'John Doe',
                 role: 'CEO',
                 experience: '10 years',
