@@ -23,7 +23,7 @@ Successfully implemented a comprehensive 9-module analysis and configuration sys
 
 ## 🎯 The 9 Core Analysis Modules
 
-### 1. TCA Scorecard (Core Assessment) - Weight: 20%
+### 1. TCA Scorecard (Core Assessment) 
 
 - **Purpose**: Primary composite scoring for investment decision
 - **Outputs**:
@@ -32,7 +32,7 @@ Successfully implemented a comprehensive 9-module analysis and configuration sys
   - Investment recommendation
 - **Key Metrics**: Market Potential, Technology Innovation, Team Capability, Business Model, Financial Health
 
-### 2. Risk Assessment & Flags - Weight: 15%
+### 2. Risk Assessment & Flags 
 
 - **Purpose**: Comprehensive risk analysis across all domains
 - **Outputs**:
@@ -41,7 +41,7 @@ Successfully implemented a comprehensive 9-module analysis and configuration sys
   - Risk flags and mitigation strategies
 - **Key Features**: Multi-domain risk assessment with actionable mitigation plans
 
-### 3. Market & Competition Analysis - Weight: 15%
+### 3. Market & Competition Analysis 
 
 - **Purpose**: Market opportunity and competitive positioning
 - **Outputs**:
@@ -51,7 +51,7 @@ Successfully implemented a comprehensive 9-module analysis and configuration sys
   - Competitive advantages identification
 - **Key Metrics**: Market size, competitive intensity, positioning strength
 
-### 4. Team & Leadership Assessment - Weight: 15%
+### 4. Team & Leadership Assessment 
 
 - **Purpose**: Evaluate team quality and leadership capability
 - **Outputs**:
@@ -62,7 +62,7 @@ Successfully implemented a comprehensive 9-module analysis and configuration sys
   - Gap identification
 - **Key Features**: Experience validation, role completeness analysis
 
-### 5. Financial Health & Projections - Weight: 15%
+### 5. Financial Health & Projections 
 
 - **Purpose**: Financial sustainability and funding requirements
 - **Outputs**:
@@ -72,8 +72,7 @@ Successfully implemented a comprehensive 9-module analysis and configuration sys
   - Funding requirements estimation
 - **Key Metrics**: Runway months, burn efficiency, revenue growth
 
-### 6. Technology & IP Assessment - Weight: 10%
-
+### 6. Technology & IP Assessment -
 - **Purpose**: Technology feasibility and intellectual property
 - **Outputs**:
   - Technology score
@@ -83,7 +82,7 @@ Successfully implemented a comprehensive 9-module analysis and configuration sys
   - Development risk analysis
 - **Key Features**: IP strength evaluation, technical risk assessment
 
-### 7. Business Model & Strategy - Weight: 5%
+### 7. Business Model & Strategy -
 
 - **Purpose**: Business model viability and strategic approach
 - **Outputs**:
@@ -94,8 +93,7 @@ Successfully implemented a comprehensive 9-module analysis and configuration sys
   - Monetization strategy
 - **Key Metrics**: Revenue model type, customer validation, scaling potential
 
-### 8. Growth Potential & Scalability - Weight: 5%
-
+### 8. Growth Potential & Scalability -
 - **Purpose**: Future growth and scaling opportunities
 - **Outputs**:
   - Growth score
@@ -105,7 +103,7 @@ Successfully implemented a comprehensive 9-module analysis and configuration sys
   - Trajectory projection
 - **Key Features**: Market expansion analysis, scaling obstacle identification
 
-### 9. Investment Readiness & Exit Potential - Weight: 5%
+### 9. Investment Readiness & Exit Potential 
 
 - **Purpose**: Investment stage and exit strategy viability
 - **Outputs**:
