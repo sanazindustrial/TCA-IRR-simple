@@ -49,7 +49,7 @@ const EnhancedBackendTestComponent: React.FC = () => {
             console.log('🔍 Performing automated health check...');
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-            
+
             const response = await fetch(`${API_BASE_URL}/health`, {
                 method: 'GET',
                 headers: {
@@ -58,13 +58,13 @@ const EnhancedBackendTestComponent: React.FC = () => {
                 mode: 'cors',
                 signal: controller.signal
             });
-            
+
             clearTimeout(timeoutId);
 
             if (response.ok) {
                 const data = await response.json();
                 console.log('✅ Health check successful:', data);
-                
+
                 setSystemStatus({
                     connected: true,
                     performance: data.performance || 'good',
@@ -88,11 +88,11 @@ const EnhancedBackendTestComponent: React.FC = () => {
     const testBackendHealth = async () => {
         setIsLoading(true);
         setTestResults(null);
-        
+
         try {
             console.log('🏥 Testing backend health endpoint...');
             const startTime = Date.now();
-            
+
             const response = await fetch(`${API_BASE_URL}/health`, {
                 method: 'GET',
                 headers: {
@@ -107,14 +107,14 @@ const EnhancedBackendTestComponent: React.FC = () => {
             if (response.ok) {
                 const data = await response.json();
                 console.log('✅ Backend health test successful:', data);
-                
-                setTestResults({ 
-                    success: true, 
+
+                setTestResults({
+                    success: true,
                     data: {
                         ...data,
                         actualResponseTime: responseTime,
                         headers: Object.fromEntries(response.headers.entries())
-                    }, 
+                    },
                     error: undefined,
                     timestamp: Date.now(),
                     responseTime
@@ -130,10 +130,10 @@ const EnhancedBackendTestComponent: React.FC = () => {
             }
         } catch (error: any) {
             console.error('❌ Backend health test failed:', error);
-            
-            setTestResults({ 
-                success: false, 
-                data: null, 
+
+            setTestResults({
+                success: false,
+                data: null,
                 error: error.message,
                 timestamp: Date.now()
             });
@@ -151,11 +151,11 @@ const EnhancedBackendTestComponent: React.FC = () => {
     const testSystemStatus = async () => {
         setIsLoading(true);
         setTestResults(null);
-        
+
         try {
             console.log('📊 Testing system status endpoint...');
             const startTime = Date.now();
-            
+
             const response = await fetch(`${API_BASE_URL}/system/status`, {
                 method: 'GET',
                 headers: {
@@ -170,13 +170,13 @@ const EnhancedBackendTestComponent: React.FC = () => {
             if (response.ok) {
                 const data = await response.json();
                 console.log('✅ System status test successful:', data);
-                
-                setTestResults({ 
-                    success: true, 
+
+                setTestResults({
+                    success: true,
                     data: {
                         ...data,
                         actualResponseTime: responseTime
-                    }, 
+                    },
                     error: undefined,
                     timestamp: Date.now(),
                     responseTime
@@ -186,9 +186,9 @@ const EnhancedBackendTestComponent: React.FC = () => {
             }
         } catch (error: any) {
             console.error('❌ System status test failed:', error);
-            setTestResults({ 
-                success: false, 
-                data: null, 
+            setTestResults({
+                success: false,
+                data: null,
                 error: error.message,
                 timestamp: Date.now()
             });
@@ -210,7 +210,7 @@ const EnhancedBackendTestComponent: React.FC = () => {
 
             console.log('🧮 Testing comprehensive analysis endpoint...');
             const startTime = Date.now();
-            
+
             const response = await fetch(`${API_BASE_URL}/analysis/comprehensive`, {
                 method: 'POST',
                 headers: {
@@ -226,14 +226,14 @@ const EnhancedBackendTestComponent: React.FC = () => {
             if (response.ok) {
                 const data = await response.json();
                 console.log('✅ Analysis test successful:', data);
-                
-                setTestResults({ 
-                    success: true, 
+
+                setTestResults({
+                    success: true,
                     data: {
                         ...data,
                         actualResponseTime: responseTime,
                         payload
-                    }, 
+                    },
                     error: undefined,
                     timestamp: Date.now(),
                     responseTime
@@ -244,9 +244,9 @@ const EnhancedBackendTestComponent: React.FC = () => {
             }
         } catch (error: any) {
             console.error('❌ Analysis test failed:', error);
-            setTestResults({ 
-                success: false, 
-                data: null, 
+            setTestResults({
+                success: false,
+                data: null,
                 error: error.message,
                 timestamp: Date.now()
             });
@@ -267,8 +267,8 @@ const EnhancedBackendTestComponent: React.FC = () => {
 
             console.log('🔐 Testing login endpoint...');
             const startTime = Date.now();
-            
-            const response = await fetch(`${API_BASE_URL}/auth/login`, {
+
+            const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -283,13 +283,13 @@ const EnhancedBackendTestComponent: React.FC = () => {
             if (response.ok) {
                 const data = await response.json();
                 console.log('✅ Login test successful:', data);
-                
-                setTestResults({ 
-                    success: true, 
+
+                setTestResults({
+                    success: true,
                     data: {
                         ...data,
                         actualResponseTime: responseTime
-                    }, 
+                    },
                     error: undefined,
                     timestamp: Date.now(),
                     responseTime
@@ -300,9 +300,9 @@ const EnhancedBackendTestComponent: React.FC = () => {
             }
         } catch (error: any) {
             console.error('❌ Login test failed:', error);
-            setTestResults({ 
-                success: false, 
-                data: null, 
+            setTestResults({
+                success: false,
+                data: null,
                 error: error.message,
                 timestamp: Date.now()
             });
@@ -340,7 +340,7 @@ const EnhancedBackendTestComponent: React.FC = () => {
                         <div>
                             <span className="font-medium">Connection: </span>
                             <span className={getStatusColor(systemStatus.connected)}>
-                                {getStatusIcon(systemStatus.connected)} 
+                                {getStatusIcon(systemStatus.connected)}
                                 {systemStatus.connected ? 'Connected' : 'Disconnected'}
                             </span>
                         </div>
@@ -355,7 +355,7 @@ const EnhancedBackendTestComponent: React.FC = () => {
                             </span>
                         </div>
                     </div>
-                    
+
                     {/* Auto Refresh Toggle */}
                     <div className="mt-3">
                         <label className="flex items-center gap-2">
@@ -372,39 +372,39 @@ const EnhancedBackendTestComponent: React.FC = () => {
 
                 {/* Test Buttons */}
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-                    <button 
+                    <button
                         onClick={testBackendHealth}
                         disabled={isLoading}
                         className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                         {isLoading ? '⏳' : '🏥'} Health Check
                     </button>
-                    
-                    <button 
+
+                    <button
                         onClick={testSystemStatus}
                         disabled={isLoading}
                         className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                         {isLoading ? '⏳' : '📊'} System Status
                     </button>
-                    
-                    <button 
+
+                    <button
                         onClick={testComprehensiveAnalysis}
                         disabled={isLoading}
                         className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                         {isLoading ? '⏳' : '🧮'} Analysis
                     </button>
-                    
-                    <button 
+
+                    <button
                         onClick={testLogin}
                         disabled={isLoading}
                         className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                         {isLoading ? '⏳' : '🔐'} Login
                     </button>
-                    
-                    <button 
+
+                    <button
                         onClick={clearResults}
                         disabled={isLoading}
                         className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
@@ -425,11 +425,10 @@ const EnhancedBackendTestComponent: React.FC = () => {
 
                 {/* Test Results Display */}
                 {testResults && (
-                    <div className={`rounded-lg p-4 border-2 ${
-                        testResults.success 
-                            ? 'bg-green-50 border-green-200' 
+                    <div className={`rounded-lg p-4 border-2 ${testResults.success
+                            ? 'bg-green-50 border-green-200'
                             : 'bg-red-50 border-red-200'
-                    }`}>
+                        }`}>
                         <div className="flex items-center justify-between mb-3">
                             <h4 className="font-semibold text-lg flex items-center gap-2">
                                 {testResults.success ? '✅ Success' : '❌ Failed'}

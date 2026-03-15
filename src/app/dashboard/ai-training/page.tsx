@@ -105,7 +105,7 @@ export default function AiTrainingPage() {
                         <CardTitle className="flex items-center gap-2"><UserCheck/> Human-in-the-Loop Agreement</CardTitle>
                     </CardHeader>
                     <CardContent className="flex flex-wrap gap-4">
-                        <MetricCard title="Reviewer Agreement (κ)" value="0.71" target="≥0.65" icon={Users}/>
+                        <MetricCard title="Analyst Agreement (κ)" value="0.71" target="≥0.65" icon={Users}/>
                         <MetricCard title="Override Rate" value="18" target="≤20%" unit="%" icon={FileOutput}/>
                         <MetricCard title="Time-to-Approve" value="18" target="≤24h" unit="h" icon={Clock}/>
                     </CardContent>
@@ -148,7 +148,7 @@ export default function AiTrainingPage() {
                     </CardHeader>
                     <CardContent className="flex flex-wrap gap-4">
                         <MetricCard title="Cost / Report" value="$0.38" target="<$0.45" icon={DollarSign}/>
-                        <MetricCard title="Reviewer Mins Saved" value="35" target="≥30%" unit="%" icon={Clock}/>
+                        <MetricCard title="Analyst Mins Saved" value="35" target="≥30%" unit="%" icon={Clock}/>
                         <MetricCard title="Retrain Cost / ΔF1" value="$480" target="<$1k" icon={DollarSign}/>
                     </CardContent>
                 </Card>
@@ -187,3 +187,5 @@ export default function AiTrainingPage() {
     </div>
   );
 }
+
+

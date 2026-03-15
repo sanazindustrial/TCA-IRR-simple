@@ -58,7 +58,7 @@ export default function GettingStartedGuidePage() {
                 num="4"
                 title="Configure Analysis Modules"
                 description="If you have the appropriate permissions, you can customize the nine analysis modules (TCA, Risk, Benchmarking, etc.) to tailor the evaluation to your specific needs."
-                badgeText="Admin/Reviewer Only"
+                badgeText="Admin/Analyst Only"
             />
              <Step 
                 num="5"
@@ -75,3 +75,4 @@ export default function GettingStartedGuidePage() {
     </div>
   );
 }
+

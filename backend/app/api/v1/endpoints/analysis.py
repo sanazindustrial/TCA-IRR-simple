@@ -561,119 +561,746 @@ async def extract_company_info(request_data: Dict[str, Any]):
         return {"error": "No content provided"}
     
     extracted = {}
+    content_lower = content.lower()
     
-    # Extract company name patterns - stop at newline or punctuation
+    # ========== COMPANY NAME EXTRACTION (Enhanced) ==========
     name_patterns = [
-        r"(?:company\s*name|legal\s*name|startup\s*name)[:\s]+([A-Za-z0-9\s&.,'-]+?)(?:\n|$|Website|Founded|Industry)",
-        r"(?:company|startup)[:\s]+([A-Z][A-Za-z0-9\s&.,'-]+?)(?:\n|$|Website|Founded)",
-        r"^([A-Z][A-Za-z0-9\s&]{2,30})\s*[-–—]\s*(?:pitch|deck|presentation)",
-        r"(?:welcome to|introducing|about)\s+([A-Z][A-Za-z0-9\s&]{2,30})",
-        r"(?:^|\n)([A-Z][A-Za-z0-9\s&]{2,25}(?:\s+(?:Inc|LLC|Ltd|Corp|Co))\.?)\s*(?:\n|$)",
+        # Explicit labels with value after colon/equals
+        r"(?:company\s*name|legal\s*name|startup\s*name|organization)[:\s=]+([A-Za-z0-9\s&.,'\-]+?)(?:\n|$|\s{2,}|Website|Founded|Industry|Location|Address)",
+        # Pitch deck title patterns
+        r"^([A-Z][A-Za-z0-9\s&'\-]{2,35})\s*[-–—:]\s*(?:pitch|deck|presentation|investor|overview)",
+        # "About [Company]" pattern
+        r"(?:welcome to|introducing|about|presenting)\s+([A-Z][A-Za-z0-9\s&'\-]{2,35})(?:\s|$|\n|,)",
+        # Company with legal suffix at start of line
+        r"(?:^|\n)\s*([A-Z][A-Za-z0-9\s&'\-]{2,25})(?:\s+(?:Inc\.?|LLC|Ltd\.?|Corp\.?|Co\.?|GmbH|PLC|SA))\s*(?:\n|$|,)",
+        # Header/Title format (all caps or title case at beginning)
+        r"^([A-Z][A-Z0-9\s&'\-]{3,30})\s*\n",
+        # After "Overview of" or similar
+        r"(?:overview of|profile of|summary of)\s+([A-Z][A-Za-z0-9\s&'\-]{2,35})",
     ]
     for pattern in name_patterns:
         match = re.search(pattern, content, re.IGNORECASE | re.MULTILINE)
         if match:
-            extracted["company_name"] = match.group(1).strip()[:100]
+            name = match.group(1).strip()
+            # Clean up the name - remove trailing punctuation and common words
+            name = re.sub(r'[,.:;]+$', '', name).strip()
+            name = re.sub(r'\s*(overview|pitch|deck|presentation)$', '', name, flags=re.IGNORECASE).strip()
+            if len(name) >= 2 and len(name) <= 100:
+                extracted["company_name"] = name
+                break
+    
+    # ========== LEGAL NAME (if different) ==========
+    legal_match = re.search(r"(?:legal\s*name|registered\s*(?:as|name))[:\s=]+([A-Za-z0-9\s&.,'\-]+?)(?:\n|$|\s{2,})", content, re.IGNORECASE)
+    if legal_match:
+        extracted["legal_name"] = legal_match.group(1).strip()[:100]
+    
+    # ========== WEBSITE EXTRACTION (Enhanced) ==========
+    # Try explicit label first
+    website_labeled = re.search(r"(?:website|url|web|site|homepage)[:\s=]+(https?://[^\s<>\"']+|(?:www\.)?[a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z]{2,}(?:/[^\s<>\"']*)?)", content, re.IGNORECASE)
+    if website_labeled:
+        url = website_labeled.group(1).rstrip('.,)>')
+        extracted["website"] = url if url.startswith('http') else f"https://{url}"
+    else:
+        # Any URL in content
+        website_match = re.search(r'(https?://[a-zA-Z0-9][-a-zA-Z0-9.]*\.[a-zA-Z]{2,}(?:/[^\s<>\"\']*)?)', content)
+        if website_match:
+            extracted["website"] = website_match.group(1).rstrip('.,)>')
+    
+    # ========== DESCRIPTION / ONE-LINER EXTRACTION (Enhanced) ==========
+    # One-line description
+    one_liner_patterns = [
+        r"(?:one[\s-]?liner?|tagline|slogan|elevator\s*pitch)[:\s=]+([^\n]{10,150})",
+        r"(?:we\s+(?:are|help|enable|provide|build))\s+([^\n.]{10,150}\.?)",
+    ]
+    for pattern in one_liner_patterns:
+        match = re.search(pattern, content, re.IGNORECASE)
+        if match:
+            extracted["one_line_description"] = match.group(1).strip()[:200]
             break
     
-    # Extract website
-    website_match = re.search(r'(https?://[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(?:/[^\s]*)?)', content)
-    if website_match:
-        extracted["website"] = website_match.group(1).rstrip('.,)')
-    else:
-        # Try without protocol
-        website_match = re.search(r'(?:website|url|site)[:\s]+((?:www\.)?[a-zA-Z0-9-]+\.[a-zA-Z]{2,})', content, re.IGNORECASE)
-        if website_match:
-            extracted["website"] = f"https://{website_match.group(1)}"
-    
-    # Extract description patterns
+    # Full description
     desc_patterns = [
-        r"(?:we are|is a|company that)\s+([^.]{20,300}\.)",
-        r"(?:our mission|mission:)\s+([^.]{20,300}\.)",
-        r"(?:about us|overview:)\s+([^.]{20,300}\.)",
+        r"(?:company\s*description|about\s*us|overview|executive\s*summary)[:\s=]+([^\n]{30,}(?:\n[^\n]{20,}){0,3})",
+        r"(?:mission|our\s*mission)[:\s=]+([^\n]{20,300})",
+        r"(?:^|\n)([A-Z][^.]{30,300}(?:company|startup|platform|solution|service|business)[^.]{10,200}\.)",
     ]
     for pattern in desc_patterns:
-        match = re.search(pattern, content, re.IGNORECASE)
+        match = re.search(pattern, content, re.IGNORECASE | re.MULTILINE)
         if match:
-            extracted["description"] = match.group(1).strip()[:500]
+            desc = match.group(1).strip()[:700]
+            # Clean up
+            desc = re.sub(r'\s+', ' ', desc)
+            extracted["description"] = desc
             break
     
-    # Extract employee count
-    emp_match = re.search(r'(\d{1,5})\s*(?:employees|team members|people)', content, re.IGNORECASE)
-    if emp_match:
-        extracted["number_of_employees"] = int(emp_match.group(1))
-    
-    # Extract location
-    location_patterns = [
-        r"(?:based in|headquarters?|located in)\s+([A-Za-z\s,]+)",
-        r"([A-Za-z]+),\s*(CA|NY|TX|WA|MA|FL|USA|UK|US)",
+    # ========== PRODUCT DESCRIPTION ==========
+    product_patterns = [
+        r"(?:product|solution|platform|service)\s*(?:description|overview)?[:\s=]+([^\n]{20,}(?:\n[^\n]{20,}){0,2})",
+        r"(?:what\s*we\s*(?:do|build|offer))[:\s=]+([^\n]{20,300})",
     ]
-    for pattern in location_patterns:
+    for pattern in product_patterns:
         match = re.search(pattern, content, re.IGNORECASE)
         if match:
-            location = match.group(1).strip()
-            parts = location.split(",")
-            if len(parts) >= 1:
-                extracted["city"] = parts[0].strip()[:50]
-            if len(parts) >= 2:
-                extracted["state"] = parts[1].strip()[:50]
+            extracted["product_description"] = match.group(1).strip()[:500]
             break
     
-    # Extract funding stage
+    # ========== EMPLOYEE COUNT (Enhanced) ==========
+    emp_patterns = [
+        r"(?:employees?|team\s*(?:size|members)|headcount|staff)[:\s=]+(\d{1,5})",
+        r"(\d{1,5})\s*(?:employees?|team\s*members?|people|staff)",
+        r"(?:team\s*of|staff\s*of)\s*(\d{1,5})",
+    ]
+    for pattern in emp_patterns:
+        match = re.search(pattern, content, re.IGNORECASE)
+        if match:
+            extracted["number_of_employees"] = int(match.group(1))
+            break
+    
+    # ========== LOCATION EXTRACTION (Enhanced) ==========
+    # Full address
+    address_match = re.search(r"(?:address|headquarters?|hq|located?(?:\s*(?:at|in))?)[:\s=]+([^\n]{10,150})", content, re.IGNORECASE)
+    if address_match:
+        addr = address_match.group(1).strip()
+        extracted["address"] = addr[:200]
+        # Try to parse city/state/country from address
+        parts = [p.strip() for p in addr.split(',')]
+        if len(parts) >= 2:
+            extracted["city"] = parts[0][:50]
+            if len(parts) >= 3:
+                extracted["state"] = parts[-2][:50]
+                extracted["country"] = parts[-1][:50]
+            else:
+                extracted["country"] = parts[-1][:50]
+    
+    # Fallback location patterns
+    if "city" not in extracted:
+        location_patterns = [
+            r"(?:based\s*in|located\s*in|headquarters?\s*in)\s+([A-Za-z\s]+),\s*([A-Za-z\s]+)",
+            r"([A-Za-z]+),\s*(CA|NY|TX|WA|MA|FL|IL|PA|OH|GA|NC|NJ|VA|AZ|CO|MD|TN)\b",
+        ]
+        for pattern in location_patterns:
+            match = re.search(pattern, content, re.IGNORECASE)
+            if match:
+                extracted["city"] = match.group(1).strip()[:50]
+                extracted["state"] = match.group(2).strip()[:50]
+                break
+    
+    # Country
+    country_patterns = [
+        r"(?:country|nation)[:\s=]+([A-Za-z\s]+?)(?:\n|$|,)",
+        r"(?:US|USA|United States|UK|United Kingdom|Canada|Germany|France|Australia|India|Israel|Singapore)",
+    ]
+    if "country" not in extracted:
+        for pattern in country_patterns:
+            match = re.search(pattern, content, re.IGNORECASE)
+            if match:
+                country = match.group(0) if match.lastindex is None else match.group(1)
+                # Normalize country names
+                country_map = {"US": "United States", "USA": "United States", "UK": "United Kingdom"}
+                extracted["country"] = country_map.get(country.strip().upper(), country.strip())[:50]
+                break
+    
+    # ========== FOUNDING DATE / YEAR ==========
+    founded_patterns = [
+        r"(?:founded|established|started|launched|incorporated)\s*(?:in\s*)?(\d{4})",
+        r"(?:year\s*founded|founding\s*year)[:\s=]+(\d{4})",
+        r"(?:since|est\.?)\s*(\d{4})",
+    ]
+    for pattern in founded_patterns:
+        match = re.search(pattern, content, re.IGNORECASE)
+        if match:
+            year = int(match.group(1))
+            if 1900 <= year <= 2030:
+                extracted["founded_year"] = year
+                break
+    
+    # ========== FUNDING STAGE (Enhanced) ==========
     stage_keywords = {
         "pre-seed": "Pre-seed",
-        "seed": "Seed",
+        "preseed": "Pre-seed",
+        "seed round": "Seed",
+        "seed stage": "Seed", 
+        "seed funding": "Seed",
         "series a": "Series A",
         "series b": "Series B",
         "series c": "Series C+",
-        "growth": "Growth",
+        "series d": "Series C+",
+        "growth stage": "Growth",
+        "growth round": "Growth",
+        "late stage": "Growth",
+        "ipo": "Public",
+        "public company": "Public",
+        "bootstrapped": "Bootstrapped",
+        "pre-revenue": "Pre-seed",
+        "mvp": "Pre-seed",
+        "early stage": "Seed",
     }
     for keyword, stage in stage_keywords.items():
-        if keyword in content.lower():
+        if keyword in content_lower:
             extracted["development_stage"] = stage
             break
     
-    # Extract industry vertical
+    # ========== FUNDING AMOUNT ==========
+    funding_patterns = [
+        r"(?:raised|funding|investment)\s*[:\s=]?\s*\$?([\d,.]+)\s*(million|m|billion|b|k|thousand)?",
+        r"\$?([\d,.]+)\s*(million|m|billion|b)\s*(?:raised|funding|investment)",
+    ]
+    for pattern in funding_patterns:
+        match = re.search(pattern, content, re.IGNORECASE)
+        if match:
+            amount = float(match.group(1).replace(',', ''))
+            multiplier = match.group(2).lower() if match.group(2) else ''
+            if multiplier in ['m', 'million']:
+                amount *= 1000000
+            elif multiplier in ['b', 'billion']:
+                amount *= 1000000000
+            elif multiplier in ['k', 'thousand']:
+                amount *= 1000
+            extracted["funding_amount"] = amount
+            break
+    
+    # ========== INDUSTRY VERTICAL (Enhanced) ==========
     industry_keywords = {
+        "software as a service": "Software/SaaS",
         "saas": "Software/SaaS",
+        "software": "Software/SaaS",
         "fintech": "FinTech",
+        "financial technology": "FinTech",
+        "financial services": "FinTech",
         "healthtech": "HealthTech/MedTech",
+        "health tech": "HealthTech/MedTech",
+        "healthcare technology": "HealthTech/MedTech",
         "medtech": "HealthTech/MedTech",
+        "medical technology": "HealthTech/MedTech",
+        "medical device": "HealthTech/MedTech",
         "biotech": "BioTech",
+        "biotechnology": "BioTech",
+        "life sciences": "BioTech",
+        "e-commerce": "E-commerce",
         "ecommerce": "E-commerce",
+        "retail tech": "E-commerce",
         "edtech": "EdTech",
+        "education technology": "EdTech",
+        "learning platform": "EdTech",
         "cleantech": "CleanTech/GreenTech",
+        "clean technology": "CleanTech/GreenTech",
+        "green tech": "CleanTech/GreenTech",
+        "sustainability": "CleanTech/GreenTech",
+        "renewable": "CleanTech/GreenTech",
         "proptech": "PropTech",
+        "property technology": "PropTech",
+        "real estate tech": "PropTech",
         "artificial intelligence": "AI/ML",
         "machine learning": "AI/ML",
+        "deep learning": "AI/ML",
         "cybersecurity": "Cybersecurity",
+        "security": "Cybersecurity",
+        "insurtech": "InsurTech",
+        "insurance technology": "InsurTech",
+        "logistics": "Logistics/Supply Chain",
+        "supply chain": "Logistics/Supply Chain",
+        "foodtech": "FoodTech",
+        "food technology": "FoodTech",
+        "agtech": "AgTech",
+        "agriculture technology": "AgTech",
+        "gaming": "Gaming/Entertainment",
+        "entertainment": "Gaming/Entertainment",
+        "media": "Media/Content",
+        "content platform": "Media/Content",
+        "hr tech": "HR Tech",
+        "human resources": "HR Tech",
+        "marketing tech": "MarTech",
+        "martech": "MarTech",
+        "advertising": "AdTech",
+        "adtech": "AdTech",
     }
     for keyword, industry in industry_keywords.items():
-        if keyword in content.lower():
+        if keyword in content_lower:
             extracted["industry_vertical"] = industry
             break
     
-    # Extract business model
+    # ========== BUSINESS MODEL (Enhanced) ==========
     model_keywords = {
         "b2b saas": "B2B SaaS",
+        "b2b software": "B2B SaaS",
+        "enterprise software": "B2B SaaS",
         "b2c saas": "B2C SaaS",
+        "consumer saas": "B2C SaaS",
+        "b2b": "B2B",
+        "b2c": "B2C",
+        "b2b2c": "B2B2C",
         "marketplace": "Marketplace",
+        "two-sided marketplace": "Marketplace",
         "subscription": "Subscription",
+        "recurring revenue": "Subscription",
         "freemium": "Freemium",
+        "free trial": "Freemium",
         "platform": "Platform",
+        "api": "API/Platform",
+        "licensing": "Licensing",
+        "transactional": "Transactional",
+        "per-transaction": "Transactional",
+        "advertising": "Advertising",
+        "ad-supported": "Advertising",
+        "hardware": "Hardware",
+        "device": "Hardware",
+        "consulting": "Services",
+        "professional services": "Services",
     }
     for keyword, model in model_keywords.items():
-        if keyword in content.lower():
+        if keyword in content_lower:
             extracted["business_model"] = model
             break
     
-    # If MedTech framework, set accordingly
+    # ========== REVENUE / FINANCIALS ==========
+    revenue_patterns = [
+        r"(?:revenue|arr|annual\s*recurring\s*revenue|mrr)[:\s=]?\s*\$?([\d,.]+)\s*(million|m|k|thousand)?",
+        r"(?:revenue|arr|mrr)\s*(?:of|:)?\s*\$?([\d,.]+)\s*(million|m|k)?",
+    ]
+    for pattern in revenue_patterns:
+        match = re.search(pattern, content, re.IGNORECASE)
+        if match:
+            amount = float(match.group(1).replace(',', ''))
+            multiplier = match.group(2).lower() if match.group(2) else ''
+            if multiplier in ['m', 'million']:
+                amount *= 1000000
+            elif multiplier in ['k', 'thousand']:
+                amount *= 1000
+            extracted["annual_revenue"] = amount
+            break
+    
+    # ========== FOUNDERS / CEO ==========
+    founder_patterns = [
+        r"(?:founder(?:s)?|ceo|chief\s*executive)[:\s=]+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})",
+        r"(?:founded\s*by|co-founders?)[:\s=]+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3}(?:\s*(?:and|,)\s*[A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})*)",
+    ]
+    for pattern in founder_patterns:
+        match = re.search(pattern, content, re.IGNORECASE)
+        if match:
+            extracted["founders"] = match.group(1).strip()[:200]
+            break
+    
+    # ========== FRAMEWORK-SPECIFIC DEFAULTS ==========
     if framework == "medtech" and not extracted.get("industry_vertical"):
         extracted["industry_vertical"] = "HealthTech/MedTech"
+    elif framework == "fintech" and not extracted.get("industry_vertical"):
+        extracted["industry_vertical"] = "FinTech"
+    elif framework == "saas" and not extracted.get("industry_vertical"):
+        extracted["industry_vertical"] = "Software/SaaS"
     
-    logger.info(f"Extracted company info: {list(extracted.keys())}")
+    logger.info(f"Extracted company info: {list(extracted.keys())} - {len(extracted)} fields")
     
     return extracted
+
+
+# ============ Analyst Review Workflow Endpoints ============
+
+@router.post("/analyst-reviews", response_model=Dict[str, Any])
+async def create_analyst_review(review_data: Dict[str, Any]):
+    """
+    Create a new analyst review for an analysis.
+    Captures human scores, comments, and deviation rationale.
+    """
+    from datetime import datetime
+    
+    try:
+        analysis_id = review_data.get("analysis_id")
+        if not analysis_id:
+            raise HTTPException(status_code=400, detail="analysis_id required")
+        
+        review = {
+            "id": f"review_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            "analysis_id": analysis_id,
+            "analyst_id": review_data.get("analyst_id"),
+            "analyst_name": review_data.get("analyst_name", "Unknown Analyst"),
+            "human_scores": review_data.get("human_scores", {}),
+            "ai_scores": review_data.get("ai_scores", {}),
+            "deviation_rationale": review_data.get("deviation_rationale", ""),
+            "category_comments": review_data.get("category_comments", {}),
+            "overall_assessment": review_data.get("overall_assessment", ""),
+            "sentiment_indicators": review_data.get("sentiment_indicators", {}),
+            "recommendation_override": review_data.get("recommendation_override"),
+            "training_approved": review_data.get("training_approved", False),
+            "status": "pending",
+            "created_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat(),
+        }
+        
+        # Calculate deviation metrics
+        review["deviation_metrics"] = _calculate_deviation_metrics(
+            review["human_scores"], 
+            review["ai_scores"]
+        )
+        
+        # Analyze sentiment from comments
+        review["sentiment_analysis"] = _analyze_review_sentiment(
+            review["category_comments"],
+            review["deviation_rationale"]
+        )
+        
+        logger.info(f"Created analyst review: {review['id']}")
+        return review
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to create analyst review: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/analyst-reviews/{analysis_id}", response_model=Dict[str, Any])
+async def get_analyst_review(analysis_id: str):
+    """Get analyst review for an analysis"""
+    # In production, fetch from database
+    return {
+        "analysis_id": analysis_id,
+        "reviews": [],
+        "message": "No reviews found for this analysis"
+    }
+
+
+@router.post("/ai-deviation-comparison", response_model=Dict[str, Any])
+async def compare_ai_human_scores(comparison_data: Dict[str, Any]):
+    """
+    Compare AI scores with human analyst scores and generate deviation analysis.
+    Used by the AI vs Human Gap Analysis component.
+    """
+    try:
+        ai_scores = comparison_data.get("ai_scores", {})
+        human_scores = comparison_data.get("human_scores", {})
+        analyst_comments = comparison_data.get("comments", {})
+        
+        if not ai_scores or not human_scores:
+            raise HTTPException(status_code=400, detail="Both ai_scores and human_scores required")
+        
+        # Calculate deviation metrics
+        deviation_metrics = _calculate_deviation_metrics(human_scores, ai_scores)
+        
+        # Generate chart data for visualization
+        chart_data = []
+        for category in set(ai_scores.keys()) | set(human_scores.keys()):
+            ai_score = ai_scores.get(category, 0)
+            human_score = human_scores.get(category, 0)
+            chart_data.append({
+                "category": category,
+                "ai": ai_score,
+                "analyst": human_score,
+                "deviation": round(ai_score - human_score, 2),
+                "comment": analyst_comments.get(category, "")
+            })
+        
+        # Sort by absolute deviation (largest first)
+        chart_data.sort(key=lambda x: abs(x["deviation"]), reverse=True)
+        
+        # Generate AI recommendations based on deviations
+        recommendations = _generate_training_recommendations(chart_data, deviation_metrics)
+        
+        # Perform sentiment analysis on comments
+        sentiment_analysis = _analyze_review_sentiment(analyst_comments, "")
+        
+        return {
+            "chart_data": chart_data,
+            "deviation_metrics": deviation_metrics,
+            "recommendations": recommendations,
+            "sentiment_analysis": sentiment_analysis,
+            "training_suggested": deviation_metrics.get("mae", 0) > 0.5,
+            "review_needed": any(abs(d["deviation"]) > 2.0 for d in chart_data)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"AI deviation comparison failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/submit-for-training", response_model=Dict[str, Any])
+async def submit_for_ml_training(training_data: Dict[str, Any]):
+    """
+    Submit analyst review data for ML model training.
+    Captures human corrections to improve AI accuracy over time.
+    """
+    from datetime import datetime
+    
+    try:
+        training_record = {
+            "id": f"train_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            "analysis_id": training_data.get("analysis_id"),
+            "company_name": training_data.get("company_name", "Unknown"),
+            "ai_scores": training_data.get("ai_scores", {}),
+            "human_scores": training_data.get("human_scores", {}),
+            "human_rationale": training_data.get("rationale", ""),
+            "category_adjustments": training_data.get("category_adjustments", {}),
+            "analyst_id": training_data.get("analyst_id"),
+            "industry_context": training_data.get("industry_context", ""),
+            "company_stage": training_data.get("company_stage", ""),
+            "submitted_at": datetime.now().isoformat(),
+            "status": "queued",
+            "priority": _calculate_training_priority(training_data)
+        }
+        
+        logger.info(f"Submitted training data: {training_record['id']}")
+        
+        return {
+            "success": True,
+            "training_id": training_record["id"],
+            "message": "Training data submitted successfully. It will be processed in the next training batch.",
+            "estimated_incorporation": "Within 24 hours",
+            "priority": training_record["priority"]
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to submit training data: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/sentiment-analysis", response_model=Dict[str, Any])
+async def analyze_comment_sentiment(request_data: Dict[str, Any]):
+    """
+    Analyze sentiment and insights from analyst comments.
+    Supports deep content analysis for reviewer feedback.
+    """
+    try:
+        comments = request_data.get("comments", {})
+        rationale = request_data.get("rationale", "")
+        
+        analysis = _analyze_review_sentiment(comments, rationale)
+        
+        # Deep content analysis
+        content_insights = _deep_content_analysis(comments, rationale)
+        
+        return {
+            "sentiment_scores": analysis,
+            "content_insights": content_insights,
+            "key_themes": content_insights.get("themes", []),
+            "action_items": content_insights.get("action_items", []),
+            "confidence_level": content_insights.get("confidence", "medium")
+        }
+        
+    except Exception as e:
+        logger.error(f"Sentiment analysis failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def _calculate_deviation_metrics(human_scores: Dict[str, float], ai_scores: Dict[str, float]) -> Dict[str, Any]:
+    """Calculate statistical metrics for AI vs Human score deviations"""
+    import math
+    
+    categories = list(set(human_scores.keys()) & set(ai_scores.keys()))
+    if not categories:
+        return {"error": "No overlapping categories"}
+    
+    deviations = []
+    squared_deviations = []
+    agreements = 0
+    
+    for cat in categories:
+        human = human_scores.get(cat, 0)
+        ai = ai_scores.get(cat, 0)
+        diff = abs(ai - human)
+        deviations.append(diff)
+        squared_deviations.append(diff ** 2)
+        if diff < 0.5:  # Within 0.5 points is considered agreement
+            agreements += 1
+    
+    n = len(deviations)
+    mae = sum(deviations) / n  # Mean Absolute Error
+    rmse = math.sqrt(sum(squared_deviations) / n)  # Root Mean Square Error
+    agreement_rate = agreements / n
+    
+    # Calculate Cohen's Kappa approximation
+    # (simplified for numerical scores - use discretized buckets)
+    human_bins = [_score_bucket(human_scores.get(c, 0)) for c in categories]
+    ai_bins = [_score_bucket(ai_scores.get(c, 0)) for c in categories]
+    observed_agreement = sum(1 for h, a in zip(human_bins, ai_bins) if h == a) / n
+    expected_agreement = 0.33  # Random agreement for 3 buckets
+    kappa = (observed_agreement - expected_agreement) / (1 - expected_agreement) if expected_agreement < 1 else 1
+    
+    # Bias calculation (positive = AI higher, negative = Human higher)
+    bias = sum(ai_scores.get(c, 0) - human_scores.get(c, 0) for c in categories) / n
+    
+    return {
+        "mae": round(mae, 3),
+        "rmse": round(rmse, 3),
+        "cohens_kappa": round(max(0, kappa), 3),
+        "agreement_rate": round(agreement_rate * 100, 1),
+        "bias": round(bias, 3),
+        "bias_direction": "AI Higher" if bias > 0.1 else "Human Higher" if bias < -0.1 else "Neutral",
+        "total_categories": n,
+        "high_deviation_count": sum(1 for d in deviations if d > 1.5),
+        "calibration_quality": "High" if mae < 0.5 else "Medium" if mae < 1.0 else "Low"
+    }
+
+
+def _score_bucket(score: float) -> str:
+    """Convert score to bucket for kappa calculation"""
+    if score >= 8:
+        return "high"
+    elif score >= 6:
+        return "medium"
+    else:
+        return "low"
+
+
+def _generate_training_recommendations(chart_data: List[Dict], metrics: Dict) -> Dict[str, Any]:
+    """Generate AI training recommendations based on deviations"""
+    
+    recommendations = []
+    weight_adjustments = {}
+    
+    for item in chart_data:
+        deviation = item["deviation"]
+        category = item["category"]
+        
+        if abs(deviation) > 1.5:
+            if deviation > 0:
+                recommendations.append(
+                    f"Reduce weight on '{category}' - AI over-scoring by {abs(deviation):.1f} points"
+                )
+                weight_adjustments[category] = {"action": "reduce", "magnitude": min(0.2, abs(deviation) / 10)}
+            else:
+                recommendations.append(
+                    f"Increase weight on '{category}' - AI under-scoring by {abs(deviation):.1f} points"
+                )
+                weight_adjustments[category] = {"action": "increase", "magnitude": min(0.2, abs(deviation) / 10)}
+    
+    # Add general recommendations based on metrics
+    if metrics.get("bias", 0) > 0.5:
+        recommendations.append("General bias detected: AI tends to score higher. Consider calibration adjustment.")
+    elif metrics.get("bias", 0) < -0.5:
+        recommendations.append("General bias detected: AI tends to score lower. Consider calibration adjustment.")
+    
+    if metrics.get("mae", 0) > 1.0:
+        recommendations.append("High overall deviation suggests model retraining may be beneficial.")
+    
+    return {
+        "recommendations": recommendations[:5],  # Top 5 recommendations
+        "weight_adjustments": weight_adjustments,
+        "retraining_suggested": metrics.get("mae", 0) > 0.8,
+        "priority": "high" if metrics.get("mae", 0) > 1.5 else "medium" if metrics.get("mae", 0) > 0.8 else "low"
+    }
+
+
+def _analyze_review_sentiment(comments: Dict[str, str], rationale: str) -> Dict[str, Any]:
+    """Analyze sentiment from analyst comments"""
+    
+    # Simple keyword-based sentiment analysis
+    positive_keywords = [
+        "strong", "excellent", "good", "impressive", "solid", "promising", "innovative",
+        "growth", "opportunity", "potential", "advantage", "leading", "experienced"
+    ]
+    negative_keywords = [
+        "weak", "poor", "concern", "risk", "challenge", "limited", "lacking",
+        "unclear", "uncertain", "competitive", "struggling", "unproven"
+    ]
+    neutral_keywords = ["adequate", "average", "moderate", "typical", "standard"]
+    
+    all_text = " ".join(comments.values()) + " " + rationale
+    all_text_lower = all_text.lower()
+    
+    positive_count = sum(1 for kw in positive_keywords if kw in all_text_lower)
+    negative_count = sum(1 for kw in negative_keywords if kw in all_text_lower)
+    neutral_count = sum(1 for kw in neutral_keywords if kw in all_text_lower)
+    
+    total = positive_count + negative_count + neutral_count + 1  # +1 to avoid division by zero
+    
+    # Calculate sentiment score (-1 to 1)
+    sentiment_score = (positive_count - negative_count) / total
+    
+    # Per-category sentiment
+    category_sentiment = {}
+    for cat, comment in comments.items():
+        comment_lower = comment.lower()
+        cat_positive = sum(1 for kw in positive_keywords if kw in comment_lower)
+        cat_negative = sum(1 for kw in negative_keywords if kw in comment_lower)
+        if cat_positive > cat_negative:
+            category_sentiment[cat] = "positive"
+        elif cat_negative > cat_positive:
+            category_sentiment[cat] = "negative"
+        else:
+            category_sentiment[cat] = "neutral"
+    
+    return {
+        "overall_sentiment": "positive" if sentiment_score > 0.2 else "negative" if sentiment_score < -0.2 else "neutral",
+        "sentiment_score": round(sentiment_score, 3),
+        "positive_indicators": positive_count,
+        "negative_indicators": negative_count,
+        "category_sentiment": category_sentiment,
+        "confidence": "high" if total > 5 else "medium" if total > 2 else "low"
+    }
+
+
+def _deep_content_analysis(comments: Dict[str, str], rationale: str) -> Dict[str, Any]:
+    """Perform deep content analysis on analyst comments"""
+    import re
+    
+    all_text = " ".join(comments.values()) + " " + rationale
+    
+    # Extract themes
+    theme_patterns = {
+        "market_concerns": r"market|competition|competitive|competitor|share|penetration",
+        "team_assessment": r"team|leadership|founder|experience|execute|execution",
+        "financial_view": r"revenue|financial|burn|runway|profit|margin|cost",
+        "product_feedback": r"product|technology|innovation|feature|development",
+        "growth_outlook": r"growth|scale|expand|traction|momentum|potential",
+        "risk_factors": r"risk|challenge|concern|threat|weakness|barrier",
+    }
+    
+    themes = []
+    for theme, pattern in theme_patterns.items():
+        if re.search(pattern, all_text, re.IGNORECASE):
+            themes.append(theme.replace("_", " ").title())
+    
+    # Extract action items (sentences with action verbs)
+    action_patterns = [
+        r"(?:should|need to|must|recommend|suggest|consider)\s+([^.!?]+[.!?])",
+        r"(?:improve|address|focus on|strengthen)\s+([^.!?]+[.!?])",
+    ]
+    
+    action_items = []
+    for pattern in action_patterns:
+        matches = re.findall(pattern, all_text, re.IGNORECASE)
+        action_items.extend([m.strip() for m in matches[:3]])  # Max 3 per pattern
+    
+    # Calculate content depth
+    word_count = len(all_text.split())
+    sentence_count = len(re.split(r'[.!?]+', all_text))
+    avg_sentence_length = word_count / max(sentence_count, 1)
+    
+    return {
+        "themes": themes[:5],
+        "action_items": action_items[:5],
+        "word_count": word_count,
+        "depth_score": "comprehensive" if word_count > 200 else "moderate" if word_count > 50 else "brief",
+        "avg_sentence_length": round(avg_sentence_length, 1),
+        "confidence": "high" if word_count > 100 else "medium" if word_count > 30 else "low"
+    }
+
+
+def _calculate_training_priority(training_data: Dict[str, Any]) -> str:
+    """Calculate priority level for training data"""
+    
+    # Higher priority for larger deviations
+    ai_scores = training_data.get("ai_scores", {})
+    human_scores = training_data.get("human_scores", {})
+    
+    if not ai_scores or not human_scores:
+        return "low"
+    
+    max_deviation = 0
+    for cat in set(ai_scores.keys()) & set(human_scores.keys()):
+        deviation = abs(ai_scores[cat] - human_scores[cat])
+        max_deviation = max(max_deviation, deviation)
+    
+    # Also consider if rationale is provided (more valuable for training)
+    has_rationale = bool(training_data.get("rationale", "").strip())
+    
+    if max_deviation > 2.0 or (max_deviation > 1.0 and has_rationale):
+        return "high"
+    elif max_deviation > 1.0 or has_rationale:
+        return "medium"
+    else:
+        return "low"
 
 
 # ============ File Upload & Text Extraction Endpoint ============

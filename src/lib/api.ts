@@ -6,20 +6,21 @@
 // API Configuration
 export const API_CONFIG = {
     BASE_URL: process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net',
+    API_PREFIX: '/api/v1',
     ENDPOINTS: {
         AUTH: {
-            REGISTER: '/auth/register',
-            LOGIN: '/auth/login',
-            ME: '/auth/me',
-            PROFILE: '/auth/profile'
+            REGISTER: '/api/v1/auth/register',
+            LOGIN: '/api/v1/auth/login',
+            ME: '/api/v1/auth/me',
+            PROFILE: '/api/v1/auth/profile'
         },
         COMPANIES: {
-            BASE: '/api/companies',
-            BY_ID: (id: string) => `/api/companies/${id}`
+            BASE: '/api/v1/companies',
+            BY_ID: (id: string) => `/api/v1/companies/${id}`
         },
         EVALUATIONS: {
-            BASE: '/api/evaluations',
-            BY_ID: (id: string) => `/api/evaluations/${id}`
+            BASE: '/api/v1/evaluations',
+            BY_ID: (id: string) => `/api/v1/evaluations/${id}`
         }
     }
 };

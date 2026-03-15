@@ -121,7 +121,7 @@ export function TcaSummaryCard({ initialData }: TcaSummaryCardProps) {
             <div className="lg:col-span-2 p-6 bg-muted/30 rounded-lg flex items-center justify-center">
               <div className="text-center">
                 <p className="text-sm text-muted-foreground">
-                  Additional statistical analysis is available for reviewers and admins.
+                  Additional statistical analysis is available for Analysts and admins.
                 </p>
               </div>
             </div>
@@ -149,3 +149,5 @@ export function TcaSummaryCard({ initialData }: TcaSummaryCardProps) {
     </DashboardCard>
   );
 }
+
+

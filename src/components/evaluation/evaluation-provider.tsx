@@ -86,6 +86,11 @@ export function useEvaluationContext() {
     return context;
 }
 
+// Safe version that returns null if not within provider (for optional usage)
+export function useEvaluationContextSafe(): EvaluationContextType | null {
+    return useContext(EvaluationContext);
+}
+
 type EvaluationProviderProps = {
     children: React.ReactNode;
     role: UserRole;
@@ -143,7 +148,7 @@ export function EvaluationProvider({
     financialInfo,
     setFinancialInfoAction,
 }: EvaluationProviderProps) {
-    const isPrivilegedUser = useMemo(() => role === 'admin' || role === 'reviewer', [role]);
+    const isPrivilegedUser = useMemo(() => role === 'admin' || role === 'analyst', [role]);
     const isEditable = useMemo(() => isPrivilegedUser, [isPrivilegedUser]);
 
     const value: EvaluationContextType = {

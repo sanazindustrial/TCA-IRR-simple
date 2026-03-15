@@ -1,5 +1,9 @@
 // Database and storage utilities for TCA reports
 import type { ComprehensiveAnalysisOutput } from '@/ai/flows/schemas';
+import { reportsApi, type CreateReportRequest } from './reports-api';
+
+// Backend API URL for report storage (base URL - endpoints add /api/v1)
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
 
 export type StoredReport = {
     id: string;
@@ -33,7 +37,7 @@ class ReportStorageService {
     private readonly currentReportKey = 'current_analysis_result';
 
     /**
-     * Save a report to storage (both localStorage and potentially database)
+     * Save a report to storage (both localStorage and backend API)
      */
     async saveReport(
         data: ComprehensiveAnalysisOutput,
@@ -68,10 +72,179 @@ class ReportStorageService {
         // Save to localStorage
         await this.saveToLocalStorage(report);
 
-        // TODO: Save to remote database
-        // await this.saveToDatabase(report);
+        // Save to backend API
+        try {
+            await this.saveToBackendAPI(report);
+            console.log('Report saved to backend API successfully');
+        } catch (error) {
+            console.warn('Failed to save report to backend API (will retry later):', error);
+            // Store in pending sync queue for later retry
+            this.addToPendingSyncQueue(report);
+        }
 
         return reportId;
+    }
+
+    /**
+     * Save report to backend API with versioning support
+     */
+    private async saveToBackendAPI(report: StoredReport): Promise<number | null> {
+        try {
+            // Prepare the analysis data for the API
+            const analysisData = {
+                tcaData: report.data.tcaData,
+                riskData: report.data.riskData,
+                benchmarkData: report.data.benchmarkData,
+                macroData: report.data.macroData,
+                growthData: report.data.growthData,
+                gapData: report.data.gapData,
+                founderFitData: report.data.founderFitData,
+                teamData: report.data.teamData,
+                strategicFitData: report.data.strategicFitData,
+            };
+
+            // Calculate module scores from TCA categories
+            const moduleScores: Record<string, number> = {};
+            if (report.data.tcaData?.categories) {
+                report.data.tcaData.categories.forEach(cat => {
+                    moduleScores[cat.category] = cat.rawScore;
+                });
+            }
+
+            const createRequest: CreateReportRequest = {
+                company_name: report.companyName,
+                report_type: report.reportType === 'dd' ? 'Due Diligence' : 'Triage',
+                overall_score: report.metadata.compositeScore,
+                tca_score: report.data.tcaData?.compositeScore || report.metadata.compositeScore * 10,
+                confidence: this.calculateConfidence(report.data),
+                recommendation: this.getRecommendation(report.metadata.compositeScore),
+                module_scores: moduleScores,
+                analysis_data: analysisData,
+                missing_sections: this.getMissingSections(report.data),
+            };
+
+            // Try to create the report in the backend
+            const response = await fetch(`${API_BASE_URL}/api/v1/reports?user_id=1`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(createRequest),
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`API error: ${response.status} - ${errorText}`);
+            }
+
+            const createdReport = await response.json();
+            console.log('Report created in backend with ID:', createdReport.id);
+            return createdReport.id;
+        } catch (error) {
+            console.error('Error saving to backend API:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Add report to pending sync queue for later retry
+     */
+    private addToPendingSyncQueue(report: StoredReport): void {
+        try {
+            const queueKey = 'pending_report_sync';
+            const existingQueue = localStorage.getItem(queueKey);
+            const queue: StoredReport[] = existingQueue ? JSON.parse(existingQueue) : [];
+
+            // Add to queue if not already present
+            if (!queue.find(r => r.id === report.id)) {
+                queue.push(report);
+                localStorage.setItem(queueKey, JSON.stringify(queue));
+            }
+        } catch (error) {
+            console.error('Error adding to sync queue:', error);
+        }
+    }
+
+    /**
+     * Retry syncing pending reports to backend
+     */
+    async syncPendingReports(): Promise<void> {
+        try {
+            const queueKey = 'pending_report_sync';
+            const existingQueue = localStorage.getItem(queueKey);
+            if (!existingQueue) return;
+
+            const queue: StoredReport[] = JSON.parse(existingQueue);
+            const stillPending: StoredReport[] = [];
+
+            for (const report of queue) {
+                try {
+                    await this.saveToBackendAPI(report);
+                    console.log(`Synced pending report: ${report.id}`);
+                } catch (error) {
+                    stillPending.push(report);
+                }
+            }
+
+            localStorage.setItem(queueKey, JSON.stringify(stillPending));
+        } catch (error) {
+            console.error('Error syncing pending reports:', error);
+        }
+    }
+
+    /**
+     * Calculate confidence score from analysis data
+     */
+    private calculateConfidence(data: ComprehensiveAnalysisOutput): number {
+        let dataPoints = 0;
+        let totalPoints = 9; // Max modules
+
+        if (data.tcaData) dataPoints++;
+        if (data.riskData) dataPoints++;
+        if (data.benchmarkData) dataPoints++;
+        if (data.macroData) dataPoints++;
+        if (data.growthData) dataPoints++;
+        if (data.gapData) dataPoints++;
+        if (data.founderFitData) dataPoints++;
+        if (data.teamData) dataPoints++;
+        if (data.strategicFitData) dataPoints++;
+
+        // Base confidence from data completeness
+        const dataConfidence = (dataPoints / totalPoints) * 100;
+
+        // Adjust based on TCA score stability
+        const scoreAdjustment = data.tcaData?.compositeScore
+            ? Math.min(10, Math.abs(data.tcaData.compositeScore - 50) / 5)
+            : 0;
+
+        return Math.round(Math.min(99, dataConfidence + scoreAdjustment));
+    }
+
+    /**
+     * Get recommendation based on score
+     */
+    private getRecommendation(score: number): string {
+        if (score >= 8) return 'Recommend';
+        if (score >= 6) return 'Hold';
+        if (score >= 5) return 'Conditional';
+        return 'Reject';
+    }
+
+    /**
+     * Get list of missing sections
+     */
+    private getMissingSections(data: ComprehensiveAnalysisOutput): string[] {
+        const missing: string[] = [];
+        if (!data.tcaData) missing.push('TCA Scorecard');
+        if (!data.riskData) missing.push('Risk Assessment');
+        if (!data.benchmarkData) missing.push('Benchmark Comparison');
+        if (!data.macroData) missing.push('Macro Trend Analysis');
+        if (!data.growthData) missing.push('Growth Classification');
+        if (!data.gapData) missing.push('Gap Analysis');
+        if (!data.founderFitData) missing.push('Founder Fit');
+        if (!data.teamData) missing.push('Team Assessment');
+        if (!data.strategicFitData) missing.push('Strategic Fit');
+        return missing;
     }
 
     /**

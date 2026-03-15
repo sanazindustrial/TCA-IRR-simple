@@ -62,7 +62,7 @@ const defaultDdSections = [
     { id: 'dd-macro-trend', title: "Macro Trend & Benchmark", active: true, description: "" },
     { id: 'dd-growth-classifier', title: "Growth Classifier Matrix", active: true, description: "" },
     { id: 'dd-strategic-fit', title: "Strategic Fit Matrix", active: true, description: "" },
-    { id: 'dd-reviewer-analysis', title: "Reviewer Analysis", active: true, description: "" },
+    { id: 'dd-Analyst-analysis', title: "Analyst Analysis", active: true, description: "" },
     { id: 'dd-founder-fit', title: "Founder & Team Analysis", active: true, description: "" },
     { id: 'dd-competitive-landscape', title: "Competitive Landscape", active: true, description: "" },
     { id: 'dd-regulatory-compliance', title: "Regulatory & Compliance", active: true, description: "" },
@@ -471,7 +471,7 @@ export default function ReportConfigurationPage() {
                         <CardContent>
                             <Tabs defaultValue="admin" className="w-full">
                                 <TabsList>
-                                    <TabsTrigger value="admin">Admin/Reviewer View</TabsTrigger>
+                                    <TabsTrigger value="admin">Admin/Analyst View</TabsTrigger>
                                     <TabsTrigger value="standard">Standard User View</TabsTrigger>
                                 </TabsList>
                                 <TabsContent value="admin" className="mt-4">
@@ -958,3 +958,5 @@ export default function ReportConfigurationPage() {
         </div>
     );
 }
+
+

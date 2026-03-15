@@ -8,7 +8,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Timer, Eye } from 'lucide-react';
+import { Timer, Eye, Save, Loader2 } from 'lucide-react';
 
 // Hooks and Utils
 import { useToast } from '@/hooks/use-toast';
@@ -30,9 +30,9 @@ import { QuickSummary } from '@/components/evaluation/quick-summary';
 import { ExecutiveSummary } from '@/components/evaluation/executive-summary';
 import { TcaSummaryCard } from '@/components/evaluation/tca-summary-card';
 import { ConsistencyCheck } from '@/components/evaluation/consistency-check';
-import { ReviewerComments } from '@/components/evaluation/reviewer-comments';
+import { AnalystComments } from '@/components/evaluation/analyst-comments';
 import { FinalRecommendation } from '@/components/evaluation/final-recommendation';
-import { ReviewerAIDeviation } from '@/components/evaluation/reviewer-ai-deviation';
+import { AnalystAIDeviation } from '@/components/evaluation/analyst-ai-deviation';
 import { WeightedScoreBreakdown } from '@/components/evaluation/weighted-score-breakdown';
 import { CompetitiveLandscape } from '@/components/evaluation/competitive-landscape';
 import { RegulatoryComplianceReview } from '@/components/evaluation/regulatory-compliance-review';
@@ -56,7 +56,7 @@ import { sampleAnalysisData, type ComprehensiveAnalysisOutput } from '@/lib/samp
 import { normalizeAnalysisData } from '@/lib/normalize-tca-data';
 
 // Type Definitions
-export type UserRole = 'user' | 'admin' | 'reviewer';
+export type UserRole = 'user' | 'admin' | 'analyst';
 export type ReportType = 'triage' | 'dd';
 type ReportSection = { id: string; title: string; active: boolean; };
 
@@ -103,8 +103,8 @@ const allReportComponents = [
 
     // Review & Final Components
     { id: 'ceo-questions', title: 'CEO Questions', component: CEOQuestions, category: 'review' },
-    { id: 'reviewer-comments', title: 'Reviewer Comments', component: ReviewerComments, category: 'review' },
-    { id: 'reviewer-ai-deviation', title: 'Reviewer AI Deviation', component: ReviewerAIDeviation, category: 'review' },
+    { id: 'analyst-comments', title: 'Analyst Comments', component: AnalystComments, category: 'review' },
+    { id: 'analyst-ai-deviation', title: 'Analyst AI Deviation', component: AnalystAIDeviation, category: 'review' },
     { id: 'final-recommendation', title: 'Final Recommendation', component: FinalRecommendation, category: 'review' },
     { id: 'appendix', title: 'Appendix', component: Appendix, category: 'review' }
 ];
@@ -124,7 +124,7 @@ const triageStandardConfig = [
     { id: 'final-recommendation', title: 'Final Recommendation', active: true }
 ];
 
-// Triage Report Configuration (Admin/Reviewer) - Enhanced 5-7 pages
+// Triage Report Configuration (Admin/Analyst) - Enhanced 5-7 pages
 const triageAdminConfig = [
     { id: 'executive-summary', title: 'Executive Summary', active: true },
     { id: 'tca-scorecard', title: 'TCA Scorecard', active: true },
@@ -141,7 +141,7 @@ const triageAdminConfig = [
     { id: 'growth-classifier', title: 'Growth Classifier', active: true },
     { id: 'team-assessment', title: 'Team Assessment', active: true },
     { id: 'consistency-check', title: 'Consistency Check', active: true },
-    { id: 'reviewer-comments', title: 'Reviewer Comments', active: true },
+    { id: 'analyst-comments', title: 'Analyst Comments', active: true },
     { id: 'final-recommendation', title: 'Final Recommendation', active: true }
 ];
 
@@ -172,8 +172,8 @@ const ddReportConfig = [
     { id: 'term-sheet-trigger', title: 'Term Sheet Trigger Analysis', active: true },
     { id: 'ceo-questions', title: 'CEO Questions', active: true },
     { id: 'consistency-check', title: 'Consistency Check', active: true },
-    { id: 'reviewer-comments', title: 'Reviewer Comments', active: true },
-    { id: 'reviewer-ai-deviation', title: 'Reviewer AI Deviation', active: true },
+    { id: 'analyst-comments', title: 'Analyst Comments', active: true },
+    { id: 'analyst-ai-deviation', title: 'Analyst AI Deviation', active: true },
     { id: 'final-recommendation', title: 'Final Recommendation', active: true },
     { id: 'appendix', title: 'Appendix', active: true }
 ];
@@ -232,8 +232,8 @@ function getComponentData(componentId: string, analysisData: ComprehensiveAnalys
 
         // Review & Final
         case 'ceo-questions':
-        case 'reviewer-comments':
-        case 'reviewer-ai-deviation':
+        case 'analyst-comments':
+        case 'analyst-ai-deviation':
         case 'final-recommendation':
         case 'appendix':
             return analysisData;
@@ -257,23 +257,29 @@ function ReportView({
         visibleSections.some(section => section.id === comp.id && section.active)
     );
 
+    // Helper to render component with proper props
+    const renderComponent = (id: string, Component: React.ComponentType<any>) => {
+        switch (id) {
+            case 'tca-summary-card':
+                return <Component initialData={getComponentData(id, analysisData)} />;
+            case 'tca-ai-table':
+                return <Component data={getComponentData(id, analysisData)} />;
+            case 'tca-interpretation-summary':
+                return <Component tcaData={getComponentData(id, analysisData)} />;
+            case 'risk-flag-summary-table':
+                return <Component data={analysisData.riskData} />;
+            case 'flag-analysis-narrative':
+                return <Component riskData={analysisData.riskData} tcaData={analysisData.tcaData} />;
+            default:
+                return <Component data={getComponentData(id, analysisData)} />;
+        }
+    };
+
     return (
         <div className="space-y-8">
-            {visibleComponents.map(({ id, title, component: Component }) => (
+            {visibleComponents.map(({ id, component: Component }) => (
                 <div key={id} id={id}>
-                    {id === 'tca-summary-card' ? (
-                        <Component initialData={getComponentData(id, analysisData)} />
-                    ) : id === 'tca-ai-table' ? (
-                        <Component data={getComponentData(id, analysisData)} />
-                    ) : id === 'tca-interpretation-summary' ? (
-                        <Component tcaData={getComponentData(id, analysisData)} />
-                    ) : id === 'risk-flag-summary-table' ? (
-                        <Component data={analysisData.riskData} />
-                    ) : id === 'flag-analysis-narrative' ? (
-                        <Component riskData={analysisData.riskData} tcaData={analysisData.tcaData} />
-                    ) : (
-                        <Component data={getComponentData(id, analysisData)} />
-                    )}
+                    {renderComponent(id, Component)}
                 </div>
             ))}
         </div>
@@ -358,7 +364,7 @@ export default function AnalysisResultPage({
                 // Set report type from URL params or localStorage with access control
                 if (params.type === 'dd') {
                     // Check if user has permission for DD reports
-                    const isPrivileged = role === 'admin' || role === 'reviewer';
+                    const isPrivileged = role === 'admin' || role === 'analyst';
                     if (isPrivileged) {
                         setReportType('dd');
                     } else {
@@ -370,7 +376,7 @@ export default function AnalysisResultPage({
                             toast({
                                 variant: 'destructive',
                                 title: 'Access Restricted',
-                                description: 'Due Diligence reports are only available for admin and reviewer accounts.',
+                                description: 'Due Diligence reports are only available for admin and analyst accounts.',
                             });
                         }, 1000);
                     }
@@ -380,7 +386,7 @@ export default function AnalysisResultPage({
                     // Try to load from localStorage or default to triage
                     const savedReportType = localStorage.getItem('currentReportType') as ReportType;
                     // Ensure standard users can't access DD even from localStorage
-                    if (savedReportType === 'dd' && !(role === 'admin' || role === 'reviewer')) {
+                    if (savedReportType === 'dd' && !(role === 'admin' || role === 'analyst')) {
                         setReportType('triage');
                     } else {
                         setReportType(savedReportType || 'triage');
@@ -415,7 +421,7 @@ export default function AnalysisResultPage({
         }
 
         try {
-            const isPrivileged = role === 'admin' || role === 'reviewer';
+            const isPrivileged = role === 'admin' || role === 'analyst';
             let configKey = '';
             let defaultConfig: ReportSection[] = [];
 
@@ -429,7 +435,7 @@ export default function AnalysisResultPage({
                     defaultConfig = triageStandardConfig;
                 }
             } else if (reportType === 'dd') {
-                // STRICT: Only admin/reviewer can access DD reports
+                // STRICT: Only admin/analyst can access DD reports
                 if (isPrivileged) {
                     configKey = 'report-config-dd';
                     defaultConfig = ddReportConfig;
@@ -445,7 +451,7 @@ export default function AnalysisResultPage({
                         toast({
                             variant: 'destructive',
                             title: 'Access Denied',
-                            description: 'Due Diligence reports are restricted to admin and reviewer accounts only.',
+                            description: 'Due Diligence reports are restricted to admin and analyst accounts only.',
                         });
                     }, 500);
                 }
@@ -499,6 +505,68 @@ export default function AnalysisResultPage({
         router.push('/dashboard/evaluation');
     };
 
+    // Handle save to reports and redirect
+    const [isSaving, setIsSaving] = useState(false);
+    const handleSaveToReports = async () => {
+        if (!analysisData || isPreview) {
+            toast({
+                variant: 'destructive',
+                title: 'Cannot Save',
+                description: 'No analysis data available to save.'
+            });
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            const user = localStorage.getItem('loggedInUser') || localStorage.getItem('user');
+            const userData = user ? JSON.parse(user) : { id: 'anonymous', email: 'anonymous@example.com' };
+            const userId = userData.id || userData.email || 'anonymous';
+            const companyName = (analysisData as any).companyName ||
+                localStorage.getItem('analysisCompanyName') ||
+                'Analysis Report';
+
+            // Save the report
+            const reportId = await saveAnalysisReport(analysisData, {
+                reportType,
+                framework,
+                userId,
+                companyName,
+                analysisDuration: analysisDuration ?? undefined,
+                tags: [reportType, framework]
+            });
+
+            console.log(`Report saved with ID: ${reportId}`);
+
+            toast({
+                title: 'Report Saved Successfully',
+                description: `${companyName} ${reportType.toUpperCase()} report saved. Redirecting to Reports...`
+            });
+
+            // Try to sync any pending reports
+            try {
+                await reportStorage.syncPendingReports();
+            } catch (e) {
+                console.warn('Pending report sync failed:', e);
+            }
+
+            // Redirect to reports page after a short delay
+            setTimeout(() => {
+                router.push('/dashboard/reports');
+            }, 1500);
+
+        } catch (error) {
+            console.error('Save failed:', error);
+            toast({
+                variant: 'destructive',
+                title: 'Save Failed',
+                description: 'Could not save report. Please try again.'
+            });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     // Auto-save analysis when data is loaded
     useEffect(() => {
         const autoSaveAnalysis = async () => {
@@ -518,7 +586,7 @@ export default function AnalysisResultPage({
                     framework,
                     userId,
                     companyName,
-                    analysisDuration,
+                    analysisDuration: analysisDuration ?? undefined,
                     tags: [reportType, framework]
                 });
 
@@ -584,7 +652,7 @@ export default function AnalysisResultPage({
                                         >
                                             Triage Report
                                         </Button>
-                                        {(role === 'admin' || role === 'reviewer') && (
+                                        {(role === 'admin' || role === 'analyst') && (
                                             <Button
                                                 variant={reportType === 'dd' ? 'default' : 'outline'}
                                                 size="sm"
@@ -600,6 +668,24 @@ export default function AnalysisResultPage({
                                             <Link href="/dashboard/evaluation">
                                                 New Analysis
                                             </Link>
+                                        </Button>
+                                        <Button
+                                            onClick={handleSaveToReports}
+                                            disabled={isSaving}
+                                            variant="default"
+                                            size="sm"
+                                        >
+                                            {isSaving ? (
+                                                <>
+                                                    <Loader2 className="size-4 animate-spin mr-2" />
+                                                    Saving...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Save className="size-4 mr-2" />
+                                                    Save to Reports
+                                                </>
+                                            )}
                                         </Button>
                                     </>
                                 )}

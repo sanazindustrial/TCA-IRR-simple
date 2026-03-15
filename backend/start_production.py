@@ -88,7 +88,9 @@ def run_production_server():
                     workers=int(os.getenv("WORKERS", 1)),
                     reload=False,
                     access_log=True,
-                    log_level="info")
+                    log_level="info",
+                    proxy_headers=True,
+                    forwarded_allow_ips="*")
     except Exception as e:
         logger.error(f"Failed to start server: {e}")
         sys.exit(1)

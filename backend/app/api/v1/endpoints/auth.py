@@ -93,6 +93,47 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(
                             detail="Database error")
 
 
+async def get_optional_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer(auto_error=False)),
+    db: asyncpg.Connection = Depends(get_db)
+) -> dict | None:
+    """Get current user if authenticated, otherwise return None.
+    Does not raise exception for unauthenticated requests."""
+    
+    if credentials is None:
+        return None
+    
+    try:
+        token = credentials.credentials
+        
+        # Check if token is blacklisted
+        if await token_blacklist.is_blacklisted(token):
+            return None
+        
+        payload = verify_token(token)
+        if payload is None:
+            return None
+
+        username = payload.get("sub")
+        if username is None:
+            return None
+
+        user = await db.fetchrow(
+            "SELECT id, username, email, role, is_active, created_at FROM users WHERE username = $1",
+            username)
+
+        if user is None or not user['is_active']:
+            return None
+
+        user_dict = dict(user)
+        user_dict['full_name'] = None
+        return user_dict
+
+    except Exception as e:
+        logger.debug(f"Optional auth check failed: {e}")
+        return None
+
+
 async def get_user_by_username(db: asyncpg.Connection, username: str) -> dict:
     """Get user by username"""
     try:
@@ -111,6 +152,24 @@ async def get_user_by_username(db: asyncpg.Connection, username: str) -> dict:
         return None
 
 
+async def get_user_by_email(db: asyncpg.Connection, email: str) -> dict:
+    """Get user by email address"""
+    try:
+        user = await db.fetchrow(
+            "SELECT id, username, email, password_hash, role, is_active FROM users WHERE email = $1",
+            email)
+        if user:
+            user_dict = dict(user)
+            # Map password_hash to password for compatibility with verify_password
+            user_dict['password'] = user_dict.pop('password_hash', None)
+            user_dict['full_name'] = None  # Column doesn't exist in DB
+            return user_dict
+        return None
+    except Exception as e:
+        logger.error(f"Error fetching user by email {email}: {e}")
+        return None
+
+
 @router.post("/login", response_model=Token)
 async def login(request: Request,
                 user_credentials: UserLogin,
@@ -118,7 +177,7 @@ async def login(request: Request,
     """
     Authenticate user and return access token
     
-    - **username**: User's username
+    - **email**: User's email address
     - **password**: User's password
     
     Security features:
@@ -131,11 +190,11 @@ async def login(request: Request,
     
     try:
         # Check if account is locked
-        is_locked, minutes_remaining = await account_lockout.is_locked(user_credentials.username)
+        is_locked, minutes_remaining = await account_lockout.is_locked(user_credentials.email)
         if is_locked:
             await audit_logger.log(
                 AuditEventType.LOGIN_FAILED,
-                username=user_credentials.username,
+                username=user_credentials.email,
                 ip_address=client_ip,
                 user_agent=user_agent,
                 action_details={"reason": "account_locked", "minutes_remaining": minutes_remaining},
@@ -147,25 +206,25 @@ async def login(request: Request,
                 detail=f"Account locked. Try again in {minutes_remaining} minutes"
             )
         
-        # Get user from database
-        user = await get_user_by_username(db, user_credentials.username)
+        # Get user from database by email
+        user = await get_user_by_email(db, user_credentials.email)
 
         if not user:
             # Record failed attempt
             locked, remaining = await account_lockout.record_failed_attempt(
-                user_credentials.username, client_ip
+                user_credentials.email, client_ip
             )
             await audit_logger.log(
                 AuditEventType.LOGIN_FAILED,
-                username=user_credentials.username,
+                username=user_credentials.email,
                 ip_address=client_ip,
                 user_agent=user_agent,
                 action_details={"reason": "user_not_found"},
                 success=False,
                 db=db
             )
-            logger.warning(f"Login attempt for non-existent user: {user_credentials.username}")
-            detail = "Incorrect username or password"
+            logger.warning(f"Login attempt for non-existent user: {user_credentials.email}")
+            detail = "Incorrect email or password"
             if locked:
                 detail += ". Account has been locked due to multiple failed attempts"
             elif remaining <= 2:
@@ -176,25 +235,25 @@ async def login(request: Request,
         if not verify_password(user_credentials.password, user['password']):
             # Record failed attempt
             locked, remaining = await account_lockout.record_failed_attempt(
-                user_credentials.username, client_ip
+                user_credentials.email, client_ip
             )
             await audit_logger.log(
                 AuditEventType.LOGIN_FAILED,
                 user_id=user['id'],
-                username=user_credentials.username,
+                username=user_credentials.email,
                 ip_address=client_ip,
                 user_agent=user_agent,
                 action_details={"reason": "invalid_password", "locked": locked},
                 success=False,
                 db=db
             )
-            logger.warning(f"Failed login attempt for user: {user_credentials.username}")
-            detail = "Incorrect username or password"
+            logger.warning(f"Failed login attempt for user: {user_credentials.email}")
+            detail = "Incorrect email or password"
             if locked:
                 await audit_logger.log(
                     AuditEventType.ACCOUNT_LOCKED,
                     user_id=user['id'],
-                    username=user_credentials.username,
+                    username=user_credentials.email,
                     ip_address=client_ip,
                     action_details={"reason": "max_failed_attempts"},
                     db=db
@@ -209,19 +268,19 @@ async def login(request: Request,
             await audit_logger.log(
                 AuditEventType.LOGIN_FAILED,
                 user_id=user['id'],
-                username=user_credentials.username,
+                username=user_credentials.email,
                 ip_address=client_ip,
                 user_agent=user_agent,
                 action_details={"reason": "account_inactive"},
                 success=False,
                 db=db
             )
-            logger.warning(f"Login attempt for inactive user: {user_credentials.username}")
+            logger.warning(f"Login attempt for inactive user: {user_credentials.email}")
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
                                 detail="Account is inactive")
 
         # Clear failed attempts on successful login
-        await account_lockout.clear_failed_attempts(user_credentials.username)
+        await account_lockout.clear_failed_attempts(user_credentials.email)
         
         # Create access token
         access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
@@ -242,7 +301,7 @@ async def login(request: Request,
             db=db
         )
         
-        logger.info(f"Successful login for user: {user_credentials.username}")
+        logger.info(f"Successful login for user: {user_credentials.email}")
 
         return Token(access_token=access_token,
                      token_type="bearer",

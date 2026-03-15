@@ -129,7 +129,7 @@ export function middleware(request: NextRequest) {
         }
     }
 
-    // Protect DD reports (admin/reviewer only)
+    // Protect DD reports (admin/Analyst only)
     if (pathname === '/analysis/result' && url.searchParams.get('type') === 'dd') {
         // In a real app, check user role from session/JWT
         // For now, this will be handled client-side
@@ -212,3 +212,6 @@ export const config = {
         '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
     ],
 };
+
+
+

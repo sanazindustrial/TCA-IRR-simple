@@ -2,11 +2,11 @@
 'use client';
 import { useState } from 'react';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
 } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileCode, Database, Users, FileText, Send, Settings, Link as LinkIcon, BrainCircuit } from 'lucide-react';
@@ -17,7 +17,7 @@ import SystemConfigurationSchema from './system-configuration/page';
 const usersSchema = `-- schema/users.sql
 
 -- Enum type for user roles to ensure data consistency
-CREATE TYPE user_role AS ENUM ('Admin', 'Reviewer', 'User', 'AI Adopter');
+CREATE TYPE user_role AS ENUM ('Admin', 'Analyst', 'User', 'AI Adopter');
 
 -- Main table for storing user information
 CREATE TABLE users (
@@ -282,99 +282,99 @@ CREATE INDEX idx_app_requests_type ON app_requests(request_type);`;
 
 
 const SchemaViewer = ({ content }: { content: string }) => {
-  return (
-    <pre className="bg-muted/50 p-4 rounded-lg overflow-x-auto text-sm font-mono">
-      <code>{content}</code>
-    </pre>
-  );
+    return (
+        <pre className="bg-muted/50 p-4 rounded-lg overflow-x-auto text-sm font-mono">
+            <code>{content}</code>
+        </pre>
+    );
 };
 
 export default function SchemaPage() {
-  return (
-    <div className="container mx-auto p-4 md:p-8">
-      <header className="mb-8">
-        <h1 className="text-2xl font-semibold flex items-center gap-2">
-          <Database className="text-primary" />
-          Database Schema & Models
-        </h1>
-        <p className="text-muted-foreground">
-          PostgreSQL schema definitions for the application's data structures.
-        </p>
-      </header>
+    return (
+        <div className="container mx-auto p-4 md:p-8">
+            <header className="mb-8">
+                <h1 className="text-2xl font-semibold flex items-center gap-2">
+                    <Database className="text-primary" />
+                    Database Schema & Models
+                </h1>
+                <p className="text-muted-foreground">
+                    PostgreSQL schema definitions for the application's data structures.
+                </p>
+            </header>
 
-      <Card>
-        <CardContent className="p-0">
-          <Tabs defaultValue="evaluations" className="w-full">
-            <TabsList className="p-2 h-auto rounded-b-none grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 w-full">
-              <TabsTrigger value="users" className="py-2 flex items-center gap-2">
-                <Users /> Users
-              </TabsTrigger>
-              <TabsTrigger value="evaluations" className="py-2 flex items-center gap-2">
-                <FileText /> Reports
-              </TabsTrigger>
-              <TabsTrigger value="modules" className="py-2 flex items-center gap-2">
-                <BrainCircuit /> Modules
-              </TabsTrigger>
-              <TabsTrigger value="system-configs" className="py-2 flex items-center gap-2">
-                <Settings /> System Config
-              </TabsTrigger>
-               <TabsTrigger value="external-sources" className="py-2 flex items-center gap-2">
-                <LinkIcon /> External Sources
-              </TabsTrigger>
-              <TabsTrigger value="requests" className="py-2 flex items-center gap-2">
-                <Send /> App Requests
-              </TabsTrigger>
-            </TabsList>
-            <div className="p-6">
-                <TabsContent value="users">
-                    <CardHeader className="px-0">
-                        <CardTitle>User & Authentication Schema</CardTitle>
-                        <CardDescription>
-                            Defines tables for users, roles, settings, and quotas.
-                        </CardDescription>
-                    </CardHeader>
-                    <SchemaViewer content={usersSchema} />
-                </TabsContent>
-                <TabsContent value="evaluations">
-                     <CardHeader className="px-0">
-                        <CardTitle>Evaluations, Reports & Documents Schema</CardTitle>
-                        <CardDescription>
-                            Defines the core tables for evaluation runs, the resulting triage/DD reports, and submitted documents with their extracted metadata.
-                        </CardDescription>
-                    </CardHeader>
-                    <SchemaViewer content={evaluationsSchema} />
-                </TabsContent>
-                 <TabsContent value="modules">
-                     <CardHeader className="px-0">
-                        <CardTitle>Analysis Modules Schema</CardTitle>
-                        <CardDescription>
-                            Defines the nine dedicated tables for storing detailed results from each analysis module.
-                        </CardDescription>
-                    </CardHeader>
-                    <SchemaViewer content={evaluationsSchema.substring(evaluationsSchema.indexOf("-- 9 Module Tables Follow --"))} />
-                </TabsContent>
-                 <TabsContent value="system-configs">
-                    <SystemConfigurationSchema />
-                </TabsContent>
-                <TabsContent value="module-configs">
-                    <ModuleConfigurationsSchema />
-                </TabsContent>
-                <TabsContent value="external-sources">
-                    <ExternalSourcesSchema />
-                </TabsContent>
-                <TabsContent value="requests">
-                     <CardHeader className="px-0">
-                        <CardTitle>Application Requests Schema</CardTitle>
-                        <CardDescription>
-                            Defines the table for managing user-submitted requests from the "Submit Request" page.
-                        </CardDescription>
-                    </CardHeader>
-                    <SchemaViewer content={requestsSchema} />
-                </TabsContent>
-            </div>
-          </Tabs>
-        </CardContent>
-      </Card>
-    </div>
-  );
+            <Card>
+                <CardContent className="p-0">
+                    <Tabs defaultValue="evaluations" className="w-full">
+                        <TabsList className="p-2 h-auto rounded-b-none grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 w-full">
+                            <TabsTrigger value="users" className="py-2 flex items-center gap-2">
+                                <Users /> Users
+                            </TabsTrigger>
+                            <TabsTrigger value="evaluations" className="py-2 flex items-center gap-2">
+                                <FileText /> Reports
+                            </TabsTrigger>
+                            <TabsTrigger value="modules" className="py-2 flex items-center gap-2">
+                                <BrainCircuit /> Modules
+                            </TabsTrigger>
+                            <TabsTrigger value="system-configs" className="py-2 flex items-center gap-2">
+                                <Settings /> System Config
+                            </TabsTrigger>
+                            <TabsTrigger value="external-sources" className="py-2 flex items-center gap-2">
+                                <LinkIcon /> External Sources
+                            </TabsTrigger>
+                            <TabsTrigger value="requests" className="py-2 flex items-center gap-2">
+                                <Send /> App Requests
+                            </TabsTrigger>
+                        </TabsList>
+                        <div className="p-6">
+                            <TabsContent value="users">
+                                <CardHeader className="px-0">
+                                    <CardTitle>User & Authentication Schema</CardTitle>
+                                    <CardDescription>
+                                        Defines tables for users, roles, settings, and quotas.
+                                    </CardDescription>
+                                </CardHeader>
+                                <SchemaViewer content={usersSchema} />
+                            </TabsContent>
+                            <TabsContent value="evaluations">
+                                <CardHeader className="px-0">
+                                    <CardTitle>Evaluations, Reports & Documents Schema</CardTitle>
+                                    <CardDescription>
+                                        Defines the core tables for evaluation runs, the resulting triage/DD reports, and submitted documents with their extracted metadata.
+                                    </CardDescription>
+                                </CardHeader>
+                                <SchemaViewer content={evaluationsSchema} />
+                            </TabsContent>
+                            <TabsContent value="modules">
+                                <CardHeader className="px-0">
+                                    <CardTitle>Analysis Modules Schema</CardTitle>
+                                    <CardDescription>
+                                        Defines the nine dedicated tables for storing detailed results from each analysis module.
+                                    </CardDescription>
+                                </CardHeader>
+                                <SchemaViewer content={evaluationsSchema.substring(evaluationsSchema.indexOf("-- 9 Module Tables Follow --"))} />
+                            </TabsContent>
+                            <TabsContent value="system-configs">
+                                <SystemConfigurationSchema />
+                            </TabsContent>
+                            <TabsContent value="module-configs">
+                                <ModuleConfigurationsSchema />
+                            </TabsContent>
+                            <TabsContent value="external-sources">
+                                <ExternalSourcesSchema />
+                            </TabsContent>
+                            <TabsContent value="requests">
+                                <CardHeader className="px-0">
+                                    <CardTitle>Application Requests Schema</CardTitle>
+                                    <CardDescription>
+                                        Defines the table for managing user-submitted requests from the "Submit Request" page.
+                                    </CardDescription>
+                                </CardHeader>
+                                <SchemaViewer content={requestsSchema} />
+                            </TabsContent>
+                        </div>
+                    </Tabs>
+                </CardContent>
+            </Card>
+        </div>
+    );
 }

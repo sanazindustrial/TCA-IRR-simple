@@ -1,4 +1,3 @@
-
 'use client';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -92,7 +91,7 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
     }
 
     const userRole = user?.role.toLowerCase() || 'user';
-    const isPrivilegedUser = userRole === 'admin' || userRole === 'reviewer';
+    const isPrivilegedUser = userRole === 'admin' || userRole === 'analyst';
 
     if (isFooter) {
         return (
@@ -239,9 +238,9 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
                 <SidebarGroupLabel>User Tools</SidebarGroupLabel>
                 <SidebarMenu>
                     <SidebarMenuItem>
-                        <SidebarMenuButton href="/dashboard/request" isActive={pathname === '/dashboard/request'} tooltip="Submit Request">
+                        <SidebarMenuButton href="/dashboard/request" isActive={pathname === '/dashboard/request'} tooltip="Submit Request to Admin">
                             <Send />
-                            <span>Submit Request</span>
+                            <span>Submit Request to Admin</span>
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                     <SidebarMenuItem>
@@ -256,18 +255,18 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
             {isPrivilegedUser && (
                 <>
                     <SidebarGroup>
-                        <SidebarGroupLabel>Reviewer Tools</SidebarGroupLabel>
+                        <SidebarGroupLabel>Analyst Tools</SidebarGroupLabel>
                         <SidebarMenu>
                             <SidebarMenuItem>
-                                <SidebarMenuButton href="/dashboard/reviewer" isActive={pathname === '/dashboard/reviewer'} tooltip="Reviewer Hub">
+                                <SidebarMenuButton href="/dashboard/analyst" isActive={pathname === '/dashboard/analyst'} tooltip="Analyst Hub">
                                     <Bell />
-                                    <span>Reviewer Hub</span>
+                                    <span>Analyst Hub</span>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
                             <SidebarMenuItem>
-                                <SidebarMenuButton href="/analysis/modules/reviewer" isActive={pathname === '/analysis/modules/reviewer'} tooltip="Reviewer Analysis">
+                                <SidebarMenuButton href="/analysis/modules/analyst" isActive={pathname === '/analysis/modules/analyst'} tooltip="Analyst Analysis">
                                     <MessageSquare />
-                                    <span>Reviewer Analysis</span>
+                                    <span>Analyst Analysis</span>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
                         </SidebarMenu>
@@ -361,9 +360,9 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
                             <SidebarMenuItem>
-                                <SidebarMenuButton href="/dashboard/ssd-audit" isActive={pathname === '/dashboard/ssd-audit'} tooltip="SSD Audit Logs">
+                                <SidebarMenuButton href="/dashboard/ssd-audit" isActive={pathname === '/dashboard/ssd-audit'} tooltip="Startup Steroid Audit">
                                     <Activity />
-                                    <span>SSD Audit Logs</span>
+                                    <span>Startup Steroid Audit</span>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
                             <SidebarMenuItem>
@@ -379,3 +378,5 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
         </SidebarContent>
     );
 }
+
+

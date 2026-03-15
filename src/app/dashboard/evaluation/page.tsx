@@ -14,7 +14,7 @@ import { useRouter } from 'next/navigation';
 import { runAnalysis } from '@/app/analysis/actions';
 import { sampleAnalysisData } from '@/lib/sample-data';
 
-export type UserRole = 'user' | 'admin' | 'reviewer';
+export type UserRole = 'user' | 'admin' | 'analyst';
 export type ReportType = 'triage' | 'dd';
 
 // Autosave storage key
@@ -132,7 +132,7 @@ function AnalysisSetup({ onClearAllData, onExtractFromDocuments, isExtracting, e
                 />
             </div>
 
-            {/* Step 3: External Data Sources (Admin/Reviewer only) */}
+            {/* Step 3: External Data Sources (Admin/Analyst only) */}
             {isPrivilegedUser && (
                 <div className="relative">
                     <div className="absolute -left-4 top-0 flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground font-bold text-sm">
@@ -142,7 +142,7 @@ function AnalysisSetup({ onClearAllData, onExtractFromDocuments, isExtracting, e
                 </div>
             )}
 
-            {/* Step 4: Module Configuration (Admin/Reviewer only) */}
+            {/* Step 4: Module Configuration (Admin/Analyst only) */}
             {isPrivilegedUser && (
                 <div className="relative">
                     <div className="absolute -left-4 top-0 flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground font-bold text-sm">
@@ -494,12 +494,12 @@ export default function EvaluationPage() {
             clearAutosave();
 
             // Role-based navigation:
-            // - Admin/Reviewer: Must go to what-if to review and adjust 9 module scores
+            // - Admin/Analyst: Must go to what-if to review and adjust 9 module scores
             // - Standard user: Skip what-if, go directly to result page for triage report
-            if (role === 'admin' || role === 'reviewer') {
+            if (role === 'admin' || role === 'analyst') {
                 toast({
                     title: 'Redirecting to Score Review',
-                    description: 'As an admin/reviewer, please review and adjust scores from 9 modules before generating the report.',
+                    description: 'As an admin/analyst, please review and adjust scores from 9 modules before generating the report.',
                 });
                 router.push('/analysis/what-if');
             } else {
@@ -517,7 +517,7 @@ export default function EvaluationPage() {
         }
     };
 
-    const isPrivilegedUser = role === 'admin' || role === 'reviewer';
+    const isPrivilegedUser = role === 'admin' || role === 'analyst';
 
 
     return (
@@ -551,7 +551,7 @@ export default function EvaluationPage() {
             <main className="bg-background text-foreground">
                 <div className="container mx-auto p-4 md:p-8">
                     <header className="text-center mb-12">
-                        {(role === 'admin' || role === 'reviewer') && (
+                        {(role === 'admin' || role === 'analyst') && (
                             <div className="flex justify-center items-center gap-4 mb-4">
                                 <Label htmlFor="role-switcher" className={!isPrivilegedUser ? 'text-primary' : ''}>Standard User</Label>
                                 <Switch
@@ -565,7 +565,7 @@ export default function EvaluationPage() {
                                         }
                                     }}
                                 />
-                                <Label htmlFor="role-switcher" className={isPrivilegedUser ? 'text-primary' : ''}>Admin / Reviewer</Label>
+                                <Label htmlFor="role-switcher" className={isPrivilegedUser ? 'text-primary' : ''}>Admin / Analyst</Label>
                             </div>
                         )}
                         <div className='relative'>

@@ -51,7 +51,7 @@ export function ConsistencyCheck() {
     <DashboardCard
       title="Consistency Check, Quality & Statistics"
       icon={CheckCircle}
-      description="Automated checks for analysis quality and data consistency (Admin/Reviewer Only)."
+      description="Automated checks for analysis quality and data consistency (Admin/Analyst Only)."
     >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card>
@@ -84,3 +84,5 @@ export function ConsistencyCheck() {
     </DashboardCard>
   );
 }
+
+

@@ -191,7 +191,7 @@ export default function SimulationGuidePage() {
         console.error("Failed to parse user from storage");
       }
     }
-    setIsPrivilegedView(userRole === 'admin' || userRole === 'reviewer');
+    setIsPrivilegedView(userRole === 'admin' || userRole === 'analyst');
 
     // Initialize scores based on all categories
     const allScores: Record<string, ScoreRow[]> = {};
@@ -253,7 +253,7 @@ export default function SimulationGuidePage() {
               <div className="flex items-center gap-2">
                 <Label htmlFor="role-switcher" className={!isPrivilegedView ? 'text-primary' : ''}>Standard View</Label>
                 <Switch id="role-switcher" checked={isPrivilegedView} onCheckedChange={setIsPrivilegedView} />
-                <Label htmlFor="role-switcher" className={isPrivilegedView ? 'text-primary' : ''}>Admin/Reviewer View</Label>
+                <Label htmlFor="role-switcher" className={isPrivilegedView ? 'text-primary' : ''}>Admin/Analyst View</Label>
               </div>
             </div>
             {isPrivilegedView ? (

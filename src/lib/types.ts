@@ -1,6 +1,6 @@
 // Core application types
 
-export type Role = 'Admin' | 'Reviewer' | 'User' | 'Guest';
+export type Role = 'Admin' | 'Analyst' | 'User' | 'Guest';
 
 export interface User {
     id: string;

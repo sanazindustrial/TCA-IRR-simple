@@ -4,7 +4,7 @@ export type User = {
   name: string;
   email: string;
   password?: string;
-  role: 'Admin' | 'Reviewer' | 'User' | 'AI Adopter';
+  role: 'Admin' | 'Analyst' | 'User' | 'AI Adopter';
   avatar?: string;
 };
 
@@ -17,11 +17,11 @@ export const users: User[] = [
     role: 'Admin',
   },
   {
-    id: 'usr_reviewer',
-    name: 'Reviewer User',
-    email: 'reviewer@tca.com',
-    password: 'reviewer123',
-    role: 'Reviewer',
+    id: 'usr_analyst',
+    name: 'Analyst User',
+    email: 'analyst@tca.com',
+    password: 'analyst123',
+    role: 'Analyst',
   },
   {
     id: 'usr_standard',
@@ -30,7 +30,7 @@ export const users: User[] = [
     password: 'user123',
     role: 'User',
   },
-   {
+  {
     id: 'usr_adopter',
     name: 'AI Adopter',
     email: 'adopter@tca.com',

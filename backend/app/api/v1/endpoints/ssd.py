@@ -1,6 +1,6 @@
 """
-SSD (Startup Success Dashboard) TIRR Integration Endpoints
-Implements the SSD → TCA TIRR API for startup data ingestion and triage report generation
+Startup Steroid TIRR Integration Endpoints
+Implements the Startup Steroid → TCA TIRR API for startup data ingestion and triage report generation
 """
 
 import logging
@@ -1287,6 +1287,48 @@ async def get_ssd_audit_log(tracking_id: str):
             detail=f"No audit log found for tracking_id: {tracking_id}"
         )
     return SSD_AUDIT_LOGS[tracking_id]
+
+
+@router.get("/audit/stats")
+async def get_ssd_audit_stats():
+    """Get aggregated statistics for SSD integration."""
+    logs = list(SSD_AUDIT_LOGS.values())
+    
+    total = len(logs)
+    completed = sum(1 for log in logs if log.get("status") == "completed")
+    failed = sum(1 for log in logs if log.get("status") == "failed")
+    processing = sum(1 for log in logs if log.get("status") == "processing")
+    
+    callback_sent = sum(1 for log in logs if log.get("callback_status") == "sent")
+    callback_failed = sum(1 for log in logs if log.get("callback_status") == "failed")
+    callback_not_configured = sum(1 for log in logs if log.get("callback_status") == "not_configured")
+    
+    processing_times = [log.get("processing_duration_ms", 0) for log in logs if log.get("processing_duration_ms")]
+    avg_processing_time = sum(processing_times) / len(processing_times) if processing_times else 0
+    
+    scores = [log.get("final_score", 0) for log in logs if log.get("final_score")]
+    avg_score = sum(scores) / len(scores) if scores else 0
+    
+    return {
+        "total_requests": total,
+        "status_breakdown": {
+            "completed": completed,
+            "failed": failed,
+            "processing": processing
+        },
+        "callback_stats": {
+            "sent": callback_sent,
+            "failed": callback_failed,
+            "not_configured": callback_not_configured
+        },
+        "performance": {
+            "avg_processing_time_ms": round(avg_processing_time, 2)
+        },
+        "scores": {
+            "avg_final_score": round(avg_score, 2),
+            "total_evaluated": len(scores)
+        }
+    }
 
 
 @router.get("/health")

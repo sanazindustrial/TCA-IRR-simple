@@ -35,15 +35,63 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Packer, Document, Paragraph, HeadingLevel, Table, TableRow, TableCell, WidthType, TextRun } from 'docx';
 import PptxGenJS from 'pptxgenjs';
-import { useEvaluationContext } from './evaluation-provider';
+import { useEvaluationContextSafe } from './evaluation-provider';
+
+// Extended type to handle runtime data that may include additional properties
+interface ExtendedAnalysisData extends ComprehensiveAnalysisOutput {
+  companyName?: string;
+  financialsData?: {
+    revenueGrowth?: string;
+    burnRate?: string;
+    runway?: string;
+    grossMargin?: string;
+    cac?: string;
+    ltv?: string;
+    cacLtv?: string;
+    overallHealth?: string;
+    strengths?: string;
+    concerns?: string;
+  };
+}
+
+// Helper function to get team members, handling both old and new property names
+const getTeamMembers = (data: ExtendedAnalysisData | null) => {
+  if (!data?.teamData) return undefined;
+  // Runtime data may use 'teamMembers' but schema uses 'members'
+  const teamData = data.teamData as { members?: Array<{ id?: string; name?: string; role?: string; experience?: string; skills?: string; avatarId?: string; assessment?: string; strengths?: string; areasForDevelopment?: string; notes?: string }> };
+  return teamData.members;
+};
+
+// Helper function to get strategic factors, handling possibly undefined structure
+const getStrategicFactors = (data: ExtendedAnalysisData | null): Array<{ factor?: string; alignment?: string; impact?: string; priority?: string; assessment?: string; actionRequired?: string }> | undefined => {
+  if (!data?.strategicFitData) return undefined;
+  const stratData = data.strategicFitData as { factors?: Array<{ factor?: string; alignment?: string; impact?: string; priority?: string; assessment?: string; actionRequired?: string }> };
+  return stratData.factors;
+};
+
+// Helper function to get growth factors
+const getGrowthFactors = (data: ExtendedAnalysisData | null): Array<{ name?: string; assessment?: string; score?: string; trend?: string; timeHorizon?: string; impact?: string; confidence?: string }> | undefined => {
+  if (!data?.growthData) return undefined;
+  const growthData = data.growthData as { factors?: Array<{ name?: string; assessment?: string; score?: string; trend?: string; timeHorizon?: string; impact?: string; confidence?: string }> };
+  return growthData.factors;
+};
+
+// Helper function to get benchmark comparisons
+const getBenchmarkComparisons = (data: ExtendedAnalysisData | null): Array<{ metric?: string; companyValue?: string; industryAverage?: string; percentile?: string; assessment?: string; variance?: string; notes?: string }> | undefined => {
+  if (!data?.benchmarkData) return undefined;
+  const benchData = data.benchmarkData as { comparisons?: Array<{ metric?: string; companyValue?: string; industryAverage?: string; percentile?: string; assessment?: string; variance?: string; notes?: string }> };
+  return benchData.comparisons;
+};
 
 
 export function ExportButtons() {
   const { toast } = useToast();
-  const { role, reportType } = useEvaluationContext();
+  const evalContext = useEvaluationContextSafe();
+  const role = evalContext?.role ?? 'user';
+  const reportType = evalContext?.reportType ?? 'triage';
   const [showPreview, setShowPreview] = useState(false);
 
-  const getAnalysisData = (): ComprehensiveAnalysisOutput | null => {
+  const getAnalysisData = (): ExtendedAnalysisData | null => {
     // Guard: Only access localStorage in browser environment
     if (typeof window === 'undefined') {
       return null;
@@ -247,14 +295,15 @@ export function ExportButtons() {
     // Investment Recommendation
     currentY = addSectionTitle(doc, 'INVESTMENT RECOMMENDATION', 80);
 
-    const recommendation = data.tcaData?.compositeScore >= 7 ?
+    const recommendationScore = data.tcaData?.compositeScore ?? 0;
+    const recommendation = recommendationScore >= 7 ?
       'RECOMMEND: Proceed to due diligence phase' :
-      data.tcaData?.compositeScore >= 5 ?
+      recommendationScore >= 5 ?
         'CONDITIONAL: Address key risks before proceeding' :
         'NOT RECOMMENDED: Significant concerns identified';
 
-    const recColor = data.tcaData?.compositeScore >= 7 ? [39, 174, 96] :
-      data.tcaData?.compositeScore >= 5 ? [243, 156, 18] : [231, 76, 60];
+    const recColor = recommendationScore >= 7 ? [39, 174, 96] :
+      recommendationScore >= 5 ? [243, 156, 18] : [231, 76, 60];
 
     doc.setFillColor(recColor[0], recColor[1], recColor[2]);
     doc.roundedRect(14, currentY - 2, 182, 12, 2, 2, 'F');
@@ -446,11 +495,12 @@ export function ExportButtons() {
     // Strategic Fit Analysis
     currentY = addSectionTitle(doc, 'STRATEGIC FIT MATRIX', currentY + 38);
 
-    if (data.strategicFitData) {
+    const ddStrategicFactors = getStrategicFactors(data);
+    if (data.strategicFitData || ddStrategicFactors) {
       autoTable(doc, {
         startY: currentY,
         head: [['Strategic Factor', 'Alignment', 'Impact', 'Priority']],
-        body: data.strategicFitData.factors?.slice(0, 5).map(f => [
+        body: ddStrategicFactors?.slice(0, 5).map((f: { factor?: string; alignment?: string; impact?: string; priority?: string }) => [
           f.factor || 'Market Alignment',
           f.alignment || 'Strong',
           f.impact || 'High',
@@ -483,14 +533,15 @@ export function ExportButtons() {
     const tableEndY2 = (doc as any).lastAutoTable?.finalY + 15 || 140;
     currentY = addSectionTitle(doc, 'FINAL INVESTMENT RECOMMENDATION', tableEndY2);
 
-    const investmentDecision = data.tcaData?.compositeScore >= 7.5 ?
+    const investmentScore = data.tcaData?.compositeScore ?? 0;
+    const investmentDecision = investmentScore >= 7.5 ?
       'STRONG BUY: High confidence investment opportunity' :
-      data.tcaData?.compositeScore >= 6 ?
+      investmentScore >= 6 ?
         'CONDITIONAL BUY: Proceed with specific conditions' :
         'PASS: Risk/reward profile not aligned with investment criteria';
 
-    const decisionColor = data.tcaData?.compositeScore >= 7 ? [39, 174, 96] :
-      data.tcaData?.compositeScore >= 5 ? [243, 156, 18] : [231, 76, 60];
+    const decisionColor = investmentScore >= 7 ? [39, 174, 96] :
+      investmentScore >= 5 ? [243, 156, 18] : [231, 76, 60];
 
     doc.setFillColor(decisionColor[0], decisionColor[1], decisionColor[2]);
     doc.roundedRect(14, currentY - 2, 182, 12, 2, 2, 'F');
@@ -817,11 +868,12 @@ export function ExportButtons() {
 
     currentY = addSectionTitle(doc, 'TEAM & LEADERSHIP ASSESSMENT', 32);
 
-    if (data.teamData?.teamMembers) {
+    const teamMembers = getTeamMembers(data);
+    if (teamMembers) {
       autoTable(doc, {
         startY: currentY,
         head: [['Name', 'Role', 'Experience', 'Assessment']],
-        body: data.teamData.teamMembers.slice(0, 6).map(member => [
+        body: teamMembers.slice(0, 6).map((member: { name?: string; role?: string; experience?: string; assessment?: string }) => [
           member.name || 'Team Member',
           member.role || 'Key Role',
           member.experience || 'Experienced',
@@ -850,11 +902,12 @@ export function ExportButtons() {
     const teamTableEndY = (doc as any).lastAutoTable?.finalY + 12 || currentY + 60;
     currentY = addSectionTitle(doc, 'STRATEGIC FIT ANALYSIS', teamTableEndY);
 
-    if (data.strategicFitData) {
+    const strategicFactors = getStrategicFactors(data);
+    if (data.strategicFitData || strategicFactors) {
       autoTable(doc, {
         startY: currentY,
         head: [['Strategic Factor', 'Alignment', 'Impact', 'Priority']],
-        body: data.strategicFitData.factors?.slice(0, 6).map(f => [
+        body: strategicFactors?.slice(0, 6).map((f: { factor?: string; alignment?: string; impact?: string; priority?: string }) => [
           f.factor || 'Strategic Element',
           f.alignment || 'Strong',
           f.impact || 'High',
@@ -1295,7 +1348,7 @@ export function ExportButtons() {
       x: 1, y: 3.3, w: 8, h: 0.6, fontSize: 18, align: 'center', color: '5b8bb5'
     });
     titleSlide.addText(`Generated: ${new Date().toLocaleDateString()} | Analyst: ${role}`, {
-      x: 1, y: 4.5, w: 8, h: 0.5, fontSize: 14, align: 'center', italics: true
+      x: 1, y: 4.5, w: 8, h: 0.5, fontSize: 14, align: 'center', italic: true
     });
 
     // SLIDE 2: Executive Summary
@@ -1341,26 +1394,26 @@ export function ExportButtons() {
 
       const tableRows = data.tcaData.categories.map(c => [
         { text: c.category, options: { fontSize: 11 } },
-        { text: String(c.rawScore), options: { fontSize: 11, align: 'center' } },
-        { text: `${c.weight}%`, options: { fontSize: 11, align: 'center' } },
+        { text: String(c.rawScore), options: { fontSize: 11, align: 'center' as const } },
+        { text: `${c.weight}%`, options: { fontSize: 11, align: 'center' as const } },
         {
           text: c.flag.toUpperCase(), options: {
             fontSize: 11,
-            align: 'center',
+            align: 'center' as const,
             color: c.flag === 'green' ? '27ae60' : c.flag === 'yellow' ? 'f39c12' : 'e74c3c',
             bold: true
           }
         },
-        { text: ((c.rawScore * c.weight) / 100).toFixed(2), options: { fontSize: 11, align: 'center' } }
+        { text: ((c.rawScore * c.weight) / 100).toFixed(2), options: { fontSize: 11, align: 'center' as const } }
       ]);
 
       tcaSlide.addTable([
         [
-          { text: 'Category', options: { bold: true, fontSize: 12, fill: '1f4e79', color: 'ffffff' } },
-          { text: 'Score', options: { bold: true, fontSize: 12, fill: '1f4e79', color: 'ffffff' } },
-          { text: 'Weight', options: { bold: true, fontSize: 12, fill: '1f4e79', color: 'ffffff' } },
-          { text: 'Status', options: { bold: true, fontSize: 12, fill: '1f4e79', color: 'ffffff' } },
-          { text: 'Contribution', options: { bold: true, fontSize: 12, fill: '1f4e79', color: 'ffffff' } }
+          { text: 'Category', options: { bold: true, fontSize: 12, fill: { color: '1f4e79' }, color: 'ffffff' } },
+          { text: 'Score', options: { bold: true, fontSize: 12, fill: { color: '1f4e79' }, color: 'ffffff' } },
+          { text: 'Weight', options: { bold: true, fontSize: 12, fill: { color: '1f4e79' }, color: 'ffffff' } },
+          { text: 'Status', options: { bold: true, fontSize: 12, fill: { color: '1f4e79' }, color: 'ffffff' } },
+          { text: 'Contribution', options: { bold: true, fontSize: 12, fill: { color: '1f4e79' }, color: 'ffffff' } }
         ],
         ...tableRows
       ], {
@@ -1408,10 +1461,10 @@ export function ExportButtons() {
         riskSlide.addText('Top Critical Risks:', { x: 0.5, y: 2.5, fontSize: 16, bold: true });
         riskSlide.addTable([
           [
-            { text: 'Domain', options: { bold: true, fontSize: 11, fill: 'e74c3c', color: 'ffffff' } },
-            { text: 'Level', options: { bold: true, fontSize: 11, fill: 'e74c3c', color: 'ffffff' } },
-            { text: 'Risk Trigger', options: { bold: true, fontSize: 11, fill: 'e74c3c', color: 'ffffff' } },
-            { text: 'Mitigation', options: { bold: true, fontSize: 11, fill: 'e74c3c', color: 'ffffff' } }
+            { text: 'Domain', options: { bold: true, fontSize: 11, fill: { color: 'e74c3c' }, color: 'ffffff' } },
+            { text: 'Level', options: { bold: true, fontSize: 11, fill: { color: 'e74c3c' }, color: 'ffffff' } },
+            { text: 'Risk Trigger', options: { bold: true, fontSize: 11, fill: { color: 'e74c3c' }, color: 'ffffff' } },
+            { text: 'Mitigation', options: { bold: true, fontSize: 11, fill: { color: 'e74c3c' }, color: 'ffffff' } }
           ],
           ...topRisks
         ], {
@@ -1436,14 +1489,14 @@ export function ExportButtons() {
 
       finSlide.addTable([
         [
-          { text: 'Financial Metric', options: { bold: true, fontSize: 12, fill: '27ae60', color: 'ffffff' } },
-          { text: 'Current Value', options: { bold: true, fontSize: 12, fill: '27ae60', color: 'ffffff' } },
-          { text: 'Category', options: { bold: true, fontSize: 12, fill: '27ae60', color: 'ffffff' } }
+          { text: 'Financial Metric', options: { bold: true, fontSize: 12, fill: { color: '27ae60' }, color: 'ffffff' } },
+          { text: 'Current Value', options: { bold: true, fontSize: 12, fill: { color: '27ae60' }, color: 'ffffff' } },
+          { text: 'Category', options: { bold: true, fontSize: 12, fill: { color: '27ae60' }, color: 'ffffff' } }
         ],
         ...financialMetrics.map(metric => [
           { text: metric[0], options: { fontSize: 11 } },
           { text: metric[1], options: { fontSize: 11, bold: true } },
-          { text: metric[2], options: { fontSize: 10, italics: true } }
+          { text: metric[2], options: { fontSize: 10, italic: true } }
         ])
       ], {
         x: 0.5, y: 1.0, w: 9.0, h: 3.0,
@@ -1452,11 +1505,12 @@ export function ExportButtons() {
     }
 
     // SLIDE 6: Team & Leadership Assessment
-    if (data.teamData?.teamMembers) {
+    const pptxTeamMembers = getTeamMembers(data);
+    if (pptxTeamMembers) {
       let teamSlide = pptx.addSlide();
       teamSlide.addText('Team & Leadership Assessment', { x: 0.5, y: 0.25, fontSize: 20, bold: true, color: '1f4e79' });
 
-      const teamTableRows = data.teamData.teamMembers.slice(0, 6).map(member => [
+      const teamTableRows = pptxTeamMembers.slice(0, 6).map((member: { name?: string; role?: string; experience?: string; assessment?: string }) => [
         { text: member.name || 'Team Member', options: { fontSize: 11, bold: true } },
         { text: member.role || 'Key Role', options: { fontSize: 11 } },
         { text: member.experience || 'Experienced Professional', options: { fontSize: 10 } },
@@ -1470,10 +1524,10 @@ export function ExportButtons() {
 
       teamSlide.addTable([
         [
-          { text: 'Name', options: { bold: true, fontSize: 12, fill: '3498db', color: 'ffffff' } },
-          { text: 'Role', options: { bold: true, fontSize: 12, fill: '3498db', color: 'ffffff' } },
-          { text: 'Experience', options: { bold: true, fontSize: 12, fill: '3498db', color: 'ffffff' } },
-          { text: 'Assessment', options: { bold: true, fontSize: 12, fill: '3498db', color: 'ffffff' } }
+          { text: 'Name', options: { bold: true, fontSize: 12, fill: { color: '3498db' }, color: 'ffffff' } },
+          { text: 'Role', options: { bold: true, fontSize: 12, fill: { color: '3498db' }, color: 'ffffff' } },
+          { text: 'Experience', options: { bold: true, fontSize: 12, fill: { color: '3498db' }, color: 'ffffff' } },
+          { text: 'Assessment', options: { bold: true, fontSize: 12, fill: { color: '3498db' }, color: 'ffffff' } }
         ],
         ...teamTableRows
       ], {
@@ -1530,7 +1584,7 @@ export function ExportButtons() {
 
     // Timeline
     nextSlide.addText('Estimated Timeline: 4-6 weeks for complete due diligence', {
-      x: 0.5, y: 4.8, fontSize: 14, bold: true, italics: true
+      x: 0.5, y: 4.8, fontSize: 14, bold: true, italic: true
     });
 
     pptx.writeFile({ fileName: `${companyName}-COMPREHENSIVE-${reportType}-Analysis.pptx` });
@@ -1662,10 +1716,10 @@ export function ExportButtons() {
       cat.weight,
       ((cat.rawScore * cat.weight) / 100).toFixed(2),
       cat.flag?.toUpperCase() || 'N/A',
-      cat.confidence || 'High',
+      'High', // Confidence level inferred from flag status
       cat.strengths || 'N/A',
       cat.concerns || 'None identified',
-      cat.recommendations || 'Continue monitoring'
+      cat.aiRecommendation || 'Continue monitoring'
     ]) || [];
     const tcaData = [tcaHeader, ...tcaRows];
     const wsTCA = XLSX.utils.aoa_to_sheet(tcaData);
@@ -1679,10 +1733,10 @@ export function ExportButtons() {
       risk.flag?.toUpperCase() || 'N/A',
       risk.trigger,
       risk.mitigation || 'Under development',
-      risk.priority || 'High',
+      risk.flag === 'red' ? 'Critical' : risk.flag === 'yellow' ? 'High' : 'Medium', // Priority inferred from flag
       risk.impact || 'Significant',
-      risk.likelihood || 'Medium',
-      risk.status || 'Active'
+      risk.flag === 'red' ? 'High' : risk.flag === 'yellow' ? 'Medium' : 'Low', // Likelihood inferred from flag
+      'Active' // Default status
     ]) || [];
     const riskData = [riskHeader, ...riskRows];
     const wsRisk = XLSX.utils.aoa_to_sheet(riskData);
@@ -1690,8 +1744,9 @@ export function ExportButtons() {
     XLSX.utils.book_append_sheet(wb, wsRisk, 'Risk Analysis');
 
     // ========== SHEET 4: Benchmark Comparison ==========
+    const xlsxBenchmarkComparisons = getBenchmarkComparisons(data);
     const benchmarkHeader = ['Metric', 'Company Value', 'Industry Average', 'Percentile Rank', 'Assessment', 'Variance', 'Notes'];
-    const benchmarkRows = data.benchmarkData?.comparisons?.map(comp => [
+    const benchmarkRows = xlsxBenchmarkComparisons?.map((comp: { metric?: string; companyValue?: string; industryAverage?: string; percentile?: string; assessment?: string; variance?: string; notes?: string }) => [
       comp.metric || 'Metric',
       comp.companyValue || 'TBD',
       comp.industryAverage || 'TBD',
@@ -1728,8 +1783,9 @@ export function ExportButtons() {
     XLSX.utils.book_append_sheet(wb, wsFinancial, 'Financial Analysis');
 
     // ========== SHEET 6: Team Assessment ==========
+    const xlsxTeamMembers = getTeamMembers(data);
     const teamHeader = ['Name', 'Role', 'Experience', 'Assessment', 'Strengths', 'Areas for Development', 'Notes'];
-    const teamRows = data.teamData?.teamMembers?.map(member => [
+    const teamRows = xlsxTeamMembers?.map((member: { name?: string; role?: string; experience?: string; assessment?: string; strengths?: string; areasForDevelopment?: string; notes?: string }) => [
       member.name || 'Team Member',
       member.role || 'Key Role',
       member.experience || 'Experienced Professional',
@@ -1744,8 +1800,9 @@ export function ExportButtons() {
     XLSX.utils.book_append_sheet(wb, wsTeam, 'Team Assessment');
 
     // ========== SHEET 7: Growth Analysis ==========
+    const xlsxGrowthFactors = getGrowthFactors(data);
     const growthHeader = ['Growth Factor', 'Assessment', 'Score', 'Trend', 'Time Horizon', 'Impact', 'Confidence'];
-    const growthRows = data.growthData?.factors?.map(factor => [
+    const growthRows = xlsxGrowthFactors?.map((factor: { name?: string; assessment?: string; score?: string; trend?: string; timeHorizon?: string; impact?: string; confidence?: string }) => [
       factor.name || 'Growth Driver',
       factor.assessment || 'Positive',
       factor.score || '7.5',
@@ -1760,8 +1817,9 @@ export function ExportButtons() {
     XLSX.utils.book_append_sheet(wb, wsGrowth, 'Growth Analysis');
 
     // ========== SHEET 8: Strategic Fit ==========
+    const xlsxStrategicFactors = getStrategicFactors(data);
     const strategicHeader = ['Strategic Factor', 'Alignment', 'Impact', 'Priority', 'Assessment', 'Action Required'];
-    const strategicRows = data.strategicFitData?.factors?.map(factor => [
+    const strategicRows = xlsxStrategicFactors?.map((factor: { factor?: string; alignment?: string; impact?: string; priority?: string; assessment?: string; actionRequired?: string }) => [
       factor.factor || 'Strategic Element',
       factor.alignment || 'Strong',
       factor.impact || 'High',
@@ -1802,17 +1860,21 @@ export function ExportButtons() {
     XLSX.utils.book_append_sheet(wb, wsDecision, 'Investment Decision');
 
     // ========== SHEET 10: Raw Data (JSON) ==========
+    const summaryTeamMembers = getTeamMembers(data);
+    const summaryGrowthFactors = getGrowthFactors(data);
+    const summaryStrategicFactors = getStrategicFactors(data);
+    const summaryBenchmarkComparisons = getBenchmarkComparisons(data);
     const rawDataForSheet = [
       ['RAW ANALYSIS DATA'],
       [''],
       ['Data Source', 'Status', 'Record Count'],
       ['TCA Data', data.tcaData ? 'Available' : 'Not Available', data.tcaData?.categories?.length || 0],
       ['Risk Data', data.riskData ? 'Available' : 'Not Available', data.riskData?.riskFlags?.length || 0],
-      ['Benchmark Data', data.benchmarkData ? 'Available' : 'Not Available', data.benchmarkData?.comparisons?.length || 0],
+      ['Benchmark Data', data.benchmarkData ? 'Available' : 'Not Available', summaryBenchmarkComparisons?.length || 0],
       ['Financial Data', data.financialsData ? 'Available' : 'Not Available', 'N/A'],
-      ['Team Data', data.teamData ? 'Available' : 'Not Available', data.teamData?.teamMembers?.length || 0],
-      ['Growth Data', data.growthData ? 'Available' : 'Not Available', data.growthData?.factors?.length || 0],
-      ['Strategic Fit Data', data.strategicFitData ? 'Available' : 'Not Available', data.strategicFitData?.factors?.length || 0],
+      ['Team Data', data.teamData ? 'Available' : 'Not Available', summaryTeamMembers?.length || 0],
+      ['Growth Data', data.growthData ? 'Available' : 'Not Available', summaryGrowthFactors?.length || 0],
+      ['Strategic Fit Data', data.strategicFitData ? 'Available' : 'Not Available', summaryStrategicFactors?.length || 0],
       [''],
       ['Export Metadata'],
       ['Export Format', 'Microsoft Excel Workbook (.xlsx)'],
@@ -1892,7 +1954,7 @@ export function ExportButtons() {
                 <FileText className="size-4 text-green-600" />
                 <span>Triage Summary (2 pages)</span>
               </DropdownMenuItem>
-              {(role === 'admin' || role === 'reviewer') && (
+              {(role === 'admin' || role === 'analyst') && (
                 <DropdownMenuItem onClick={handleExportDDTwoPage} className="flex items-center gap-3 py-2">
                   <FileText className="size-4 text-blue-600" />
                   <span>DD Summary (2 pages)</span>

@@ -15,6 +15,9 @@ python-jose[cryptography]>=3.3.0
 # HTTP Client
 httpx>=0.25.0
 
+# AI/LLM Integration
+openai>=1.12.0
+
 # Data Validation and Serialization
 pydantic>=2.5.0
 pydantic-settings>=2.1.0

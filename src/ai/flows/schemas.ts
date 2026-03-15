@@ -1,5 +1,5 @@
 
-import {z} from 'genkit';
+import { z } from 'genkit';
 
 // TCA Scorecard Schemas
 export const GenerateTcaScorecardInputSchema = z.object({
@@ -221,7 +221,21 @@ export type GenerateBenchmarkComparisonOutput = z.infer<
 // Growth Classifier Schemas
 export const GenerateGrowthClassifierInputSchema = z.object({});
 export type GenerateGrowthClassifierInput = z.infer<typeof GenerateGrowthClassifierInputSchema>;
-export const GenerateGrowthClassifierOutputSchema = z.object({}).optional();
+export const GenerateGrowthClassifierOutputSchema = z.object({
+  tier: z.number().describe('Growth tier classification (1-5)'),
+  confidence: z.number().describe('Confidence level (0-1)'),
+  analysis: z.string().describe('AI-generated growth analysis'),
+  scenarios: z.array(z.object({
+    name: z.string().describe('Scenario name'),
+    growth: z.number().describe('Growth rate as decimal'),
+  })).optional(),
+  models: z.array(z.object({
+    name: z.string().describe('Model name'),
+    score: z.number().describe('Model score'),
+    contribution: z.string().describe('Model contribution description'),
+  })).optional(),
+  interpretation: z.string().optional(),
+});
 export type GenerateGrowthClassifierOutput = z.infer<typeof GenerateGrowthClassifierOutputSchema>;
 
 // Gap Analysis Schemas
@@ -268,6 +282,7 @@ export const GenerateTeamAssessmentInputSchema = z.object({
 export type GenerateTeamAssessmentInput = z.infer<typeof GenerateTeamAssessmentInputSchema>;
 
 export const GenerateTeamAssessmentOutputSchema = z.object({
+  teamScore: z.number().optional().describe('Overall team score (0-10)'),
   members: z.array(z.object({
     id: z.string(),
     name: z.string(),
