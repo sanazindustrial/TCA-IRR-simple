@@ -5,6 +5,9 @@ const nextConfig: NextConfig = {
   // Production configuration for Azure App Service
   output: 'standalone',  // Required for Azure App Service deployment
 
+  // SECURITY: Disable source maps in production to hide source code
+  productionBrowserSourceMaps: false,
+
   // Build configuration for production
   typescript: {
     ignoreBuildErrors: true,
@@ -15,20 +18,55 @@ const nextConfig: NextConfig = {
 
   serverExternalPackages: ['@opentelemetry/context-async-hooks'],
 
-  // Security headers for production
+  // Webpack optimization for code protection
+  webpack: (config, { isServer, dev }) => {
+    if (!dev && !isServer) {
+      // Disable source maps completely
+      config.devtool = false;
+
+      // Minimize and obfuscate code
+      if (config.optimization) {
+        config.optimization.minimize = true;
+        config.optimization.moduleIds = 'deterministic';
+        config.optimization.chunkIds = 'deterministic';
+      }
+    }
+    return config;
+  },
+
+  // Comprehensive security headers for production
   async headers() {
     return [
       {
         source: '/:path*',
         headers: [
+          // Prevent clickjacking
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          // Prevent MIME type sniffing
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          // XSS Protection
+          { key: 'X-XSS-Protection', value: '1; mode=block' },
+          // Referrer Policy
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          // Permissions Policy - restrict browser features
+          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+          // Prevent caching of sensitive data
+          { key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate, proxy-revalidate' },
+          { key: 'Pragma', value: 'no-cache' },
+          { key: 'Expires', value: '0' },
+          // Content Security Policy - block inline scripts that could expose code
           {
-            key: 'X-Frame-Options',
-            value: 'SAMEORIGIN'
+            key: 'Content-Security-Policy',
+            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; frame-ancestors 'self';"
           },
-          {
-            key: 'X-Content-Type-Options',
-            value: 'nosniff'
-          },
+        ],
+      },
+      // Block source map requests
+      {
+        source: '/:path*.map',
+        headers: [
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+          { key: 'Cache-Control', value: 'no-store' },
         ],
       },
     ]

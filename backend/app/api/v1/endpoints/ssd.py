@@ -12,7 +12,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, status, Header, Security
+from fastapi.security import APIKeyHeader
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr, Field
 import httpx
@@ -28,7 +29,45 @@ REPORTS_DIR = Path(__file__).parent.parent.parent.parent.parent / "reports"
 REPORTS_DIR.mkdir(exist_ok=True)
 
 # SSD callback URL (configurable via environment)
-SSD_CALLBACK_URL = getattr(settings, 'SSD_CALLBACK_URL', None)
+SSD_CALLBACK_URL = getattr(settings, 'ssd_callback_url', None)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  API Key Authentication for Third-Party Integration
+# ═══════════════════════════════════════════════════════════════════════
+
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+
+async def verify_ssd_api_key(api_key: str = Security(api_key_header)) -> bool:
+    """
+    Verify the X-API-Key header for SSD integration.
+    If SSD_API_KEY is not configured, authentication is bypassed (development mode).
+    """
+    configured_key = getattr(settings, 'ssd_api_key', None)
+    
+    # If no API key configured, allow all requests (development mode)
+    if not configured_key:
+        logger.warning("[SSD-AUTH] No API key configured - running in open mode")
+        return True
+    
+    # If API key is configured, require valid key
+    if not api_key:
+        logger.warning("[SSD-AUTH] Request missing X-API-Key header")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing API key. Provide X-API-Key header.",
+            headers={"WWW-Authenticate": "ApiKey"}
+        )
+    
+    if api_key != configured_key:
+        logger.warning(f"[SSD-AUTH] Invalid API key provided")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid API key"
+        )
+    
+    return True
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -1059,12 +1098,18 @@ async def _process_ssd_tirr_request(
 # ═══════════════════════════════════════════════════════════════════════
 
 @router.post("/tirr")
-async def ssd_tirr_endpoint(payload: SSDStartupData, background_tasks: BackgroundTasks):
+async def ssd_tirr_endpoint(
+    payload: SSDStartupData,
+    background_tasks: BackgroundTasks,
+    _api_key_valid: bool = Security(verify_ssd_api_key)
+):
     """
     TCA TIRR endpoint for the SSD application.
     
     Receives structured startup data from SSD and generates a triage report.
     Returns 202 Accepted with a tracking ID for status polling.
+    
+    **Authentication:** Requires X-API-Key header (when SSD_API_KEY is configured).
     """
     company_name = payload.companyInformation.companyName or f"{payload.contactInformation.firstName}'s Company"
     founder_email = payload.contactInformation.email
@@ -1119,7 +1164,10 @@ async def ssd_tirr_endpoint(payload: SSDStartupData, background_tasks: Backgroun
 
 
 @router.post("/tirr/preview")
-async def ssd_tirr_preview(payload: SSDStartupData):
+async def ssd_tirr_preview(
+    payload: SSDStartupData,
+    _api_key_valid: bool = Security(verify_ssd_api_key)
+):
     """
     Generate a preview of the TCA TIRR triage report without saving to database.
     
@@ -1127,6 +1175,8 @@ async def ssd_tirr_preview(payload: SSDStartupData):
     submitting for full processing. Useful for validation and user confirmation.
     
     Returns the complete 10-page report structure synchronously.
+    
+    **Authentication:** Requires X-API-Key header (when SSD_API_KEY is configured).
     """
     company_name = payload.companyInformation.companyName or f"{payload.contactInformation.firstName}'s Company"
     preview_id = f"preview-{str(uuid.uuid4())[:8]}"
@@ -1347,4 +1397,34 @@ async def ssd_health_check():
             log for log in SSD_AUDIT_LOGS.values() 
             if log.get("status") == "completed"
         ]),
+    }
+
+@router.get("/callback-test")
+async def ssd_callback_test_endpoint():
+    """
+    Test endpoint for validating webhook/callback connectivity.
+    Used by the SSD audit dashboard to verify the callback system is operational.
+    """
+    return {
+        "status": "online",
+        "service": "ssd_webhook_receiver",
+        "callback_url_configured": SSD_CALLBACK_URL is not None,
+        "callback_url": SSD_CALLBACK_URL or "not_configured",
+        "message": "Webhook receiver endpoint is operational",
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+
+@router.post("/callback-test")
+async def ssd_callback_test_post(payload: dict = None):
+    """
+    POST endpoint for testing webhook callback processing.
+    Accepts test payloads and returns confirmation.
+    """
+    return {
+        "status": "received",
+        "service": "ssd_webhook_receiver",
+        "message": "Callback payload received successfully",
+        "payload_received": payload is not None,
+        "timestamp": datetime.utcnow().isoformat()
     }
