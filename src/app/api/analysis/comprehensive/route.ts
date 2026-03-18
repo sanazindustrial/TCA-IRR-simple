@@ -2,7 +2,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { ComprehensiveAnalysisOutput } from '@/ai/flows/schemas';
 
-const BACKEND_API_URL = 'http://127.0.0.1:8000/api';
+const BACKEND_API_URL = process.env.BACKEND_API_URL || 'http://127.0.0.1:8000/api';
+
+// GET - Return API information and status
+export async function GET() {
+    return NextResponse.json({
+        status: 'ok',
+        endpoint: '/api/analysis/comprehensive',
+        description: 'Comprehensive TCA Analysis API',
+        methods: {
+            GET: 'Returns API information and status',
+            POST: 'Run comprehensive analysis (requires framework: "general" | "medtech")'
+        },
+        usage: {
+            method: 'POST',
+            contentType: 'application/json',
+            body: {
+                framework: 'general | medtech (required)'
+            }
+        },
+        timestamp: new Date().toISOString()
+    });
+}
 
 export async function POST(request: NextRequest) {
     try {

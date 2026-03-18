@@ -51,6 +51,58 @@ import {
 } from '@/components/ui/dialog';
 import { reportsApi, type ReportData, type ReportVersion, type ReportStats } from '@/lib/reports-api';
 
+// Type for localStorage stored reports
+interface LocalStoredReport {
+  id: string;
+  userId: string;
+  companyName: string;
+  reportType: 'triage' | 'dd';
+  framework: 'general' | 'medtech';
+  data: any;
+  createdAt: string;
+  updatedAt: string;
+  metadata: {
+    analysisDuration?: number;
+    moduleCount: number;
+    compositeScore: number;
+    status: 'draft' | 'completed' | 'archived';
+    tags?: string[];
+  };
+}
+
+// Helper to get all reports from localStorage
+function getLocalStorageReports(): Report[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const stored = localStorage.getItem('tca_reports');
+    console.log('localStorage tca_reports raw:', stored ? `${stored.length} chars` : 'null');
+    if (!stored) return [];
+    const reports: LocalStoredReport[] = JSON.parse(stored);
+    console.log('Parsed localStorage reports:', reports.length, 'reports');
+    const mappedReports = reports.map((r, index) => {
+      const mapped = {
+        id: r.id || `local-${index}`,
+        company: r.companyName || 'Unnamed Company',
+        type: r.reportType === 'dd' ? 'Due Diligence' : 'Triage',
+        status: r.metadata?.status === 'completed' ? 'Completed' : 'Draft',
+        approval: 'Pending',
+        score: r.metadata?.compositeScore || 0,
+        confidence: Math.round((r.metadata?.moduleCount || 0) / 9 * 100),
+        recommendation: r.metadata?.compositeScore >= 8 ? 'Recommend' : r.metadata?.compositeScore >= 6 ? 'Hold' : 'Conditional',
+        user: { name: 'Local User', email: localStorage.getItem('userEmail') || 'user@tca.com' },
+        createdAt: r.createdAt ? new Date(r.createdAt).toLocaleDateString() : new Date().toLocaleDateString(),
+        missingSections: undefined,
+      };
+      console.log('Mapped report:', mapped.company, mapped.id);
+      return mapped;
+    });
+    return mappedReports;
+  } catch (error) {
+    console.error('Error loading localStorage reports:', error);
+    return [];
+  }
+}
+
 // Fallback data when API is unavailable
 const fallbackReportsData: ReportData[] = [
   {
@@ -255,29 +307,101 @@ export default function ReportsPage() {
 
   const loadReports = useCallback(async () => {
     setLoading(true);
+    console.log('loadReports() called');
     try {
-      const response = await reportsApi.getReports({
-        search: searchQuery || undefined,
-        status: statusFilter || undefined,
-        report_type: typeFilter || undefined,
-      });
-      // Map API response to local Report type
-      const reports: Report[] = response.map((r: ReportData) => ({
-        id: r.id,
-        company: r.company_name || r.company || '',
-        type: r.type || 'Triage',
-        status: r.status || 'Completed',
-        approval: r.approval || 'Pending',
-        score: r.score ?? 0,
-        confidence: r.confidence ?? 0,
-        recommendation: r.recommendation || 'Hold',
-        user: r.user || { name: 'Unknown', email: '' },
-        createdAt: r.created_at || r.createdAt || '',
-        missingSections: r.missing_sections || r.missingSections,
-      }));
-      setAllReports(reports);
+      // Get localStorage reports first
+      const localReports = getLocalStorageReports();
+      console.log('Local reports loaded:', localReports.length);
+
+      // Try to get API reports
+      let apiReports: Report[] = [];
+      try {
+        const response = await reportsApi.getReports({
+          search: searchQuery || undefined,
+          status: statusFilter || undefined,
+          report_type: typeFilter || undefined,
+        });
+        console.log('API reports loaded:', response.length);
+        // Map API response to local Report type
+        apiReports = response.map((r: ReportData) => ({
+          id: r.id,
+          company: r.company_name || r.company || '',
+          type: r.type || 'Triage',
+          status: r.status || 'Completed',
+          approval: r.approval || 'Pending',
+          score: r.score ?? 0,
+          confidence: r.confidence ?? 0,
+          recommendation: r.recommendation || 'Hold',
+          user: r.user || { name: 'Unknown', email: '' },
+          createdAt: r.created_at || r.createdAt || '',
+          missingSections: r.missing_sections || r.missingSections,
+        }));
+      } catch (apiError) {
+        console.warn('API unavailable, using localStorage only:', apiError);
+      }
+
+      // Merge reports: localStorage first, then API
+      // Use a Set to track unique company names to avoid duplicates
+      const seenCompanies = new Set<string>();
+      const mergedReports: Report[] = [];
+
+      // Add local reports first (most recent saves)
+      for (const report of localReports) {
+        const key = report.company.toLowerCase();
+        if (!seenCompanies.has(key)) {
+          seenCompanies.add(key);
+          mergedReports.push(report);
+        }
+      }
+
+      // Add API reports that aren't duplicates
+      for (const report of apiReports) {
+        const key = report.company.toLowerCase();
+        if (!seenCompanies.has(key)) {
+          seenCompanies.add(key);
+          mergedReports.push(report);
+        }
+      }
+
+      // If no reports from either source, use fallback
+      if (mergedReports.length === 0) {
+        const mappedFallback: Report[] = fallbackReportsData.map(r => ({
+          id: r.id,
+          company: r.company_name || r.company || '',
+          type: r.type,
+          status: r.status,
+          approval: r.approval,
+          score: r.score ?? 0,
+          confidence: r.confidence ?? 0,
+          recommendation: r.recommendation || 'Hold',
+          user: r.user,
+          createdAt: r.created_at || r.createdAt || '',
+          missingSections: undefined,
+        }));
+        setAllReports(mappedFallback);
+      } else {
+        // Apply search filter to merged reports
+        let filteredReports = mergedReports;
+        if (searchQuery) {
+          const query = searchQuery.toLowerCase();
+          filteredReports = mergedReports.filter(r =>
+            r.company.toLowerCase().includes(query)
+          );
+        }
+        if (statusFilter) {
+          filteredReports = filteredReports.filter(r =>
+            r.status.toLowerCase() === statusFilter.toLowerCase()
+          );
+        }
+        if (typeFilter) {
+          filteredReports = filteredReports.filter(r =>
+            r.type.toLowerCase().includes(typeFilter.toLowerCase())
+          );
+        }
+        setAllReports(filteredReports);
+      }
     } catch (error) {
-      console.error('Failed to load reports from API, using fallback data:', error);
+      console.error('Failed to load reports, using fallback data:', error);
       // Fallback to local data
       const mappedFallback: Report[] = fallbackReportsData.map(r => ({
         id: r.id,
@@ -317,6 +441,46 @@ export default function ReportsPage() {
 
     // Load reports from API
     loadReports();
+
+    // Listen for storage changes (when reports are saved from other tabs/pages)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'tca_reports') {
+        console.log('Storage changed, reloading reports...');
+        loadReports();
+      }
+    };
+
+    // Listen for page visibility changes (when navigating back to this page)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('Page became visible, reloading reports...');
+        loadReports();
+      }
+    };
+
+    // Listen for focus (when user returns to this tab)
+    const handleFocus = () => {
+      console.log('Window focused, reloading reports...');
+      loadReports();
+    };
+
+    // Listen for custom event from same-page saves
+    const handleCustomUpdate = () => {
+      console.log('Custom reports update event received, reloading...');
+      loadReports();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('tca_reports_updated', handleCustomUpdate);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('tca_reports_updated', handleCustomUpdate);
+    };
   }, [loadReports]);
 
   const handleRefresh = async () => {

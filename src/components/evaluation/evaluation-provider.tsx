@@ -5,7 +5,7 @@ import React, { createContext, useContext, useMemo, useState } from 'react';
 import type { ReportType, UserRole } from '@/app/analysis/result/page';
 import type { UploadedFile } from '@/components/analysis/document-submission';
 
-// Extended company information fields matching SSD spec 4.1.2
+// Extended company information fields matching Startup Steroid spec 4.1.2
 export type CompanyInformationData = {
     companyName: string;
     website: string;
@@ -23,7 +23,7 @@ export type CompanyInformationData = {
     numberOfEmployees: number | null;
 };
 
-// Contact information fields matching SSD spec 4.1.1
+// Contact information fields matching Startup Steroid spec 4.1.1
 export type ContactInformationData = {
     email: string;
     phoneNumber: string;
@@ -33,7 +33,7 @@ export type ContactInformationData = {
     linkedInUrl: string;
 };
 
-// Financial information fields matching SSD spec 4.1.3
+// Financial information fields matching Startup Steroid spec 4.1.3
 export type FinancialInformationData = {
     fundingType: string;
     annualRevenue: number | null;
