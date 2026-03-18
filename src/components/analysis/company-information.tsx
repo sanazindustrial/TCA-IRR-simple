@@ -95,18 +95,18 @@ export function CompanyInformation({
   framework,
   onFrameworkChange,
 }: CompanyInformationProps) {
-  const { 
-    isPrivilegedUser, 
-    companyName, 
-    setCompanyNameAction, 
-    companyDescription, 
+  const {
+    isPrivilegedUser,
+    companyName,
+    setCompanyNameAction,
+    companyDescription,
     setCompanyDescriptionAction,
     companyInfo,
     setCompanyInfoAction,
   } = useEvaluationContext();
 
   const [isExpanded, setIsExpanded] = useState(false);
-  
+
   // Use extended company info if available, fallback to basic fields
   const currentInfo = companyInfo || DEFAULT_COMPANY_INFO;
 
@@ -132,7 +132,7 @@ export function CompanyInformation({
         <CardTitle className="flex items-center gap-2">
           <Globe className="text-primary" />
           Company Information
-          <Badge variant="outline" className="ml-2 text-xs">SSD Compatible</Badge>
+          <Badge variant="outline" className="ml-2 text-xs">Startup Steroid Compatible</Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -187,8 +187,8 @@ export function CompanyInformation({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="space-y-2">
             <Label htmlFor="industry">Industry Vertical *</Label>
-            <Select 
-              value={currentInfo.industryVertical || ''} 
+            <Select
+              value={currentInfo.industryVertical || ''}
               onValueChange={(val) => updateCompanyInfo('industryVertical', val)}
             >
               <SelectTrigger>
@@ -203,8 +203,8 @@ export function CompanyInformation({
           </div>
           <div className="space-y-2">
             <Label htmlFor="stage">Development Stage *</Label>
-            <Select 
-              value={currentInfo.developmentStage || ''} 
+            <Select
+              value={currentInfo.developmentStage || ''}
               onValueChange={(val) => updateCompanyInfo('developmentStage', val)}
             >
               <SelectTrigger>
@@ -219,8 +219,8 @@ export function CompanyInformation({
           </div>
           <div className="space-y-2">
             <Label htmlFor="business-model">Business Model *</Label>
-            <Select 
-              value={currentInfo.businessModel || ''} 
+            <Select
+              value={currentInfo.businessModel || ''}
               onValueChange={(val) => updateCompanyInfo('businessModel', val)}
             >
               <SelectTrigger>

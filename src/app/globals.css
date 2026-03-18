@@ -90,14 +90,7 @@
   }
   body {
     @apply bg-background text-foreground;
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-    -webkit-touch-callout: none;
-  }
-  /* Allow selection in input fields */
-  input, textarea, [contenteditable="true"] {
+    /* Enable text selection and copying */
     -webkit-user-select: text;
     -moz-user-select: text;
     -ms-user-select: text;
