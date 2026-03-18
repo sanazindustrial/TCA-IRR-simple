@@ -28,7 +28,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="font-body antialiased select-none">
+      <body className="font-body antialiased">
         <CopyProtection />
         <ThemeProvider
           attribute="class"

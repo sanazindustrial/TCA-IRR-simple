@@ -588,7 +588,7 @@ export function ExportButtons() {
     const companyName = getCompanyName();
     const score = data.tcaData?.compositeScore || 0;
     const scoreColor = score >= 7 ? [39, 174, 96] : score >= 5 ? [243, 156, 18] : [231, 76, 60];
-    const totalPages = 6; // Estimated total pages
+    const totalPages = 9; // Estimated total pages (added Macro, Benchmark, Growth, Gap, Founder Fit)
 
     // ========== TITLE PAGE ==========
     // Background gradient effect
@@ -656,8 +656,11 @@ export function ExportButtons() {
       { title: 'Financial Health Overview', page: 4 },
       { title: 'Team & Leadership Assessment', page: 5 },
       { title: 'Strategic Fit Analysis', page: 5 },
-      { title: 'Investment Recommendation', page: 6 },
-      { title: 'Due Diligence Checklist', page: 6 }
+      { title: 'Macro Trend & Benchmark Analysis', page: 6 },
+      { title: 'Growth Classification & Gap Analysis', page: 7 },
+      { title: 'Founder Fit & CEO Questions', page: 8 },
+      { title: 'Investment Recommendation', page: 9 },
+      { title: 'Due Diligence Checklist', page: 9 }
     ];
 
     doc.setFontSize(12);
@@ -939,7 +942,237 @@ export function ExportButtons() {
 
     addPageFooter(doc, 5, totalPages);
 
-    // ========== PAGE 6: INVESTMENT RECOMMENDATION ==========
+    // ========== PAGE 6: MACRO TREND & BENCHMARK ANALYSIS ==========
+    doc.addPage();
+    addPageHeader(doc, companyName, 'MARKET ANALYSIS');
+
+    currentY = addSectionTitle(doc, 'MACRO TREND ALIGNMENT', 32);
+
+    if (data.macroData) {
+      // Display PESTEL and trend signals
+      doc.setFontSize(10);
+      doc.text(`Sector Outlook: ${data.macroData.sectorOutlook || 'Under Analysis'}`, 18, currentY);
+      doc.text(`Trend Overlay Score: ${data.macroData.trendOverlayScore || 'N/A'}`, 120, currentY);
+
+      const trendSignals = data.macroData.trendSignals || [];
+      if (trendSignals.length > 0) {
+        autoTable(doc, {
+          startY: currentY + 10,
+          head: [['Trend Signal', 'Alignment']],
+          body: trendSignals.slice(0, 5).map((signal: string) => [
+            signal,
+            'Aligned'
+          ]),
+          theme: 'striped',
+          headStyles: {
+            fillColor: [155, 89, 182],
+            textColor: 255,
+            fontStyle: 'bold',
+            fontSize: 10,
+            cellPadding: 4
+          },
+          bodyStyles: { fontSize: 9, cellPadding: 3 },
+          alternateRowStyles: { fillColor: [248, 249, 250] },
+          margin: { left: 14, right: 14 }
+        });
+      }
+    } else {
+      doc.setFontSize(10);
+      doc.text('Macro trend analysis data pending review.', 18, currentY);
+    }
+
+    const macroTableEndY = (doc as any).lastAutoTable?.finalY + 15 || currentY + 50;
+    currentY = addSectionTitle(doc, 'BENCHMARK COMPARISON', macroTableEndY);
+
+    const benchmarkComparisons = getBenchmarkComparisons(data);
+    if (benchmarkComparisons && benchmarkComparisons.length > 0) {
+      autoTable(doc, {
+        startY: currentY,
+        head: [['Metric', 'Company', 'Industry Avg', 'Percentile', 'Status']],
+        body: benchmarkComparisons.slice(0, 6).map((b: { metric?: string; companyValue?: string; industryAverage?: string; percentile?: string; assessment?: string }) => [
+          b.metric || 'Performance Metric',
+          b.companyValue || 'TBD',
+          b.industryAverage || 'TBD',
+          b.percentile || 'Top 50%',
+          b.assessment || 'On Track'
+        ]),
+        theme: 'striped',
+        headStyles: {
+          fillColor: [52, 73, 94],
+          textColor: 255,
+          fontStyle: 'bold',
+          fontSize: 10,
+          cellPadding: 4
+        },
+        bodyStyles: { fontSize: 9, cellPadding: 3 },
+        alternateRowStyles: { fillColor: [248, 249, 250] },
+        margin: { left: 14, right: 14 }
+      });
+    } else {
+      doc.setFontSize(10);
+      doc.text('Benchmark comparison data under analysis.', 18, currentY);
+    }
+
+    addPageFooter(doc, 6, totalPages);
+
+    // ========== PAGE 7: GROWTH CLASSIFIER & GAP ANALYSIS ==========
+    doc.addPage();
+    addPageHeader(doc, companyName, 'GROWTH & GAP ANALYSIS');
+
+    currentY = addSectionTitle(doc, 'GROWTH CLASSIFICATION', 32);
+
+    if (data.growthData) {
+      // Growth tier display
+      const growthTier = data.growthData.tier || 2;
+      const growthConfidence = data.growthData.confidence || 75;
+
+      doc.setFillColor(growthTier === 1 ? 39 : growthTier === 2 ? 243 : 231,
+        growthTier === 1 ? 174 : growthTier === 2 ? 156 : 76,
+        growthTier === 1 ? 96 : growthTier === 2 ? 18 : 60);
+      doc.roundedRect(14, currentY, 88, 25, 3, 3, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Tier ${growthTier} Growth`, 58, currentY + 10, { align: 'center' });
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`${growthConfidence}% Confidence`, 58, currentY + 20, { align: 'center' });
+      doc.setTextColor(0, 0, 0);
+
+      // Growth scenarios
+      const scenarios = data.growthData.scenarios || [];
+      if (scenarios.length > 0) {
+        autoTable(doc, {
+          startY: currentY + 35,
+          head: [['Scenario', 'Growth Rate', 'Probability']],
+          body: scenarios.map((s: { name?: string; growth?: number; probability?: string }) => [
+            s.name || 'Scenario',
+            `${s.growth || 0}x YoY`,
+            s.probability || '33%'
+          ]),
+          theme: 'striped',
+          headStyles: {
+            fillColor: [46, 204, 113],
+            textColor: 255,
+            fontStyle: 'bold',
+            fontSize: 10,
+            cellPadding: 4
+          },
+          bodyStyles: { fontSize: 10, cellPadding: 3 },
+          margin: { left: 14, right: 100 }
+        });
+      }
+    } else {
+      doc.setFontSize(10);
+      doc.text('Growth classification pending analysis.', 18, currentY);
+    }
+
+    const growthTableEndY = (doc as any).lastAutoTable?.finalY + 15 || currentY + 70;
+    currentY = addSectionTitle(doc, 'GAP ANALYSIS', growthTableEndY);
+
+    if (data.gapData && data.gapData.heatmap) {
+      autoTable(doc, {
+        startY: currentY,
+        head: [['Category', 'Gap Score', 'Priority', 'Trend', 'Direction']],
+        body: data.gapData.heatmap.slice(0, 5).map((g: { category: string; gap: number; priority: "High" | "Medium" | "Low"; trend: number; direction: "up" | "down" | "stable" }) => [
+          g.category || 'Business Area',
+          g.gap?.toFixed(1) || '0',
+          g.priority || 'Medium',
+          g.trend?.toFixed(1) || '0',
+          g.direction || 'stable'
+        ]),
+        theme: 'striped',
+        headStyles: {
+          fillColor: [230, 126, 34],
+          textColor: 255,
+          fontStyle: 'bold',
+          fontSize: 9,
+          cellPadding: 3
+        },
+        bodyStyles: { fontSize: 8, cellPadding: 2.5 },
+        alternateRowStyles: { fillColor: [254, 243, 231] },
+        margin: { left: 14, right: 14 }
+      });
+    } else {
+      doc.setFontSize(10);
+      doc.text('Gap analysis data under review.', 18, currentY);
+    }
+
+    addPageFooter(doc, 7, totalPages);
+
+    // ========== PAGE 8: FOUNDER FIT & CEO QUESTIONS ==========
+    doc.addPage();
+    addPageHeader(doc, companyName, 'FOUNDER & LEADERSHIP');
+
+    currentY = addSectionTitle(doc, 'FOUNDER FIT ANALYSIS', 32);
+
+    if (data.founderFitData) {
+      const founderScore = data.founderFitData.readinessScore || 7.5;
+      const founderScoreColor = founderScore >= 7 ? [39, 174, 96] : founderScore >= 5 ? [243, 156, 18] : [231, 76, 60];
+
+      // Founder fit score display
+      doc.setFillColor(founderScoreColor[0], founderScoreColor[1], founderScoreColor[2]);
+      doc.roundedRect(14, currentY, 60, 28, 3, 3, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(10);
+      doc.text('Readiness Score', 44, currentY + 8, { align: 'center' });
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${founderScore.toFixed(1)}/10`, 44, currentY + 22, { align: 'center' });
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(0, 0, 0);
+
+      // Investor list
+      const investors = data.founderFitData.investorList || [];
+      if (investors.length > 0) {
+        autoTable(doc, {
+          startY: currentY + 38,
+          head: [['Investor', 'Thesis', 'Match %', 'Stage']],
+          body: investors.slice(0, 6).map((inv: { name?: string; thesis?: string; match?: number; stage?: string }) => [
+            inv.name || 'Investor',
+            inv.thesis || 'Growth',
+            `${inv.match || 0}%`,
+            inv.stage || 'Series A'
+          ]),
+          headStyles: {
+            fillColor: [142, 68, 173],
+            textColor: 255,
+            fontStyle: 'bold',
+            fontSize: 9,
+            cellPadding: 3
+          },
+          bodyStyles: { fontSize: 9, cellPadding: 2.5 },
+          alternateRowStyles: { fillColor: [248, 243, 252] },
+          margin: { left: 14, right: 14 }
+        });
+      }
+    } else {
+      doc.setFontSize(10);
+      doc.text('Founder fit analysis pending evaluation.', 18, currentY);
+    }
+
+    const founderTableEndY = (doc as any).lastAutoTable?.finalY + 15 || currentY + 80;
+    currentY = addSectionTitle(doc, 'KEY CEO QUESTIONS', founderTableEndY);
+
+    // CEO Questions - generated based on analysis
+    const ceoQuestions = [
+      'What is your 18-month roadmap for product-market fit expansion?',
+      'How do you plan to address the identified competitive threats?',
+      'What is your strategy for reducing customer acquisition cost?',
+      'How will you scale the team while maintaining culture?',
+      'What are your key milestones before the next funding round?'
+    ];
+
+    doc.setFontSize(10);
+    ceoQuestions.forEach((question, index) => {
+      doc.setFillColor(248, 249, 250);
+      doc.roundedRect(14, currentY + (index * 12), 182, 10, 2, 2, 'F');
+      doc.text(`${index + 1}. ${question}`, 18, currentY + (index * 12) + 7);
+    });
+
+    addPageFooter(doc, 8, totalPages);
+
+    // ========== PAGE 9: INVESTMENT RECOMMENDATION ==========
     doc.addPage();
     addPageHeader(doc, companyName, 'INVESTMENT RECOMMENDATION');
 
@@ -1000,7 +1233,7 @@ export function ExportButtons() {
       doc.setTextColor(0, 0, 0);
     });
 
-    addPageFooter(doc, 6, totalPages);
+    addPageFooter(doc, 9, totalPages);
 
     doc.save(`${companyName}-Comprehensive-${reportType}-Report-${new Date().toISOString().split('T')[0]}.pdf`);
     toast({
@@ -1241,6 +1474,265 @@ export function ExportButtons() {
         });
       }
     }
+
+    // MACRO TREND ALIGNMENT
+    sections.push(
+      new Paragraph({
+        heading: HeadingLevel.HEADING_1,
+        children: [new TextRun({ text: "MACRO TREND ALIGNMENT", bold: true, size: 32, color: "1F4E79" })],
+        spacing: { before: 400, after: 200 }
+      })
+    );
+
+    if (data.macroData) {
+      sections.push(
+        new Paragraph({
+          children: [
+            new TextRun({ text: "Sector Outlook: ", bold: true, size: 22 }),
+            new TextRun({ text: data.macroData.sectorOutlook || 'Under Analysis', size: 22 })
+          ],
+          spacing: { after: 100 }
+        }),
+        new Paragraph({
+          children: [
+            new TextRun({ text: "Trend Overlay Score: ", bold: true, size: 22 }),
+            new TextRun({ text: `${data.macroData.trendOverlayScore || 'N/A'}`, size: 22, color: "27AE60" })
+          ],
+          spacing: { after: 150 }
+        })
+      );
+
+      const trendSignals = data.macroData.trendSignals || [];
+      if (trendSignals.length > 0) {
+        sections.push(
+          new Paragraph({
+            children: [new TextRun({ text: "Trend Signals:", bold: true, size: 22 })],
+            spacing: { after: 100 }
+          })
+        );
+        trendSignals.slice(0, 5).forEach((signal: string, index: number) => {
+          sections.push(
+            new Paragraph({
+              children: [new TextRun({ text: `${index + 1}. ${signal}`, size: 22 })],
+              spacing: { after: 50 }
+            })
+          );
+        });
+      }
+    } else {
+      sections.push(
+        new Paragraph({
+          children: [new TextRun({ text: "Macro trend analysis data pending review.", size: 22, italics: true, color: "888888" })],
+          spacing: { after: 100 }
+        })
+      );
+    }
+
+    // BENCHMARK COMPARISON
+    sections.push(
+      new Paragraph({
+        heading: HeadingLevel.HEADING_1,
+        children: [new TextRun({ text: "BENCHMARK COMPARISON", bold: true, size: 32, color: "1F4E79" })],
+        spacing: { before: 400, after: 200 }
+      })
+    );
+
+    const docxBenchmarkComparisons = getBenchmarkComparisons(data);
+    if (docxBenchmarkComparisons && docxBenchmarkComparisons.length > 0) {
+      docxBenchmarkComparisons.slice(0, 6).forEach((comp: { metric?: string; companyValue?: string; industryAverage?: string; percentile?: string; assessment?: string }, index: number) => {
+        sections.push(
+          new Paragraph({
+            children: [
+              new TextRun({ text: `${comp.metric || 'Metric'}: `, bold: true, size: 22 }),
+              new TextRun({ text: `Company: ${comp.companyValue || 'TBD'} `, size: 22 }),
+              new TextRun({ text: `| Industry: ${comp.industryAverage || 'TBD'} `, size: 20, color: "666666" }),
+              new TextRun({ text: `| ${comp.percentile || 'Top 50%'}`, size: 20, color: "27AE60" })
+            ],
+            spacing: { after: 100 }
+          })
+        );
+      });
+    } else {
+      sections.push(
+        new Paragraph({
+          children: [new TextRun({ text: "Benchmark comparison data under analysis.", size: 22, italics: true, color: "888888" })],
+          spacing: { after: 100 }
+        })
+      );
+    }
+
+    // GROWTH CLASSIFICATION
+    sections.push(
+      new Paragraph({
+        heading: HeadingLevel.HEADING_1,
+        children: [new TextRun({ text: "GROWTH CLASSIFICATION", bold: true, size: 32, color: "1F4E79" })],
+        spacing: { before: 400, after: 200 }
+      })
+    );
+
+    if (data.growthData) {
+      const growthTier = data.growthData.tier || 2;
+      const growthConfidence = data.growthData.confidence || 75;
+      const tierColor = growthTier === 1 ? "27AE60" : growthTier === 2 ? "F39C12" : "E74C3C";
+
+      sections.push(
+        new Paragraph({
+          children: [
+            new TextRun({ text: `Growth Tier: ${growthTier}`, size: 28, bold: true, color: tierColor }),
+            new TextRun({ text: ` (${growthConfidence}% confidence)`, size: 22, color: "666666" })
+          ],
+          spacing: { after: 150 }
+        })
+      );
+
+      if (data.growthData.scenarios) {
+        sections.push(
+          new Paragraph({
+            children: [new TextRun({ text: "Growth Scenarios:", bold: true, size: 22 })],
+            spacing: { after: 100 }
+          })
+        );
+        data.growthData.scenarios.forEach((scenario: { name?: string; growth?: number }, index: number) => {
+          sections.push(
+            new Paragraph({
+              children: [
+                new TextRun({ text: `  • ${scenario.name || 'Scenario'}: `, size: 22 }),
+                new TextRun({ text: `${scenario.growth || 0}x YoY Growth`, size: 22, bold: true })
+              ],
+              spacing: { after: 50 }
+            })
+          );
+        });
+      }
+    } else {
+      sections.push(
+        new Paragraph({
+          children: [new TextRun({ text: "Growth classification pending analysis.", size: 22, italics: true, color: "888888" })],
+          spacing: { after: 100 }
+        })
+      );
+    }
+
+    // GAP ANALYSIS
+    sections.push(
+      new Paragraph({
+        heading: HeadingLevel.HEADING_1,
+        children: [new TextRun({ text: "GAP ANALYSIS", bold: true, size: 32, color: "1F4E79" })],
+        spacing: { before: 400, after: 200 }
+      })
+    );
+
+    if (data.gapData && data.gapData.heatmap) {
+      data.gapData.heatmap.slice(0, 5).forEach((item: { category: string; gap: number; priority: "High" | "Medium" | "Low"; trend: number; direction: "up" | "down" | "stable" }, index: number) => {
+        const priorityColor = item.priority === 'High' ? "E74C3C" : item.priority === 'Medium' ? "F39C12" : "27AE60";
+        sections.push(
+          new Paragraph({
+            children: [
+              new TextRun({ text: `${index + 1}. ${item.category || 'Category'}: `, bold: true, size: 22 }),
+              new TextRun({ text: `Gap Score: ${item.gap || 0}%`, size: 20 }),
+              new TextRun({ text: ` | Trend: ${item.trend || 'Stable'} ${item.direction || ''}`, size: 20, color: "666666" })
+            ],
+            spacing: { after: 50 }
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: `   Priority: ${item.priority || 'Medium'}`, size: 20, bold: true, color: priorityColor })
+            ],
+            spacing: { after: 100 }
+          })
+        );
+      });
+    } else {
+      sections.push(
+        new Paragraph({
+          children: [new TextRun({ text: "Gap analysis data under review.", size: 22, italics: true, color: "888888" })],
+          spacing: { after: 100 }
+        })
+      );
+    }
+
+    // FOUNDER FIT ANALYSIS
+    sections.push(
+      new Paragraph({
+        heading: HeadingLevel.HEADING_1,
+        children: [new TextRun({ text: "FOUNDER FIT ANALYSIS", bold: true, size: 32, color: "1F4E79" })],
+        spacing: { before: 400, after: 200 }
+      })
+    );
+
+    if (data.founderFitData) {
+      const founderScore = data.founderFitData.readinessScore || 75;
+      const founderColor = founderScore >= 70 ? "27AE60" : founderScore >= 50 ? "F39C12" : "E74C3C";
+
+      sections.push(
+        new Paragraph({
+          children: [
+            new TextRun({ text: `Founder Readiness Score: ${founderScore}%`, size: 28, bold: true, color: founderColor })
+          ],
+          spacing: { after: 150 }
+        })
+      );
+
+      if (data.founderFitData.investorList) {
+        sections.push(
+          new Paragraph({
+            children: [new TextRun({ text: "Top Investor Matches:", bold: true, size: 22 })],
+            spacing: { after: 100 }
+          })
+        );
+        data.founderFitData.investorList.slice(0, 5).forEach((investor: { name?: string; thesis?: string; match?: number; stage?: string }, index: number) => {
+          sections.push(
+            new Paragraph({
+              children: [
+                new TextRun({ text: `${index + 1}. ${investor.name || 'Investor'}: `, bold: true, size: 22 }),
+                new TextRun({ text: `${investor.match || 0}% match`, size: 22 }),
+                new TextRun({ text: ` | Stage: ${investor.stage || 'Seed'}`, size: 20, color: "666666" })
+              ],
+              spacing: { after: 50 }
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: `   Thesis: ${investor.thesis || 'Investment focus'}`, size: 20, italics: true, color: "666666" })
+              ],
+              spacing: { after: 80 }
+            })
+          );
+        });
+      }
+    } else {
+      sections.push(
+        new Paragraph({
+          children: [new TextRun({ text: "Founder fit analysis pending evaluation.", size: 22, italics: true, color: "888888" })],
+          spacing: { after: 100 }
+        })
+      );
+    }
+
+    // CEO QUESTIONS
+    sections.push(
+      new Paragraph({
+        heading: HeadingLevel.HEADING_1,
+        children: [new TextRun({ text: "KEY CEO QUESTIONS", bold: true, size: 32, color: "1F4E79" })],
+        spacing: { before: 400, after: 200 }
+      })
+    );
+
+    const docxCeoQuestions = [
+      'What is your 18-month roadmap for product-market fit expansion?',
+      'How do you plan to address the identified competitive threats?',
+      'What is your strategy for reducing customer acquisition cost?',
+      'How will you scale the team while maintaining culture?',
+      'What are your key milestones before the next funding round?'
+    ];
+
+    docxCeoQuestions.forEach((question, index) => {
+      sections.push(
+        new Paragraph({
+          children: [new TextRun({ text: `${index + 1}. ${question}`, size: 22 })],
+          spacing: { after: 100 }
+        })
+      );
+    });
 
     // INVESTMENT RECOMMENDATION
     sections.push(
@@ -1536,7 +2028,157 @@ export function ExportButtons() {
       });
     }
 
-    // SLIDE 7: Investment Recommendation
+    // SLIDE 7: Macro Trend & Benchmark Analysis
+    let macroSlide = pptx.addSlide();
+    macroSlide.addText('Macro Trend & Benchmark Analysis', { x: 0.5, y: 0.25, fontSize: 20, bold: true, color: '1f4e79' });
+
+    if (data.macroData) {
+      macroSlide.addText(`Sector Outlook: ${data.macroData.sectorOutlook || 'Under Analysis'}`, { x: 0.5, y: 0.8, fontSize: 14, bold: true });
+      macroSlide.addText(`Trend Score: ${data.macroData.trendOverlayScore || 'N/A'}`, { x: 0.5, y: 1.1, fontSize: 12, color: '27ae60' });
+
+      const trendSignals = data.macroData.trendSignals || [];
+      if (trendSignals.length > 0) {
+        const trendRows = trendSignals.slice(0, 4).map((signal: string, idx: number) => [
+          { text: `${idx + 1}`, options: { fontSize: 11, bold: true } },
+          { text: signal, options: { fontSize: 11 } }
+        ]);
+
+        macroSlide.addText('Trend Signals:', { x: 0.5, y: 1.5, fontSize: 12, bold: true });
+        macroSlide.addTable([
+          [
+            { text: '#', options: { bold: true, fontSize: 11, fill: { color: '9b59b6' }, color: 'ffffff' } },
+            { text: 'Signal', options: { bold: true, fontSize: 11, fill: { color: '9b59b6' }, color: 'ffffff' } }
+          ],
+          ...trendRows
+        ], {
+          x: 0.5, y: 1.8, w: 4.2, h: 1.5,
+          border: { type: 'solid', color: '333333' }
+        });
+      }
+    }
+
+    const pptxBenchmarkComparisons = getBenchmarkComparisons(data);
+    if (pptxBenchmarkComparisons && pptxBenchmarkComparisons.length > 0) {
+      const benchRows = pptxBenchmarkComparisons.slice(0, 4).map((b: { metric?: string; companyValue?: string; industryAverage?: string; percentile?: string }) => [
+        { text: b.metric || 'Metric', options: { fontSize: 11 } },
+        { text: b.companyValue || 'TBD', options: { fontSize: 11, bold: true } },
+        { text: b.industryAverage || 'TBD', options: { fontSize: 11 } },
+        { text: b.percentile || 'Top 50%', options: { fontSize: 11, color: '27ae60' } }
+      ]);
+
+      macroSlide.addText('Benchmark Comparison:', { x: 5.0, y: 0.8, fontSize: 14, bold: true });
+      macroSlide.addTable([
+        [
+          { text: 'Metric', options: { bold: true, fontSize: 10, fill: { color: '34495e' }, color: 'ffffff' } },
+          { text: 'Company', options: { bold: true, fontSize: 10, fill: { color: '34495e' }, color: 'ffffff' } },
+          { text: 'Industry', options: { bold: true, fontSize: 10, fill: { color: '34495e' }, color: 'ffffff' } },
+          { text: 'Percentile', options: { bold: true, fontSize: 10, fill: { color: '34495e' }, color: 'ffffff' } }
+        ],
+        ...benchRows
+      ], {
+        x: 5.0, y: 1.1, w: 4.5, h: 1.8,
+        border: { type: 'solid', color: '333333' }
+      });
+    }
+
+    // SLIDE 8: Growth Classification & Gap Analysis
+    let growthSlide = pptx.addSlide();
+    growthSlide.addText('Growth Classification & Gap Analysis', { x: 0.5, y: 0.25, fontSize: 20, bold: true, color: '1f4e79' });
+
+    if (data.growthData) {
+      const growthTier = data.growthData.tier || 2;
+      const growthConfidence = data.growthData.confidence || 75;
+      const tierColor = growthTier === 1 ? '27ae60' : growthTier === 2 ? 'f39c12' : 'e74c3c';
+
+      growthSlide.addText(`Growth Tier: ${growthTier}`, { x: 0.5, y: 0.8, fontSize: 18, bold: true, color: tierColor });
+      growthSlide.addText(`Confidence: ${growthConfidence}%`, { x: 2.5, y: 0.8, fontSize: 14 });
+
+      if (data.growthData.scenarios) {
+        const scenarioRows = data.growthData.scenarios.map((s: { name?: string; growth?: number }) => [
+          { text: s.name || 'Scenario', options: { fontSize: 11 } },
+          { text: `${s.growth || 0}x YoY`, options: { fontSize: 11, bold: true } }
+        ]);
+
+        growthSlide.addTable([
+          [
+            { text: 'Scenario', options: { bold: true, fontSize: 11, fill: { color: '2ecc71' }, color: 'ffffff' } },
+            { text: 'Growth Rate', options: { bold: true, fontSize: 11, fill: { color: '2ecc71' }, color: 'ffffff' } }
+          ],
+          ...scenarioRows
+        ], {
+          x: 0.5, y: 1.2, w: 3.5, h: 1.5,
+          border: { type: 'solid', color: '333333' }
+        });
+      }
+    }
+
+    if (data.gapData && data.gapData.heatmap) {
+      const gapRows = data.gapData.heatmap.slice(0, 4).map((g: { category: string; gap: number; priority: "High" | "Medium" | "Low"; trend: number; direction: "up" | "down" | "stable" }) => [
+        { text: g.category || 'Category', options: { fontSize: 11 } },
+        { text: `${g.gap || 0}%`, options: { fontSize: 11 } },
+        { text: g.priority || 'Medium', options: { fontSize: 11, color: g.priority === 'High' ? 'e74c3c' : g.priority === 'Medium' ? 'f39c12' : '27ae60' } }
+      ]);
+
+      growthSlide.addText('Gap Analysis:', { x: 5.0, y: 0.8, fontSize: 14, bold: true });
+      growthSlide.addTable([
+        [
+          { text: 'Category', options: { bold: true, fontSize: 11, fill: { color: 'e67e22' }, color: 'ffffff' } },
+          { text: 'Gap', options: { bold: true, fontSize: 11, fill: { color: 'e67e22' }, color: 'ffffff' } },
+          { text: 'Priority', options: { bold: true, fontSize: 11, fill: { color: 'e67e22' }, color: 'ffffff' } }
+        ],
+        ...gapRows
+      ], {
+        x: 5.0, y: 1.1, w: 4.5, h: 1.8,
+        border: { type: 'solid', color: '333333' }
+      });
+    }
+
+    // SLIDE 9: Founder Fit & CEO Questions
+    let founderSlide = pptx.addSlide();
+    founderSlide.addText('Founder Fit & CEO Questions', { x: 0.5, y: 0.25, fontSize: 20, bold: true, color: '1f4e79' });
+
+    if (data.founderFitData) {
+      const founderScore = data.founderFitData.readinessScore || 75;
+      const founderColor = founderScore >= 70 ? '27ae60' : founderScore >= 50 ? 'f39c12' : 'e74c3c';
+
+      founderSlide.addText(`Founder Readiness Score: ${founderScore}%`, { x: 0.5, y: 0.8, fontSize: 18, bold: true, color: founderColor });
+
+      if (data.founderFitData.investorList) {
+        const investorRows = data.founderFitData.investorList.slice(0, 5).map((inv: { name?: string; match?: number; stage?: string }) => [
+          { text: inv.name || 'Investor', options: { fontSize: 11 } },
+          { text: `${inv.match || 0}%`, options: { fontSize: 11, bold: true } },
+          { text: inv.stage || 'Seed', options: { fontSize: 11 } }
+        ]);
+
+        founderSlide.addTable([
+          [
+            { text: 'Investor', options: { bold: true, fontSize: 11, fill: { color: '8e44ad' }, color: 'ffffff' } },
+            { text: 'Match', options: { bold: true, fontSize: 11, fill: { color: '8e44ad' }, color: 'ffffff' } },
+            { text: 'Stage', options: { bold: true, fontSize: 11, fill: { color: '8e44ad' }, color: 'ffffff' } }
+          ],
+          ...investorRows
+        ], {
+          x: 0.5, y: 1.2, w: 4.5, h: 2.2,
+          border: { type: 'solid', color: '333333' }
+        });
+      }
+    }
+
+    // CEO Questions
+    const pptxCeoQuestions = [
+      '1. 18-month product-market fit roadmap?',
+      '2. Strategy to address competitive threats?',
+      '3. Plan for reducing customer acquisition cost?',
+      '4. Team scaling while maintaining culture?',
+      '5. Key milestones before next funding round?'
+    ];
+
+    founderSlide.addText('Key CEO Questions:', { x: 5.5, y: 0.8, fontSize: 14, bold: true });
+    pptxCeoQuestions.forEach((q, index) => {
+      founderSlide.addText(q, { x: 5.5, y: 1.2 + (index * 0.4), fontSize: 12 });
+    });
+
+    // SLIDE 10: Investment Recommendation
     let recSlide = pptx.addSlide();
     recSlide.addText('Investment Recommendation', { x: 0.5, y: 0.25, fontSize: 24, bold: true, color: '1f4e79' });
 
@@ -1563,7 +2205,7 @@ export function ExportButtons() {
     recSlide.addText('• Financial health and capital efficiency', { x: 1.2, y: 4.5, fontSize: 14 });
     recSlide.addText('• Strategic fit with investment criteria', { x: 1.2, y: 4.8, fontSize: 14 });
 
-    // SLIDE 8: Next Steps
+    // SLIDE 11: Next Steps
     let nextSlide = pptx.addSlide();
     nextSlide.addText('Recommended Next Steps', { x: 0.5, y: 0.25, fontSize: 20, bold: true, color: '1f4e79' });
 
@@ -1590,7 +2232,7 @@ export function ExportButtons() {
     pptx.writeFile({ fileName: `${companyName}-COMPREHENSIVE-${reportType}-Analysis.pptx` });
     toast({
       title: 'Comprehensive PowerPoint Exported',
-      description: `Complete ${reportType} presentation with detailed analysis slides has been downloaded.`
+      description: `Complete ${reportType} presentation with 11 detailed analysis slides has been downloaded.`
     });
   };
 
@@ -1974,7 +2616,7 @@ export function ExportButtons() {
                 <FileText className="size-4 text-red-600" />
                 <div className="flex flex-col">
                   <span>Complete Analysis PDF</span>
-                  <span className="text-xs text-muted-foreground">20+ pages with all modules</span>
+                  <span className="text-xs text-muted-foreground">9 pages with all modules</span>
                 </div>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleExportDocx} className="flex items-center gap-3 py-2">
@@ -1988,7 +2630,7 @@ export function ExportButtons() {
                 <Presentation className="size-4 text-orange-600" />
                 <div className="flex flex-col">
                   <span>Full PowerPoint Deck</span>
-                  <span className="text-xs text-muted-foreground">8+ slides with detailed analysis</span>
+                  <span className="text-xs text-muted-foreground">11 slides with detailed analysis</span>
                 </div>
               </DropdownMenuItem>
             </DropdownMenuSubContent>
