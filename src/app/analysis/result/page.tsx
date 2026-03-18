@@ -6,9 +6,13 @@ import Link from 'next/link';
 
 // UI Components
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Timer, Eye, Save, Loader2 } from 'lucide-react';
+import { Timer, Eye, Save, Loader2, CheckCircle2, XCircle, AlertTriangle, ClipboardCheck, Shield, ArrowRight, MessageSquare } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
 
 // Hooks and Utils
 import { useToast } from '@/hooks/use-toast';
@@ -59,6 +63,20 @@ import { normalizeAnalysisData } from '@/lib/normalize-tca-data';
 export type UserRole = 'user' | 'admin' | 'analyst';
 export type ReportType = 'triage' | 'dd';
 type ReportSection = { id: string; title: string; active: boolean; };
+type ApprovalStatus = 'pending' | 'approved' | 'rejected' | 'needs-revision';
+type ReviewCheckItem = {
+    id: string;
+    label: string;
+    checked: boolean;
+};
+
+const defaultReviewChecklist: ReviewCheckItem[] = [
+    { id: 'data-accuracy', label: 'Data accuracy verified', checked: false },
+    { id: 'scoring-consistency', label: 'TCA scoring consistency checked', checked: false },
+    { id: 'risk-flags-reviewed', label: 'All risk flags reviewed', checked: false },
+    { id: 'recommendations-valid', label: 'Recommendations are valid', checked: false },
+    { id: 'formatting-correct', label: 'Report formatting is correct', checked: false },
+];
 
 
 
@@ -304,6 +322,13 @@ export default function AnalysisResultPage({
     const [params, setParams] = useState<{ preview?: string; type?: string }>({});
     const [isPreview, setIsPreview] = useState(false);
 
+    // Reviewer Approval State
+    const [approvalStatus, setApprovalStatus] = useState<ApprovalStatus>('pending');
+    const [reviewChecklist, setReviewChecklist] = useState<ReviewCheckItem[]>(defaultReviewChecklist);
+    const [reviewerComments, setReviewerComments] = useState('');
+    const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+    const [showApprovalPanel, setShowApprovalPanel] = useState(true);
+
     // Unwrap searchParams
     useEffect(() => {
         searchParams.then(p => {
@@ -311,6 +336,23 @@ export default function AnalysisResultPage({
             setIsPreview(p.preview === 'true');
         });
     }, [searchParams]);
+
+    // Load approval status from localStorage
+    useEffect(() => {
+        try {
+            const savedApproval = localStorage.getItem('reportApprovalStatus');
+            if (savedApproval) {
+                const parsed = JSON.parse(savedApproval);
+                setApprovalStatus(parsed.status || 'pending');
+                setReviewerComments(parsed.comments || '');
+                if (parsed.checklist) {
+                    setReviewChecklist(parsed.checklist);
+                }
+            }
+        } catch (e) {
+            console.error('Failed to load approval status:', e);
+        }
+    }, []);
 
     // Load user role and analysis data - Dynamic Data Loading
     useEffect(() => {
@@ -567,6 +609,75 @@ export default function AnalysisResultPage({
         }
     };
 
+    // Handle checklist item toggle
+    const handleChecklistToggle = (itemId: string) => {
+        setReviewChecklist(prev =>
+            prev.map(item =>
+                item.id === itemId ? { ...item, checked: !item.checked } : item
+            )
+        );
+    };
+
+    // Calculate checklist progress
+    const checklistProgress = Math.round(
+        (reviewChecklist.filter(item => item.checked).length / reviewChecklist.length) * 100
+    );
+
+    // Handle approval submission
+    const handleApprovalSubmit = async (status: ApprovalStatus) => {
+        setIsSubmittingReview(true);
+
+        try {
+            // Simulate API call
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            const approvalData = {
+                status,
+                comments: reviewerComments,
+                checklist: reviewChecklist,
+                timestamp: new Date().toISOString(),
+                reviewer: JSON.parse(localStorage.getItem('loggedInUser') || '{}')?.email || 'Unknown'
+            };
+
+            localStorage.setItem('reportApprovalStatus', JSON.stringify(approvalData));
+            setApprovalStatus(status);
+
+            toast({
+                title: status === 'approved' ? '✅ Report Approved' :
+                    status === 'rejected' ? '❌ Report Rejected' : '📝 Revision Requested',
+                description: status === 'approved' ?
+                    'The report has been approved and is ready for distribution.' :
+                    status === 'rejected' ?
+                        'The report has been rejected. Please review the comments.' :
+                        'The analyst has been notified to make revisions.',
+            });
+
+            // Update the review assignment status
+            const storedReviews = localStorage.getItem('reviewerAssignments');
+            if (storedReviews) {
+                const reviews = JSON.parse(storedReviews);
+                const updatedReviews = reviews.map((r: any) => ({
+                    ...r,
+                    status: status === 'approved' ? 'Completed' : r.status,
+                    progress: status === 'approved' ? 100 : r.progress,
+                    lastActivity: status === 'approved' ? 'Approved by reviewer' :
+                        status === 'rejected' ? 'Rejected by reviewer' : 'Revision requested'
+                }));
+                localStorage.setItem('reviewerAssignments', JSON.stringify(updatedReviews));
+            }
+
+        } catch (error) {
+            console.error('Approval submission failed:', error);
+            toast({
+                variant: 'destructive',
+                title: 'Submission Failed',
+                description: 'Could not submit review. Please try again.'
+            });
+        } finally {
+            setIsSubmittingReview(false);
+        }
+    };
+
     // Auto-save analysis when data is loaded
     useEffect(() => {
         const autoSaveAnalysis = async () => {
@@ -716,6 +827,187 @@ export default function AnalysisResultPage({
                             </div>
                         </div>
                     </header>
+
+                    {/* Reviewer Approval Panel - Only for Admin/Analyst */}
+                    {(role === 'admin' || role === 'analyst') && !isPreview && showApprovalPanel && (
+                        <Card className={`mb-8 border-2 ${approvalStatus === 'approved' ? 'border-green-300 bg-green-50/50' :
+                                approvalStatus === 'rejected' ? 'border-red-300 bg-red-50/50' :
+                                    approvalStatus === 'needs-revision' ? 'border-amber-300 bg-amber-50/50' :
+                                        'border-primary/30 bg-primary/5'
+                            }`}>
+                            <CardHeader className="pb-3">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`p-2 rounded-full ${approvalStatus === 'approved' ? 'bg-green-100' :
+                                                approvalStatus === 'rejected' ? 'bg-red-100' :
+                                                    approvalStatus === 'needs-revision' ? 'bg-amber-100' :
+                                                        'bg-primary/20'
+                                            }`}>
+                                            {approvalStatus === 'approved' ? (
+                                                <CheckCircle2 className="size-6 text-green-600" />
+                                            ) : approvalStatus === 'rejected' ? (
+                                                <XCircle className="size-6 text-red-600" />
+                                            ) : approvalStatus === 'needs-revision' ? (
+                                                <AlertTriangle className="size-6 text-amber-600" />
+                                            ) : (
+                                                <ClipboardCheck className="size-6 text-primary" />
+                                            )}
+                                        </div>
+                                        <div>
+                                            <CardTitle className="text-lg flex items-center gap-2">
+                                                Reviewer Approval Process
+                                                <Badge variant={
+                                                    approvalStatus === 'approved' ? 'success' :
+                                                        approvalStatus === 'rejected' ? 'destructive' :
+                                                            approvalStatus === 'needs-revision' ? 'warning' : 'outline'
+                                                }>
+                                                    {approvalStatus === 'pending' ? 'Pending Review' :
+                                                        approvalStatus === 'approved' ? 'Approved' :
+                                                            approvalStatus === 'rejected' ? 'Rejected' : 'Needs Revision'}
+                                                </Badge>
+                                            </CardTitle>
+                                            <CardDescription>
+                                                Complete the checklist below before approving this report
+                                            </CardDescription>
+                                        </div>
+                                    </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setShowApprovalPanel(false)}
+                                    >
+                                        Minimize
+                                    </Button>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="space-y-6">
+                                {/* Progress Bar */}
+                                <div className="space-y-2">
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-muted-foreground">Review Checklist Progress</span>
+                                        <span className="font-medium">{checklistProgress}%</span>
+                                    </div>
+                                    <Progress value={checklistProgress} className="h-2" />
+                                </div>
+
+                                {/* Review Checklist */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                    {reviewChecklist.map(item => (
+                                        <div
+                                            key={item.id}
+                                            className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${item.checked ? 'bg-green-50 border-green-200' : 'bg-muted/30 hover:bg-muted/50'
+                                                }`}
+                                            onClick={() => handleChecklistToggle(item.id)}
+                                        >
+                                            <Checkbox
+                                                checked={item.checked}
+                                                onCheckedChange={() => handleChecklistToggle(item.id)}
+                                            />
+                                            <span className={`text-sm ${item.checked ? 'text-green-700 font-medium' : ''}`}>
+                                                {item.label}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Reviewer Comments */}
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium flex items-center gap-2">
+                                        <MessageSquare className="size-4" />
+                                        Reviewer Comments (Optional)
+                                    </label>
+                                    <Textarea
+                                        placeholder="Add any comments or notes about this report..."
+                                        value={reviewerComments}
+                                        onChange={(e) => setReviewerComments(e.target.value)}
+                                        className="min-h-[80px]"
+                                    />
+                                </div>
+                            </CardContent>
+                            <CardFooter className="flex flex-col sm:flex-row gap-3 pt-4 border-t">
+                                {approvalStatus === 'pending' ? (
+                                    <>
+                                        <Button
+                                            variant="outline"
+                                            className="flex-1 border-amber-300 text-amber-700 hover:bg-amber-50"
+                                            onClick={() => handleApprovalSubmit('needs-revision')}
+                                            disabled={isSubmittingReview}
+                                        >
+                                            <AlertTriangle className="size-4 mr-2" />
+                                            Request Revision
+                                        </Button>
+                                        <Button
+                                            variant="destructive"
+                                            className="flex-1"
+                                            onClick={() => handleApprovalSubmit('rejected')}
+                                            disabled={isSubmittingReview}
+                                        >
+                                            <XCircle className="size-4 mr-2" />
+                                            Reject Report
+                                        </Button>
+                                        <Button
+                                            variant="default"
+                                            className="flex-1 bg-green-600 hover:bg-green-700"
+                                            onClick={() => handleApprovalSubmit('approved')}
+                                            disabled={isSubmittingReview || checklistProgress < 100}
+                                        >
+                                            {isSubmittingReview ? (
+                                                <Loader2 className="size-4 mr-2 animate-spin" />
+                                            ) : (
+                                                <CheckCircle2 className="size-4 mr-2" />
+                                            )}
+                                            Approve Report
+                                        </Button>
+                                    </>
+                                ) : (
+                                    <div className="w-full flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <Shield className="size-5 text-muted-foreground" />
+                                            <span className="text-sm text-muted-foreground">
+                                                Review submitted. Status: <strong>{approvalStatus}</strong>
+                                            </span>
+                                        </div>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => {
+                                                setApprovalStatus('pending');
+                                                setReviewChecklist(defaultReviewChecklist);
+                                                setReviewerComments('');
+                                                localStorage.removeItem('reportApprovalStatus');
+                                            }}
+                                        >
+                                            Reset Review
+                                        </Button>
+                                    </div>
+                                )}
+                            </CardFooter>
+                        </Card>
+                    )}
+
+                    {/* Minimized Approval Panel Toggle */}
+                    {(role === 'admin' || role === 'analyst') && !isPreview && !showApprovalPanel && (
+                        <div className="mb-6">
+                            <Button
+                                variant="outline"
+                                onClick={() => setShowApprovalPanel(true)}
+                                className="w-full justify-between"
+                            >
+                                <span className="flex items-center gap-2">
+                                    <ClipboardCheck className="size-4" />
+                                    Reviewer Approval Panel
+                                    <Badge variant={
+                                        approvalStatus === 'approved' ? 'success' :
+                                            approvalStatus === 'rejected' ? 'destructive' :
+                                                approvalStatus === 'needs-revision' ? 'warning' : 'outline'
+                                    } className="ml-2">
+                                        {approvalStatus}
+                                    </Badge>
+                                </span>
+                                <ArrowRight className="size-4" />
+                            </Button>
+                        </div>
+                    )}
 
                     <ReportView
                         analysisData={analysisData}

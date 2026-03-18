@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
+    CardFooter,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -26,12 +27,17 @@ import {
     DialogHeader,
     DialogTitle,
     DialogTrigger,
+    DialogFooter,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Progress } from '@/components/ui/progress';
+import { Separator } from '@/components/ui/separator';
 import {
     ArrowLeft,
+    ArrowRight,
+    ArrowDown,
     RefreshCw,
     Eye,
     FileJson,
@@ -50,9 +56,47 @@ import {
     Trash2,
     Copy,
     ExternalLink,
+    Wifi,
+    WifiOff,
+    Zap,
+    Shield,
+    Database,
+    Play,
+    Settings,
+    Link as LinkIcon,
+    Globe,
+    Lock,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
+
+// Connection Test Types
+interface ConnectionTestResult {
+    endpoint: string;
+    status: 'connected' | 'failed' | 'timeout' | 'auth_failed';
+    latency_ms: number;
+    message: string;
+    details?: Record<string, unknown>;
+}
+
+interface WorkflowStep {
+    step: number;
+    name: string;
+    status: 'pending' | 'running' | 'success' | 'failed';
+    endpoint?: string;
+    timestamp?: string;
+    response?: unknown;
+}
+
+interface ConnectionTestResponse {
+    success: boolean;
+    overall_status: 'healthy' | 'auth_required' | 'degraded';
+    total_latency_ms: number;
+    tested_at: string;
+    backend_url: string;
+    results: ConnectionTestResult[];
+    workflow: WorkflowStep[];
+}
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
 
@@ -165,6 +209,68 @@ export default function SsdAuditLogPage() {
     const [apiAvailable, setApiAvailable] = useState(true);
     const { toast } = useToast();
 
+    // Connection Testing State
+    const [connectionTest, setConnectionTest] = useState<ConnectionTestResponse | null>(null);
+    const [testingConnection, setTestingConnection] = useState(false);
+    const [sendTestOpen, setSendTestOpen] = useState(false);
+    const [sendingTest, setSendingTest] = useState(false);
+    const [testCompany, setTestCompany] = useState('Test Company');
+    const [testEmail, setTestEmail] = useState('test@example.com');
+    const [testCallbackUrl, setTestCallbackUrl] = useState('');
+    const [activeTab, setActiveTab] = useState('overview');
+
+    // Run connection test
+    const runConnectionTest = useCallback(async () => {
+        setTestingConnection(true);
+        try {
+            const response = await fetch('/api/ssd/connection-test');
+            if (response.ok) {
+                const data = await response.json();
+                setConnectionTest(data);
+                if (data.success) {
+                    toast({ title: 'Connection Test Passed', description: 'All endpoints are responding correctly.' });
+                } else {
+                    toast({ variant: 'destructive', title: 'Connection Issues Detected', description: 'Some endpoints failed. Check details below.' });
+                }
+            } else {
+                toast({ variant: 'destructive', title: 'Test Failed', description: 'Could not run connection test.' });
+            }
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to run connection test.' });
+        } finally {
+            setTestingConnection(false);
+        }
+    }, [toast]);
+
+    // Send test request through pipeline
+    const sendTestRequest = async () => {
+        setSendingTest(true);
+        try {
+            const response = await fetch('/api/ssd/connection-test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    test_company_name: testCompany,
+                    test_founder_email: testEmail,
+                    callback_url: testCallbackUrl || null
+                })
+            });
+            const data = await response.json();
+            if (data.success) {
+                toast({ title: 'Test Request Sent', description: `Tracking ID: ${data.tracking_id || 'N/A'}` });
+                setSendTestOpen(false);
+                // Refresh logs after a delay
+                setTimeout(() => fetchLogs(), 2000);
+            } else {
+                toast({ variant: 'destructive', title: 'Test Failed', description: data.message });
+            }
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to send test request.' });
+        } finally {
+            setSendingTest(false);
+        }
+    };
+
     const fetchLogs = async () => {
         try {
             const statusParam = filterStatus !== 'all' ? `?status=${filterStatus}` : '';
@@ -269,28 +375,225 @@ export default function SsdAuditLogPage() {
     useEffect(() => {
         const load = async () => {
             setLoading(true);
-            await Promise.all([fetchLogs(), fetchStats()]);
+            await Promise.all([fetchLogs(), fetchStats(), runConnectionTest()]);
             setLoading(false);
         };
         load();
-    }, [filterStatus]);
+    }, [filterStatus, runConnectionTest]);
 
     return (
-        <div className="container mx-auto p-4 md:p-8">
-            <header className="flex justify-between items-center mb-8">
+        <div className="container mx-auto p-4 md:p-8 space-y-6">
+            <header className="flex justify-between items-center mb-4">
                 <div>
                     <Link href="/dashboard/reports/configure" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary mb-4">
                         <ArrowLeft className="size-4" />
                         Back to Report Configuration
                     </Link>
-                    <h1 className="text-3xl font-bold">Startup Steroid Integration Audit Logs</h1>
-                    <p className="text-muted-foreground">Monitor and review Startup Steroid → TCA TIRR integration requests, responses, and reports</p>
+                    <h1 className="text-3xl font-bold">Startup Steroid Integration Audit</h1>
+                    <p className="text-muted-foreground">Monitor connections, test endpoints, and review integration requests</p>
                 </div>
-                <Button onClick={handleRefresh} disabled={refreshing}>
-                    <RefreshCw className={`size-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-                    Refresh
-                </Button>
+                <div className="flex gap-2">
+                    <Button variant="outline" onClick={runConnectionTest} disabled={testingConnection}>
+                        {testingConnection ? <Loader2 className="size-4 mr-2 animate-spin" /> : <Zap className="size-4 mr-2" />}
+                        Test Connection
+                    </Button>
+                    <Button onClick={handleRefresh} disabled={refreshing}>
+                        <RefreshCw className={`size-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                        Refresh
+                    </Button>
+                </div>
             </header>
+
+            {/* Connection Status & Workflow Visualization */}
+            <Card className="border-2 border-dashed">
+                <CardHeader>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className={`p-2 rounded-full ${connectionTest?.success ? 'bg-green-100 dark:bg-green-900' : 'bg-amber-100 dark:bg-amber-900'}`}>
+                                {connectionTest?.success ? (
+                                    <Wifi className="size-6 text-green-600 dark:text-green-400" />
+                                ) : (
+                                    <WifiOff className="size-6 text-amber-600 dark:text-amber-400" />
+                                )}
+                            </div>
+                            <div>
+                                <CardTitle className="flex items-center gap-2">
+                                    Integration Pipeline Status
+                                    <Badge variant={connectionTest?.success ? 'default' : connectionTest?.overall_status === 'auth_required' ? 'destructive' : 'secondary'}>
+                                        {connectionTest?.overall_status || 'Unknown'}
+                                    </Badge>
+                                </CardTitle>
+                                <CardDescription>
+                                    {connectionTest ? `Last tested: ${new Date(connectionTest.tested_at).toLocaleString()} • Latency: ${connectionTest.total_latency_ms}ms` : 'Run connection test to verify pipeline'}
+                                </CardDescription>
+                            </div>
+                        </div>
+                        <Dialog open={sendTestOpen} onOpenChange={setSendTestOpen}>
+                            <DialogTrigger asChild>
+                                <Button variant="outline" size="sm">
+                                    <Play className="size-4 mr-2" />
+                                    Send Test Request
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>Send Test Request Through Pipeline</DialogTitle>
+                                    <DialogDescription>
+                                        This will send a test request through the Startup Steroid → TCA TIRR pipeline.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4 py-4">
+                                    <div>
+                                        <Label htmlFor="test-company">Test Company Name</Label>
+                                        <Input id="test-company" value={testCompany} onChange={(e) => setTestCompany(e.target.value)} placeholder="Test Company" />
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="test-email">Founder Email</Label>
+                                        <Input id="test-email" type="email" value={testEmail} onChange={(e) => setTestEmail(e.target.value)} placeholder="test@example.com" />
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="test-callback">Callback URL (Optional)</Label>
+                                        <Input id="test-callback" value={testCallbackUrl} onChange={(e) => setTestCallbackUrl(e.target.value)} placeholder="https://your-callback-url.com/webhook" />
+                                    </div>
+                                </div>
+                                <DialogFooter>
+                                    <Button variant="outline" onClick={() => setSendTestOpen(false)}>Cancel</Button>
+                                    <Button onClick={sendTestRequest} disabled={sendingTest}>
+                                        {sendingTest ? <Loader2 className="size-4 mr-2 animate-spin" /> : <Send className="size-4 mr-2" />}
+                                        Send Test
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    {/* Visual Workflow Diagram */}
+                    <div className="py-4">
+                        <h4 className="text-sm font-medium mb-4 flex items-center gap-2">
+                            <Activity className="size-4" />
+                            Integration Workflow
+                        </h4>
+                        <div className="flex flex-col md:flex-row items-center justify-center gap-2 md:gap-4 overflow-x-auto pb-4">
+                            {/* Step 1: Startup Steroid */}
+                            <div className="flex flex-col items-center min-w-[140px]">
+                                <div className="w-16 h-16 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center border-2 border-purple-300">
+                                    <Globe className="size-8 text-purple-600 dark:text-purple-400" />
+                                </div>
+                                <span className="mt-2 text-sm font-medium">Startup Steroid</span>
+                                <span className="text-xs text-muted-foreground">External Platform</span>
+                            </div>
+
+                            <ArrowRight className="hidden md:block size-6 text-muted-foreground flex-shrink-0" />
+                            <ArrowDown className="block md:hidden size-6 text-muted-foreground" />
+
+                            {/* Step 2: Webhook Receiver */}
+                            <div className="flex flex-col items-center min-w-[140px]">
+                                <div className={`w-16 h-16 rounded-full flex items-center justify-center border-2 ${connectionTest?.workflow?.[3]?.status === 'success'
+                                        ? 'bg-green-100 dark:bg-green-900 border-green-300'
+                                        : connectionTest?.workflow?.[3]?.status === 'failed'
+                                            ? 'bg-red-100 dark:bg-red-900 border-red-300'
+                                            : 'bg-gray-100 dark:bg-gray-800 border-gray-300'
+                                    }`}>
+                                    <Zap className={`size-8 ${connectionTest?.workflow?.[3]?.status === 'success'
+                                            ? 'text-green-600 dark:text-green-400'
+                                            : connectionTest?.workflow?.[3]?.status === 'failed'
+                                                ? 'text-red-600 dark:text-red-400'
+                                                : 'text-gray-600 dark:text-gray-400'
+                                        }`} />
+                                </div>
+                                <span className="mt-2 text-sm font-medium">Webhook Receiver</span>
+                                <Badge variant={connectionTest?.workflow?.[3]?.status === 'success' ? 'default' : 'secondary'} className="mt-1 text-xs">
+                                    {connectionTest?.workflow?.[3]?.status || 'Unknown'}
+                                </Badge>
+                            </div>
+
+                            <ArrowRight className="hidden md:block size-6 text-muted-foreground flex-shrink-0" />
+                            <ArrowDown className="block md:hidden size-6 text-muted-foreground" />
+
+                            {/* Step 3: TCA-IRR Backend */}
+                            <div className="flex flex-col items-center min-w-[140px]">
+                                <div className={`w-16 h-16 rounded-full flex items-center justify-center border-2 ${connectionTest?.workflow?.[0]?.status === 'success'
+                                        ? 'bg-green-100 dark:bg-green-900 border-green-300'
+                                        : connectionTest?.workflow?.[0]?.status === 'failed'
+                                            ? 'bg-red-100 dark:bg-red-900 border-red-300'
+                                            : 'bg-gray-100 dark:bg-gray-800 border-gray-300'
+                                    }`}>
+                                    <Server className={`size-8 ${connectionTest?.workflow?.[0]?.status === 'success'
+                                            ? 'text-green-600 dark:text-green-400'
+                                            : connectionTest?.workflow?.[0]?.status === 'failed'
+                                                ? 'text-red-600 dark:text-red-400'
+                                                : 'text-gray-600 dark:text-gray-400'
+                                        }`} />
+                                </div>
+                                <span className="mt-2 text-sm font-medium">TCA-IRR Backend</span>
+                                <Badge variant={connectionTest?.workflow?.[0]?.status === 'success' ? 'default' : 'secondary'} className="mt-1 text-xs">
+                                    {connectionTest?.results?.[0]?.latency_ms ? `${connectionTest.results[0].latency_ms}ms` : 'N/A'}
+                                </Badge>
+                            </div>
+
+                            <ArrowRight className="hidden md:block size-6 text-muted-foreground flex-shrink-0" />
+                            <ArrowDown className="block md:hidden size-6 text-muted-foreground" />
+
+                            {/* Step 4: TIRR Analysis */}
+                            <div className="flex flex-col items-center min-w-[140px]">
+                                <div className="w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center border-2 border-blue-300">
+                                    <Activity className="size-8 text-blue-600 dark:text-blue-400" />
+                                </div>
+                                <span className="mt-2 text-sm font-medium">TIRR Analysis</span>
+                                <span className="text-xs text-muted-foreground">Process & Score</span>
+                            </div>
+
+                            <ArrowRight className="hidden md:block size-6 text-muted-foreground flex-shrink-0" />
+                            <ArrowDown className="block md:hidden size-6 text-muted-foreground" />
+
+                            {/* Step 5: Callback */}
+                            <div className="flex flex-col items-center min-w-[140px]">
+                                <div className="w-16 h-16 rounded-full bg-orange-100 dark:bg-orange-900 flex items-center justify-center border-2 border-orange-300">
+                                    <Send className="size-8 text-orange-600 dark:text-orange-400" />
+                                </div>
+                                <span className="mt-2 text-sm font-medium">Callback</span>
+                                <span className="text-xs text-muted-foreground">Report Delivery</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <Separator className="my-4" />
+
+                    {/* Endpoint Status Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {connectionTest?.results?.map((result, idx) => (
+                            <div key={idx} className={`p-4 rounded-lg border ${result.status === 'connected'
+                                    ? 'bg-green-50 dark:bg-green-950 border-green-200'
+                                    : result.status === 'auth_failed'
+                                        ? 'bg-amber-50 dark:bg-amber-950 border-amber-200'
+                                        : 'bg-red-50 dark:bg-red-950 border-red-200'
+                                }`}>
+                                <div className="flex items-center gap-2 mb-2">
+                                    {result.status === 'connected' ? (
+                                        <CheckCircle2 className="size-5 text-green-600" />
+                                    ) : result.status === 'auth_failed' ? (
+                                        <Lock className="size-5 text-amber-600" />
+                                    ) : (
+                                        <XCircle className="size-5 text-red-600" />
+                                    )}
+                                    <span className="font-medium text-sm">{result.endpoint}</span>
+                                </div>
+                                <p className="text-xs text-muted-foreground">{result.message}</p>
+                                <div className="flex items-center gap-2 mt-2 text-xs">
+                                    <Clock className="size-3" />
+                                    <span>{result.latency_ms}ms</span>
+                                </div>
+                            </div>
+                        )) || (
+                                <div className="col-span-full text-center py-4 text-muted-foreground">
+                                    <Loader2 className="size-6 mx-auto mb-2 animate-spin" />
+                                    <p>Testing connections...</p>
+                                </div>
+                            )}
+                    </div>
+                </CardContent>
+            </Card>
 
             {/* Stats Cards */}
             {stats && (

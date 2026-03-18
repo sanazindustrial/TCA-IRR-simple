@@ -381,6 +381,7 @@ class ReportStorageService {
     private async saveToLocalStorage(report: StoredReport): Promise<void> {
         try {
             const existing = this.getAllReportsFromStorage();
+            console.log('saveToLocalStorage: existing reports count:', existing.length);
             const reports = existing.filter(r => r.id !== report.id);
             reports.push(report);
 
@@ -388,6 +389,10 @@ class ReportStorageService {
             const recentReports = reports.slice(-50);
 
             localStorage.setItem(this.storageKey, JSON.stringify(recentReports));
+            console.log('saveToLocalStorage: saved', recentReports.length, 'reports to', this.storageKey);
+            
+            // Dispatch a custom event for same-page listeners
+            window.dispatchEvent(new CustomEvent('tca_reports_updated', { detail: { count: recentReports.length } }));
         } catch (error) {
             console.error('Error saving to localStorage:', error);
             throw error;

@@ -30,6 +30,12 @@ api_router.include_router(admin.router,
 api_router.include_router(ssd.router,
                           prefix="/ssd",
                           tags=["SSD Integration"])
+
+# Alias for /startup-steroid/* → /ssd/* (backwards compatibility)
+api_router.include_router(ssd.router,
+                          prefix="/startup-steroid",
+                          tags=["Startup Steroid Integration"])
+
 api_router.include_router(cost.router,
                           prefix="/cost",
                           tags=["Cost Management"])
