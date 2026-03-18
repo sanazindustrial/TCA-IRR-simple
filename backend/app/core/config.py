@@ -85,6 +85,10 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4o"
     openai_timeout: int = 120
 
+    # SSD Integration Settings
+    ssd_api_key: Optional[str] = None  # API key for SSD third-party integration
+    ssd_callback_url: Optional[str] = None  # SSD callback URL for report delivery
+
     # External API Settings
     external_api_timeout: int = 30
     external_api_retries: int = 3

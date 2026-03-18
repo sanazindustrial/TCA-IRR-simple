@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, GripVertical, RotateCcw, Save, Trash2, Plus, Link2, TestTube2, CheckCircle2, XCircle, Loader2, ExternalLink, FileText, Shield, AlertTriangle, Settings2, ClipboardList, BarChart3 } from 'lucide-react';
+import { ArrowLeft, GripVertical, RotateCcw, Save, Trash2, Plus, Link2, TestTube2, CheckCircle2, XCircle, Loader2, ExternalLink, FileText, Shield, AlertTriangle, Settings2, ClipboardList, BarChart3, Scale, Eye, Download, Play, TrendingUp, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { API_CONFIG } from '@/lib/api';
@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 
 const defaultTriageSectionsAdmin = [
     { id: 'executive-summary', title: 'Page 1: Executive Summary', active: true, description: 'Overall investment recommendation, key highlights, and company overview' },
@@ -74,30 +75,30 @@ const defaultDdSections = [
     { id: 'dd-appendix', title: "Appendix", active: true, description: "" },
 ];
 
-// ─── SSD → TCA TIRR Integration Report Sections (10-page triage) ──────
-const defaultSsdSections: ReportSection[] = [
-    { id: 'ssd-page-1', title: 'Page 1: Executive Summary', active: true, description: 'Overall score, investment recommendation, analysis completeness, company snapshot' },
-    { id: 'ssd-page-2', title: 'Page 2: TCA Scorecard', active: true, description: 'Composite score, category breakdown, top strengths, areas of concern' },
-    { id: 'ssd-page-3', title: 'Page 3: TCA AI Interpretation', active: true, description: 'AI-powered analysis insights and interpretation of key metrics' },
-    { id: 'ssd-page-4', title: 'Page 4: Weighted Score Breakdown', active: true, description: 'Detailed breakdown of weighted scores by evaluation category' },
-    { id: 'ssd-page-5', title: 'Page 5: Risk Assessment', active: true, description: 'Risk score, flags count, severity levels, risk domains' },
-    { id: 'ssd-page-6', title: 'Page 6: Flag Analysis Narrative', active: true, description: 'In-depth narrative analysis of identified risk flags' },
-    { id: 'ssd-page-7', title: 'Page 7: Market & Team', active: true, description: 'Market score, TAM/SAM/SOM, team score, founders, gaps' },
-    { id: 'ssd-page-8', title: 'Page 8: Financials & Technology', active: true, description: 'Financial score, revenue, burn rate, runway, technology score, IP' },
-    { id: 'ssd-page-9', title: 'Page 9: CEO Questions', active: true, description: 'Strategic questions for CEO and leadership team' },
-    { id: 'ssd-page-10', title: 'Page 10: Final Recommendation', active: true, description: 'Final decision, funding recommendation, next steps' },
+// ─── Startup Steroid → TCA TIRR Integration Report Sections (10-page triage) ──────
+const defaultStartupSteroidSections: ReportSection[] = [
+    { id: 'ss-page-1', title: 'Page 1: Executive Summary', active: true, description: 'Overall score, investment recommendation, analysis completeness, company snapshot' },
+    { id: 'ss-page-2', title: 'Page 2: TCA Scorecard', active: true, description: 'Composite score, category breakdown, top strengths, areas of concern' },
+    { id: 'ss-page-3', title: 'Page 3: TCA AI Interpretation', active: true, description: 'AI-powered analysis insights and interpretation of key metrics' },
+    { id: 'ss-page-4', title: 'Page 4: Weighted Score Breakdown', active: true, description: 'Detailed breakdown of weighted scores by evaluation category' },
+    { id: 'ss-page-5', title: 'Page 5: Risk Assessment', active: true, description: 'Risk score, flags count, severity levels, risk domains' },
+    { id: 'ss-page-6', title: 'Page 6: Flag Analysis Narrative', active: true, description: 'In-depth narrative analysis of identified risk flags' },
+    { id: 'ss-page-7', title: 'Page 7: Market & Team', active: true, description: 'Market score, TAM/SAM/SOM, team score, founders, gaps' },
+    { id: 'ss-page-8', title: 'Page 8: Financials & Technology', active: true, description: 'Financial score, revenue, burn rate, runway, technology score, IP' },
+    { id: 'ss-page-9', title: 'Page 9: CEO Questions', active: true, description: 'Strategic questions for CEO and leadership team' },
+    { id: 'ss-page-10', title: 'Page 10: Final Recommendation', active: true, description: 'Final decision, funding recommendation, next steps' },
 ];
 
-// ─── SSD Scoring Thresholds ──────────────────────────────────────────
-const defaultSsdThresholds = [
+// ─── Startup Steroid Scoring Thresholds ──────────────────────────────────────────
+const defaultStartupSteroidThresholds = [
     { tier: 'STRONG_BUY', minScore: 8.0, label: 'STRONG BUY', description: 'High confidence investment opportunity', color: '#2F855A' },
     { tier: 'PROCEED', minScore: 7.0, label: 'PROCEED', description: 'Proceed with due diligence', color: '#3182CE' },
     { tier: 'CONDITIONAL', minScore: 5.5, label: 'CONDITIONAL', description: 'Address key risks before investing', color: '#D69E2E' },
     { tier: 'PASS', minScore: 0.0, label: 'PASS', description: 'Risk/reward profile not aligned', color: '#E53E3E' },
 ];
 
-// ─── SSD Risk Domains (matches /analysis/modules/risk) ──────────────
-const defaultSsdRiskDomains = [
+// ─── Startup Steroid Risk Domains (matches /analysis/modules/risk) ──────────────
+const defaultStartupSteroidRiskDomains = [
     { id: '1', name: 'Regulatory / Compliance', techWeight: 5, medWeight: 15, enabled: true },
     { id: '2', name: 'Clinical / Safety / Product Safety', techWeight: 5, medWeight: 15, enabled: true },
     { id: '3', name: 'Liability / Legal Exposure', techWeight: 5, medWeight: 10, enabled: true },
@@ -114,15 +115,15 @@ const defaultSsdRiskDomains = [
     { id: '14', name: 'Adoption / Customer Retention Risk', techWeight: 4, medWeight: 2, enabled: true },
 ];
 
-// ─── SSD Risk Penalties (flag severity penalties) ────────────────────
-const defaultSsdRiskPenalties = [
+// ─── Startup Steroid Risk Penalties (flag severity penalties) ────────────────────
+const defaultStartupSteroidRiskPenalties = [
     { id: 'green', flag: '🟢 Green', techPenalty: 0, medPenalty: 0 },
     { id: 'yellow', flag: '🟡 Yellow', techPenalty: -0.5, medPenalty: -1.0 },
     { id: 'red', flag: '🔴 Red', techPenalty: -3.0, medPenalty: -6.0 },
 ];
 
-// ─── SSD Mandatory Fields (spec section 6) ───────────────────────────
-const ssdMandatoryFields = [
+// ─── Startup Steroid Mandatory Fields (spec section 6) ───────────────────────────
+const startupSteroidMandatoryFields = [
     { section: 'Contact', field: 'email', type: 'String', required: true },
     { section: 'Contact', field: 'phoneNumber', type: 'String', required: true },
     { section: 'Contact', field: 'firstName', type: 'String', required: true },
@@ -142,7 +143,7 @@ const ssdMandatoryFields = [
     { section: 'Financial', field: 'preMoneyValuation', type: 'Decimal', required: true },
 ];
 
-// ─── TCA Scorecard Categories for SSD Configuration ──────────────────
+// ─── TCA Scorecard Categories for Startup Steroid Configuration ──────────────────
 // Matches categories from /analysis/modules/tca (General + MedTech dual-framework)
 const defaultTcaScorecardCategories = [
     { id: 'leadership', name: 'Leadership', weight: 20, enabled: true, medtechWeight: 15 },
@@ -166,6 +167,16 @@ type ReportSection = {
     title: string;
     active: boolean;
     description: string;
+};
+
+type TcaScorecardCategory = {
+    id: string;
+    name: string;
+    weight: number;
+    enabled: boolean;
+    medtechWeight: number;
+    medtechNA?: boolean;
+    generalNA?: boolean;
 };
 
 const ReportConfigTable = ({ sections, onUpdate, onRemove, setSections }: { sections: ReportSection[], onUpdate: (id: string, field: keyof ReportSection, value: string | boolean) => void, onRemove: (id: string) => void, setSections: React.Dispatch<React.SetStateAction<ReportSection[]>> }) => {
@@ -266,23 +277,224 @@ export default function ReportConfigurationPage() {
     const [triageSectionsAdmin, setTriageSectionsAdmin] = useState<ReportSection[]>(defaultTriageSectionsAdmin);
     const [triageSectionsStandard, setTriageSectionsStandard] = useState<ReportSection[]>(defaultTriageSectionsStandard);
     const [ddSections, setDdSections] = useState<ReportSection[]>(defaultDdSections);
-    const [ssdSections, setSsdSections] = useState<ReportSection[]>(defaultSsdSections);
+    const [startupSteroidSections, setStartupSteroidSections] = useState<ReportSection[]>(defaultStartupSteroidSections);
 
     const [newTriageSection, setNewTriageSection] = useState({ title: '', description: '' });
     const [newDdSection, setNewDdSection] = useState({ title: '', description: '' });
-    const [newSsdSection, setNewSsdSection] = useState({ title: '', description: '' });
+    const [newStartupSteroidSection, setNewStartupSteroidSection] = useState({ title: '', description: '' });
 
-    // SSD Integration settings
+    // Startup Steroid Integration settings
     const [ssdCallbackUrl, setSsdCallbackUrl] = useState('');
-    const [ssdEndpointUrl, setSsdEndpointUrl] = useState('/api/v1/ssd/tirr');
+    const [ssdEndpointUrl, setSsdEndpointUrl] = useState('/api/v1/startup-steroid/tirr');
     const [ssdTestStatus, setSsdTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
     const [ssdTestResult, setSsdTestResult] = useState<string>('');
-    const [ssdThresholds, setSsdThresholds] = useState(defaultSsdThresholds);
+    const [startupSteroidThresholds, setStartupSteroidThresholds] = useState(defaultStartupSteroidThresholds);
+    // Aliases for backward compatibility with short names
+    const ssdThresholds = startupSteroidThresholds;
+    const setSsdThresholds = setStartupSteroidThresholds;
     const [tcaScorecardCategories, setTcaScorecardCategories] = useState(defaultTcaScorecardCategories);
-    const [ssdRiskDomains, setSsdRiskDomains] = useState(defaultSsdRiskDomains);
-    const [ssdRiskPenalties, setSsdRiskPenalties] = useState(defaultSsdRiskPenalties);
+    const [startupSteroidRiskDomains, setStartupSteroidRiskDomains] = useState(defaultStartupSteroidRiskDomains);
+    const [startupSteroidRiskPenalties, setStartupSteroidRiskPenalties] = useState(defaultStartupSteroidRiskPenalties);
+    // More aliases for shorthand variable names
+    const ssdRiskDomains = startupSteroidRiskDomains;
+    const setSsdRiskDomains = setStartupSteroidRiskDomains;
+    const defaultSsdRiskDomains = defaultStartupSteroidRiskDomains;
+    const ssdRiskPenalties = startupSteroidRiskPenalties;
+    const setSsdRiskPenalties = setStartupSteroidRiskPenalties;
+    const defaultSsdRiskPenalties = defaultStartupSteroidRiskPenalties;
+    const ssdMandatoryFields = startupSteroidMandatoryFields;
+    const [showPreview, setShowPreview] = useState(false);
+    const [previewLoading, setPreviewLoading] = useState(false);
 
     const { toast } = useToast();
+
+    // Normalize TCA weights to 100%
+    const normalizeTcaWeights = (type: 'general' | 'medtech') => {
+        const enabledCategories = tcaScorecardCategories.filter(c => c.enabled);
+        if (enabledCategories.length === 0) return;
+
+        const currentTotal = type === 'general'
+            ? enabledCategories.reduce((sum, c) => sum + c.weight, 0)
+            : enabledCategories.reduce((sum, c) => sum + (c.medtechWeight || 0), 0);
+
+        if (currentTotal === 0) return;
+
+        const scaleFactor = 100 / currentTotal;
+        const updated = tcaScorecardCategories.map(cat => {
+            if (!cat.enabled) return cat;
+            if (type === 'general') {
+                return { ...cat, weight: Math.round(cat.weight * scaleFactor * 10) / 10 };
+            } else {
+                return { ...cat, medtechWeight: Math.round((cat.medtechWeight || 0) * scaleFactor * 10) / 10 };
+            }
+        });
+
+        // Final adjustment to ensure exactly 100%
+        const newTotal = type === 'general'
+            ? updated.filter(c => c.enabled).reduce((sum, c) => sum + c.weight, 0)
+            : updated.filter(c => c.enabled).reduce((sum, c) => sum + (c.medtechWeight || 0), 0);
+
+        if (newTotal !== 100 && updated.filter(c => c.enabled).length > 0) {
+            const firstEnabled = updated.findIndex(c => c.enabled);
+            if (firstEnabled !== -1) {
+                const diff = 100 - newTotal;
+                if (type === 'general') {
+                    updated[firstEnabled] = { ...updated[firstEnabled], weight: Math.round((updated[firstEnabled].weight + diff) * 10) / 10 };
+                } else {
+                    updated[firstEnabled] = { ...updated[firstEnabled], medtechWeight: Math.round(((updated[firstEnabled].medtechWeight || 0) + diff) * 10) / 10 };
+                }
+            }
+        }
+
+        setTcaScorecardCategories(updated);
+        toast({ title: 'Weights Normalized', description: `${type === 'general' ? 'General' : 'MedTech'} weights adjusted to total 100%` });
+    };
+
+    // Normalize Risk Domain weights to 100%
+    const normalizeRiskWeights = (type: 'tech' | 'medtech') => {
+        const enabledDomains = startupSteroidRiskDomains.filter(d => d.enabled);
+        if (enabledDomains.length === 0) return;
+
+        const currentTotal = type === 'tech'
+            ? enabledDomains.reduce((sum, d) => sum + d.techWeight, 0)
+            : enabledDomains.reduce((sum, d) => sum + d.medWeight, 0);
+
+        if (currentTotal === 0) return;
+
+        const scaleFactor = 100 / currentTotal;
+        const updated = startupSteroidRiskDomains.map(domain => {
+            if (!domain.enabled) return domain;
+            if (type === 'tech') {
+                return { ...domain, techWeight: Math.round(domain.techWeight * scaleFactor) };
+            } else {
+                return { ...domain, medWeight: Math.round(domain.medWeight * scaleFactor) };
+            }
+        });
+
+        // Final adjustment to ensure exactly 100%
+        const newTotal = type === 'tech'
+            ? updated.filter(d => d.enabled).reduce((sum, d) => sum + d.techWeight, 0)
+            : updated.filter(d => d.enabled).reduce((sum, d) => sum + d.medWeight, 0);
+
+        if (newTotal !== 100 && updated.filter(d => d.enabled).length > 0) {
+            const firstEnabled = updated.findIndex(d => d.enabled);
+            if (firstEnabled !== -1) {
+                const diff = 100 - newTotal;
+                if (type === 'tech') {
+                    updated[firstEnabled] = { ...updated[firstEnabled], techWeight: updated[firstEnabled].techWeight + diff };
+                } else {
+                    updated[firstEnabled] = { ...updated[firstEnabled], medWeight: updated[firstEnabled].medWeight + diff };
+                }
+            }
+        }
+
+        setStartupSteroidRiskDomains(updated);
+        toast({ title: 'Weights Normalized', description: `${type === 'tech' ? 'Tech' : 'MedTech'} risk weights adjusted to total 100%` });
+    };
+
+    // Expanded sample data for comprehensive 10-page report preview
+    const sampleReportData = {
+        companyName: 'TechVenture AI Inc.',
+        industry: 'Technology / AI',
+        stage: 'Series A',
+        requestAmount: '$5,000,000',
+        founded: '2021',
+        location: 'San Francisco, CA',
+        website: 'techventureai.com',
+        tcaScore: 7.8,
+        riskScore: 6.5,
+        recommendation: 'PROCEED',
+        analysisCompleteness: '95%',
+        categories: [
+            { name: 'Leadership', score: 8.2, weight: 20 },
+            { name: 'Product-Market Fit', score: 7.5, weight: 20 },
+            { name: 'Team Strength', score: 8.0, weight: 10 },
+            { name: 'Technology & IP', score: 7.8, weight: 10 },
+            { name: 'Business Model', score: 7.2, weight: 10 },
+            { name: 'Go-to-Market', score: 7.5, weight: 10 },
+            { name: 'Competition', score: 6.8, weight: 5 },
+            { name: 'Market Potential', score: 8.5, weight: 5 },
+            { name: 'Traction', score: 7.0, weight: 5 },
+            { name: 'Scalability', score: 7.8, weight: 2.5 },
+            { name: 'Risk Assessment', score: 6.5, weight: 2.5 },
+        ],
+        riskFlags: [
+            { domain: 'Market Risk', flag: '🟡 Yellow', description: 'Competitive landscape emerging rapidly', severity: 'Medium' },
+            { domain: 'Financial Risk', flag: '🟢 Green', description: 'Strong burn rate management', severity: 'Low' },
+            { domain: 'Technical Execution', flag: '🟢 Green', description: 'Experienced tech team', severity: 'Low' },
+            { domain: 'Regulatory', flag: '🟢 Green', description: 'Standard compliance requirements', severity: 'Low' },
+            { domain: 'Team Risk', flag: '🟡 Yellow', description: 'Key person dependency', severity: 'Medium' },
+        ],
+        strengths: ['Strong founding team with domain expertise', 'Patent-pending AI technology', 'Early customer traction with Fortune 500', 'Clear go-to-market strategy'],
+        concerns: ['Market competition increasing', 'Dependency on key technical hires', 'Runway needs extension'],
+        aiInterpretation: 'The company demonstrates strong fundamentals with above-average leadership and technology scores. The AI analysis indicates high probability of achieving product-market fit within 12 months.',
+        weightedBreakdown: [
+            { category: 'Leadership', rawScore: 8.2, weight: 20, weightedScore: 1.64 },
+            { category: 'Product-Market Fit', rawScore: 7.5, weight: 20, weightedScore: 1.50 },
+            { category: 'Team Strength', rawScore: 8.0, weight: 10, weightedScore: 0.80 },
+            { category: 'Technology & IP', rawScore: 7.8, weight: 10, weightedScore: 0.78 },
+            { category: 'Business Model', rawScore: 7.2, weight: 10, weightedScore: 0.72 },
+        ],
+        marketData: {
+            tam: '$50B',
+            sam: '$12B',
+            som: '$500M',
+            marketScore: 8.5,
+            growthRate: '25% CAGR',
+        },
+        teamData: {
+            founders: ['John Smith (CEO) - 15y exp', 'Jane Doe (CTO) - 12y exp'],
+            teamSize: 25,
+            keyHires: ['VP Sales', 'VP Marketing'],
+            gaps: ['CFO needed for Series B'],
+        },
+        financials: {
+            revenue: '$1.2M ARR',
+            burnRate: '$150K/month',
+            runway: '14 months',
+            techScore: 7.8,
+            ipStatus: '2 patents pending',
+        },
+        ceoQuestions: [
+            'What is your customer acquisition cost and how does it compare to LTV?',
+            'How do you plan to defend against larger competitors entering the space?',
+            'What are the key milestones for the next 18 months?',
+            'How will you use the Series A funding?',
+            'What keeps you up at night about this business?',
+        ],
+        finalDecision: {
+            recommendation: 'PROCEED',
+            fundingRecommendation: 'Recommend proceeding with due diligence',
+            nextSteps: ['Complete financial DD', 'Technical review', 'Customer reference calls'],
+            keyConditions: ['Board seat', 'Pro-rata rights', 'Information rights'],
+        },
+    };
+
+    // Generate sample report and log
+    const generateSampleReport = async () => {
+        setPreviewLoading(true);
+        try {
+            const reportLog = {
+                timestamp: new Date().toISOString(),
+                type: 'sample_report_preview',
+                config: {
+                    triageSectionsAdmin,
+                    tcaScorecardCategories,
+                    startupSteroidRiskDomains,
+                    startupSteroidThresholds,
+                },
+                sampleData: sampleReportData,
+            };
+            console.log('Sample Report Generated:', JSON.stringify(reportLog, null, 2));
+            localStorage.setItem('last-report-preview-log', JSON.stringify(reportLog));
+            setShowPreview(true);
+            toast({ title: 'Preview Generated', description: 'Sample report preview created and logged for quality review.' });
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to generate preview' });
+        } finally {
+            setPreviewLoading(false);
+        }
+    };
 
     useEffect(() => {
         try {
@@ -291,52 +503,71 @@ export default function ReportConfigurationPage() {
             const savedDd = localStorage.getItem('report-config-dd');
             const savedSsd = localStorage.getItem('report-config-ssd-sections');
             const savedSsdCallback = localStorage.getItem('report-config-ssd-callback');
-            const savedSsdThresholds = localStorage.getItem('report-config-ssd-thresholds');
+            const savedStartupSteroidThresholds = localStorage.getItem('report-config-ssd-thresholds');
             const savedTcaCategories = localStorage.getItem('report-config-tca-scorecard-categories');
-            const savedSsdRiskDomains = localStorage.getItem('report-config-ssd-risk-domains');
-            const savedSsdRiskPenalties = localStorage.getItem('report-config-ssd-risk-penalties');
+            const savedStartupSteroidRiskDomains = localStorage.getItem('report-config-ssd-risk-domains');
+            const savedStartupSteroidRiskPenalties = localStorage.getItem('report-config-ssd-risk-penalties');
             if (savedTriageAdmin) setTriageSectionsAdmin(JSON.parse(savedTriageAdmin));
             if (savedTriageStandard) setTriageSectionsStandard(JSON.parse(savedTriageStandard));
             if (savedDd) setDdSections(JSON.parse(savedDd));
-            if (savedSsd) setSsdSections(JSON.parse(savedSsd));
+            // Startup Steroid sections migration: ensure all 10 pages are present
+            if (savedSsd) {
+                const parsedSsd = JSON.parse(savedSsd);
+                // If saved config has fewer pages than default, reset to default
+                if (parsedSsd.length < defaultStartupSteroidSections.length) {
+                    console.log('Migrating Startup Steroid sections from', parsedSsd.length, 'to', defaultStartupSteroidSections.length, 'pages');
+                    setStartupSteroidSections(defaultStartupSteroidSections);
+                    localStorage.setItem('report-config-ssd-sections', JSON.stringify(defaultStartupSteroidSections));
+                } else {
+                    setStartupSteroidSections(parsedSsd);
+                }
+            }
             if (savedSsdCallback) setSsdCallbackUrl(savedSsdCallback);
-            if (savedSsdThresholds) setSsdThresholds(JSON.parse(savedSsdThresholds));
-            if (savedTcaCategories) setTcaScorecardCategories(JSON.parse(savedTcaCategories));
-            if (savedSsdRiskDomains) setSsdRiskDomains(JSON.parse(savedSsdRiskDomains));
-            if (savedSsdRiskPenalties) setSsdRiskPenalties(JSON.parse(savedSsdRiskPenalties));
+            if (savedStartupSteroidThresholds) setStartupSteroidThresholds(JSON.parse(savedStartupSteroidThresholds));
+            // TCA categories migration: ensure medtechWeight exists
+            if (savedTcaCategories) {
+                const parsedCategories = JSON.parse(savedTcaCategories);
+                const migratedCategories = parsedCategories.map((cat: TcaScorecardCategory, idx: number) => ({
+                    ...cat,
+                    medtechWeight: cat.medtechWeight ?? defaultTcaScorecardCategories[idx]?.medtechWeight ?? cat.weight
+                }));
+                setTcaScorecardCategories(migratedCategories);
+            }
+            if (savedStartupSteroidRiskDomains) setStartupSteroidRiskDomains(JSON.parse(savedStartupSteroidRiskDomains));
+            if (savedStartupSteroidRiskPenalties) setStartupSteroidRiskPenalties(JSON.parse(savedStartupSteroidRiskPenalties));
         } catch (error) {
             console.error("Failed to load report configurations from localStorage", error);
         }
     }, []);
 
-    const handleUpdate = (reportType: 'triageAdmin' | 'triageStandard' | 'dd' | 'ssd', sectionId: string, field: keyof ReportSection, value: string | boolean) => {
+    const handleUpdate = (reportType: 'triageAdmin' | 'triageStandard' | 'dd' | 'startupSteroid', sectionId: string, field: keyof ReportSection, value: string | boolean) => {
         const setSections = reportType === 'triageAdmin' ? setTriageSectionsAdmin
             : reportType === 'triageStandard' ? setTriageSectionsStandard
-                : reportType === 'ssd' ? setSsdSections
+                : reportType === 'startupSteroid' ? setStartupSteroidSections
                     : setDdSections;
         setSections(prev =>
             prev.map(s => s.id === sectionId ? { ...s, [field]: value } : s)
         );
     };
 
-    const handleRemove = (reportType: 'triageAdmin' | 'triageStandard' | 'dd' | 'ssd', sectionId: string) => {
+    const handleRemove = (reportType: 'triageAdmin' | 'triageStandard' | 'dd' | 'startupSteroid', sectionId: string) => {
         const setSections = reportType === 'triageAdmin' ? setTriageSectionsAdmin
             : reportType === 'triageStandard' ? setTriageSectionsStandard
-                : reportType === 'ssd' ? setSsdSections
+                : reportType === 'startupSteroid' ? setStartupSteroidSections
                     : setDdSections;
         setSections(prev => prev.filter(s => s.id !== sectionId));
     };
 
-    const handleAdd = (reportType: 'triageAdmin' | 'triageStandard' | 'dd' | 'ssd') => {
+    const handleAdd = (reportType: 'triageAdmin' | 'triageStandard' | 'dd' | 'startupSteroid') => {
         let setSections, newSectionData, setNewSectionData;
         if (reportType === 'triageAdmin' || reportType === 'triageStandard') {
             setSections = reportType === 'triageAdmin' ? setTriageSectionsAdmin : setTriageSectionsStandard;
             newSectionData = newTriageSection;
             setNewSectionData = setNewTriageSection;
-        } else if (reportType === 'ssd') {
-            setSections = setSsdSections;
-            newSectionData = newSsdSection;
-            setNewSectionData = setNewSsdSection;
+        } else if (reportType === 'startupSteroid') {
+            setSections = setStartupSteroidSections;
+            newSectionData = newStartupSteroidSection;
+            setNewSectionData = setNewStartupSteroidSection;
         } else {
             setSections = setDdSections;
             newSectionData = newDdSection;
@@ -359,16 +590,16 @@ export default function ReportConfigurationPage() {
         setNewSectionData({ title: '', description: '' });
     };
 
-    const handleReset = (reportType: 'triageAdmin' | 'triageStandard' | 'dd' | 'ssd') => {
+    const handleReset = (reportType: 'triageAdmin' | 'triageStandard' | 'dd' | 'startupSteroid') => {
         if (reportType === 'triageAdmin') setTriageSectionsAdmin(defaultTriageSectionsAdmin);
         if (reportType === 'triageStandard') setTriageSectionsStandard(defaultTriageSectionsStandard);
         if (reportType === 'dd') setDdSections(defaultDdSections);
-        if (reportType === 'ssd') {
-            setSsdSections(defaultSsdSections);
-            setSsdThresholds(defaultSsdThresholds);
+        if (reportType === 'startupSteroid') {
+            setStartupSteroidSections(defaultStartupSteroidSections);
+            setStartupSteroidThresholds(defaultStartupSteroidThresholds);
             setTcaScorecardCategories(defaultTcaScorecardCategories);
-            setSsdRiskDomains(defaultSsdRiskDomains);
-            setSsdRiskPenalties(defaultSsdRiskPenalties);
+            setStartupSteroidRiskDomains(defaultStartupSteroidRiskDomains);
+            setStartupSteroidRiskPenalties(defaultStartupSteroidRiskPenalties);
             setSsdCallbackUrl('');
         }
 
@@ -393,7 +624,7 @@ export default function ReportConfigurationPage() {
             if (response.ok) {
                 const data = await response.json();
                 setSsdTestStatus('success');
-                setSsdTestResult(`Backend connection successful! Status: ${data.status}, Database: ${data.database}. SSD endpoint: ${API_CONFIG.BASE_URL}/api/v1/ssd/tirr`);
+                setSsdTestResult(`Backend connection successful! Status: ${data.status}, Database: ${data.database}. Startup Steroid endpoint: ${API_CONFIG.BASE_URL}/api/v1/startup-steroid/tirr`);
             } else {
                 throw new Error(`Backend responded with status: ${response.status}`);
             }
@@ -409,12 +640,12 @@ export default function ReportConfigurationPage() {
             localStorage.setItem('report-config-triage-admin', JSON.stringify(triageSectionsAdmin));
             localStorage.setItem('report-config-triage-standard', JSON.stringify(triageSectionsStandard));
             localStorage.setItem('report-config-dd', JSON.stringify(ddSections));
-            localStorage.setItem('report-config-ssd-sections', JSON.stringify(ssdSections));
+            localStorage.setItem('report-config-ssd-sections', JSON.stringify(startupSteroidSections));
             localStorage.setItem('report-config-ssd-callback', ssdCallbackUrl);
-            localStorage.setItem('report-config-ssd-thresholds', JSON.stringify(ssdThresholds));
+            localStorage.setItem('report-config-ssd-thresholds', JSON.stringify(startupSteroidThresholds));
             localStorage.setItem('report-config-tca-scorecard-categories', JSON.stringify(tcaScorecardCategories));
-            localStorage.setItem('report-config-ssd-risk-domains', JSON.stringify(ssdRiskDomains));
-            localStorage.setItem('report-config-ssd-risk-penalties', JSON.stringify(ssdRiskPenalties));
+            localStorage.setItem('report-config-ssd-risk-domains', JSON.stringify(startupSteroidRiskDomains));
+            localStorage.setItem('report-config-ssd-risk-penalties', JSON.stringify(startupSteroidRiskPenalties));
             toast({
                 title: 'Configuration Saved',
                 description: 'Your report configurations have been saved locally.'
@@ -441,7 +672,7 @@ export default function ReportConfigurationPage() {
                     </div>
                     <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">Report Configuration</h1>
                 </div>
-                <p className="text-muted-foreground">Customize report sections, SSD integration settings, and scoring thresholds.</p>
+                <p className="text-muted-foreground">Customize report sections, Startup Steroid integration settings, and scoring thresholds.</p>
             </header>
 
             <Tabs defaultValue="triage" className="space-y-6">
@@ -456,10 +687,10 @@ export default function ReportConfigurationPage() {
                         <span className="hidden sm:inline">Due Diligence</span>
                         <span className="sm:hidden">DD</span>
                     </TabsTrigger>
-                    <TabsTrigger value="ssd" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                    <TabsTrigger value="startupSteroid" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                         <Link2 className="size-4" />
-                        <span className="hidden sm:inline">SSD Integration</span>
-                        <span className="sm:hidden">SSD</span>
+                        <span className="hidden sm:inline">Startup Steroid</span>
+                        <span className="sm:hidden">SS</span>
                     </TabsTrigger>
                 </TabsList>
                 <TabsContent value="triage">
@@ -527,19 +758,19 @@ export default function ReportConfigurationPage() {
                     </Card>
                 </TabsContent>
 
-                {/* SSD Integration Tab */}
-                <TabsContent value="ssd">
+                {/* Startup Steroid Integration Tab */}
+                <TabsContent value="startupSteroid">
                     <div className="space-y-6">
-                        {/* SSD Integration Overview */}
+                        {/* Startup Steroid Integration Overview */}
                         <Card>
                             <CardHeader>
                                 <div className="flex justify-between items-center">
                                     <div>
                                         <CardTitle className="flex items-center gap-2">
                                             <Link2 className="size-5" />
-                                            SSD → TCA TIRR Integration
+                                            Startup Steroid → TCA TIRR Integration
                                         </CardTitle>
-                                        <CardDescription>Configure the integration endpoint for SSD Application report generation</CardDescription>
+                                        <CardDescription>Configure the integration endpoint for Startup Steroid Application report generation</CardDescription>
                                     </div>
                                     <div className="flex gap-2">
                                         <Link href="/dashboard/ssd-audit">
@@ -555,12 +786,12 @@ export default function ReportConfigurationPage() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
                                         <Label htmlFor="ssd-endpoint">Endpoint URL</Label>
-                                        <Input id="ssd-endpoint" value={ssdEndpointUrl} onChange={(e) => setSsdEndpointUrl(e.target.value)} placeholder="/api/v1/ssd/tirr" />
-                                        <p className="text-xs text-muted-foreground mt-1">The endpoint that receives SSD payloads (POST)</p>
+                                        <Input id="ssd-endpoint" value={ssdEndpointUrl} onChange={(e) => setSsdEndpointUrl(e.target.value)} placeholder="/api/v1/startup-steroid/tirr" />
+                                        <p className="text-xs text-muted-foreground mt-1">The endpoint that receives Startup Steroid payloads (POST)</p>
                                     </div>
                                     <div>
                                         <Label htmlFor="ssd-callback">Callback URL (CaptureTCAReportResponse)</Label>
-                                        <Input id="ssd-callback" value={ssdCallbackUrl} onChange={(e) => setSsdCallbackUrl(e.target.value)} placeholder="https://ssd-app.com/api/CaptureTCAReportResponse" />
+                                        <Input id="ssd-callback" value={ssdCallbackUrl} onChange={(e) => setSsdCallbackUrl(e.target.value)} placeholder="https://startup-steroid.com/api/CaptureTCAReportResponse" />
                                         <p className="text-xs text-muted-foreground mt-1">URL to POST generated report path after completion</p>
                                     </div>
                                 </div>
@@ -588,32 +819,32 @@ export default function ReportConfigurationPage() {
                             </CardContent>
                         </Card>
 
-                        {/* SSD Report Sections */}
+                        {/* Startup Steroid Report Sections */}
                         <Card>
                             <CardHeader>
                                 <div className="flex justify-between items-center">
                                     <div>
-                                        <CardTitle>SSD Triage Report Sections (10-Page Format)</CardTitle>
-                                        <CardDescription>Configure sections included in the automated SSD triage report</CardDescription>
+                                        <CardTitle>Startup Steroid Triage Report Sections (10-Page Format)</CardTitle>
+                                        <CardDescription>Configure sections included in the automated Startup Steroid triage report</CardDescription>
                                     </div>
-                                    <Button variant="ghost" onClick={() => handleReset('ssd')}><RotateCcw className="mr-2" /> Reset to Default</Button>
+                                    <Button variant="ghost" onClick={() => handleReset('startupSteroid')}><RotateCcw className="mr-2" /> Reset to Default</Button>
                                 </div>
                             </CardHeader>
                             <CardContent>
                                 <ReportConfigTable
-                                    sections={ssdSections}
-                                    onUpdate={(id, field, value) => handleUpdate('ssd', id, field, value)}
-                                    onRemove={(id) => handleRemove('ssd', id)}
-                                    setSections={setSsdSections}
+                                    sections={startupSteroidSections}
+                                    onUpdate={(id, field, value) => handleUpdate('startupSteroid', id, field, value)}
+                                    onRemove={(id) => handleRemove('startupSteroid', id)}
+                                    setSections={setStartupSteroidSections}
                                 />
                                 <div className="mt-6 p-4 border-t">
                                     <h4 className="font-semibold mb-2">Add New Section</h4>
                                     <div className="flex items-start gap-4">
                                         <div className="flex-grow space-y-2">
-                                            <Input placeholder="Section Title" value={newSsdSection.title} onChange={(e) => setNewSsdSection({ ...newSsdSection, title: e.target.value })} />
-                                            <Textarea placeholder="Section Description" value={newSsdSection.description} onChange={(e) => setNewSsdSection({ ...newSsdSection, description: e.target.value })} rows={2} />
+                                            <Input placeholder="Section Title" value={newStartupSteroidSection.title} onChange={(e) => setNewStartupSteroidSection({ ...newStartupSteroidSection, title: e.target.value })} />
+                                            <Textarea placeholder="Section Description" value={newStartupSteroidSection.description} onChange={(e) => setNewStartupSteroidSection({ ...newStartupSteroidSection, description: e.target.value })} rows={2} />
                                         </div>
-                                        <Button onClick={() => handleAdd('ssd')}><Plus className="mr-2" /> Add Section</Button>
+                                        <Button onClick={() => handleAdd('startupSteroid')}><Plus className="mr-2" /> Add Section</Button>
                                     </div>
                                 </div>
                             </CardContent>
@@ -625,7 +856,7 @@ export default function ReportConfigurationPage() {
                                 <div className="flex justify-between items-center">
                                     <div>
                                         <CardTitle>TCA Scorecard Configuration</CardTitle>
-                                        <CardDescription>Configure category weights for TCA analysis scoring (total should equal 100%)</CardDescription>
+                                        <CardDescription>Configure category weights for TCA analysis scoring - General and MedTech frameworks (each total should equal 100%)</CardDescription>
                                     </div>
                                     <Button variant="ghost" onClick={() => setTcaScorecardCategories(defaultTcaScorecardCategories)}>
                                         <RotateCcw className="mr-2" /> Reset to Default
@@ -637,7 +868,8 @@ export default function ReportConfigurationPage() {
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>Category</TableHead>
-                                            <TableHead className="w-[120px]">Weight (%)</TableHead>
+                                            <TableHead className="w-[120px]">General Weight (%)</TableHead>
+                                            <TableHead className="w-[120px]">MedTech Weight (%)</TableHead>
                                             <TableHead className="w-[100px] text-center">Enabled</TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -659,6 +891,20 @@ export default function ReportConfigurationPage() {
                                                         className="h-8 w-20"
                                                     />
                                                 </TableCell>
+                                                <TableCell>
+                                                    <Input
+                                                        type="number"
+                                                        min="0"
+                                                        max="100"
+                                                        value={category.medtechWeight}
+                                                        onChange={(e) => {
+                                                            const updated = [...tcaScorecardCategories];
+                                                            updated[index] = { ...category, medtechWeight: parseInt(e.target.value) || 0 };
+                                                            setTcaScorecardCategories(updated);
+                                                        }}
+                                                        className="h-8 w-20"
+                                                    />
+                                                </TableCell>
                                                 <TableCell className="text-center">
                                                     <Switch
                                                         checked={category.enabled}
@@ -673,14 +919,43 @@ export default function ReportConfigurationPage() {
                                         ))}
                                     </TableBody>
                                 </Table>
-                                <div className="mt-4 flex justify-between items-center p-3 rounded-lg bg-muted/50">
-                                    <span className="font-medium">Total Weight:</span>
-                                    <span className={`text-lg font-bold ${tcaScorecardCategories.filter(c => c.enabled).reduce((sum, c) => sum + c.weight, 0) === 100
-                                        ? 'text-green-600'
-                                        : 'text-red-600'
-                                        }`}>
-                                        {tcaScorecardCategories.filter(c => c.enabled).reduce((sum, c) => sum + c.weight, 0)}%
-                                    </span>
+                                <div className="mt-4 flex flex-wrap justify-between items-center gap-4 p-3 rounded-lg bg-muted/50">
+                                    <div className="flex items-center gap-4">
+                                        <span className="font-medium">General Total:</span>
+                                        <span className={`text-lg font-bold ${tcaScorecardCategories.filter(c => c.enabled).reduce((sum, c) => sum + c.weight, 0) === 100
+                                            ? 'text-green-600'
+                                            : 'text-red-600'
+                                            }`}>
+                                            {tcaScorecardCategories.filter(c => c.enabled).reduce((sum, c) => sum + c.weight, 0)}%
+                                        </span>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => normalizeTcaWeights('general')}
+                                            disabled={tcaScorecardCategories.filter(c => c.enabled).reduce((sum, c) => sum + c.weight, 0) === 100}
+                                        >
+                                            <Scale className="size-4 mr-1" />
+                                            Normalize
+                                        </Button>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                        <span className="font-medium">MedTech Total:</span>
+                                        <span className={`text-lg font-bold ${tcaScorecardCategories.filter(c => c.enabled).reduce((sum, c) => sum + (c.medtechWeight || 0), 0) === 100
+                                            ? 'text-green-600'
+                                            : 'text-red-600'
+                                            }`}>
+                                            {tcaScorecardCategories.filter(c => c.enabled).reduce((sum, c) => sum + (c.medtechWeight || 0), 0)}%
+                                        </span>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => normalizeTcaWeights('medtech')}
+                                            disabled={tcaScorecardCategories.filter(c => c.enabled).reduce((sum, c) => sum + (c.medtechWeight || 0), 0) === 100}
+                                        >
+                                            <Scale className="size-4 mr-1" />
+                                            Normalize
+                                        </Button>
+                                    </div>
                                 </div>
                             </CardContent>
                         </Card>
@@ -831,15 +1106,37 @@ export default function ReportConfigurationPage() {
                                         ))}
                                     </TableBody>
                                 </Table>
-                                <div className="mt-4 flex justify-between items-center p-3 rounded-lg bg-muted/50">
-                                    <span className="font-medium">Tech Total:</span>
-                                    <span className={`text-lg font-bold ${ssdRiskDomains.filter(d => d.enabled).reduce((sum, d) => sum + d.techWeight, 0) === 100 ? 'text-green-600' : 'text-red-600'}`}>
-                                        {ssdRiskDomains.filter(d => d.enabled).reduce((sum, d) => sum + d.techWeight, 0)}%
-                                    </span>
-                                    <span className="font-medium">MedTech Total:</span>
-                                    <span className={`text-lg font-bold ${ssdRiskDomains.filter(d => d.enabled).reduce((sum, d) => sum + d.medWeight, 0) === 100 ? 'text-green-600' : 'text-red-600'}`}>
-                                        {ssdRiskDomains.filter(d => d.enabled).reduce((sum, d) => sum + d.medWeight, 0)}%
-                                    </span>
+                                <div className="mt-4 flex flex-wrap justify-between items-center gap-4 p-3 rounded-lg bg-muted/50">
+                                    <div className="flex items-center gap-4">
+                                        <span className="font-medium">Tech Total:</span>
+                                        <span className={`text-lg font-bold ${ssdRiskDomains.filter(d => d.enabled).reduce((sum, d) => sum + d.techWeight, 0) === 100 ? 'text-green-600' : 'text-red-600'}`}>
+                                            {ssdRiskDomains.filter(d => d.enabled).reduce((sum, d) => sum + d.techWeight, 0)}%
+                                        </span>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => normalizeRiskWeights('tech')}
+                                            disabled={ssdRiskDomains.filter(d => d.enabled).reduce((sum, d) => sum + d.techWeight, 0) === 100}
+                                        >
+                                            <Scale className="size-4 mr-1" />
+                                            Normalize
+                                        </Button>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                        <span className="font-medium">MedTech Total:</span>
+                                        <span className={`text-lg font-bold ${ssdRiskDomains.filter(d => d.enabled).reduce((sum, d) => sum + d.medWeight, 0) === 100 ? 'text-green-600' : 'text-red-600'}`}>
+                                            {ssdRiskDomains.filter(d => d.enabled).reduce((sum, d) => sum + d.medWeight, 0)}%
+                                        </span>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => normalizeRiskWeights('medtech')}
+                                            disabled={ssdRiskDomains.filter(d => d.enabled).reduce((sum, d) => sum + d.medWeight, 0) === 100}
+                                        >
+                                            <Scale className="size-4 mr-1" />
+                                            Normalize
+                                        </Button>
+                                    </div>
                                 </div>
                             </CardContent>
                         </Card>
@@ -901,6 +1198,277 @@ export default function ReportConfigurationPage() {
                                     </TableBody>
                                 </Table>
                             </CardContent>
+                        </Card>
+
+                        {/* Report Preview Section */}
+                        <Card>
+                            <CardHeader>
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <CardTitle className="flex items-center gap-2">
+                                            <Eye className="size-5" />
+                                            Report Preview
+                                        </CardTitle>
+                                        <CardDescription>Preview report layout with sample data - generates quality log for review</CardDescription>
+                                    </div>
+                                    <Button onClick={generateSampleReport} disabled={previewLoading}>
+                                        {previewLoading ? (
+                                            <><Loader2 className="size-4 mr-2 animate-spin" />Generating...</>
+                                        ) : (
+                                            <><Play className="size-4 mr-2" />Generate Preview</>
+                                        )}
+                                    </Button>
+                                </div>
+                            </CardHeader>
+                            {showPreview && (
+                                <CardContent className="space-y-6">
+                                    {/* Page 1: Executive Summary */}
+                                    <div className="border rounded-lg p-6 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+                                        <div className="flex items-center gap-2 mb-4 text-xs font-medium text-primary">
+                                            <FileText className="size-4" />
+                                            PAGE 1: EXECUTIVE SUMMARY
+                                        </div>
+                                        <div className="text-center mb-6 pb-4 border-b">
+                                            <h2 className="text-2xl font-bold text-primary">{sampleReportData.companyName}</h2>
+                                            <p className="text-muted-foreground">{sampleReportData.industry} | {sampleReportData.stage}</p>
+                                            <p className="text-sm">Funding Request: {sampleReportData.requestAmount}</p>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                            <div className="p-4 bg-white dark:bg-slate-800 rounded-lg shadow text-center">
+                                                <div className="text-3xl font-bold text-blue-600">{sampleReportData.tcaScore}</div>
+                                                <div className="text-sm text-muted-foreground">TCA Score</div>
+                                            </div>
+                                            <div className="p-4 bg-white dark:bg-slate-800 rounded-lg shadow text-center">
+                                                <div className="text-xl font-bold text-green-600">{sampleReportData.recommendation}</div>
+                                                <div className="text-sm text-muted-foreground">Recommendation</div>
+                                            </div>
+                                            <div className="p-4 bg-white dark:bg-slate-800 rounded-lg shadow text-center">
+                                                <div className="text-xl font-bold">{sampleReportData.analysisCompleteness}</div>
+                                                <div className="text-sm text-muted-foreground">Completeness</div>
+                                            </div>
+                                            <div className="p-4 bg-white dark:bg-slate-800 rounded-lg shadow text-center">
+                                                <div className="text-sm font-medium">{sampleReportData.location}</div>
+                                                <div className="text-sm text-muted-foreground">Location</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Page 2: TCA Scorecard */}
+                                    <div className="border rounded-lg p-6 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20">
+                                        <div className="flex items-center gap-2 mb-4 text-xs font-medium text-blue-600">
+                                            <BarChart3 className="size-4" />
+                                            PAGE 2: TCA SCORECARD
+                                        </div>
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                            {sampleReportData.categories.slice(0, 8).map((cat, i) => (
+                                                <div key={i} className="p-3 bg-white dark:bg-slate-800 rounded border text-sm">
+                                                    <div className="font-medium truncate">{cat.name}</div>
+                                                    <div className="flex justify-between mt-1">
+                                                        <span className="text-muted-foreground">{cat.weight}%</span>
+                                                        <span className={`font-bold ${cat.score >= 7 ? 'text-green-600' : cat.score >= 5 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                                            {cat.score}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Page 3: TCA AI Interpretation */}
+                                    <div className="border rounded-lg p-6 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20">
+                                        <div className="flex items-center gap-2 mb-4 text-xs font-medium text-purple-600">
+                                            <Settings2 className="size-4" />
+                                            PAGE 3: TCA AI INTERPRETATION
+                                        </div>
+                                        <p className="text-sm bg-white dark:bg-slate-800 p-4 rounded border">{sampleReportData.aiInterpretation}</p>
+                                        <div className="mt-4 grid grid-cols-2 gap-4">
+                                            <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded">
+                                                <h4 className="font-semibold text-green-700 text-sm">Key Strengths</h4>
+                                                <ul className="text-xs mt-1">
+                                                    {sampleReportData.strengths.slice(0, 2).map((s, i) => <li key={i}>• {s}</li>)}
+                                                </ul>
+                                            </div>
+                                            <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded">
+                                                <h4 className="font-semibold text-yellow-700 text-sm">Areas to Watch</h4>
+                                                <ul className="text-xs mt-1">
+                                                    {sampleReportData.concerns.slice(0, 2).map((c, i) => <li key={i}>• {c}</li>)}
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Page 4: Weighted Score Breakdown */}
+                                    <div className="border rounded-lg p-6 bg-gradient-to-br from-indigo-50 to-indigo-100 dark:from-indigo-900/20 dark:to-indigo-800/20">
+                                        <div className="flex items-center gap-2 mb-4 text-xs font-medium text-indigo-600">
+                                            <Scale className="size-4" />
+                                            PAGE 4: WEIGHTED SCORE BREAKDOWN
+                                        </div>
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow className="text-xs">
+                                                    <TableHead>Category</TableHead>
+                                                    <TableHead className="text-center">Raw Score</TableHead>
+                                                    <TableHead className="text-center">Weight</TableHead>
+                                                    <TableHead className="text-center">Weighted</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {sampleReportData.weightedBreakdown.map((row, i) => (
+                                                    <TableRow key={i} className="text-xs">
+                                                        <TableCell>{row.category}</TableCell>
+                                                        <TableCell className="text-center">{row.rawScore}</TableCell>
+                                                        <TableCell className="text-center">{row.weight}%</TableCell>
+                                                        <TableCell className="text-center font-bold">{row.weightedScore.toFixed(2)}</TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+
+                                    {/* Page 5: Risk Assessment */}
+                                    <div className="border rounded-lg p-6 bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20">
+                                        <div className="flex items-center gap-2 mb-4 text-xs font-medium text-orange-600">
+                                            <Shield className="size-4" />
+                                            PAGE 5: RISK ASSESSMENT
+                                        </div>
+                                        <div className="text-center mb-4 p-4 bg-white dark:bg-slate-800 rounded">
+                                            <div className="text-3xl font-bold text-orange-500">{sampleReportData.riskScore}</div>
+                                            <div className="text-sm text-muted-foreground">Overall Risk Score</div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            {sampleReportData.riskFlags.map((flag, i) => (
+                                                <div key={i} className="flex items-center gap-3 p-2 bg-white dark:bg-slate-800 rounded border text-sm">
+                                                    <span>{flag.flag}</span>
+                                                    <span className="font-medium">{flag.domain}</span>
+                                                    <span className="text-muted-foreground flex-1">{flag.description}</span>
+                                                    <Badge variant="outline">{flag.severity}</Badge>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Page 6: Flag Analysis Narrative */}
+                                    <div className="border rounded-lg p-6 bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-800/20">
+                                        <div className="flex items-center gap-2 mb-4 text-xs font-medium text-amber-600">
+                                            <AlertTriangle className="size-4" />
+                                            PAGE 6: FLAG ANALYSIS NARRATIVE
+                                        </div>
+                                        <div className="space-y-3">
+                                            <div className="p-3 bg-white dark:bg-slate-800 rounded border">
+                                                <h4 className="font-semibold text-sm">Market Risk Analysis</h4>
+                                                <p className="text-xs text-muted-foreground mt-1">Competitive landscape is evolving with new entrants. Company maintains differentiation through patent-pending technology.</p>
+                                            </div>
+                                            <div className="p-3 bg-white dark:bg-slate-800 rounded border">
+                                                <h4 className="font-semibold text-sm">Team Risk Analysis</h4>
+                                                <p className="text-xs text-muted-foreground mt-1">Key person dependency on CTO mitigated by strong engineering team. Succession planning recommended.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Page 7: Market & Team */}
+                                    <div className="border rounded-lg p-6 bg-gradient-to-br from-teal-50 to-teal-100 dark:from-teal-900/20 dark:to-teal-800/20">
+                                        <div className="flex items-center gap-2 mb-4 text-xs font-medium text-teal-600">
+                                            <Users className="size-4" />
+                                            PAGE 7: MARKET & TEAM
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="p-4 bg-white dark:bg-slate-800 rounded border">
+                                                <h4 className="font-semibold text-sm mb-2">Market Opportunity</h4>
+                                                <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                                                    <div><div className="font-bold">{sampleReportData.marketData.tam}</div><div className="text-muted-foreground">TAM</div></div>
+                                                    <div><div className="font-bold">{sampleReportData.marketData.sam}</div><div className="text-muted-foreground">SAM</div></div>
+                                                    <div><div className="font-bold">{sampleReportData.marketData.som}</div><div className="text-muted-foreground">SOM</div></div>
+                                                </div>
+                                            </div>
+                                            <div className="p-4 bg-white dark:bg-slate-800 rounded border">
+                                                <h4 className="font-semibold text-sm mb-2">Team Summary</h4>
+                                                <ul className="text-xs space-y-1">
+                                                    {sampleReportData.teamData.founders.map((f, i) => <li key={i}>• {f}</li>)}
+                                                    <li className="text-muted-foreground">Team size: {sampleReportData.teamData.teamSize}</li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Page 8: Financials & Technology */}
+                                    <div className="border rounded-lg p-6 bg-gradient-to-br from-cyan-50 to-cyan-100 dark:from-cyan-900/20 dark:to-cyan-800/20">
+                                        <div className="flex items-center gap-2 mb-4 text-xs font-medium text-cyan-600">
+                                            <TrendingUp className="size-4" />
+                                            PAGE 8: FINANCIALS & TECHNOLOGY
+                                        </div>
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                            <div className="p-3 bg-white dark:bg-slate-800 rounded border text-center">
+                                                <div className="font-bold text-lg">{sampleReportData.financials.revenue}</div>
+                                                <div className="text-xs text-muted-foreground">Revenue</div>
+                                            </div>
+                                            <div className="p-3 bg-white dark:bg-slate-800 rounded border text-center">
+                                                <div className="font-bold text-lg">{sampleReportData.financials.burnRate}</div>
+                                                <div className="text-xs text-muted-foreground">Burn Rate</div>
+                                            </div>
+                                            <div className="p-3 bg-white dark:bg-slate-800 rounded border text-center">
+                                                <div className="font-bold text-lg">{sampleReportData.financials.runway}</div>
+                                                <div className="text-xs text-muted-foreground">Runway</div>
+                                            </div>
+                                            <div className="p-3 bg-white dark:bg-slate-800 rounded border text-center">
+                                                <div className="font-bold text-lg">{sampleReportData.financials.ipStatus}</div>
+                                                <div className="text-xs text-muted-foreground">IP Status</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Page 9: CEO Questions */}
+                                    <div className="border rounded-lg p-6 bg-gradient-to-br from-rose-50 to-rose-100 dark:from-rose-900/20 dark:to-rose-800/20">
+                                        <div className="flex items-center gap-2 mb-4 text-xs font-medium text-rose-600">
+                                            <ClipboardList className="size-4" />
+                                            PAGE 9: CEO QUESTIONS
+                                        </div>
+                                        <div className="space-y-2">
+                                            {sampleReportData.ceoQuestions.map((q, i) => (
+                                                <div key={i} className="p-3 bg-white dark:bg-slate-800 rounded border text-sm flex items-start gap-2">
+                                                    <span className="font-bold text-rose-600">{i + 1}.</span>
+                                                    <span>{q}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Page 10: Final Recommendation */}
+                                    <div className="border rounded-lg p-6 bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20">
+                                        <div className="flex items-center gap-2 mb-4 text-xs font-medium text-emerald-600">
+                                            <CheckCircle2 className="size-4" />
+                                            PAGE 10: FINAL RECOMMENDATION
+                                        </div>
+                                        <div className="text-center mb-4 p-4 bg-white dark:bg-slate-800 rounded">
+                                            <div className="text-3xl font-bold text-emerald-600">{sampleReportData.finalDecision.recommendation}</div>
+                                            <p className="text-sm text-muted-foreground mt-1">{sampleReportData.finalDecision.fundingRecommendation}</p>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="p-3 bg-white dark:bg-slate-800 rounded border">
+                                                <h4 className="font-semibold text-sm mb-2">Next Steps</h4>
+                                                <ul className="text-xs space-y-1">
+                                                    {sampleReportData.finalDecision.nextSteps.map((s, i) => (
+                                                        <li key={i} className="flex items-center gap-1">
+                                                            <CheckCircle2 className="size-3 text-emerald-500" />{s}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                            <div className="p-3 bg-white dark:bg-slate-800 rounded border">
+                                                <h4 className="font-semibold text-sm mb-2">Key Conditions</h4>
+                                                <ul className="text-xs space-y-1">
+                                                    {sampleReportData.finalDecision.keyConditions.map((c, i) => (
+                                                        <li key={i}>• {c}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <p className="text-xs text-muted-foreground text-center">
+                                        Preview log saved to localStorage (key: last-report-preview-log) for quality review
+                                    </p>
+                                </CardContent>
+                            )}
                         </Card>
 
                         {/* Mandatory Fields Reference */}
