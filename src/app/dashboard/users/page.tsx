@@ -29,8 +29,7 @@ import {
   Search,
   Upload,
   Users,
-  UserPlus,
-  Loader2
+  UserPlus
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -64,8 +63,8 @@ const initialUsers = [
     name: 'Analyst User',
     email: 'analyst@tca.com',
     role: 'analyst',
-    triageReports: '25',
-    ddReports: '5',
+    triageReports: 25,
+    ddReports: 5,
     permissions: 'Review and analysis functions',
     status: 'Active',
     lastActivity: '30 minutes ago',
@@ -77,8 +76,8 @@ const initialUsers = [
     name: 'Standard User',
     email: 'user@tca.com',
     role: 'User',
-    triageReports: '10',
-    ddReports: '0',
+    triageReports: 10,
+    ddReports: 0,
     permissions: 'Basic user functionality',
     status: 'Active',
     lastActivity: '1 hour ago',
@@ -103,8 +102,8 @@ const initialUsers = [
     name: 'Analyst One',
     email: 'Analyst1@startupcompass.ai',
     role: 'analyst',
-    triageReports: '10',
-    ddReports: '2',
+    triageReports: 10,
+    ddReports: 2,
     permissions: 'View, Edit',
     status: 'Active',
     lastActivity: '1 day ago',
@@ -116,8 +115,8 @@ const initialUsers = [
     name: 'AI Adopter',
     email: 'adopter@startupcompass.ai',
     role: 'AI Adopter',
-    triageReports: '15',
-    ddReports: '1',
+    triageReports: 15,
+    ddReports: 1,
     permissions: 'AI module interaction',
     status: 'Active',
     lastActivity: '3 hours ago',
@@ -129,8 +128,8 @@ const initialUsers = [
     name: 'Standard User',
     email: 'user@startupcompass.ai',
     role: 'User',
-    triageReports: '5',
-    ddReports: '0',
+    triageReports: 5,
+    ddReports: 0,
     permissions: 'View Only',
     status: 'Inactive',
     lastActivity: '3 weeks ago',
@@ -146,7 +145,6 @@ export default function UserManagementPage() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('User');
   const [isInviteDialogOpen, setInviteDialogOpen] = useState(false);
-  const [isInviting, setIsInviting] = useState(false);
   const { toast } = useToast();
 
   const filteredUsers = users.filter(user =>
@@ -167,12 +165,12 @@ export default function UserManagementPage() {
       currentUsers.map(user => {
         if (user.id === userId) {
           const isUnlimited = typeof value === 'string' && value.toLowerCase() === 'unlimited';
-          const stringValue = String(value);
+          const numericValue = typeof value === 'string' ? parseInt(value, 10) : value;
 
           if (type === 'triage') {
-            return { ...user, triageReports: isUnlimited ? 'Unlimited' : stringValue };
+            return { ...user, triageReports: isUnlimited ? 'Unlimited' : (isNaN(numericValue) ? user.triageReports : numericValue) };
           } else {
-            return { ...user, ddReports: isUnlimited ? 'Unlimited' : stringValue };
+            return { ...user, ddReports: isUnlimited ? 'Unlimited' : (isNaN(numericValue) ? user.ddReports : numericValue) };
           }
         }
         return user;
@@ -180,111 +178,21 @@ export default function UserManagementPage() {
     );
   };
 
-  const handleSendInvite = async () => {
-    if (!inviteEmail || !inviteRole) {
+  const handleSendInvite = () => {
+    if (inviteEmail && inviteRole) {
+      toast({
+        title: 'Invitation Sent',
+        description: `An invitation has been sent to ${inviteEmail} for the ${inviteRole} role.`,
+      });
+      setInviteDialogOpen(false);
+      setInviteEmail('');
+      setInviteRole('User');
+    } else {
       toast({
         variant: 'destructive',
         title: 'Missing Information',
         description: 'Please provide a valid email and select a role.',
       });
-      return;
-    }
-
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(inviteEmail)) {
-      toast({
-        variant: 'destructive',
-        title: 'Invalid Email',
-        description: 'Please enter a valid email address.',
-      });
-      return;
-    }
-
-    // Check if user already exists
-    const existingUser = users.find(u => u.email.toLowerCase() === inviteEmail.toLowerCase());
-    if (existingUser) {
-      toast({
-        variant: 'destructive',
-        title: 'User Exists',
-        description: 'A user with this email already exists.',
-      });
-      return;
-    }
-
-    setIsInviting(true);
-
-    try {
-      // Attempt to call backend API for user invitation
-      const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
-      const response = await fetch(`${backendUrl}/api/v1/users/invite`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('authToken') || ''}`
-        },
-        body: JSON.stringify({
-          email: inviteEmail,
-          role: inviteRole,
-          invitedBy: localStorage.getItem('loggedInUser') ? JSON.parse(localStorage.getItem('loggedInUser') || '{}').email : 'admin@tca.com'
-        })
-      });
-
-      // Even if API fails, add user locally for demo purposes
-      const newUser = {
-        id: `usr_${Date.now()}`,
-        name: inviteEmail.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-        email: inviteEmail,
-        role: inviteRole,
-        triageReports: inviteRole === 'Admin' ? 'Unlimited' : inviteRole === 'Analyst' ? '25' : '10',
-        ddReports: inviteRole === 'Admin' ? 'Unlimited' : inviteRole === 'Analyst' ? '5' : '0',
-        permissions: inviteRole === 'Admin' ? 'Full system administration' : inviteRole === 'Analyst' ? 'Review and analysis functions' : 'Basic user functionality',
-        status: 'Pending',
-        lastActivity: 'Invited just now',
-        cost: { ytd: 0.00, mtd: 0.00 },
-        avatarId: 'avatar3'
-      };
-
-      setUsers(prev => [newUser, ...prev]);
-
-      toast({
-        title: 'User Invited Successfully',
-        description: `An invitation has been sent to ${inviteEmail}. They will receive an email with instructions to set up their account.`,
-      });
-
-      setInviteDialogOpen(false);
-      setInviteEmail('');
-      setInviteRole('User');
-
-    } catch (error) {
-      console.error('Invitation error:', error);
-      // Still add user locally for demo
-      const newUser = {
-        id: `usr_${Date.now()}`,
-        name: inviteEmail.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-        email: inviteEmail,
-        role: inviteRole,
-        triageReports: inviteRole === 'Admin' ? 'Unlimited' : inviteRole === 'Analyst' ? '25' : '10',
-        ddReports: inviteRole === 'Admin' ? 'Unlimited' : inviteRole === 'Analyst' ? '5' : '0',
-        permissions: inviteRole === 'Admin' ? 'Full system administration' : inviteRole === 'Analyst' ? 'Review and analysis functions' : 'Basic user functionality',
-        status: 'Pending',
-        lastActivity: 'Invited just now',
-        cost: { ytd: 0.00, mtd: 0.00 },
-        avatarId: 'avatar3'
-      };
-
-      setUsers(prev => [newUser, ...prev]);
-
-      toast({
-        title: 'User Added Locally',
-        description: `${inviteEmail} has been added to the user list. Email invitation will be sent when backend is available.`,
-      });
-
-      setInviteDialogOpen(false);
-      setInviteEmail('');
-      setInviteRole('User');
-    } finally {
-      setIsInviting(false);
     }
   };
 
@@ -332,10 +240,8 @@ export default function UserManagementPage() {
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setInviteDialogOpen(false)} disabled={isInviting}>Cancel</Button>
-                <Button onClick={handleSendInvite} disabled={isInviting}>
-                  {isInviting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...</> : 'Send Invitation'}
-                </Button>
+                <Button variant="outline" onClick={() => setInviteDialogOpen(false)}>Cancel</Button>
+                <Button onClick={handleSendInvite}>Send Invitation</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
