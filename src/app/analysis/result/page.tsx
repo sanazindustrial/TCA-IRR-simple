@@ -127,39 +127,69 @@ const allReportComponents = [
     { id: 'appendix', title: 'Appendix', component: Appendix, category: 'review' }
 ];
 
-// Triage Report Configuration (Standard User) - 5-7 pages
+// Triage Report Configuration (Standard User) - 10 pages
 const triageStandardConfig = [
+    // Page 1: Cover & Executive Summary
+    { id: 'executive-summary', title: 'Executive Summary', active: true },
+    // Page 2: Quick Summary & TCA Overview
     { id: 'quick-summary', title: 'Quick Summary', active: true },
     { id: 'tca-scorecard', title: 'TCA Scorecard', active: true },
+    // Page 3: TCA Analysis Details
+    { id: 'tca-summary-card', title: 'TCA Summary Card', active: true },
     { id: 'tca-ai-table', title: 'TCA AI Analysis Table', active: true },
+    // Page 4: TCA Interpretation
     { id: 'tca-interpretation-summary', title: 'TCA AI Interpretation Summary', active: true },
     { id: 'weighted-score-breakdown', title: 'Weighted Score Breakdown', active: true },
+    // Page 5: Risk Assessment
     { id: 'risk-flag-summary-table', title: 'Risk Flag Summary Table', active: true },
     { id: 'flag-analysis-narrative', title: 'Flag Analysis Narrative', active: true },
-    { id: 'ceo-questions', title: 'CEO Questions', active: true },
-    { id: 'growth-classifier', title: 'Growth Classifier', active: true },
+    // Page 6: Gap & Trend Analysis
+    { id: 'gap-analysis', title: 'Gap Analysis', active: true },
+    { id: 'macro-trend-alignment', title: 'Macro Trend Alignment', active: true },
+    // Page 7: Market Position
     { id: 'benchmark-comparison', title: 'Benchmark Comparison', active: true },
+    { id: 'competitive-landscape', title: 'Competitive Landscape', active: true },
+    // Page 8: Growth & Team
+    { id: 'growth-classifier', title: 'Growth Classifier', active: true },
+    { id: 'team-assessment', title: 'Team Assessment', active: true },
+    // Page 9: CEO Questions & Consistency
+    { id: 'ceo-questions', title: 'CEO Questions', active: true },
+    { id: 'consistency-check', title: 'Consistency Check', active: true },
+    // Page 10: Final Recommendation & Next Steps
     { id: 'final-recommendation', title: 'Final Recommendation', active: true }
 ];
 
-// Triage Report Configuration (Admin/Analyst) - Enhanced 5-7 pages
+// Triage Report Configuration (Admin/Analyst) - Enhanced 10 pages with analytics
 const triageAdminConfig = [
+    // Page 1: Cover & Executive Summary
     { id: 'executive-summary', title: 'Executive Summary', active: true },
+    // Page 2: Quick Summary & TCA Overview
+    { id: 'quick-summary', title: 'Quick Summary', active: true },
     { id: 'tca-scorecard', title: 'TCA Scorecard', active: true },
+    // Page 3: TCA Analysis Details
     { id: 'tca-summary-card', title: 'TCA Summary Card', active: true },
     { id: 'tca-ai-table', title: 'TCA AI Analysis Table', active: true },
+    // Page 4: TCA Interpretation
     { id: 'tca-interpretation-summary', title: 'TCA AI Interpretation Summary', active: true },
     { id: 'weighted-score-breakdown', title: 'Weighted Score Breakdown', active: true },
+    // Page 5: Risk Assessment
     { id: 'risk-flag-summary-table', title: 'Risk Flag Summary Table', active: true },
     { id: 'flag-analysis-narrative', title: 'Flag Analysis Narrative', active: true },
-    { id: 'ceo-questions', title: 'CEO Questions', active: true },
+    // Page 6: Gap & Trend Analysis
     { id: 'gap-analysis', title: 'Gap Analysis', active: true },
     { id: 'macro-trend-alignment', title: 'Macro Trend Alignment', active: true },
+    // Page 7: Market Position
     { id: 'benchmark-comparison', title: 'Benchmark Comparison', active: true },
+    { id: 'competitive-landscape', title: 'Competitive Landscape', active: true },
+    // Page 8: Growth & Team
     { id: 'growth-classifier', title: 'Growth Classifier', active: true },
     { id: 'team-assessment', title: 'Team Assessment', active: true },
+    // Page 9: CEO Questions, Consistency & Analyst Review
+    { id: 'ceo-questions', title: 'CEO Questions', active: true },
     { id: 'consistency-check', title: 'Consistency Check', active: true },
     { id: 'analyst-comments', title: 'Analyst Comments', active: true },
+    // Page 10: AI Deviation & Final Recommendation
+    { id: 'analyst-ai-deviation', title: 'Analyst AI Deviation', active: true },
     { id: 'final-recommendation', title: 'Final Recommendation', active: true }
 ];
 
@@ -831,17 +861,17 @@ export default function AnalysisResultPage({
                     {/* Reviewer Approval Panel - Only for Admin/Analyst */}
                     {(role === 'admin' || role === 'analyst') && !isPreview && showApprovalPanel && (
                         <Card className={`mb-8 border-2 ${approvalStatus === 'approved' ? 'border-green-300 bg-green-50/50' :
-                                approvalStatus === 'rejected' ? 'border-red-300 bg-red-50/50' :
-                                    approvalStatus === 'needs-revision' ? 'border-amber-300 bg-amber-50/50' :
-                                        'border-primary/30 bg-primary/5'
+                            approvalStatus === 'rejected' ? 'border-red-300 bg-red-50/50' :
+                                approvalStatus === 'needs-revision' ? 'border-amber-300 bg-amber-50/50' :
+                                    'border-primary/30 bg-primary/5'
                             }`}>
                             <CardHeader className="pb-3">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <div className={`p-2 rounded-full ${approvalStatus === 'approved' ? 'bg-green-100' :
-                                                approvalStatus === 'rejected' ? 'bg-red-100' :
-                                                    approvalStatus === 'needs-revision' ? 'bg-amber-100' :
-                                                        'bg-primary/20'
+                                            approvalStatus === 'rejected' ? 'bg-red-100' :
+                                                approvalStatus === 'needs-revision' ? 'bg-amber-100' :
+                                                    'bg-primary/20'
                                             }`}>
                                             {approvalStatus === 'approved' ? (
                                                 <CheckCircle2 className="size-6 text-green-600" />

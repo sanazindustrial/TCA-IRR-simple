@@ -13,8 +13,8 @@ import { useToast } from '@/hooks/use-toast';
 import { users } from '@/lib/users';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('admin@tca.com');
-  const [password, setPassword] = useState('admin123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
@@ -86,7 +86,7 @@ export default function LoginPage() {
               <Label htmlFor="email">Email Address</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <Input id="email" type="email" placeholder="admin@demo.com" required className="pl-10" value={email} onChange={e => setEmail(e.target.value)} />
+                <Input id="email" type="email" placeholder="Enter your email address" required className="pl-10" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" />
               </div>
             </div>
             <div className="space-y-2">
@@ -96,11 +96,12 @@ export default function LoginPage() {
                 <Input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
-                  placeholder="••••••••"
+                  placeholder="Enter your password"
                   required
                   className="pl-10 pr-10"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
+                  autoComplete="current-password"
                 />
                 <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
                   {showPassword ? <EyeOff /> : <Eye />}

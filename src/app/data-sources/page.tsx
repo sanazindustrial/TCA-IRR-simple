@@ -529,6 +529,9 @@ export default function DataSourcesPage() {
                 className="pl-10"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                name="source-search-filter"
+                autoComplete="off"
+                data-form-type="other"
               />
             </div>
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>

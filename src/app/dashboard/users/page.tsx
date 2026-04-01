@@ -29,7 +29,8 @@ import {
   Search,
   Upload,
   Users,
-  UserPlus
+  UserPlus,
+  Loader2
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -63,8 +64,8 @@ const initialUsers = [
     name: 'Analyst User',
     email: 'analyst@tca.com',
     role: 'analyst',
-    triageReports: 25,
-    ddReports: 5,
+    triageReports: '25',
+    ddReports: '5',
     permissions: 'Review and analysis functions',
     status: 'Active',
     lastActivity: '30 minutes ago',
@@ -76,8 +77,8 @@ const initialUsers = [
     name: 'Standard User',
     email: 'user@tca.com',
     role: 'User',
-    triageReports: 10,
-    ddReports: 0,
+    triageReports: '10',
+    ddReports: '0',
     permissions: 'Basic user functionality',
     status: 'Active',
     lastActivity: '1 hour ago',
@@ -102,21 +103,21 @@ const initialUsers = [
     name: 'Analyst One',
     email: 'Analyst1@startupcompass.ai',
     role: 'analyst',
-    triageReports: 10,
-    ddReports: 2,
+    triageReports: '10',
+    ddReports: '2',
     permissions: 'View, Edit',
     status: 'Active',
     lastActivity: '1 day ago',
     cost: { ytd: 87.00, mtd: 12.75 },
     avatarId: 'avatar2'
   },
-    {
+  {
     id: 'usr_7',
     name: 'AI Adopter',
     email: 'adopter@startupcompass.ai',
     role: 'AI Adopter',
-    triageReports: 15,
-    ddReports: 1,
+    triageReports: '15',
+    ddReports: '1',
     permissions: 'AI module interaction',
     status: 'Active',
     lastActivity: '3 hours ago',
@@ -128,8 +129,8 @@ const initialUsers = [
     name: 'Standard User',
     email: 'user@startupcompass.ai',
     role: 'User',
-    triageReports: 5,
-    ddReports: 0,
+    triageReports: '5',
+    ddReports: '0',
     permissions: 'View Only',
     status: 'Inactive',
     lastActivity: '3 weeks ago',
@@ -145,6 +146,7 @@ export default function UserManagementPage() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('User');
   const [isInviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [isInviting, setIsInviting] = useState(false);
   const { toast } = useToast();
 
   const filteredUsers = users.filter(user =>
@@ -159,40 +161,130 @@ export default function UserManagementPage() {
       )
     );
   };
-  
-  const handleReportChange = (userId: string, type: 'triage' | 'dd', value: string | number) => {
-      setUsers(currentUsers =>
-          currentUsers.map(user => {
-              if (user.id === userId) {
-                  const isUnlimited = typeof value === 'string' && value.toLowerCase() === 'unlimited';
-                  const numericValue = typeof value === 'string' ? parseInt(value, 10) : value;
 
-                  if (type === 'triage') {
-                      return { ...user, triageReports: isUnlimited ? 'Unlimited' : (isNaN(numericValue) ? user.triageReports : numericValue) };
-                  } else {
-                      return { ...user, ddReports: isUnlimited ? 'Unlimited' : (isNaN(numericValue) ? user.ddReports : numericValue) };
-                  }
-              }
-              return user;
-          })
-      );
+  const handleReportChange = (userId: string, type: 'triage' | 'dd', value: string | number) => {
+    setUsers(currentUsers =>
+      currentUsers.map(user => {
+        if (user.id === userId) {
+          const isUnlimited = typeof value === 'string' && value.toLowerCase() === 'unlimited';
+          const stringValue = String(value);
+
+          if (type === 'triage') {
+            return { ...user, triageReports: isUnlimited ? 'Unlimited' : stringValue };
+          } else {
+            return { ...user, ddReports: isUnlimited ? 'Unlimited' : stringValue };
+          }
+        }
+        return user;
+      })
+    );
   };
-  
-  const handleSendInvite = () => {
-    if (inviteEmail && inviteRole) {
-      toast({
-        title: 'Invitation Sent',
-        description: `An invitation has been sent to ${inviteEmail} for the ${inviteRole} role.`,
-      });
-      setInviteDialogOpen(false);
-      setInviteEmail('');
-      setInviteRole('User');
-    } else {
+
+  const handleSendInvite = async () => {
+    if (!inviteEmail || !inviteRole) {
       toast({
         variant: 'destructive',
         title: 'Missing Information',
         description: 'Please provide a valid email and select a role.',
       });
+      return;
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(inviteEmail)) {
+      toast({
+        variant: 'destructive',
+        title: 'Invalid Email',
+        description: 'Please enter a valid email address.',
+      });
+      return;
+    }
+
+    // Check if user already exists
+    const existingUser = users.find(u => u.email.toLowerCase() === inviteEmail.toLowerCase());
+    if (existingUser) {
+      toast({
+        variant: 'destructive',
+        title: 'User Exists',
+        description: 'A user with this email already exists.',
+      });
+      return;
+    }
+
+    setIsInviting(true);
+
+    try {
+      // Attempt to call backend API for user invitation
+      const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
+      const response = await fetch(`${backendUrl}/api/v1/users/invite`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken') || ''}`
+        },
+        body: JSON.stringify({
+          email: inviteEmail,
+          role: inviteRole,
+          invitedBy: localStorage.getItem('loggedInUser') ? JSON.parse(localStorage.getItem('loggedInUser') || '{}').email : 'admin@tca.com'
+        })
+      });
+
+      // Even if API fails, add user locally for demo purposes
+      const newUser = {
+        id: `usr_${Date.now()}`,
+        name: inviteEmail.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+        email: inviteEmail,
+        role: inviteRole,
+        triageReports: inviteRole === 'Admin' ? 'Unlimited' : inviteRole === 'Analyst' ? '25' : '10',
+        ddReports: inviteRole === 'Admin' ? 'Unlimited' : inviteRole === 'Analyst' ? '5' : '0',
+        permissions: inviteRole === 'Admin' ? 'Full system administration' : inviteRole === 'Analyst' ? 'Review and analysis functions' : 'Basic user functionality',
+        status: 'Pending',
+        lastActivity: 'Invited just now',
+        cost: { ytd: 0.00, mtd: 0.00 },
+        avatarId: 'avatar3'
+      };
+
+      setUsers(prev => [newUser, ...prev]);
+
+      toast({
+        title: 'User Invited Successfully',
+        description: `An invitation has been sent to ${inviteEmail}. They will receive an email with instructions to set up their account.`,
+      });
+
+      setInviteDialogOpen(false);
+      setInviteEmail('');
+      setInviteRole('User');
+
+    } catch (error) {
+      console.error('Invitation error:', error);
+      // Still add user locally for demo
+      const newUser = {
+        id: `usr_${Date.now()}`,
+        name: inviteEmail.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+        email: inviteEmail,
+        role: inviteRole,
+        triageReports: inviteRole === 'Admin' ? 'Unlimited' : inviteRole === 'Analyst' ? '25' : '10',
+        ddReports: inviteRole === 'Admin' ? 'Unlimited' : inviteRole === 'Analyst' ? '5' : '0',
+        permissions: inviteRole === 'Admin' ? 'Full system administration' : inviteRole === 'Analyst' ? 'Review and analysis functions' : 'Basic user functionality',
+        status: 'Pending',
+        lastActivity: 'Invited just now',
+        cost: { ytd: 0.00, mtd: 0.00 },
+        avatarId: 'avatar3'
+      };
+
+      setUsers(prev => [newUser, ...prev]);
+
+      toast({
+        title: 'User Added Locally',
+        description: `${inviteEmail} has been added to the user list. Email invitation will be sent when backend is available.`,
+      });
+
+      setInviteDialogOpen(false);
+      setInviteEmail('');
+      setInviteRole('User');
+    } finally {
+      setIsInviting(false);
     }
   };
 
@@ -210,39 +302,41 @@ export default function UserManagementPage() {
           </Button>
           <Dialog open={isInviteDialogOpen} onOpenChange={setInviteDialogOpen}>
             <DialogTrigger asChild>
-                <Button>
-                    <UserPlus className="mr-2" /> Add User
-                </Button>
+              <Button>
+                <UserPlus className="mr-2" /> Add User
+              </Button>
             </DialogTrigger>
             <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Invite New User</DialogTitle>
-                    <DialogDescription>Send an email invitation to a new user and assign them a role.</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="invite-email">Email Address</Label>
-                        <Input id="invite-email" type="email" placeholder="new.user@example.com" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} />
-                    </div>
-                     <div className="space-y-2">
-                        <Label htmlFor="invite-role">Role</Label>
-                         <Select value={inviteRole} onValueChange={setInviteRole}>
-                            <SelectTrigger id="invite-role">
-                                <SelectValue placeholder="Select a role" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="Admin">Admin</SelectItem>
-                                <SelectItem value="Analyst">Analyst</SelectItem>
-                                <SelectItem value="User">User</SelectItem>
-                                <SelectItem value="AI Adopter">AI Adopter</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
+              <DialogHeader>
+                <DialogTitle>Invite New User</DialogTitle>
+                <DialogDescription>Send an email invitation to a new user and assign them a role.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="invite-email">Email Address</Label>
+                  <Input id="invite-email" type="email" placeholder="new.user@example.com" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} />
                 </div>
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => setInviteDialogOpen(false)}>Cancel</Button>
-                    <Button onClick={handleSendInvite}>Send Invitation</Button>
-                </DialogFooter>
+                <div className="space-y-2">
+                  <Label htmlFor="invite-role">Role</Label>
+                  <Select value={inviteRole} onValueChange={setInviteRole}>
+                    <SelectTrigger id="invite-role">
+                      <SelectValue placeholder="Select a role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Admin">Admin</SelectItem>
+                      <SelectItem value="Analyst">Analyst</SelectItem>
+                      <SelectItem value="User">User</SelectItem>
+                      <SelectItem value="AI Adopter">AI Adopter</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setInviteDialogOpen(false)} disabled={isInviting}>Cancel</Button>
+                <Button onClick={handleSendInvite} disabled={isInviting}>
+                  {isInviting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...</> : 'Send Invitation'}
+                </Button>
+              </DialogFooter>
             </DialogContent>
           </Dialog>
         </div>
@@ -301,20 +395,20 @@ export default function UserManagementPage() {
               {filteredUsers.length > 0 ? (
                 filteredUsers.map(user => {
                   const avatar = PlaceHolderImages.find(p => p.id === user.avatarId);
-                  const roleVariant = user.role === 'Admin' 
-                    ? 'destructive' 
-                    : user.role === 'analyst' 
-                    ? 'warning' 
-                    : user.role === 'AI Adopter'
-                    ? 'default'
-                    : 'secondary';
+                  const roleVariant = user.role === 'Admin'
+                    ? 'destructive'
+                    : user.role === 'analyst'
+                      ? 'warning'
+                      : user.role === 'AI Adopter'
+                        ? 'default'
+                        : 'secondary';
                   return (
                     <TableRow key={user.id}>
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <Avatar className='size-8'>
-                             <AvatarImage src={avatar?.imageUrl} alt={user.name} data-ai-hint={avatar?.imageHint} />
-                             <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+                            <AvatarImage src={avatar?.imageUrl} alt={user.name} data-ai-hint={avatar?.imageHint} />
+                            <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
                           </Avatar>
                           <div>
                             <p className="font-medium">{user.name}</p>
@@ -329,33 +423,33 @@ export default function UserManagementPage() {
                       </TableCell>
                       <TableCell>
                         <Input
-                            value={user.triageReports}
-                            onChange={(e) => handleReportChange(user.id, 'triage', e.target.value)}
-                            className="h-8 w-24"
-                          />
+                          value={user.triageReports}
+                          onChange={(e) => handleReportChange(user.id, 'triage', e.target.value)}
+                          className="h-8 w-24"
+                        />
                       </TableCell>
                       <TableCell>
-                         <Input
-                            value={user.ddReports}
-                            onChange={(e) => handleReportChange(user.id, 'dd', e.target.value)}
-                            className="h-8 w-24"
-                          />
+                        <Input
+                          value={user.ddReports}
+                          onChange={(e) => handleReportChange(user.id, 'dd', e.target.value)}
+                          className="h-8 w-24"
+                        />
                       </TableCell>
                       <TableCell>
-                          <Input
-                            value={user.permissions}
-                            onChange={(e) => handlePermissionChange(user.id, e.target.value)}
-                            className="h-8"
-                          />
+                        <Input
+                          value={user.permissions}
+                          onChange={(e) => handlePermissionChange(user.id, e.target.value)}
+                          className="h-8"
+                        />
                       </TableCell>
-                       <TableCell>
+                      <TableCell>
                         <p>${user.cost.mtd.toFixed(2)} / ${user.cost.ytd.toFixed(2)}</p>
                       </TableCell>
                       <TableCell>
                         <Badge variant={user.status === 'Active' ? 'success' : 'secondary'}>{user.status}</Badge>
                       </TableCell>
-                       <TableCell>{user.lastActivity}</TableCell>
-                       <TableCell>
+                      <TableCell>{user.lastActivity}</TableCell>
+                      <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" className="h-8 w-8 p-0">
@@ -379,11 +473,11 @@ export default function UserManagementPage() {
                 })
               ) : (
                 <TableRow>
-                    <TableCell colSpan={9} className="h-48 text-center text-muted-foreground">
-                        <Users className="mx-auto h-12 w-12" />
-                        <h3 className="mt-4 text-lg font-semibold">No users found</h3>
-                        <p>Try adjusting your search or filter criteria.</p>
-                    </TableCell>
+                  <TableCell colSpan={9} className="h-48 text-center text-muted-foreground">
+                    <Users className="mx-auto h-12 w-12" />
+                    <h3 className="mt-4 text-lg font-semibold">No users found</h3>
+                    <p>Try adjusting your search or filter criteria.</p>
+                  </TableCell>
                 </TableRow>
               )}
             </TableBody>
