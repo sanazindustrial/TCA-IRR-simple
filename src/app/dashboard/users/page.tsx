@@ -44,7 +44,22 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 
-const initialUsers = [
+// User interface with proper types
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  triageReports: number | 'Unlimited';
+  ddReports: number | 'Unlimited';
+  permissions: string;
+  status: string;
+  lastActivity: string;
+  cost: { ytd: number; mtd: number };
+  avatarId: string;
+}
+
+const initialUsers: User[] = [
   {
     id: 'usr_4',
     name: 'Admin User',
@@ -145,6 +160,7 @@ export default function UserManagementPage() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('User');
   const [isInviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [isInviteLoading, setInviteLoading] = useState(false);
   const { toast } = useToast();
 
   const filteredUsers = users.filter(user =>
@@ -164,13 +180,16 @@ export default function UserManagementPage() {
     setUsers(currentUsers =>
       currentUsers.map(user => {
         if (user.id === userId) {
-          const isUnlimited = typeof value === 'string' && value.toLowerCase() === 'unlimited';
-          const numericValue = typeof value === 'string' ? parseInt(value, 10) : value;
+          const strValue = String(value).trim();
+          const isUnlimited = strValue.toLowerCase() === 'unlimited';
+          const numericValue = parseInt(strValue, 10);
+          const newValue: number | 'Unlimited' = isUnlimited ? 'Unlimited' : (isNaN(numericValue) ? (typeof user.triageReports === 'number' ? user.triageReports : 0) : numericValue);
 
           if (type === 'triage') {
-            return { ...user, triageReports: isUnlimited ? 'Unlimited' : (isNaN(numericValue) ? user.triageReports : numericValue) };
+            return { ...user, triageReports: newValue };
           } else {
-            return { ...user, ddReports: isUnlimited ? 'Unlimited' : (isNaN(numericValue) ? user.ddReports : numericValue) };
+            const ddValue: number | 'Unlimited' = isUnlimited ? 'Unlimited' : (isNaN(numericValue) ? (typeof user.ddReports === 'number' ? user.ddReports : 0) : numericValue);
+            return { ...user, ddReports: ddValue };
           }
         }
         return user;
@@ -178,8 +197,54 @@ export default function UserManagementPage() {
     );
   };
 
-  const handleSendInvite = () => {
-    if (inviteEmail && inviteRole) {
+  const handleSendInvite = async () => {
+    if (!inviteEmail || !inviteRole) {
+      toast({
+        variant: 'destructive',
+        title: 'Missing Information',
+        description: 'Please provide a valid email and select a role.',
+      });
+      return;
+    }
+
+    setInviteLoading(true);
+    try {
+      const response = await fetch('/api/users/invite', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: inviteEmail,
+          role: inviteRole,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to send invitation');
+      }
+
+      const newUser = await response.json();
+
+      // Add new user to the list
+      setUsers(currentUsers => [
+        ...currentUsers,
+        {
+          id: newUser.id || `usr_${Date.now()}`,
+          name: inviteEmail.split('@')[0],
+          email: inviteEmail,
+          role: inviteRole,
+          triageReports: inviteRole === 'Admin' ? 'Unlimited' : 10,
+          ddReports: inviteRole === 'Admin' ? 'Unlimited' : 2,
+          permissions: inviteRole === 'Admin' ? 'Full system administration' : 'Standard',
+          status: 'Pending',
+          lastActivity: 'Just now',
+          cost: { ytd: 0, mtd: 0 },
+          avatarId: 'avatar1',
+        } as User,
+      ]);
+
       toast({
         title: 'Invitation Sent',
         description: `An invitation has been sent to ${inviteEmail} for the ${inviteRole} role.`,
@@ -187,12 +252,14 @@ export default function UserManagementPage() {
       setInviteDialogOpen(false);
       setInviteEmail('');
       setInviteRole('User');
-    } else {
+    } catch (error) {
       toast({
         variant: 'destructive',
-        title: 'Missing Information',
-        description: 'Please provide a valid email and select a role.',
+        title: 'Invitation Failed',
+        description: error instanceof Error ? error.message : 'Failed to send invitation. Please try again.',
       });
+    } finally {
+      setInviteLoading(false);
     }
   };
 
@@ -240,8 +307,10 @@ export default function UserManagementPage() {
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setInviteDialogOpen(false)}>Cancel</Button>
-                <Button onClick={handleSendInvite}>Send Invitation</Button>
+                <Button variant="outline" onClick={() => setInviteDialogOpen(false)} disabled={isInviteLoading}>Cancel</Button>
+                <Button onClick={handleSendInvite} disabled={isInviteLoading}>
+                  {isInviteLoading ? 'Sending...' : 'Send Invitation'}
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
