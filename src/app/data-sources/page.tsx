@@ -10,6 +10,8 @@ import {
   sourceStatusStructured as sourceStatus,
   sourceTypesStructured as sourceTypes,
   sourcePricingListStructured as sourcePricingList,
+  REQUIREMENT_GROUPS,
+  type RequirementGroup,
 } from '@/lib/external-sources-config';
 import {
   ArrowLeft,
@@ -36,6 +38,8 @@ import {
   BarChart,
   Edit,
   Trash2,
+  Key,
+  ExternalLink,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
@@ -186,6 +190,22 @@ const SourceCard = ({ source, showSecrets, onActiveChange, onTest, onEdit, onDel
   const isFree = source.pricing === 'Free';
   const isConnected = source.active && (source.apiKey?.startsWith('N/A') || (source.apiKey && source.apiKey.length > 0));
 
+  // Get requirement group info
+  const reqGroup = source.requirementGroup as RequirementGroup | undefined;
+  const reqGroupInfo = reqGroup ? REQUIREMENT_GROUPS[reqGroup] : null;
+
+  // Requirement group badge colors
+  const getRequirementGroupColor = (group: string | undefined) => {
+    switch (group) {
+      case 'A': return 'bg-green-100 text-green-800 border-green-200';
+      case 'B': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'C': return 'bg-purple-100 text-purple-800 border-purple-200';
+      case 'D': return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'E': return 'bg-gray-100 text-gray-800 border-gray-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
   return (
     <Card className="flex flex-col transition-all hover:shadow-lg hover:border-primary/50">
       <CardContent className="p-4 space-y-4">
@@ -197,7 +217,26 @@ const SourceCard = ({ source, showSecrets, onActiveChange, onTest, onEdit, onDel
               <p className="text-xs text-muted-foreground">{source.category}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            {reqGroup && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant="outline" className={cn('text-xs', getRequirementGroupColor(reqGroup))}>
+                      Group {reqGroup}
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="font-semibold">{reqGroupInfo?.groupName}</p>
+                    <ul className="text-xs mt-1 list-disc pl-4">
+                      {reqGroupInfo?.requirements.map((req, i) => (
+                        <li key={i}>{req}</li>
+                      ))}
+                    </ul>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
             {isFree && <Badge variant="outline" className='text-success border-success/50'>FREE</Badge>}
             <Badge variant={isConnected ? 'success' : 'secondary'}>
               {isConnected ? 'Connected' : 'Disconnected'}
@@ -230,7 +269,21 @@ const SourceCard = ({ source, showSecrets, onActiveChange, onTest, onEdit, onDel
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor={`api-key-${source.id}`} className="text-xs text-muted-foreground">API Key</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor={`api-key-${source.id}`} className="text-xs text-muted-foreground">API Key</Label>
+              {source.getKeyUrl && (
+                <a
+                  href={source.getKeyUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-primary hover:text-primary/80 flex items-center gap-1"
+                >
+                  <Key className="size-3" />
+                  Get Key
+                  <ExternalLink className="size-3" />
+                </a>
+              )}
+            </div>
             <Input id={`api-key-${source.id}`}
               type={showSecrets ? "text" : "password"}
               placeholder="Enter API Key"
@@ -562,6 +615,57 @@ export default function DataSourcesPage() {
         onSave={handleSaveSource}
         dialogType={dialogType}
       />
+
+      {/* Data Providers Attribution Section */}
+      <Card className="mt-8 bg-muted/30">
+        <CardContent className="p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Database className="size-5 text-primary" />
+            <h3 className="font-semibold text-lg">Data Providers & Attribution</h3>
+          </div>
+          <p className="text-sm text-muted-foreground mb-4">
+            TCA-IRR-APP aggregates data from multiple trusted sources. We are committed to transparency and compliance with all data provider terms of service.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+            <div className="space-y-2">
+              <p className="font-medium">Government & Regulatory</p>
+              <ul className="text-muted-foreground space-y-1">
+                <li>• SEC EDGAR - U.S. Securities and Exchange Commission</li>
+                <li>• FDA Orange Book - Food and Drug Administration</li>
+                <li>• USPTO PatentsView - U.S. Patent and Trademark Office</li>
+                <li>• ClinicalTrials.gov - National Library of Medicine</li>
+              </ul>
+            </div>
+            <div className="space-y-2">
+              <p className="font-medium">Economic & Financial</p>
+              <ul className="text-muted-foreground space-y-1">
+                <li>• FRED - Federal Reserve Bank of St. Louis</li>
+                <li>• BEA - Bureau of Economic Analysis</li>
+                <li>• BLS - Bureau of Labor Statistics</li>
+                <li>• World Bank Open Data</li>
+              </ul>
+            </div>
+            <div className="space-y-2">
+              <p className="font-medium">Research & Technology</p>
+              <ul className="text-muted-foreground space-y-1">
+                <li>• PubMed - National Center for Biotechnology Information</li>
+                <li>• GitHub - Microsoft Corporation</li>
+                <li>• Hugging Face - AI Model Repository</li>
+                <li>• arXiv - Cornell University</li>
+              </ul>
+            </div>
+          </div>
+          <Separator className="my-4" />
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <p>Data usage is subject to each provider's terms of service and rate limits.</p>
+            <div className="flex items-center gap-4">
+              <Badge variant="outline" className="text-xs">Rate Limited</Badge>
+              <Badge variant="outline" className="text-xs">Cached</Badge>
+              <Badge variant="outline" className="text-xs">Compliant</Badge>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </main>
   );
 }
