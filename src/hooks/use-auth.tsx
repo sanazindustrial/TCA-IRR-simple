@@ -63,11 +63,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 setCurrentUser(user);
                 setIsAuthenticated(true);
             } else {
-                // Default to Admin for demo purposes
-                const defaultUser = mockUsers[0]; // Admin user
-                setCurrentUser(defaultUser);
-                setIsAuthenticated(true);
-                localStorage.setItem('currentUser', JSON.stringify(defaultUser));
+                // No user found - do not default to admin, require login
+                setIsAuthenticated(false);
+                setCurrentUser(null);
             }
         } catch (e) {
             setIsAuthenticated(false);
@@ -128,8 +126,8 @@ export function useAuth() {
         // Return default values when not wrapped in provider (for build-time rendering)
         return {
             users: mockUsers,
-            currentUser: mockUsers[0], // Default to Admin
-            isAuthenticated: true,
+            currentUser: null, // Do not default to Admin
+            isAuthenticated: false,
             login: async () => { },
             logout: () => { },
             switchRole: () => { },
