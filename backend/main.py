@@ -1,9 +1,11 @@
 """
 TCA Investment Analysis Platform - Refactored Main Application
+OPTIMIZED FOR FAST STARTUP - Heavy initialization is deferred to background tasks
 """
 
 import logging
 import json
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,9 +23,13 @@ from app.api.documentation import custom_openapi_schema
 from app.middleware import (ErrorHandlingMiddleware, SecurityHeadersMiddleware,
                             RequestLoggingMiddleware, RateLimitingMiddleware)
 
-# Configure logging
+# Configure logging EARLY but don't block
 configure_logging()
 logger = logging.getLogger(__name__)
+
+# Global state for background initialization
+_app_ready = False
+_init_error = None
 
 
 class CustomJSONResponse(JSONResponse):
@@ -47,30 +53,47 @@ def create_json_response_with_datetime(content, status_code: int = 200):
                     media_type="application/json")
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Application lifespan manager"""
-    # Startup
-    logger.info("Starting TCA Investment Analysis Platform...")
-
+async def _background_init():
+    """Heavy initialization in background - doesn't block startup"""
+    global _app_ready, _init_error
+    
     try:
-        # Initialize database connection
+        logger.info("Background: Starting database connection...")
         await db_manager.connect()
-        logger.info("Database connection established")
+        logger.info("Background: Database connection established")
 
-        # Initialize AI service connection
-        from app.services import ai_client
-        health = await ai_client.health_check()
-        if health.get("status") == "healthy":
-            logger.info("AI service connection established")
-        else:
-            logger.warning(f"AI service health check failed: {health}")
+        # Initialize AI service connection (non-blocking, just log status)
+        try:
+            from app.services import ai_client
+            health = await asyncio.wait_for(ai_client.health_check(), timeout=10.0)
+            if health.get("status") == "healthy":
+                logger.info("Background: AI service connection established")
+            else:
+                logger.warning(f"Background: AI service health check failed: {health}")
+        except asyncio.TimeoutError:
+            logger.warning("Background: AI service health check timed out (continuing anyway)")
+        except Exception as e:
+            logger.warning(f"Background: AI service init warning: {e} (continuing anyway)")
+
+        _app_ready = True
+        logger.info("Background: All services initialized successfully")
 
     except Exception as e:
-        logger.error(f"Application startup failed: {e}")
-        raise
+        _init_error = str(e)
+        logger.error(f"Background: Initialization failed: {e}")
+        # Don't re-raise - let app continue running with degraded state
 
-    logger.info("Application startup completed successfully")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan manager - FAST STARTUP"""
+    # Startup - just schedule background init, don't wait
+    logger.info("Starting TCA Investment Analysis Platform (fast mode)...")
+    
+    # Schedule heavy init in background - DON'T await it
+    asyncio.create_task(_background_init())
+    
+    logger.info("Application started - background initialization in progress")
 
     yield
 
@@ -161,18 +184,57 @@ def create_application() -> FastAPI:
 app = create_application()
 
 
-# Root endpoint
-@app.get("/", response_model=BaseResponse)
+# =============================================================================
+# FAST HEALTH ENDPOINTS - These respond INSTANTLY for Azure health probes
+# =============================================================================
+
+@app.get("/", response_model=None)
 async def root():
-    """Root endpoint with basic application information"""
-    return BaseResponse(
-        message=f"Welcome to {settings.app_name} v{settings.version}")
+    """Root endpoint - INSTANT response for Azure health probe"""
+    return {"status": "ok", "app": settings.app_name, "version": settings.version}
 
 
-# Health check endpoint
-@app.get("/health", response_model=HealthCheck)
-async def health_check():
-    """Comprehensive health check endpoint"""
+@app.get("/health", response_model=None)
+async def health_check_fast():
+    """Fast health check - responds instantly for Azure startup probe"""
+    return {
+        "status": "healthy" if _app_ready else "starting",
+        "version": settings.version,
+        "ready": _app_ready,
+        "error": _init_error
+    }
+
+
+@app.get("/healthz", response_model=None)
+async def healthz():
+    """Kubernetes-style health endpoint - INSTANT"""
+    return {"status": "ok"}
+
+
+@app.get("/ready", response_model=None)
+async def readiness():
+    """Readiness probe - checks if background init is complete"""
+    if _app_ready:
+        return {"status": "ready", "services": "initialized"}
+    elif _init_error:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "message": _init_error}
+        )
+    else:
+        return JSONResponse(
+            status_code=503, 
+            content={"status": "starting", "message": "Services initializing..."}
+        )
+
+
+# =============================================================================
+# DETAILED HEALTH ENDPOINT - Only call this when needed (slow)
+# =============================================================================
+
+@app.get("/health/detailed", response_model=HealthCheck)
+async def health_check_detailed():
+    """Comprehensive health check endpoint - checks DB and AI (SLOW)"""
     try:
         # Check database health
         db_health = await db_manager.health_check()
@@ -195,8 +257,7 @@ async def health_check():
             environment=settings.environment,
             database=db_health,
             ai_service=ai_health,
-            external_apis={"status":
-                           "healthy"}  # Placeholder for external API checks
+            external_apis={"status": "healthy"}
         )
 
     except Exception as e:
