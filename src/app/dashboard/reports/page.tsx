@@ -548,6 +548,7 @@ export default function ReportsPage() {
               {isPrivilegedUser ? (
                 <>
                   <TabsTrigger value="all">All Reports ({reportsForUser.length})</TabsTrigger>
+                  <TabsTrigger value="due-diligence">Due Diligence ({allReports.filter(r => r.type === 'Due Diligence').length})</TabsTrigger>
                   <TabsTrigger value="pending">Pending Approval ({pendingReports.length})</TabsTrigger>
                   <TabsTrigger value="my-reports">My Reports ({myReports.length})</TabsTrigger>
                 </>
@@ -601,13 +602,46 @@ export default function ReportsPage() {
           ) : (
             <>
               <TabsContent value="all" className="space-y-4">
-                {reportsForUser.length > 0 ? reportsForUser.map(report => <ReportCard key={report.id} report={report} isPrivileged={isPrivilegedUser} />) : <p className="text-center text-muted-foreground py-10">No reports found.</p>}
+                {reportsForUser.length > 0 ? reportsForUser.map(report => <ReportCard key={report.id} report={report} isPrivileged={isPrivilegedUser} />) : (
+                  <Card className="p-8 text-center">
+                    <p className="text-muted-foreground mb-4">No reports found. Start by creating a new analysis.</p>
+                    <div className="flex gap-2 justify-center">
+                      <Button asChild><Link href="/analysis">New Triage Report</Link></Button>
+                      {isPrivilegedUser && <Button asChild variant="outline"><Link href="/dashboard/reports/due-diligence">New Due Diligence</Link></Button>}
+                    </div>
+                  </Card>
+                )}
+              </TabsContent>
+              <TabsContent value="due-diligence" className="space-y-4">
+                {allReports.filter(r => r.type === 'Due Diligence').length > 0
+                  ? allReports.filter(r => r.type === 'Due Diligence').map(report => <ReportCard key={report.id} report={report} isPrivileged={isPrivilegedUser} />)
+                  : (
+                    <Card className="p-8 text-center">
+                      <div className="flex flex-col items-center gap-4">
+                        <FileText className="size-12 text-muted-foreground" />
+                        <div>
+                          <h3 className="text-lg font-semibold">No Due Diligence Reports</h3>
+                          <p className="text-muted-foreground mb-4">Start a comprehensive Due Diligence analysis for detailed investment evaluation.</p>
+                        </div>
+                        <Button asChild className="bg-blue-600 hover:bg-blue-700">
+                          <Link href="/dashboard/reports/due-diligence">
+                            <FileUp className="mr-2 size-4" /> Start Due Diligence Analysis
+                          </Link>
+                        </Button>
+                      </div>
+                    </Card>
+                  )}
               </TabsContent>
               <TabsContent value="pending" className="space-y-4">
                 {pendingReports.length > 0 ? pendingReports.map(report => <ReportCard key={report.id} report={report} isPrivileged={isPrivilegedUser} />) : <p className="text-center text-muted-foreground py-10">No reports are pending approval.</p>}
               </TabsContent>
               <TabsContent value="my-reports" className="space-y-4">
-                {myReports.length > 0 ? myReports.map(report => <ReportCard key={report.id} report={report} isPrivileged={isPrivilegedUser} />) : <p className="text-center text-muted-foreground py-10">You have not created any reports.</p>}
+                {myReports.length > 0 ? myReports.map(report => <ReportCard key={report.id} report={report} isPrivileged={isPrivilegedUser} />) : (
+                  <Card className="p-8 text-center">
+                    <p className="text-muted-foreground mb-4">You have not created any reports yet.</p>
+                    <Button asChild><Link href="/analysis">Create Your First Report</Link></Button>
+                  </Card>
+                )}
               </TabsContent>
             </>
           )}
