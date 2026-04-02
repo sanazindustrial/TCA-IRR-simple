@@ -63,14 +63,14 @@ interface ModuleConfig {
 
 // Default module definitions (used as fallback)
 const MODULE_DEFINITIONS: Record<string, { name: string; description: string; }> = {
-  tca: { name: 'TCA Scorecard', description: 'Core technology capability assessment',  },
+  tca: { name: 'TCA Scorecard', description: 'Core technology capability assessment', },
   risk: { name: 'Risk Assessment', description: 'Risk factors and mitigation analysis', },
-  macro: { name: 'Macro Trend Analysis', description: 'PESTEL framework analysis',  },
+  macro: { name: 'Macro Trend Analysis', description: 'PESTEL framework analysis', },
   benchmark: { name: 'Benchmark Comparison', description: 'Industry benchmark overlay', },
-  growth: { name: 'Growth Classification', description: 'Growth trajectory analysis',  },
-  gap: { name: 'Gap Analysis', description: 'Capability gap heatmap',  },
-  founderFit: { name: 'Founder Fit Analysis', description: 'Funding readiness assessment',  },
-  team: { name: 'Team Assessment', description: 'Team effectiveness evaluation',  },
+  growth: { name: 'Growth Classification', description: 'Growth trajectory analysis', },
+  gap: { name: 'Gap Analysis', description: 'Capability gap heatmap', },
+  founderFit: { name: 'Founder Fit Analysis', description: 'Funding readiness assessment', },
+  team: { name: 'Team Assessment', description: 'Team effectiveness evaluation', },
   strategicFit: { name: 'Strategic Fit Matrix', description: 'Strategic alignment scoring', },
 };
 
@@ -756,7 +756,7 @@ export default function SimulationPage() {
               // ignore parse error
             }
           }
-          
+
           await settingsApi.runSimulation({
             settings_version_id: selectedVersion.id,
             company_name: companyName,

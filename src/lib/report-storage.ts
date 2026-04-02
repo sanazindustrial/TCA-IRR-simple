@@ -364,8 +364,14 @@ class ReportStorageService {
     }
 
     private extractCompositeScore(data: ComprehensiveAnalysisOutput): number {
-        if (data.tcaData?.compositeScore) {
-            return data.tcaData.compositeScore / 10; // Convert to 0-10 scale
+        if (data.tcaData?.compositeScore !== undefined) {
+            // compositeScore is already on 0-10 scale (e.g., 7.81)
+            // Only normalize if it's > 10 (legacy data on 0-100 scale)
+            const score = data.tcaData.compositeScore;
+            if (score > 10) {
+                return Math.round(score) / 10; // Convert 0-100 to 0-10
+            }
+            return Math.round(score * 100) / 100; // Keep 0-10 scale, round to 2 decimals
         }
 
         // Calculate from categories if available
@@ -390,7 +396,7 @@ class ReportStorageService {
 
             localStorage.setItem(this.storageKey, JSON.stringify(recentReports));
             console.log('saveToLocalStorage: saved', recentReports.length, 'reports to', this.storageKey);
-            
+
             // Dispatch a custom event for same-page listeners
             window.dispatchEvent(new CustomEvent('tca_reports_updated', { detail: { count: recentReports.length } }));
         } catch (error) {
