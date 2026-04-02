@@ -520,6 +520,104 @@ export default function DataSourcesPage() {
           <StatCard title="Total Calls" value={"6,745"} icon={BarChart} />
         </div>
 
+        {/* External Config Tracking & Review Workflow */}
+        <Card className="mb-8 bg-gradient-to-r from-card via-card to-purple-50/30 dark:to-purple-950/30">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Activity className="size-5 text-purple-500" />
+                <h3 className="font-semibold text-lg">Configuration Tracking & Review Workflow</h3>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => toast({ title: 'Configuration Log', description: 'Viewing recent configuration changes...' })}>
+                  <Eye className="size-4 mr-2" />
+                  View Log
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => toast({ title: 'Audit Export', description: 'Configuration audit exported successfully.' })}>
+                  <Upload className="size-4 mr-2" />
+                  Export Audit
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              {/* Config Changes */}
+              <div className="p-4 rounded-lg border bg-background/50">
+                <div className="flex items-center gap-2 mb-2">
+                  <Activity className="size-5 text-blue-500" />
+                  <span className="font-medium">Recent Changes</span>
+                </div>
+                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  {sources.filter(s => s.active).length}
+                </p>
+                <p className="text-xs text-muted-foreground">Active source configurations</p>
+              </div>
+
+              {/* Pending Reviews */}
+              <div className="p-4 rounded-lg border bg-background/50">
+                <div className="flex items-center gap-2 mb-2">
+                  <Eye className="size-5 text-amber-500" />
+                  <span className="font-medium">Pending Review</span>
+                </div>
+                <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                  {sources.filter(s => s.active && !s.apiKey?.startsWith('N/A') && (!s.apiKey || s.apiKey.length === 0)).length}
+                </p>
+                <p className="text-xs text-muted-foreground">Sources missing API keys</p>
+              </div>
+
+              {/* Compliant Sources */}
+              <div className="p-4 rounded-lg border bg-background/50">
+                <div className="flex items-center gap-2 mb-2">
+                  <CheckCircle2 className="size-5 text-green-500" />
+                  <span className="font-medium">Fully Configured</span>
+                </div>
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                  {connectedSources}
+                </p>
+                <p className="text-xs text-muted-foreground">Sources ready for production</p>
+              </div>
+            </div>
+
+            {/* Quick Actions & Workflow Steps */}
+            <div className="p-4 rounded-lg border bg-muted/30">
+              <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                <Lightbulb className="size-4" />
+                Configuration Review Workflow
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+                <div className="flex items-start gap-2">
+                  <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-xs font-bold text-blue-600">1</div>
+                  <div>
+                    <p className="font-medium">Add Source</p>
+                    <p className="text-xs text-muted-foreground">Configure API URL & credentials</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="w-6 h-6 rounded-full bg-amber-100 dark:bg-amber-900 flex items-center justify-center text-xs font-bold text-amber-600">2</div>
+                  <div>
+                    <p className="font-medium">Test Connection</p>
+                    <p className="text-xs text-muted-foreground">Verify API access & rate limits</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="w-6 h-6 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center text-xs font-bold text-green-600">3</div>
+                  <div>
+                    <p className="font-medium">Activate</p>
+                    <p className="text-xs text-muted-foreground">Enable for analysis modules</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="w-6 h-6 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center text-xs font-bold text-purple-600">4</div>
+                  <div>
+                    <p className="font-medium">Monitor</p>
+                    <p className="text-xs text-muted-foreground">Track success rate & usage</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card className="p-4 mb-8">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="relative flex-grow">

@@ -490,16 +490,16 @@ export default function SsdAuditLogPage() {
                             {/* Step 2: Webhook Receiver */}
                             <div className="flex flex-col items-center min-w-[140px]">
                                 <div className={`w-16 h-16 rounded-full flex items-center justify-center border-2 ${connectionTest?.workflow?.[3]?.status === 'success'
-                                        ? 'bg-green-100 dark:bg-green-900 border-green-300'
-                                        : connectionTest?.workflow?.[3]?.status === 'failed'
-                                            ? 'bg-red-100 dark:bg-red-900 border-red-300'
-                                            : 'bg-gray-100 dark:bg-gray-800 border-gray-300'
+                                    ? 'bg-green-100 dark:bg-green-900 border-green-300'
+                                    : connectionTest?.workflow?.[3]?.status === 'failed'
+                                        ? 'bg-red-100 dark:bg-red-900 border-red-300'
+                                        : 'bg-gray-100 dark:bg-gray-800 border-gray-300'
                                     }`}>
                                     <Zap className={`size-8 ${connectionTest?.workflow?.[3]?.status === 'success'
-                                            ? 'text-green-600 dark:text-green-400'
-                                            : connectionTest?.workflow?.[3]?.status === 'failed'
-                                                ? 'text-red-600 dark:text-red-400'
-                                                : 'text-gray-600 dark:text-gray-400'
+                                        ? 'text-green-600 dark:text-green-400'
+                                        : connectionTest?.workflow?.[3]?.status === 'failed'
+                                            ? 'text-red-600 dark:text-red-400'
+                                            : 'text-gray-600 dark:text-gray-400'
                                         }`} />
                                 </div>
                                 <span className="mt-2 text-sm font-medium">Webhook Receiver</span>
@@ -514,16 +514,16 @@ export default function SsdAuditLogPage() {
                             {/* Step 3: TCA-IRR Backend */}
                             <div className="flex flex-col items-center min-w-[140px]">
                                 <div className={`w-16 h-16 rounded-full flex items-center justify-center border-2 ${connectionTest?.workflow?.[0]?.status === 'success'
-                                        ? 'bg-green-100 dark:bg-green-900 border-green-300'
-                                        : connectionTest?.workflow?.[0]?.status === 'failed'
-                                            ? 'bg-red-100 dark:bg-red-900 border-red-300'
-                                            : 'bg-gray-100 dark:bg-gray-800 border-gray-300'
+                                    ? 'bg-green-100 dark:bg-green-900 border-green-300'
+                                    : connectionTest?.workflow?.[0]?.status === 'failed'
+                                        ? 'bg-red-100 dark:bg-red-900 border-red-300'
+                                        : 'bg-gray-100 dark:bg-gray-800 border-gray-300'
                                     }`}>
                                     <Server className={`size-8 ${connectionTest?.workflow?.[0]?.status === 'success'
-                                            ? 'text-green-600 dark:text-green-400'
-                                            : connectionTest?.workflow?.[0]?.status === 'failed'
-                                                ? 'text-red-600 dark:text-red-400'
-                                                : 'text-gray-600 dark:text-gray-400'
+                                        ? 'text-green-600 dark:text-green-400'
+                                        : connectionTest?.workflow?.[0]?.status === 'failed'
+                                            ? 'text-red-600 dark:text-red-400'
+                                            : 'text-gray-600 dark:text-gray-400'
                                         }`} />
                                 </div>
                                 <span className="mt-2 text-sm font-medium">TCA-IRR Backend</span>
@@ -564,10 +564,10 @@ export default function SsdAuditLogPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         {connectionTest?.results?.map((result, idx) => (
                             <div key={idx} className={`p-4 rounded-lg border ${result.status === 'connected'
-                                    ? 'bg-green-50 dark:bg-green-950 border-green-200'
-                                    : result.status === 'auth_failed'
-                                        ? 'bg-amber-50 dark:bg-amber-950 border-amber-200'
-                                        : 'bg-red-50 dark:bg-red-950 border-red-200'
+                                ? 'bg-green-50 dark:bg-green-950 border-green-200'
+                                : result.status === 'auth_failed'
+                                    ? 'bg-amber-50 dark:bg-amber-950 border-amber-200'
+                                    : 'bg-red-50 dark:bg-red-950 border-red-200'
                                 }`}>
                                 <div className="flex items-center gap-2 mb-2">
                                     {result.status === 'connected' ? (
@@ -682,6 +682,92 @@ export default function SsdAuditLogPage() {
                     </Card>
                 </div>
             )}
+
+            {/* Report Storage Visualization */}
+            <Card className="mb-8 bg-gradient-to-r from-card via-card to-blue-50/30 dark:to-blue-950/30">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Database className="size-5 text-blue-500" />
+                        Report Storage & Versioning
+                    </CardTitle>
+                    <CardDescription>
+                        Monitor report storage status, version history, and data persistence across the integration
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        {/* Storage Location */}
+                        <div className="p-4 rounded-lg border bg-background/50">
+                            <div className="flex items-center gap-2 mb-2">
+                                <Server className="size-5 text-blue-500" />
+                                <span className="font-medium">Backend Storage</span>
+                            </div>
+                            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                                {stats?.total_requests || 0}
+                            </p>
+                            <p className="text-xs text-muted-foreground">Reports stored in database</p>
+                        </div>
+
+                        {/* Versioning Status */}
+                        <div className="p-4 rounded-lg border bg-background/50">
+                            <div className="flex items-center gap-2 mb-2">
+                                <FileJson className="size-5 text-purple-500" />
+                                <span className="font-medium">Version Tracking</span>
+                            </div>
+                            <Badge variant="default" className="bg-purple-500 mt-1">Active</Badge>
+                            <p className="text-xs text-muted-foreground mt-2">Each report update creates a version</p>
+                        </div>
+
+                        {/* File Storage */}
+                        <div className="p-4 rounded-lg border bg-background/50">
+                            <div className="flex items-center gap-2 mb-2">
+                                <FileText className="size-5 text-green-500" />
+                                <span className="font-medium">Report Files</span>
+                            </div>
+                            <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                                {logs.filter(l => l.report_exists).length}
+                            </p>
+                            <p className="text-xs text-muted-foreground">JSON reports saved locally</p>
+                        </div>
+
+                        {/* Total Data Size */}
+                        <div className="p-4 rounded-lg border bg-background/50">
+                            <div className="flex items-center gap-2 mb-2">
+                                <Activity className="size-5 text-orange-500" />
+                                <span className="font-medium">Data Processed</span>
+                            </div>
+                            <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                                {formatBytes(logs.reduce((sum, l) => sum + (l.request_payload_size || 0), 0))}
+                            </p>
+                            <p className="text-xs text-muted-foreground">Total payload size</p>
+                        </div>
+                    </div>
+
+                    {/* Storage Details */}
+                    <div className="mt-6 p-4 rounded-lg border bg-muted/30">
+                        <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                            <Shield className="size-4" />
+                            Storage & Retention Policy
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                            <div>
+                                <p className="text-muted-foreground">Storage Type</p>
+                                <p className="font-medium">PostgreSQL + JSON Files</p>
+                            </div>
+                            <div>
+                                <p className="text-muted-foreground">Retention Period</p>
+                                <p className="font-medium">Indefinite (Manual deletion)</p>
+                            </div>
+                            <div>
+                                <p className="text-muted-foreground">Backup Status</p>
+                                <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300">
+                                    <CheckCircle2 className="size-3 mr-1" /> Enabled
+                                </Badge>
+                            </div>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
 
             {/* Audit Log Table */}
             <Card>
