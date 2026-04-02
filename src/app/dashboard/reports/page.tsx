@@ -16,6 +16,13 @@ import {
   FileUp,
   History,
   Loader2,
+  Database,
+  CloudOff,
+  Cloud,
+  HardDrive,
+  CheckCircle2,
+  Clock,
+  GitBranch,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -80,15 +87,22 @@ function getLocalStorageReports(): Report[] {
     const reports: LocalStoredReport[] = JSON.parse(stored);
     console.log('Parsed localStorage reports:', reports.length, 'reports');
     const mappedReports = reports.map((r, index) => {
+      // Normalize score: if < 1, it was incorrectly divided by 10 before (legacy bug)
+      let score = r.metadata?.compositeScore || 0;
+      if (score > 0 && score < 1) {
+        score = score * 10; // Fix legacy data that was divided by 10
+      }
+      score = Math.round(score * 100) / 100; // Round to 2 decimals
+
       const mapped = {
         id: r.id || `local-${index}`,
         company: r.companyName || 'Unnamed Company',
         type: r.reportType === 'dd' ? 'Due Diligence' : 'Triage',
         status: r.metadata?.status === 'completed' ? 'Completed' : 'Draft',
         approval: 'Pending',
-        score: r.metadata?.compositeScore || 0,
+        score: score,
         confidence: Math.round((r.metadata?.moduleCount || 0) / 9 * 100),
-        recommendation: r.metadata?.compositeScore >= 8 ? 'Recommend' : r.metadata?.compositeScore >= 6 ? 'Hold' : 'Conditional',
+        recommendation: score >= 8 ? 'Recommend' : score >= 6 ? 'Hold' : 'Conditional',
         user: { name: 'Local User', email: localStorage.getItem('userEmail') || 'user@tca.com' },
         createdAt: r.createdAt ? new Date(r.createdAt).toLocaleDateString() : new Date().toLocaleDateString(),
         missingSections: undefined,
@@ -226,7 +240,7 @@ const approvalStatusColors: { [key: string]: string } = {
 };
 
 
-const ReportCard = ({ report, isPrivileged }: { report: Report; isPrivileged: boolean }) => {
+const ReportCard = ({ report, isPrivileged, onViewVersions }: { report: Report; isPrivileged: boolean; onViewVersions?: () => void }) => {
   return (
     <Card className="overflow-hidden">
       <div className="p-6 grid grid-cols-1 md:grid-cols-6 lg:grid-cols-8 items-center gap-4">
@@ -286,6 +300,11 @@ const ReportCard = ({ report, isPrivileged }: { report: Report; isPrivileged: bo
           <Button asChild variant="default" className='justify-start'>
             <Link href="/analysis/result"><Eye className="mr-2" /> View Report</Link>
           </Button>
+          {isPrivileged && typeof report.id === 'number' && onViewVersions && (
+            <Button variant="outline" className='justify-start' onClick={onViewVersions}>
+              <History className="mr-2 size-4" /> Version History
+            </Button>
+          )}
           <div className='w-full'>
             <ExportButtons />
           </div>
@@ -305,6 +324,37 @@ export default function ReportsPage() {
   const [typeFilter, setTypeFilter] = useState<string>('');
   const { toast } = useToast();
 
+  // Storage status state
+  const [localStorageCount, setLocalStorageCount] = useState(0);
+  const [pendingSyncCount, setPendingSyncCount] = useState(0);
+  const [backendConnected, setBackendConnected] = useState(false);
+  const [showVersionsDialog, setShowVersionsDialog] = useState(false);
+  const [selectedReportVersions, setSelectedReportVersions] = useState<ReportVersion[]>([]);
+  const [selectedReportName, setSelectedReportName] = useState('');
+  const [loadingVersions, setLoadingVersions] = useState(false);
+
+  // Function to fetch and display version history for a report
+  const viewReportVersions = useCallback(async (reportId: number, companyName: string) => {
+    setSelectedReportName(companyName);
+    setShowVersionsDialog(true);
+    setLoadingVersions(true);
+
+    try {
+      const versions = await reportsApi.getReportVersions(reportId);
+      setSelectedReportVersions(versions);
+    } catch (error) {
+      console.error('Error fetching versions:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to load version history. The report may not have any saved versions yet.',
+      });
+      setSelectedReportVersions([]);
+    } finally {
+      setLoadingVersions(false);
+    }
+  }, [toast]);
+
   const loadReports = useCallback(async () => {
     setLoading(true);
     console.log('loadReports() called');
@@ -313,8 +363,21 @@ export default function ReportsPage() {
       const localReports = getLocalStorageReports();
       console.log('Local reports loaded:', localReports.length);
 
+      // Update local storage count
+      setLocalStorageCount(localReports.length);
+
+      // Check pending sync queue
+      try {
+        const pendingQueue = localStorage.getItem('pending_report_sync');
+        const pendingCount = pendingQueue ? JSON.parse(pendingQueue).length : 0;
+        setPendingSyncCount(pendingCount);
+      } catch {
+        setPendingSyncCount(0);
+      }
+
       // Try to get API reports
       let apiReports: Report[] = [];
+      let apiConnected = false;
       try {
         const response = await reportsApi.getReports({
           search: searchQuery || undefined,
@@ -322,6 +385,7 @@ export default function ReportsPage() {
           report_type: typeFilter || undefined,
         });
         console.log('API reports loaded:', response.length);
+        apiConnected = true;
         // Map API response to local Report type
         apiReports = response.map((r: ReportData) => ({
           id: r.id,
@@ -338,7 +402,11 @@ export default function ReportsPage() {
         }));
       } catch (apiError) {
         console.warn('API unavailable, using localStorage only:', apiError);
+        apiConnected = false;
       }
+
+      // Update backend connection status
+      setBackendConnected(apiConnected);
 
       // Merge reports: localStorage first, then API
       // Use a Set to track unique company names to avoid duplicates
@@ -542,6 +610,90 @@ export default function ReportsPage() {
           </div>
         )}
 
+        {/* Report Storage & Versioning Status */}
+        {isPrivilegedUser && (
+          <Card className="mb-8 bg-gradient-to-r from-card to-muted/50">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Database className="size-5" />
+                Report Storage & Sync Status
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {/* Local Storage */}
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-background/50">
+                  <HardDrive className="size-8 text-blue-500" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Local Storage</p>
+                    <p className="text-xl font-bold">{localStorageCount} reports</p>
+                  </div>
+                </div>
+
+                {/* Backend Connection */}
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-background/50">
+                  {backendConnected ? (
+                    <Cloud className="size-8 text-green-500" />
+                  ) : (
+                    <CloudOff className="size-8 text-red-500" />
+                  )}
+                  <div>
+                    <p className="text-sm text-muted-foreground">Backend API</p>
+                    <p className={`text-xl font-bold ${backendConnected ? 'text-green-500' : 'text-red-500'}`}>
+                      {backendConnected ? 'Connected' : 'Offline'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Pending Sync */}
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-background/50">
+                  {pendingSyncCount > 0 ? (
+                    <Clock className="size-8 text-yellow-500" />
+                  ) : (
+                    <CheckCircle2 className="size-8 text-green-500" />
+                  )}
+                  <div>
+                    <p className="text-sm text-muted-foreground">Pending Sync</p>
+                    <p className={`text-xl font-bold ${pendingSyncCount > 0 ? 'text-yellow-500' : 'text-green-500'}`}>
+                      {pendingSyncCount > 0 ? `${pendingSyncCount} pending` : 'All synced'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Version History */}
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-background/50">
+                  <GitBranch className="size-8 text-purple-500" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Versioning</p>
+                    <Button
+                      variant="link"
+                      className="p-0 h-auto text-xl font-bold text-purple-500"
+                      onClick={() => {
+                        toast({
+                          title: "Version History",
+                          description: "Select a report below to view its version history.",
+                        });
+                      }}
+                    >
+                      View History
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sync warning */}
+              {pendingSyncCount > 0 && (
+                <div className="mt-4 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 flex items-center gap-2">
+                  <AlertTriangle className="size-5 text-yellow-500" />
+                  <span className="text-sm text-yellow-600 dark:text-yellow-400">
+                    {pendingSyncCount} report(s) waiting to sync. They will be uploaded when backend connection is restored.
+                  </span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         <Tabs defaultValue={isPrivilegedUser ? "all" : "my-reports"}>
           <div className="flex flex-col md:flex-row gap-4 justify-between items-center mb-4">
             <TabsList>
@@ -602,7 +754,14 @@ export default function ReportsPage() {
           ) : (
             <>
               <TabsContent value="all" className="space-y-4">
-                {reportsForUser.length > 0 ? reportsForUser.map(report => <ReportCard key={report.id} report={report} isPrivileged={isPrivilegedUser} />) : (
+                {reportsForUser.length > 0 ? reportsForUser.map(report => (
+                  <ReportCard
+                    key={report.id}
+                    report={report}
+                    isPrivileged={isPrivilegedUser}
+                    onViewVersions={typeof report.id === 'number' ? () => viewReportVersions(report.id as number, report.company) : undefined}
+                  />
+                )) : (
                   <Card className="p-8 text-center">
                     <p className="text-muted-foreground mb-4">No reports found. Start by creating a new analysis.</p>
                     <div className="flex gap-2 justify-center">
@@ -614,7 +773,14 @@ export default function ReportsPage() {
               </TabsContent>
               <TabsContent value="due-diligence" className="space-y-4">
                 {allReports.filter(r => r.type === 'Due Diligence').length > 0
-                  ? allReports.filter(r => r.type === 'Due Diligence').map(report => <ReportCard key={report.id} report={report} isPrivileged={isPrivilegedUser} />)
+                  ? allReports.filter(r => r.type === 'Due Diligence').map(report => (
+                    <ReportCard
+                      key={report.id}
+                      report={report}
+                      isPrivileged={isPrivilegedUser}
+                      onViewVersions={typeof report.id === 'number' ? () => viewReportVersions(report.id as number, report.company) : undefined}
+                    />
+                  ))
                   : (
                     <Card className="p-8 text-center">
                       <div className="flex flex-col items-center gap-4">
@@ -633,10 +799,24 @@ export default function ReportsPage() {
                   )}
               </TabsContent>
               <TabsContent value="pending" className="space-y-4">
-                {pendingReports.length > 0 ? pendingReports.map(report => <ReportCard key={report.id} report={report} isPrivileged={isPrivilegedUser} />) : <p className="text-center text-muted-foreground py-10">No reports are pending approval.</p>}
+                {pendingReports.length > 0 ? pendingReports.map(report => (
+                  <ReportCard
+                    key={report.id}
+                    report={report}
+                    isPrivileged={isPrivilegedUser}
+                    onViewVersions={typeof report.id === 'number' ? () => viewReportVersions(report.id as number, report.company) : undefined}
+                  />
+                )) : <p className="text-center text-muted-foreground py-10">No reports are pending approval.</p>}
               </TabsContent>
               <TabsContent value="my-reports" className="space-y-4">
-                {myReports.length > 0 ? myReports.map(report => <ReportCard key={report.id} report={report} isPrivileged={isPrivilegedUser} />) : (
+                {myReports.length > 0 ? myReports.map(report => (
+                  <ReportCard
+                    key={report.id}
+                    report={report}
+                    isPrivileged={isPrivilegedUser}
+                    onViewVersions={typeof report.id === 'number' ? () => viewReportVersions(report.id as number, report.company) : undefined}
+                  />
+                )) : (
                   <Card className="p-8 text-center">
                     <p className="text-muted-foreground mb-4">You have not created any reports yet.</p>
                     <Button asChild><Link href="/analysis">Create Your First Report</Link></Button>
@@ -647,6 +827,75 @@ export default function ReportsPage() {
           )}
         </Tabs>
       </div>
+
+      {/* Version History Dialog */}
+      <Dialog open={showVersionsDialog} onOpenChange={setShowVersionsDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="size-5" />
+              Version History: {selectedReportName}
+            </DialogTitle>
+            <DialogDescription>
+              View all saved versions of this report with score changes and modification reasons.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto">
+            {loadingVersions ? (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 className="size-6 animate-spin text-primary" />
+                <span className="ml-2 text-muted-foreground">Loading versions...</span>
+              </div>
+            ) : selectedReportVersions.length > 0 ? (
+              <div className="space-y-4">
+                {selectedReportVersions.map((version, index) => (
+                  <Card key={version.id} className={index === 0 ? 'border-primary' : ''}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <Badge variant={index === 0 ? 'default' : 'outline'}>
+                            v{version.version_number}
+                          </Badge>
+                          {index === 0 && <Badge variant="success">Current</Badge>}
+                        </div>
+                        <span className="text-sm text-muted-foreground">
+                          {new Date(version.created_at).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-4 text-sm">
+                        <div>
+                          <p className="text-muted-foreground">Score</p>
+                          <p className="font-bold text-primary">{version.overall_score?.toFixed(2) || 'N/A'}/10</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">TCA Score</p>
+                          <p className="font-bold">{version.tca_score?.toFixed(2) || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Confidence</p>
+                          <p className="font-bold">{version.confidence || 'N/A'}%</p>
+                        </div>
+                      </div>
+                      {version.change_reason && (
+                        <div className="mt-3 p-2 rounded bg-muted/50">
+                          <p className="text-xs text-muted-foreground">Change Reason:</p>
+                          <p className="text-sm">{version.change_reason}</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-10 text-muted-foreground">
+                <History className="size-12 mx-auto mb-4 opacity-50" />
+                <p>No version history available for this report.</p>
+                <p className="text-sm mt-2">Versions are created when reports are updated in the backend.</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }
