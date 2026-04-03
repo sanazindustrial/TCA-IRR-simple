@@ -16,9 +16,22 @@ import { ChevronLeft, ChevronRight, Check, Lock, FileText, Database, Settings, P
 import { cn } from '@/lib/utils';
 import { trackingService } from '@/lib/tracking-service';
 import { startFreshEvaluation, clearEvaluationState, archiveCurrentEvaluation } from '@/lib/auto-extraction-service';
+import { User, Building2, Trash2, AlertTriangle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export type UserRole = 'user' | 'admin' | 'analyst';
 export type ReportType = 'triage' | 'dd';
+
+// Session data interface
+interface UserSession {
+    userId: string;
+    email: string;
+    name: string;
+    role: UserRole;
+    companyActive?: string;
+    sessionStart: number;
+    lastActivity: number;
+}
 
 // Autosave storage key
 const AUTOSAVE_KEY = 'evaluation_autosave';
@@ -197,6 +210,7 @@ function WorkflowProgress({ currentStep, steps, workflowData, onStepClick }: {
 
 function AnalysisSetup({
     onClearAllData,
+    onShowClearConfirm,
     onExtractFromDocuments,
     isExtracting,
     extractionComplete,
@@ -206,6 +220,7 @@ function AnalysisSetup({
     workflowData
 }: {
     onClearAllData: () => void;
+    onShowClearConfirm: () => void;
     onExtractFromDocuments: () => void;
     isExtracting: boolean;
     extractionComplete: boolean;
@@ -434,7 +449,8 @@ function AnalysisSetup({
                         Back
                     </Button>
                     {hasData && (
-                        <Button variant="ghost" onClick={onClearAllData}>
+                        <Button variant="ghost" onClick={onShowClearConfirm} className="text-destructive hover:text-destructive">
+                            <Trash2 className="h-4 w-4 mr-1" />
                             Clear All Data
                         </Button>
                     )}
@@ -496,7 +512,50 @@ export default function EvaluationPage() {
         hasModuleConfig: true, // Modules have default config
     };
 
-    // Start fresh evaluation - clears all previous data
+    // User session state
+    const [userSession, setUserSession] = useState<UserSession | null>(null);
+    const [showClearConfirm, setShowClearConfirm] = useState(false);
+
+    // Load user session on mount
+    useEffect(() => {
+        const loadUserSession = () => {
+            const storedUser = localStorage.getItem('loggedInUser');
+            if (storedUser) {
+                try {
+                    const user = JSON.parse(storedUser);
+                    setUserSession({
+                        userId: user.id || user.userId || 'unknown',
+                        email: user.email || 'Not logged in',
+                        name: user.name || user.email?.split('@')[0] || 'User',
+                        role: (user.role?.toLowerCase() || 'user') as UserRole,
+                        companyActive: companyInfo.companyName || undefined,
+                        sessionStart: Date.now(),
+                        lastActivity: Date.now(),
+                    });
+                    setRole(user.role?.toLowerCase() || 'user');
+                } catch (e) {
+                    console.warn('Failed to parse user session:', e);
+                    setRole('user');
+                }
+            } else {
+                setRole('user');
+            }
+        };
+        loadUserSession();
+    }, []);
+
+    // Update session activity and company
+    useEffect(() => {
+        if (userSession && companyInfo.companyName) {
+            setUserSession(prev => prev ? {
+                ...prev,
+                companyActive: companyInfo.companyName,
+                lastActivity: Date.now(),
+            } : null);
+        }
+    }, [companyInfo.companyName]);
+
+    // Start fresh evaluation - clears all previous data COMPLETELY
     const startNewEvaluation = useCallback(() => {
         // Archive current evaluation if it has data
         archiveCurrentEvaluation();
@@ -522,13 +581,39 @@ export default function EvaluationPage() {
         setIsExtracting(false);
         setCurrentStep(1);
         setFramework('general');
+        setReportType('triage');
         autoExtractionTriggered.current = false;
 
         // Initialize tracking service
-        trackingService.initializeNewEvaluation(framework);
+        trackingService.initializeNewEvaluation('general');
 
-        // Clear localStorage
-        localStorage.removeItem(AUTOSAVE_KEY);
+        // CLEAR ALL localStorage keys related to evaluation/analysis
+        const keysToRemove = [
+            AUTOSAVE_KEY,
+            'processedFiles',
+            'processedUrls',
+            'processedTexts',
+            'analysisResult',
+            'analysisDuration',
+            'analysisFramework',
+            'analysisEvaluationId',
+            'analysisCompanyId',
+            'analysisCompanyName',
+            'currentEvaluationId',
+            'currentCompanyId',
+            'evaluationArchive',
+            'tca_analysis_state',
+        ];
+        keysToRemove.forEach(key => {
+            try {
+                localStorage.removeItem(key);
+            } catch (e) {
+                console.warn(`Failed to remove ${key}:`, e);
+            }
+        });
+
+        // Hide clear confirmation
+        setShowClearConfirm(false);
 
         toast({
             title: 'New Evaluation Started',
@@ -859,7 +944,7 @@ export default function EvaluationPage() {
             localStorage.setItem('analysisEvaluationId', evaluationId);
             localStorage.setItem('analysisCompanyId', companyId);
             localStorage.setItem('analysisCompanyName', companyInfo.companyName);
-            
+
             // Update tracking service
             trackingService.updateEvaluation(evaluationId, {
                 status: 'completed',
@@ -889,12 +974,12 @@ export default function EvaluationPage() {
 
         } catch (error) {
             console.error('Failed to run analysis:', error);
-            
+
             // Track failure
             trackingService.updateEvaluation(evaluationId, {
                 status: 'failed',
             });
-            
+
             toast({
                 variant: 'destructive',
                 title: 'Analysis Failed',
@@ -937,6 +1022,57 @@ export default function EvaluationPage() {
         >
             <main className="bg-background text-foreground">
                 <div className="container mx-auto p-4 md:p-8">
+                    {/* User Session & Company Info Bar */}
+                    <div className="mb-6 p-4 bg-muted/50 rounded-lg border">
+                        <div className="flex flex-wrap items-center justify-between gap-4">
+                            <div className="flex items-center gap-6">
+                                <div className="flex items-center gap-2">
+                                    <User className="h-4 w-4 text-muted-foreground" />
+                                    <span className="text-sm">
+                                        <span className="text-muted-foreground">User: </span>
+                                        <span className="font-medium">{userSession?.email || 'Not logged in'}</span>
+                                    </span>
+                                    <span className="px-2 py-0.5 text-xs rounded-full bg-primary/10 text-primary capitalize">
+                                        {userSession?.role || role}
+                                    </span>
+                                </div>
+                                {companyInfo.companyName && (
+                                    <div className="flex items-center gap-2">
+                                        <Building2 className="h-4 w-4 text-muted-foreground" />
+                                        <span className="text-sm">
+                                            <span className="text-muted-foreground">Active Company: </span>
+                                            <span className="font-medium text-primary">{companyInfo.companyName}</span>
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                                Session ID: {evaluationId}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Clear Data Confirmation Alert */}
+                    {showClearConfirm && (
+                        <Alert className="mb-6 border-yellow-500 bg-yellow-50 dark:bg-yellow-950">
+                            <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                            <AlertDescription className="flex items-center justify-between">
+                                <span className="text-yellow-700 dark:text-yellow-300">
+                                    Are you sure you want to clear ALL data? This action cannot be undone.
+                                </span>
+                                <div className="flex gap-2 ml-4">
+                                    <Button size="sm" variant="outline" onClick={() => setShowClearConfirm(false)}>
+                                        Cancel
+                                    </Button>
+                                    <Button size="sm" variant="destructive" onClick={startNewEvaluation}>
+                                        <Trash2 className="h-4 w-4 mr-1" />
+                                        Clear All & Start Fresh
+                                    </Button>
+                                </div>
+                            </AlertDescription>
+                        </Alert>
+                    )}
+
                     <header className="text-center mb-12">
                         {(role === 'admin' || role === 'analyst') && (
                             <div className="flex justify-center items-center gap-4 mb-4">
@@ -965,8 +1101,8 @@ export default function EvaluationPage() {
                         </p>
                         {/* New Evaluation Button */}
                         <div className="mt-4">
-                            <Button 
-                                variant="outline" 
+                            <Button
+                                variant="outline"
                                 onClick={startNewEvaluation}
                                 className="gap-2"
                             >
@@ -985,6 +1121,7 @@ export default function EvaluationPage() {
                         </div>
                     ) : <AnalysisSetup
                         onClearAllData={clearAllData}
+                        onShowClearConfirm={() => setShowClearConfirm(true)}
                         onExtractFromDocuments={handleExtractFromDocuments}
                         isExtracting={isExtracting}
                         extractionComplete={extractionComplete}
