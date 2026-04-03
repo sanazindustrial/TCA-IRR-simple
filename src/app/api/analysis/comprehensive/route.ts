@@ -2,7 +2,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { ComprehensiveAnalysisOutput } from '@/ai/flows/schemas';
 
-const BACKEND_API_URL = process.env.BACKEND_API_URL || 'http://127.0.0.1:8000/api';
+// Use the correct production API URL - check multiple env vars for compatibility
+const BACKEND_API_URL = process.env.API_URL || process.env.BACKEND_URL || process.env.BACKEND_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
+const API_VERSION = '/api/v1';
 
 // GET - Return API information and status
 export async function GET() {
@@ -108,7 +110,7 @@ export async function POST(request: NextRequest) {
 
         console.log('API Route: Making request to backend...');
 
-        const response = await fetch(`${BACKEND_API_URL}/analysis/comprehensive`, {
+        const response = await fetch(`${BACKEND_API_URL}${API_VERSION}/analysis/comprehensive`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

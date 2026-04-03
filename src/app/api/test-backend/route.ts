@@ -3,16 +3,17 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // Use environment variable or fallback to production API
 const BACKEND_API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
+const API_VERSION = '/api/v1';
 
 export async function GET() {
     try {
-        console.log(`Testing backend connectivity: ${BACKEND_API_URL}/api/health`);
+        console.log(`Testing backend connectivity: ${BACKEND_API_URL}${API_VERSION}/health`);
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
         try {
-            const response = await fetch(`${BACKEND_API_URL}/api/health`, {
+            const response = await fetch(`${BACKEND_API_URL}${API_VERSION}/health`, {
                 method: 'GET',
                 signal: controller.signal,
             });
@@ -60,7 +61,7 @@ export async function GET() {
 
 export async function POST() {
     try {
-        console.log(`Testing comprehensive analysis: ${BACKEND_API_URL}/api/analysis/comprehensive`);
+        console.log(`Testing comprehensive analysis: ${BACKEND_API_URL}${API_VERSION}/analysis/comprehensive`);
 
         const payload = {
             framework: 'general',
@@ -71,7 +72,7 @@ export async function POST() {
         const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout for analysis
 
         try {
-            const response = await fetch(`${BACKEND_API_URL}/api/analysis/comprehensive`, {
+            const response = await fetch(`${BACKEND_API_URL}${API_VERSION}/analysis/comprehensive`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
