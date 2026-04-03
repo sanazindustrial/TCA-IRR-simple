@@ -691,23 +691,48 @@ export default function EvaluationPage() {
                     numberOfEmployees: extractedData.number_of_employees || companyInfo.numberOfEmployees,
                 });
 
+                // Generate company ID based on extracted name
+                if (extractedData.company_name) {
+                    const newCompanyId = generateCompanyId(extractedData.company_name);
+                    setCompanyId(newCompanyId);
+                }
+
                 toast({
                     title: 'Extraction Complete!',
                     description: 'Company information has been extracted. Please review and confirm the details.',
                 });
             } else {
-                // Fallback: Extract basic info from content using patterns
+                // Robust fallback: Extract as much info as possible from content using patterns
                 const extractedName = extractNameFromContent(allContent);
                 const extractedDescription = extractDescriptionFromContent(allContent);
+                const extractedWebsite = extractWebsiteFromContent(allContent);
+                const extractedIndustry = extractIndustryFromContent(allContent);
+                const extractedStage = extractStageFromContent(allContent);
 
-                updateCompanyInfo({
-                    companyName: extractedName || companyInfo.companyName,
-                    companyDescription: extractedDescription || companyInfo.companyDescription,
-                });
+                // Update all fields that we could extract
+                const updates: Partial<CompanyInformationData> = {};
+                if (extractedName && !companyInfo.companyName) updates.companyName = extractedName;
+                if (extractedDescription && !companyInfo.companyDescription) updates.companyDescription = extractedDescription;
+                if (extractedWebsite && !companyInfo.website) updates.website = extractedWebsite;
+                if (extractedIndustry && !companyInfo.industryVertical) updates.industryVertical = extractedIndustry;
+                if (extractedStage && !companyInfo.developmentStage) updates.developmentStage = extractedStage;
 
+                if (Object.keys(updates).length > 0) {
+                    updateCompanyInfo(updates);
+
+                    // Generate company ID if we found a name
+                    if (updates.companyName) {
+                        const newCompanyId = generateCompanyId(updates.companyName);
+                        setCompanyId(newCompanyId);
+                    }
+                }
+
+                const fieldsExtracted = Object.keys(updates).length;
                 toast({
-                    title: 'Basic Extraction Complete',
-                    description: 'Some information was extracted. Please review and complete missing fields.',
+                    title: fieldsExtracted > 0 ? 'Extraction Complete' : 'Manual Entry Required',
+                    description: fieldsExtracted > 0
+                        ? `Extracted ${fieldsExtracted} field(s). Please review and complete any missing information.`
+                        : 'Could not identify company information automatically. Please enter details manually.',
                 });
             }
 
@@ -724,27 +749,46 @@ export default function EvaluationPage() {
         }
     };
 
-    // Helper functions for basic extraction fallback
+    // Helper functions for robust extraction fallback
     const extractNameFromContent = (content: string): string => {
-        // Look for common patterns
+        // Look for common patterns - expanded to handle more cases
         const patterns = [
-            /company[:\s]+([A-Z][A-Za-z0-9\s&]+)/i,
-            /^([A-Z][A-Za-z0-9\s&]+)\s*[-–—]\s*(pitch|deck|presentation)/im,
-            /about\s+([A-Z][A-Za-z0-9\s&]+)/i,
+            // Direct company mentions
+            /(?:company\s*(?:name)?[:\s]+)([A-Z][A-Za-z0-9\s&.,]+?)(?:\s*[-–—|,]|$)/im,
+            // Pitch deck title patterns
+            /^([A-Z][A-Za-z0-9\s&]+?)\s*[-–—|]\s*(?:pitch|deck|presentation|investor)/im,
+            // About section
+            /(?:about|introducing|introducing)\s+([A-Z][A-Za-z0-9\s&]+?)(?:\s*[-–—.,]|$)/im,
+            // Header/Title patterns
+            /^#\s*([A-Z][A-Za-z0-9\s&]+)$/m,
+            // Logo/Company header
+            /(?:welcome to|meet|discover)\s+([A-Z][A-Za-z0-9\s&]+)/i,
+            // Legal patterns
+            /(?:inc\.|llc|corp\.|ltd\.?)\s*$/im,
+            // First line if capitalized
+            /^([A-Z][A-Z0-9\s]{2,30})$/m,
         ];
         for (const pattern of patterns) {
             const match = content.match(pattern);
-            if (match?.[1]) return match[1].trim().slice(0, 100);
+            if (match?.[1] || match?.[0]) {
+                const name = (match[1] || match[0]).trim().replace(/\s+/g, ' ').slice(0, 100);
+                if (name.length > 2 && !name.toLowerCase().includes('pitch') && !name.toLowerCase().includes('deck')) {
+                    return name;
+                }
+            }
         }
         return '';
     };
 
     const extractDescriptionFromContent = (content: string): string => {
-        // Look for description patterns
+        // Look for description patterns - expanded
         const patterns = [
-            /(?:we are|is a|company that)\s+([^.]+\.)/i,
-            /(?:our mission|mission:)\s+([^.]+\.)/i,
-            /(?:what we do|overview:)\s+([^.]+\.)/i,
+            /(?:we\s+are|is\s+a|company\s+that)\s+([^.!?]+[.!?])/i,
+            /(?:our\s+mission|mission[:\s]+)([^.!?]+[.!?])/i,
+            /(?:what\s+we\s+do|overview[:\s]+)([^.!?]+[.!?])/i,
+            /(?:executive\s+summary[:\s]+)([^.!?]+[.!?])/i,
+            /(?:company\s+description[:\s]+)([^.!?]+[.!?])/i,
+            /(?:about\s+(?:us|the\s+company)[:\s]+)([^.!?]+[.!?])/i,
         ];
         for (const pattern of patterns) {
             const match = content.match(pattern);
@@ -753,6 +797,41 @@ export default function EvaluationPage() {
         // Return first substantial paragraph
         const paragraphs = content.split(/\n\n+/).filter(p => p.length > 50 && p.length < 500);
         return paragraphs[0] || '';
+    };
+
+    // Enhanced extraction for additional fields
+    const extractWebsiteFromContent = (content: string): string => {
+        const match = content.match(/https?:\/\/(?:www\.)?([a-zA-Z0-9-]+\.[a-zA-Z]{2,})/i);
+        return match ? `https://www.${match[1]}` : '';
+    };
+
+    const extractIndustryFromContent = (content: string): string => {
+        const industries: { [key: string]: string[] } = {
+            'Software/SaaS': ['saas', 'software', 'cloud', 'api', 'platform'],
+            'FinTech': ['fintech', 'financial', 'banking', 'payment', 'lending'],
+            'HealthTech/MedTech': ['health', 'medical', 'healthcare', 'clinical', 'patient'],
+            'AI/ML': ['artificial intelligence', 'machine learning', 'ai', 'ml', 'deep learning'],
+            'E-commerce': ['ecommerce', 'e-commerce', 'retail', 'marketplace', 'shopping'],
+            'EdTech': ['education', 'learning', 'edtech', 'e-learning', 'training'],
+            'CleanTech/GreenTech': ['clean', 'green', 'sustainable', 'renewable', 'environmental'],
+            'Cybersecurity': ['security', 'cyber', 'encryption', 'privacy', 'protection'],
+        };
+        const lower = content.toLowerCase();
+        for (const [industry, keywords] of Object.entries(industries)) {
+            if (keywords.some(k => lower.includes(k))) return industry;
+        }
+        return '';
+    };
+
+    const extractStageFromContent = (content: string): string => {
+        const lower = content.toLowerCase();
+        if (lower.includes('series c') || lower.includes('series d')) return 'Series C+';
+        if (lower.includes('series b')) return 'Series B';
+        if (lower.includes('series a')) return 'Series A';
+        if (lower.includes('seed round') || lower.includes('seed funding')) return 'Seed';
+        if (lower.includes('pre-seed') || lower.includes('preseed')) return 'Pre-seed';
+        if (lower.includes('growth') || lower.includes('scaling')) return 'Growth';
+        return '';
     };
 
     // Restore autosaved data on mount

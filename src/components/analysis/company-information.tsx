@@ -91,6 +91,17 @@ const DEFAULT_COMPANY_INFO: CompanyInformationData = {
   numberOfEmployees: null,
 };
 
+// Required fields for validation
+const REQUIRED_FIELDS = [
+  'companyName',
+  'industryVertical',
+  'developmentStage',
+  'businessModel',
+  'oneLineDescription',
+  'companyDescription',
+  'productDescription',
+] as const;
+
 export function CompanyInformation({
   framework,
   onFrameworkChange,
@@ -106,9 +117,27 @@ export function CompanyInformation({
   } = useEvaluationContext();
 
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showValidation, setShowValidation] = useState(false);
 
   // Use extended company info if available, fallback to basic fields
   const currentInfo = companyInfo || DEFAULT_COMPANY_INFO;
+
+  // Validation helper
+  const isFieldEmpty = (field: keyof CompanyInformationData): boolean => {
+    const value = field === 'companyName' ? (companyName || currentInfo.companyName) :
+      field === 'companyDescription' ? (companyDescription || currentInfo.companyDescription) :
+        currentInfo[field];
+    return !value || (typeof value === 'string' && value.trim() === '');
+  };
+
+  const getMissingFields = (): string[] => {
+    return REQUIRED_FIELDS.filter(field => isFieldEmpty(field)).map(field =>
+      field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).trim()
+    );
+  };
+
+  const missingFields = getMissingFields();
+  const hasValidationErrors = missingFields.length > 0;
 
   const updateCompanyInfo = useCallback((field: keyof CompanyInformationData, value: string | number | null) => {
     if (setCompanyInfoAction) {
@@ -124,7 +153,11 @@ export function CompanyInformation({
     if (field === 'companyDescription' && setCompanyDescriptionAction) {
       setCompanyDescriptionAction(value as string);
     }
-  }, [setCompanyInfoAction, setCompanyNameAction, setCompanyDescriptionAction]);
+    // Show validation after first edit
+    if (!showValidation) {
+      setShowValidation(true);
+    }
+  }, [setCompanyInfoAction, setCompanyNameAction, setCompanyDescriptionAction, showValidation]);
 
   return (
     <Card className="shadow-lg">
@@ -136,6 +169,21 @@ export function CompanyInformation({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Validation Warning */}
+        {showValidation && hasValidationErrors && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+            <div className="flex items-center gap-2 text-amber-800">
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              <span className="font-medium">Missing Required Fields ({missingFields.length})</span>
+            </div>
+            <p className="text-amber-700 text-sm mt-2">
+              Please fill in: {missingFields.map(f => f.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())).join(', ')}
+            </p>
+          </div>
+        )}
+
         {/* Basic Information */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
@@ -147,6 +195,7 @@ export function CompanyInformation({
               onChange={(e) => {
                 updateCompanyInfo('companyName', e.target.value);
               }}
+              className={showValidation && isFieldEmpty('companyName') ? 'border-red-500 focus:border-red-500' : ''}
             />
           </div>
           <div className="space-y-2">
@@ -191,7 +240,7 @@ export function CompanyInformation({
               value={currentInfo.industryVertical || ''}
               onValueChange={(val) => updateCompanyInfo('industryVertical', val)}
             >
-              <SelectTrigger>
+              <SelectTrigger className={showValidation && isFieldEmpty('industryVertical') ? 'border-red-500' : ''}>
                 <SelectValue placeholder="Select industry" />
               </SelectTrigger>
               <SelectContent>
@@ -207,7 +256,7 @@ export function CompanyInformation({
               value={currentInfo.developmentStage || ''}
               onValueChange={(val) => updateCompanyInfo('developmentStage', val)}
             >
-              <SelectTrigger>
+              <SelectTrigger className={showValidation && isFieldEmpty('developmentStage') ? 'border-red-500' : ''}>
                 <SelectValue placeholder="Select stage" />
               </SelectTrigger>
               <SelectContent>
@@ -223,7 +272,7 @@ export function CompanyInformation({
               value={currentInfo.businessModel || ''}
               onValueChange={(val) => updateCompanyInfo('businessModel', val)}
             >
-              <SelectTrigger>
+              <SelectTrigger className={showValidation && isFieldEmpty('businessModel') ? 'border-red-500' : ''}>
                 <SelectValue placeholder="Select model" />
               </SelectTrigger>
               <SelectContent>
@@ -269,6 +318,7 @@ export function CompanyInformation({
             value={currentInfo.oneLineDescription || ''}
             onChange={(e) => updateCompanyInfo('oneLineDescription', e.target.value)}
             maxLength={200}
+            className={showValidation && isFieldEmpty('oneLineDescription') ? 'border-red-500 focus:border-red-500' : ''}
           />
           <p className="text-xs text-muted-foreground">
             {(currentInfo.oneLineDescription || '').length}/200 characters
@@ -287,6 +337,7 @@ export function CompanyInformation({
             onChange={(e) => {
               updateCompanyInfo('companyDescription', e.target.value);
             }}
+            className={showValidation && isFieldEmpty('companyDescription') ? 'border-red-500 focus:border-red-500' : ''}
           />
         </div>
 
@@ -298,6 +349,7 @@ export function CompanyInformation({
             rows={3}
             value={currentInfo.productDescription || ''}
             onChange={(e) => updateCompanyInfo('productDescription', e.target.value)}
+            className={showValidation && isFieldEmpty('productDescription') ? 'border-red-500 focus:border-red-500' : ''}
           />
         </div>
 
