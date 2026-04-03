@@ -327,11 +327,97 @@ export default function ReportsPage() {
   // Storage status state
   const [localStorageCount, setLocalStorageCount] = useState(0);
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
+  const [pendingSyncReports, setPendingSyncReports] = useState<Report[]>([]);
   const [backendConnected, setBackendConnected] = useState(false);
   const [showVersionsDialog, setShowVersionsDialog] = useState(false);
   const [selectedReportVersions, setSelectedReportVersions] = useState<ReportVersion[]>([]);
   const [selectedReportName, setSelectedReportName] = useState('');
   const [loadingVersions, setLoadingVersions] = useState(false);
+
+  // Function to get pending sync reports from localStorage
+  const getPendingSyncReports = useCallback((): Report[] => {
+    if (typeof window === 'undefined') return [];
+    try {
+      // Check multiple possible storage keys for pending sync
+      const keys = ['pending_report_sync', 'pending_record_sync', 'pending_sync_queue'];
+      const allPending: Report[] = [];
+
+      for (const key of keys) {
+        const stored = localStorage.getItem(key);
+        if (stored) {
+          try {
+            const records = JSON.parse(stored);
+            if (Array.isArray(records)) {
+              for (const record of records) {
+                // Map to Report format for display
+                const report: Report = {
+                  id: record.id?.evaluationId || record.evaluationId || `pending-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+                  company: record.company?.name || record.companyName || record.company_name || 'Unknown',
+                  type: record.report?.reportType === 'dd' ? 'Due Diligence' : 'Triage',
+                  status: 'Pending Sync',
+                  approval: 'Pending',
+                  score: record.analysis?.overallScore || record.score || 0,
+                  confidence: record.analysis?.confidence || record.confidence || 0,
+                  recommendation: record.analysis?.recommendation || 'Hold',
+                  user: {
+                    name: record.user?.name || record.userName || 'Local User',
+                    email: record.user?.email || record.userEmail || localStorage.getItem('userEmail') || 'user@tca.com'
+                  },
+                  createdAt: record.id?.createdAt || record.createdAt || new Date().toISOString(),
+                };
+                // Avoid duplicates
+                if (!allPending.find(p => p.id === report.id)) {
+                  allPending.push(report);
+                }
+              }
+            }
+          } catch (e) {
+            console.warn(`Error parsing ${key}:`, e);
+          }
+        }
+      }
+
+      // Also check unified_records for records not yet synced
+      const unifiedRecords = localStorage.getItem('unified_records');
+      if (unifiedRecords) {
+        try {
+          const records = JSON.parse(unifiedRecords);
+          if (Array.isArray(records)) {
+            for (const record of records) {
+              // Check if this record has a status indicating it needs sync
+              if (record.workflow?.status === 'completed' && !record.synced) {
+                const report: Report = {
+                  id: record.id?.evaluationId || `unified-${Date.now()}`,
+                  company: record.company?.name || 'Unknown',
+                  type: record.report?.reportType === 'dd' ? 'Due Diligence' : 'Triage',
+                  status: 'Pending Sync',
+                  approval: record.workflow?.reviewerApproval?.status || 'Pending',
+                  score: record.analysis?.overallScore || 0,
+                  confidence: record.analysis?.confidence || 0,
+                  recommendation: record.analysis?.recommendation || 'Hold',
+                  user: {
+                    name: record.user?.name || 'Local User',
+                    email: record.user?.email || 'user@tca.com'
+                  },
+                  createdAt: record.id?.createdAt || new Date().toISOString(),
+                };
+                if (!allPending.find(p => p.id === report.id)) {
+                  allPending.push(report);
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Error parsing unified_records:', e);
+        }
+      }
+
+      return allPending;
+    } catch (error) {
+      console.error('Error getting pending sync reports:', error);
+      return [];
+    }
+  }, []);
 
   // Function to fetch and display version history for a report
   const viewReportVersions = useCallback(async (reportId: number, companyName: string) => {
@@ -366,14 +452,10 @@ export default function ReportsPage() {
       // Update local storage count
       setLocalStorageCount(localReports.length);
 
-      // Check pending sync queue
-      try {
-        const pendingQueue = localStorage.getItem('pending_report_sync');
-        const pendingCount = pendingQueue ? JSON.parse(pendingQueue).length : 0;
-        setPendingSyncCount(pendingCount);
-      } catch {
-        setPendingSyncCount(0);
-      }
+      // Check pending sync queue - now loading full records
+      const pendingRecords = getPendingSyncReports();
+      setPendingSyncReports(pendingRecords);
+      setPendingSyncCount(pendingRecords.length);
 
       // Try to get API reports
       let apiReports: Report[] = [];
@@ -559,8 +641,20 @@ export default function ReportsPage() {
     await loadReports();
   };
 
-  const reportsForUser = allReports.filter(r => isPrivilegedUser || r.user.email === 'user@tca.com');
-  const myReports = allReports.filter(r => r.user.email === 'admin@tca.com'); // This would be dynamic
+  // Get current user email from localStorage
+  const currentUserEmail = typeof window !== 'undefined' 
+    ? (() => {
+        try {
+          const user = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
+          return user.email || localStorage.getItem('userEmail') || 'user@tca.com';
+        } catch {
+          return localStorage.getItem('userEmail') || 'user@tca.com';
+        }
+      })()
+    : 'user@tca.com';
+
+  const reportsForUser = allReports.filter(r => isPrivilegedUser || r.user.email === currentUserEmail);
+  const myReports = allReports.filter(r => r.user.email === currentUserEmail);
   const pendingReports = allReports.filter(r => r.approval === 'Pending');
 
 
@@ -702,10 +796,22 @@ export default function ReportsPage() {
                   <TabsTrigger value="all">All Reports ({reportsForUser.length})</TabsTrigger>
                   <TabsTrigger value="due-diligence">Due Diligence ({allReports.filter(r => r.type === 'Due Diligence').length})</TabsTrigger>
                   <TabsTrigger value="pending">Pending Approval ({pendingReports.length})</TabsTrigger>
+                  {pendingSyncCount > 0 && (
+                    <TabsTrigger value="pending-sync" className="text-yellow-600">
+                      Pending Sync ({pendingSyncCount})
+                    </TabsTrigger>
+                  )}
                   <TabsTrigger value="my-reports">My Reports ({myReports.length})</TabsTrigger>
                 </>
               ) : (
-                <TabsTrigger value="my-reports">My Reports ({reportsForUser.length})</TabsTrigger>
+                <>
+                  <TabsTrigger value="my-reports">My Reports ({reportsForUser.length})</TabsTrigger>
+                  {pendingSyncCount > 0 && (
+                    <TabsTrigger value="pending-sync" className="text-yellow-600">
+                      Pending Sync ({pendingSyncCount})
+                    </TabsTrigger>
+                  )}
+                </>
               )}
             </TabsList>
             <div className="flex-1 w-full md:w-auto flex flex-col md:flex-row gap-2">
@@ -807,6 +913,86 @@ export default function ReportsPage() {
                     onViewVersions={typeof report.id === 'number' ? () => viewReportVersions(report.id as number, report.company) : undefined}
                   />
                 )) : <p className="text-center text-muted-foreground py-10">No reports are pending approval.</p>}
+              </TabsContent>
+              <TabsContent value="pending-sync" className="space-y-4">
+                {pendingSyncReports.length > 0 ? (
+                  <>
+                    <Card className="bg-yellow-50 dark:bg-yellow-950 border-yellow-200 dark:border-yellow-800 mb-4">
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-3">
+                          <CloudOff className="size-6 text-yellow-600" />
+                          <div>
+                            <p className="font-medium text-yellow-700 dark:text-yellow-300">
+                              {pendingSyncReports.length} report(s) waiting to sync
+                            </p>
+                            <p className="text-sm text-yellow-600 dark:text-yellow-400">
+                              These reports are stored locally and will be uploaded when the backend connection is restored.
+                            </p>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="ml-auto"
+                            onClick={async () => {
+                              toast({ title: 'Attempting sync...', description: 'Trying to upload pending reports...' });
+                              await loadReports();
+                            }}
+                          >
+                            <RefreshCw className="size-4 mr-1" /> Retry Sync
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    {pendingSyncReports.map(report => (
+                      <Card key={report.id} className="overflow-hidden border-l-4 border-l-yellow-500">
+                        <div className="p-6 grid grid-cols-1 md:grid-cols-6 items-center gap-4">
+                          <div className="md:col-span-4 flex flex-wrap items-center gap-4">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <h3 className="text-xl font-bold truncate">{report.company}</h3>
+                                <Badge variant="outline">{report.type.toUpperCase()}</Badge>
+                                <Badge className="bg-yellow-500/20 text-yellow-600">Pending Sync</Badge>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2 text-sm">
+                              <div>
+                                <p className="text-muted-foreground">ID</p>
+                                <p className="font-mono text-xs">{String(report.id).substring(0, 15)}...</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Score</p>
+                                <p className="font-bold text-primary">{report.score}/10</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">User</p>
+                                <p className="font-semibold truncate">{report.user.name}</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Created</p>
+                                <p className="font-bold">{new Date(report.createdAt).toLocaleDateString()}</p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="md:col-span-2 flex flex-col gap-2">
+                            <Button asChild variant="default" className='justify-start'>
+                              <Link href="/analysis/result"><Eye className="mr-2" /> View Report</Link>
+                            </Button>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </>
+                ) : (
+                  <Card className="p-8 text-center">
+                    <div className="flex flex-col items-center gap-4">
+                      <CheckCircle2 className="size-12 text-green-500" />
+                      <div>
+                        <h3 className="text-lg font-semibold">All Reports Synced</h3>
+                        <p className="text-muted-foreground">No pending reports waiting to sync.</p>
+                      </div>
+                    </div>
+                  </Card>
+                )}
               </TabsContent>
               <TabsContent value="my-reports" className="space-y-4">
                 {myReports.length > 0 ? myReports.map(report => (

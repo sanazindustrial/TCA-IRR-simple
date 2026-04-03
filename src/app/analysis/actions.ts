@@ -5,6 +5,7 @@ import { sampleAnalysisData } from '@/lib/sample-data';
 
 // Try different backend URLs based on environment
 const BACKEND_API_URL = 'https://tcairrapiccontainer.azurewebsites.net'; // Production fallback
+const API_VERSION = '/api/v1'; // API version prefix
 
 console.log('Backend API URL:', BACKEND_API_URL);
 console.log('Environment:', process.env.NODE_ENV);
@@ -40,7 +41,7 @@ export async function runAnalysis(
     // Test basic connectivity first (non-blocking)
     console.log('Testing backend connectivity...');
     try {
-      const healthCheck = await fetch(`${BACKEND_API_URL}/health`, {
+      const healthCheck = await fetch(`${BACKEND_API_URL}${API_VERSION}/health`, {
         method: 'GET',
         signal: AbortSignal.timeout(5000), // 5 second timeout for health check
       });
@@ -144,7 +145,7 @@ export async function runAnalysis(
       companyName: 'Sample Company'
     };
 
-    console.log('Making request to:', `${BACKEND_API_URL}/api/analysis/comprehensive`);
+    console.log('Making request to:', `${BACKEND_API_URL}${API_VERSION}/analysis/comprehensive`);
     console.log('Request payload:', JSON.stringify(analysisPayload, null, 2));
 
     // Add timeout to the fetch request
@@ -154,7 +155,7 @@ export async function runAnalysis(
     let response: Response;
 
     try {
-      response = await fetch(`${BACKEND_API_URL}/api/analysis/comprehensive`, {
+      response = await fetch(`${BACKEND_API_URL}${API_VERSION}/analysis/comprehensive`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
