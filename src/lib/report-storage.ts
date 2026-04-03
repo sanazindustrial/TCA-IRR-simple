@@ -1,35 +1,49 @@
 // Database and storage utilities for TCA reports
 import type { ComprehensiveAnalysisOutput } from '@/ai/flows/schemas';
 import { reportsApi, type CreateReportRequest } from './reports-api';
+import { trackingService, generateReportId as genRepId, generateCompanyId as genCoId } from './tracking-service';
 
 // Backend API URL for report storage (base URL - endpoints add /api/v1)
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
 
 export type StoredReport = {
     id: string;
+    // Unique indexing - Primary and Foreign Keys
+    reportId: string;           // Primary key: RPT-{type}-{timestamp}-{random}
+    evaluationId: string;       // Foreign key to evaluation
+    companyId: string;          // Foreign key to company
     userId: string;
+    userEmail?: string;
     companyName: string;
     reportType: 'triage' | 'dd';
     framework: 'general' | 'medtech';
     data: ComprehensiveAnalysisOutput;
     createdAt: string;
     updatedAt: string;
+    version: number;
     metadata: {
         analysisDuration?: number;
         moduleCount: number;
         compositeScore: number;
         status: 'draft' | 'completed' | 'archived';
         tags?: string[];
+        // Tracking info
+        generatedBy?: string;
+        documentsUsed?: string[];
     };
 };
 
 export type ReportListItem = {
     id: string;
+    reportId: string;
+    evaluationId: string;
+    companyId: string;
     companyName: string;
     reportType: 'triage' | 'dd';
     compositeScore: number;
     createdAt: string;
     status: 'draft' | 'completed' | 'archived';
+    userId: string;
 };
 
 class ReportStorageService {
@@ -37,7 +51,19 @@ class ReportStorageService {
     private readonly currentReportKey = 'current_analysis_result';
 
     /**
+     * Generate unique report ID with type prefix
+     * Format: RPT-{TYPE}-{timestamp}-{random}
+     */
+    private generateUniqueReportId(reportType: 'triage' | 'dd'): string {
+        const typePrefix = reportType === 'dd' ? 'DD' : 'SSD';
+        const timestamp = Date.now().toString(36).toUpperCase();
+        const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+        return `RPT-${typePrefix}-${timestamp}-${random}`;
+    }
+
+    /**
      * Save a report to storage (both localStorage and backend API)
+     * Now includes unique indexing with evaluation and company IDs
      */
     async saveReport(
         data: ComprehensiveAnalysisOutput,
@@ -45,29 +71,50 @@ class ReportStorageService {
         framework: 'general' | 'medtech',
         userId: string,
         companyName: string,
-        metadata?: Partial<StoredReport['metadata']>
+        metadata?: Partial<StoredReport['metadata']>,
+        trackingIds?: { evaluationId?: string; companyId?: string; userEmail?: string }
     ): Promise<string> {
-        const reportId = this.generateReportId();
+        const reportId = this.generateUniqueReportId(reportType);
         const now = new Date().toISOString();
+        
+        // Get tracking IDs from localStorage if not provided
+        const evaluationId = trackingIds?.evaluationId || 
+                            localStorage.getItem('analysisEvaluationId') || 
+                            `EVAL-${Date.now().toString(36).toUpperCase()}`;
+        const companyId = trackingIds?.companyId || 
+                         localStorage.getItem('analysisCompanyId') || 
+                         genCoId(companyName);
+        const userEmail = trackingIds?.userEmail || this.getCurrentUserEmail();
 
         const report: StoredReport = {
-            id: reportId,
+            id: reportId, // For backwards compatibility
+            reportId,
+            evaluationId,
+            companyId,
             userId,
+            userEmail,
             companyName: companyName || 'Unnamed Company',
             reportType,
             framework,
             data,
             createdAt: now,
             updatedAt: now,
+            version: 1,
             metadata: {
                 moduleCount: this.calculateModuleCount(data),
                 compositeScore: this.extractCompositeScore(data),
                 status: 'completed',
                 analysisDuration: metadata?.analysisDuration,
                 tags: metadata?.tags || [],
+                generatedBy: userId,
                 ...metadata
             }
         };
+
+        // Track report in tracking service
+        trackingService.trackReport(evaluationId, reportType === 'dd' ? 'DD' : 'SSD', 
+            Object.keys(data).filter(k => data[k as keyof ComprehensiveAnalysisOutput] !== null)
+        );
 
         // Save to localStorage
         await this.saveToLocalStorage(report);
@@ -75,7 +122,7 @@ class ReportStorageService {
         // Save to backend API
         try {
             await this.saveToBackendAPI(report);
-            console.log('Report saved to backend API successfully');
+            console.log(`Report ${reportId} saved to backend (Eval: ${evaluationId}, Company: ${companyId})`);
         } catch (error) {
             console.warn('Failed to save report to backend API (will retry later):', error);
             // Store in pending sync queue for later retry
@@ -83,6 +130,18 @@ class ReportStorageService {
         }
 
         return reportId;
+    }
+
+    /**
+     * Get current user email from localStorage
+     */
+    private getCurrentUserEmail(): string {
+        try {
+            const user = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
+            return user.email || 'unknown@tca-irr.com';
+        } catch {
+            return 'unknown@tca-irr.com';
+        }
     }
 
     /**
@@ -111,7 +170,17 @@ class ReportStorageService {
                 });
             }
 
-            const createRequest: CreateReportRequest = {
+            // Include tracking IDs in the request
+            const createRequest: CreateReportRequest & { 
+                report_id?: string; 
+                evaluation_id?: string; 
+                company_id?: string;
+                user_email?: string;
+                version?: number;
+            } = {
+                report_id: report.reportId,
+                evaluation_id: report.evaluationId,
+                company_id: report.companyId,
                 company_name: report.companyName,
                 report_type: report.reportType === 'dd' ? 'Due Diligence' : 'Triage',
                 overall_score: report.metadata.compositeScore,
@@ -121,10 +190,12 @@ class ReportStorageService {
                 module_scores: moduleScores,
                 analysis_data: analysisData,
                 missing_sections: this.getMissingSections(report.data),
+                user_email: report.userEmail,
+                version: report.version,
             };
 
             // Try to create the report in the backend
-            const response = await fetch(`${API_BASE_URL}/api/v1/reports?user_id=1`, {
+            const response = await fetch(`${API_BASE_URL}/api/v1/reports?user_id=${report.userId || 1}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -138,7 +209,7 @@ class ReportStorageService {
             }
 
             const createdReport = await response.json();
-            console.log('Report created in backend with ID:', createdReport.id);
+            console.log(`Report ${report.reportId} created in backend with DB ID: ${createdReport.id}`);
             return createdReport.id;
         } catch (error) {
             console.error('Error saving to backend API:', error);
