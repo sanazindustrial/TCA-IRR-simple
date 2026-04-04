@@ -131,11 +131,11 @@ class ReportStorageService {
                 await this.saveToBackendAPI(report);
                 console.log(`Report ${reportId} saved to backend on attempt ${attempt} (Eval: ${evaluationId}, Company: ${companyId})`);
                 backendSaved = true;
-                
+
                 // Mark as synced in localStorage
                 report.metadata.status = 'completed';
                 await this.saveToLocalStorage(report);
-                
+
                 // Clear this report from pending queue if present
                 this.removeFromPendingSyncQueue(reportId);
                 break;
@@ -161,10 +161,10 @@ class ReportStorageService {
             const queueKey = 'pending_report_sync';
             const existingQueue = localStorage.getItem(queueKey);
             if (!existingQueue) return;
-            
+
             const queue: StoredReport[] = JSON.parse(existingQueue);
             const filtered = queue.filter(r => r.id !== reportId && r.reportId !== reportId);
-            
+
             if (filtered.length === 0) {
                 localStorage.removeItem(queueKey);
             } else {
@@ -297,7 +297,7 @@ class ReportStorageService {
                     await this.saveToBackendAPI(report);
                     console.log(`Synced pending report: ${report.id}`);
                     syncedCount++;
-                    
+
                     // Update local storage status to completed
                     report.metadata.status = 'completed';
                     await this.saveToLocalStorage(report);
@@ -316,8 +316,8 @@ class ReportStorageService {
 
             // Dispatch event for UI updates
             if (typeof window !== 'undefined') {
-                window.dispatchEvent(new CustomEvent('tca_sync_completed', { 
-                    detail: { synced: syncedCount, remaining: stillPending.length } 
+                window.dispatchEvent(new CustomEvent('tca_sync_completed', {
+                    detail: { synced: syncedCount, remaining: stillPending.length }
                 }));
             }
 
