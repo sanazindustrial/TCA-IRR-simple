@@ -291,7 +291,7 @@ export default function DatabaseSearchPage() {
             />
             </div>
             <Select value={category} onValueChange={setCategory}>
-            <SelectTrigger className="w-[200px]">
+            <SelectTrigger id="query-category-filter" className="w-[200px]">
                 <SelectValue placeholder="All Categories" />
             </SelectTrigger>
             <SelectContent>

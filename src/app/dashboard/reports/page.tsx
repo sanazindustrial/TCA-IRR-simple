@@ -23,6 +23,7 @@ import {
   CheckCircle2,
   Clock,
   GitBranch,
+  Trash2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -57,6 +58,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { reportsApi, type ReportData, type ReportVersion, type ReportStats } from '@/lib/reports-api';
+import { reportStorage } from '@/lib/report-storage';
 
 // Type for localStorage stored reports
 interface LocalStoredReport {
@@ -419,6 +421,51 @@ export default function ReportsPage() {
     }
   }, []);
 
+  // Function to clear pending sync queue
+  const clearPendingSyncQueue = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      // Clear all possible storage keys for pending sync
+      const keys = ['pending_report_sync', 'pending_record_sync', 'pending_sync_queue'];
+      for (const key of keys) {
+        localStorage.removeItem(key);
+      }
+
+      // Also clear synced flag from unified_records
+      const unifiedRecords = localStorage.getItem('unified_records');
+      if (unifiedRecords) {
+        try {
+          const records = JSON.parse(unifiedRecords);
+          if (Array.isArray(records)) {
+            const updatedRecords = records.map(record => ({
+              ...record,
+              synced: true // Mark as synced to prevent re-queuing
+            }));
+            localStorage.setItem('unified_records', JSON.stringify(updatedRecords));
+          }
+        } catch (e) {
+          console.warn('Error updating unified_records:', e);
+        }
+      }
+
+      // Update state
+      setPendingSyncCount(0);
+      setPendingSyncReports([]);
+
+      toast({
+        title: 'Queue Cleared',
+        description: 'Pending sync queue has been cleared. Reports will remain in local storage.',
+      });
+    } catch (error) {
+      console.error('Error clearing pending sync queue:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to clear pending sync queue.',
+      });
+    }
+  }, [toast]);
+
   // Function to fetch and display version history for a report
   const viewReportVersions = useCallback(async (reportId: number, companyName: string) => {
     setSelectedReportName(companyName);
@@ -489,6 +536,20 @@ export default function ReportsPage() {
 
       // Update backend connection status
       setBackendConnected(apiConnected);
+
+      // Auto-sync pending reports when backend is connected
+      if (apiConnected && pendingRecords.length > 0) {
+        console.log(`Auto-syncing ${pendingRecords.length} pending reports...`);
+        try {
+          await reportStorage.syncPendingReports();
+          // Refresh pending count after sync
+          const remainingPending = getPendingSyncReports();
+          setPendingSyncReports(remainingPending);
+          setPendingSyncCount(remainingPending.length);
+        } catch (syncError) {
+          console.warn('Auto-sync failed:', syncError);
+        }
+      }
 
       // Merge reports: localStorage first, then API
       // Use a Set to track unique company names to avoid duplicates
@@ -642,15 +703,15 @@ export default function ReportsPage() {
   };
 
   // Get current user email from localStorage
-  const currentUserEmail = typeof window !== 'undefined' 
+  const currentUserEmail = typeof window !== 'undefined'
     ? (() => {
-        try {
-          const user = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
-          return user.email || localStorage.getItem('userEmail') || 'user@tca.com';
-        } catch {
-          return localStorage.getItem('userEmail') || 'user@tca.com';
-        }
-      })()
+      try {
+        const user = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
+        return user.email || localStorage.getItem('userEmail') || 'user@tca.com';
+      } catch {
+        return localStorage.getItem('userEmail') || 'user@tca.com';
+      }
+    })()
     : 'user@tca.com';
 
   const reportsForUser = allReports.filter(r => isPrivilegedUser || r.user.email === currentUserEmail);
@@ -827,7 +888,7 @@ export default function ReportsPage() {
               {isPrivilegedUser && (
                 <>
                   <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val === 'all' ? '' : val)}>
-                    <SelectTrigger className="md:w-[180px]">
+                    <SelectTrigger id="status-filter" className="md:w-[180px]">
                       <SelectValue placeholder="All Status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -838,7 +899,7 @@ export default function ReportsPage() {
                     </SelectContent>
                   </Select>
                   <Select value={typeFilter} onValueChange={(val) => setTypeFilter(val === 'all' ? '' : val)}>
-                    <SelectTrigger className="md:w-[180px]">
+                    <SelectTrigger id="type-filter" className="md:w-[180px]">
                       <SelectValue placeholder="All Types" />
                     </SelectTrigger>
                     <SelectContent>
@@ -871,7 +932,7 @@ export default function ReportsPage() {
                   <Card className="p-8 text-center">
                     <p className="text-muted-foreground mb-4">No reports found. Start by creating a new analysis.</p>
                     <div className="flex gap-2 justify-center">
-                      <Button asChild><Link href="/analysis">New Triage Report</Link></Button>
+                      <Button asChild><Link href="/dashboard/evaluation">New Triage Report</Link></Button>
                       {isPrivilegedUser && <Button asChild variant="outline"><Link href="/dashboard/reports/due-diligence">New Due Diligence</Link></Button>}
                     </div>
                   </Card>
@@ -929,17 +990,36 @@ export default function ReportsPage() {
                               These reports are stored locally and will be uploaded when the backend connection is restored.
                             </p>
                           </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="ml-auto"
-                            onClick={async () => {
-                              toast({ title: 'Attempting sync...', description: 'Trying to upload pending reports...' });
-                              await loadReports();
-                            }}
-                          >
-                            <RefreshCw className="size-4 mr-1" /> Retry Sync
-                          </Button>
+                          <div className="ml-auto flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={async () => {
+                                toast({ title: 'Syncing...', description: 'Uploading pending reports to backend...' });
+                                try {
+                                  await reportStorage.syncPendingReports();
+                                  toast({ title: 'Sync Complete', description: 'Pending reports have been uploaded.' });
+                                } catch (error) {
+                                  console.error('Sync failed:', error);
+                                  toast({ variant: 'destructive', title: 'Sync Failed', description: 'Could not upload reports. Will retry later.' });
+                                }
+                                await loadReports();
+                              }}
+                            >
+                              <RefreshCw className="size-4 mr-1" /> Retry Sync
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => {
+                                if (confirm('Are you sure you want to clear the pending sync queue? Reports will remain in local storage but won\'t be synced to backend.')) {
+                                  clearPendingSyncQueue();
+                                }
+                              }}
+                            >
+                              <Trash2 className="size-4 mr-1" /> Clear Queue
+                            </Button>
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
@@ -1005,7 +1085,7 @@ export default function ReportsPage() {
                 )) : (
                   <Card className="p-8 text-center">
                     <p className="text-muted-foreground mb-4">You have not created any reports yet.</p>
-                    <Button asChild><Link href="/analysis">Create Your First Report</Link></Button>
+                    <Button asChild><Link href="/dashboard/evaluation">Create Your First Report</Link></Button>
                   </Card>
                 )}
               </TabsContent>

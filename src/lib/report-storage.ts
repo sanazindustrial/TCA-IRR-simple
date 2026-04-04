@@ -25,11 +25,15 @@ export type StoredReport = {
         analysisDuration?: number;
         moduleCount: number;
         compositeScore: number;
-        status: 'draft' | 'completed' | 'archived';
+        status: 'draft' | 'completed' | 'archived' | 'pending_approval';
+        approvalStatus?: 'pending' | 'approved' | 'rejected' | 'needs_revision';
         tags?: string[];
         // Tracking info
         generatedBy?: string;
         documentsUsed?: string[];
+        reviewerId?: string;
+        reviewedAt?: string;
+        reviewerComments?: string;
     };
 };
 
@@ -42,7 +46,7 @@ export type ReportListItem = {
     reportType: 'triage' | 'dd';
     compositeScore: number;
     createdAt: string;
-    status: 'draft' | 'completed' | 'archived';
+    status: 'draft' | 'completed' | 'archived' | 'pending_approval';
     userId: string;
 };
 
@@ -76,14 +80,14 @@ class ReportStorageService {
     ): Promise<string> {
         const reportId = this.generateUniqueReportId(reportType);
         const now = new Date().toISOString();
-        
+
         // Get tracking IDs from localStorage if not provided
-        const evaluationId = trackingIds?.evaluationId || 
-                            localStorage.getItem('analysisEvaluationId') || 
-                            `EVAL-${Date.now().toString(36).toUpperCase()}`;
-        const companyId = trackingIds?.companyId || 
-                         localStorage.getItem('analysisCompanyId') || 
-                         genCoId(companyName);
+        const evaluationId = trackingIds?.evaluationId ||
+            localStorage.getItem('analysisEvaluationId') ||
+            `EVAL-${Date.now().toString(36).toUpperCase()}`;
+        const companyId = trackingIds?.companyId ||
+            localStorage.getItem('analysisCompanyId') ||
+            genCoId(companyName);
         const userEmail = trackingIds?.userEmail || this.getCurrentUserEmail();
 
         const report: StoredReport = {
@@ -103,7 +107,8 @@ class ReportStorageService {
             metadata: {
                 moduleCount: this.calculateModuleCount(data),
                 compositeScore: this.extractCompositeScore(data),
-                status: 'completed',
+                status: 'pending_approval',  // Reports start pending approval for reviewer
+                approvalStatus: 'pending',
                 analysisDuration: metadata?.analysisDuration,
                 tags: metadata?.tags || [],
                 generatedBy: userId,
@@ -112,7 +117,7 @@ class ReportStorageService {
         };
 
         // Track report in tracking service
-        trackingService.trackReport(evaluationId, reportType === 'dd' ? 'DD' : 'SSD', 
+        trackingService.trackReport(evaluationId, reportType === 'dd' ? 'DD' : 'SSD',
             Object.keys(data).filter(k => data[k as keyof ComprehensiveAnalysisOutput] !== null)
         );
 
@@ -171,16 +176,16 @@ class ReportStorageService {
             }
 
             // Include tracking IDs in the request
-            const createRequest: CreateReportRequest & { 
-                report_id?: string; 
-                evaluation_id?: string; 
-                company_id?: string;
+            const createRequest: CreateReportRequest & {
+                report_id?: string;
+                evaluation_id?: string;
+                company_id_string?: string;
                 user_email?: string;
                 version?: number;
             } = {
                 report_id: report.reportId,
                 evaluation_id: report.evaluationId,
-                company_id: report.companyId,
+                company_id_string: report.companyId, // String version for tracking
                 company_name: report.companyName,
                 report_type: report.reportType === 'dd' ? 'Due Diligence' : 'Triage',
                 overall_score: report.metadata.compositeScore,
@@ -353,11 +358,15 @@ class ReportStorageService {
 
             return userReports.map(report => ({
                 id: report.id,
+                reportId: report.reportId,
+                evaluationId: report.evaluationId,
+                companyId: report.companyId,
                 companyName: report.companyName,
                 reportType: report.reportType,
                 compositeScore: report.metadata.compositeScore,
                 createdAt: report.createdAt,
-                status: report.metadata.status
+                status: report.metadata.status,
+                userId: report.userId,
             })).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         } catch (error) {
             console.error('Error getting user reports:', error);
@@ -533,6 +542,8 @@ export const saveAnalysisReport = async (
         companyName: string;
         analysisDuration?: number;
         tags?: string[];
+        evaluationId?: string;
+        companyId?: string;
     }
 ): Promise<string> => {
     return reportStorage.saveReport(
@@ -544,6 +555,10 @@ export const saveAnalysisReport = async (
         {
             analysisDuration: options.analysisDuration,
             tags: options.tags
+        },
+        {
+            evaluationId: options.evaluationId,
+            companyId: options.companyId
         }
     );
 };

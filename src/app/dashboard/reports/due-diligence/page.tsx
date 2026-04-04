@@ -113,12 +113,26 @@ export default function DueDiligenceWorkflowPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
 
+  // Company selection mode
+  const [selectionMode, setSelectionMode] = useState<'new' | 'existing'>('existing');
+  const [existingCompanies, setExistingCompanies] = useState<Array<{
+    id: string;
+    name: string;
+    industry: string;
+    triageScore: number;
+    analysisDate: string;
+    evaluationId: string;
+  }>>([]);
+  const [loadingCompanies, setLoadingCompanies] = useState(false);
+  const [selectedExistingCompany, setSelectedExistingCompany] = useState<string | null>(null);
+
   // Company info
   const [companyName, setCompanyName] = useState('');
   const [companyTicker, setCompanyTicker] = useState('');
   const [companyIndustry, setCompanyIndustry] = useState('');
   const [companyDescription, setCompanyDescription] = useState('');
   const [dealType, setDealType] = useState('acquisition');
+  const [sourceEvaluationId, setSourceEvaluationId] = useState<string | null>(null);
 
   // Documents
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
@@ -363,6 +377,124 @@ export default function DueDiligenceWorkflowPage() {
     }
   }, []);
 
+  // Load existing companies with triage reports
+  const loadExistingCompanies = useCallback(async () => {
+    setLoadingCompanies(true);
+    try {
+      // First check localStorage for recent reports
+      const tcaReports = localStorage.getItem('tca_reports');
+      const unifiedRecords = localStorage.getItem('unified_records');
+
+      const companies: Array<{
+        id: string;
+        name: string;
+        industry: string;
+        triageScore: number;
+        analysisDate: string;
+        evaluationId: string;
+      }> = [];
+
+      // Parse localStorage reports
+      if (tcaReports) {
+        try {
+          const reports = JSON.parse(tcaReports);
+          if (Array.isArray(reports)) {
+            reports.forEach(report => {
+              if (report.reportType === 'triage' && report.companyName) {
+                companies.push({
+                  id: report.reportId || report.id,
+                  name: report.companyName,
+                  industry: report.framework === 'medtech' ? 'MedTech/Biotech' : 'Technology',
+                  triageScore: report.metadata?.compositeScore || 0,
+                  analysisDate: report.createdAt || new Date().toISOString(),
+                  evaluationId: report.evaluationId || report.id,
+                });
+              }
+            });
+          }
+        } catch (e) {
+          console.warn('Error parsing tca_reports:', e);
+        }
+      }
+
+      // Parse unified records
+      if (unifiedRecords) {
+        try {
+          const records = JSON.parse(unifiedRecords);
+          if (Array.isArray(records)) {
+            records.forEach(record => {
+              if (record.analysis?.overallScore && record.company?.name) {
+                // Check if company already in list
+                if (!companies.find(c => c.name === record.company.name)) {
+                  companies.push({
+                    id: record.id?.evaluationId || String(Date.now()),
+                    name: record.company.name,
+                    industry: record.company.industry || 'Technology',
+                    triageScore: record.analysis.overallScore,
+                    analysisDate: record.id?.createdAt || new Date().toISOString(),
+                    evaluationId: record.id?.evaluationId || String(Date.now()),
+                  });
+                }
+              }
+            });
+          }
+        } catch (e) {
+          console.warn('Error parsing unified_records:', e);
+        }
+      }
+
+      // Sort by date descending
+      companies.sort((a, b) => new Date(b.analysisDate).getTime() - new Date(a.analysisDate).getTime());
+
+      setExistingCompanies(companies);
+    } catch (error) {
+      console.error('Error loading existing companies:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to load existing companies.',
+      });
+    } finally {
+      setLoadingCompanies(false);
+    }
+  }, [toast]);
+
+  // Load existing companies on mount
+  useEffect(() => {
+    loadExistingCompanies();
+  }, [loadExistingCompanies]);
+
+  // Handle selecting an existing company
+  const handleSelectExistingCompany = useCallback((companyId: string) => {
+    const company = existingCompanies.find(c => c.id === companyId);
+    if (company) {
+      setSelectedExistingCompany(companyId);
+      setCompanyName(company.name);
+      setCompanyIndustry(company.industry);
+      setSourceEvaluationId(company.evaluationId);
+
+      // Load company data from localStorage
+      const tcaReports = localStorage.getItem('tca_reports');
+      if (tcaReports) {
+        try {
+          const reports = JSON.parse(tcaReports);
+          const report = reports.find((r: { companyName: string }) => r.companyName === company.name);
+          if (report?.data) {
+            // Store for later use
+            localStorage.setItem('ddSourceAnalysis', JSON.stringify(report.data));
+          }
+        } catch (e) {
+          console.warn('Error loading company data:', e);
+        }
+      }
+
+      toast({
+        title: 'Company Selected',
+        description: `${company.name} selected. Previous triage data will be used as foundation.`,
+      });
+    }
+  }, [existingCompanies, toast]);
+
   // Render step content
   const renderStepContent = () => {
     switch (currentStep) {
@@ -374,76 +506,178 @@ export default function DueDiligenceWorkflowPage() {
                 <Building2 className="size-5" />
                 Company Information
               </CardTitle>
-              <CardDescription>Enter details about the target company for due diligence.</CardDescription>
+              <CardDescription>Select an existing company or enter details about a new target company for due diligence.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="companyName">Company Name *</Label>
-                  <Input
-                    id="companyName"
-                    placeholder="e.g., QuantumLeap AI"
-                    value={companyName}
-                    onChange={(e) => setCompanyName(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="ticker">Stock Ticker (if public)</Label>
-                  <Input
-                    id="ticker"
-                    placeholder="e.g., AAPL"
-                    value={companyTicker}
-                    onChange={(e) => setCompanyTicker(e.target.value.toUpperCase())}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="industry">Industry</Label>
-                  <Select value={companyIndustry} onValueChange={setCompanyIndustry}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select industry" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="healthcare">Healthcare / MedTech</SelectItem>
-                      <SelectItem value="technology">Technology / SaaS</SelectItem>
-                      <SelectItem value="fintech">FinTech</SelectItem>
-                      <SelectItem value="biotech">Biotechnology</SelectItem>
-                      <SelectItem value="manufacturing">Manufacturing</SelectItem>
-                      <SelectItem value="retail">Retail / E-commerce</SelectItem>
-                      <SelectItem value="energy">Energy / CleanTech</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="dealType">Deal Type</Label>
-                  <Select value={dealType} onValueChange={setDealType}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select deal type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="acquisition">Acquisition</SelectItem>
-                      <SelectItem value="investment">Investment</SelectItem>
-                      <SelectItem value="merger">Merger</SelectItem>
-                      <SelectItem value="partnership">Partnership</SelectItem>
-                      <SelectItem value="ipo">IPO Preparation</SelectItem>
-                    </SelectContent>
-                  </Select>
+              {/* Company Selection Mode */}
+              <div className="space-y-4">
+                <Label>Company Source</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <Button
+                    variant={selectionMode === 'existing' ? 'default' : 'outline'}
+                    className="w-full justify-start"
+                    onClick={() => setSelectionMode('existing')}
+                  >
+                    <Database className="mr-2 size-4" />
+                    Select from Database
+                  </Button>
+                  <Button
+                    variant={selectionMode === 'new' ? 'default' : 'outline'}
+                    className="w-full justify-start"
+                    onClick={() => setSelectionMode('new')}
+                  >
+                    <Building2 className="mr-2 size-4" />
+                    New Company
+                  </Button>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="description">Company Description</Label>
-                <Textarea
-                  id="description"
-                  placeholder="Brief description of the company, its products/services, and market position..."
-                  rows={4}
-                  value={companyDescription}
-                  onChange={(e) => setCompanyDescription(e.target.value)}
-                />
-              </div>
+              {/* Existing Company Selection */}
+              {selectionMode === 'existing' && (
+                <div className="space-y-4">
+                  <Label>Select Company with Triage Report</Label>
+                  {loadingCompanies ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="size-6 animate-spin mr-2" />
+                      <span>Loading companies...</span>
+                    </div>
+                  ) : existingCompanies.length === 0 ? (
+                    <div className="text-center py-8 border rounded-lg bg-muted/50">
+                      <Database className="size-12 mx-auto mb-4 text-muted-foreground" />
+                      <p className="text-muted-foreground">No companies with completed triage reports found.</p>
+                      <Button
+                        variant="link"
+                        className="mt-2"
+                        onClick={() => setSelectionMode('new')}
+                      >
+                        Enter new company instead
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="grid gap-3 max-h-[300px] overflow-y-auto">
+                      {existingCompanies.map((company) => (
+                        <div
+                          key={company.id}
+                          className={cn(
+                            "flex items-center justify-between p-4 border rounded-lg cursor-pointer transition-colors",
+                            selectedExistingCompany === company.id
+                              ? "border-primary bg-primary/5"
+                              : "hover:border-primary/50"
+                          )}
+                          onClick={() => handleSelectExistingCompany(company.id)}
+                        >
+                          <div className="flex items-center gap-3">
+                            {selectedExistingCompany === company.id && (
+                              <CheckCircle2 className="size-5 text-primary" />
+                            )}
+                            <div>
+                              <p className="font-semibold">{company.name}</p>
+                              <p className="text-sm text-muted-foreground">{company.industry}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <Badge variant={company.triageScore >= 7 ? 'default' : company.triageScore >= 5 ? 'secondary' : 'destructive'}>
+                              Score: {company.triageScore.toFixed(1)}
+                            </Badge>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {new Date(company.analysisDate).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {selectedExistingCompany && (
+                    <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
+                      <CheckCircle2 className="size-5 text-green-600" />
+                      <span className="text-green-800">
+                        Previous analysis data will be imported. You can add additional documents below.
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* New Company Form or Additional Info */}
+              {(selectionMode === 'new' || selectedExistingCompany) && (
+                <>
+                  <Separator />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="companyName">Company Name *</Label>
+                      <Input
+                        id="companyName"
+                        name="companyName"
+                        placeholder="e.g., QuantumLeap AI"
+                        value={companyName}
+                        onChange={(e) => setCompanyName(e.target.value)}
+                        disabled={selectionMode === 'existing' && !!selectedExistingCompany}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="ticker">Stock Ticker (if public)</Label>
+                      <Input
+                        id="ticker"
+                        name="ticker"
+                        placeholder="e.g., AAPL"
+                        value={companyTicker}
+                        onChange={(e) => setCompanyTicker(e.target.value.toUpperCase())}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {selectionMode === 'new' && (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="industry">Industry</Label>
+                      <Select value={companyIndustry} onValueChange={setCompanyIndustry}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select industry" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="healthcare">Healthcare / MedTech</SelectItem>
+                          <SelectItem value="technology">Technology / SaaS</SelectItem>
+                          <SelectItem value="fintech">FinTech</SelectItem>
+                          <SelectItem value="biotech">Biotechnology</SelectItem>
+                          <SelectItem value="manufacturing">Manufacturing</SelectItem>
+                          <SelectItem value="retail">Retail / E-commerce</SelectItem>
+                          <SelectItem value="energy">Energy / CleanTech</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="dealType">Deal Type</Label>
+                      <Select value={dealType} onValueChange={setDealType}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select deal type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="acquisition">Acquisition</SelectItem>
+                          <SelectItem value="investment">Investment</SelectItem>
+                          <SelectItem value="merger">Merger</SelectItem>
+                          <SelectItem value="partnership">Partnership</SelectItem>
+                          <SelectItem value="ipo">IPO Preparation</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Company Description</Label>
+                    <Textarea
+                      id="description"
+                      placeholder="Brief description of the company, its products/services, and market position..."
+                      rows={4}
+                      value={companyDescription}
+                      onChange={(e) => setCompanyDescription(e.target.value)}
+                    />
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         );

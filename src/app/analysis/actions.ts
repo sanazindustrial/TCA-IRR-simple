@@ -182,24 +182,50 @@ export async function runAnalysis(
     }
 
     const backendData = await response.json();    // Transform backend response to match frontend schema expectations
+
+    // Process TCA categories first to calculate composite score
+    const tcaCategories = backendData.scorecard ? Object.entries(backendData.scorecard.categories || {}).map(([key, cat]: [string, any]) => {
+      const rawScore = cat.raw_score || 7.5;
+      const weight = (cat.weight || 0.1) * 100; // Convert to percentage
+      const weightedScore = rawScore * (weight / 100); // Calculate correct weighted score
+      return {
+        category: cat.name || key,
+        rawScore,
+        weight,
+        weightedScore,
+        interpretation: cat.notes || `Analysis for ${cat.name || key}`,
+        flag: (rawScore >= 8 ? 'green' : rawScore >= 6 ? 'yellow' : 'red') as 'green' | 'yellow' | 'red',
+        pestel: 'Technology and market trends favor this category',
+        description: `Evaluation of ${cat.name || key} performance`,
+        strengths: `Strong performance in ${cat.name || key}`,
+        concerns: rawScore < 6 ? `Improvement needed in ${cat.name || key}` : 'Minor areas for optimization',
+        aiRecommendation: `Focus on strengthening ${cat.name || key} capabilities`
+      };
+    }) : [];
+
+    // Calculate composite score correctly: sum of weighted scores (0-10 scale)
+    // If backend returns 0-100 scale, divide by 10
+    let compositeScore = 0;
+    if (tcaCategories.length > 0) {
+      // Calculate from categories: sum of (rawScore * weight/100)
+      compositeScore = tcaCategories.reduce((sum, cat) => sum + cat.weightedScore, 0);
+    } else if (backendData.final_tca_score) {
+      // Convert from 0-100 to 0-10 scale if needed
+      compositeScore = backendData.final_tca_score > 10
+        ? backendData.final_tca_score / 10
+        : backendData.final_tca_score;
+    } else {
+      compositeScore = 7.5; // Default fallback
+    }
+    // Ensure score is in valid 0-10 range
+    compositeScore = Math.max(0, Math.min(10, compositeScore));
+
     const comprehensiveData: ComprehensiveAnalysisOutput = {
       // TCA Scorecard Data
       tcaData: backendData.scorecard ? {
-        categories: Object.entries(backendData.scorecard.categories || {}).map(([key, cat]: [string, any]) => ({
-          category: cat.name || key,
-          rawScore: cat.raw_score || 7.5,
-          weight: (cat.weight || 0.1) * 100, // Convert to percentage
-          weightedScore: cat.weighted_score || 7.5,
-          interpretation: cat.notes || `Analysis for ${cat.name || key}`,
-          flag: (cat.raw_score >= 8 ? 'green' : cat.raw_score >= 6 ? 'yellow' : 'red') as 'green' | 'yellow' | 'red',
-          pestel: 'Technology and market trends favor this category',
-          description: `Evaluation of ${cat.name || key} performance`,
-          strengths: `Strong performance in ${cat.name || key}`,
-          concerns: cat.raw_score < 6 ? `Improvement needed in ${cat.name || key}` : 'Minor areas for optimization',
-          aiRecommendation: `Focus on strengthening ${cat.name || key} capabilities`
-        })),
-        compositeScore: backendData.final_tca_score || 75,
-        summary: `TCA Analysis completed with score of ${backendData.final_tca_score || 75}/100. ${backendData.investment_recommendation || 'Further analysis recommended'}.`
+        categories: tcaCategories,
+        compositeScore,
+        summary: `TCA Analysis completed with score of ${compositeScore.toFixed(2)}/10. ${backendData.investment_recommendation || 'Further analysis recommended'}.`
       } : null,
 
       // Risk Assessment Data

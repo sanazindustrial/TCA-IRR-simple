@@ -34,6 +34,18 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- User invites table (for admin/analyst role invitations)
+CREATE TABLE IF NOT EXISTS user_invites (
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(255) NOT NULL,
+    role VARCHAR(20) NOT NULL CHECK (role IN ('admin', 'analyst')),
+    invite_token VARCHAR(255) UNIQUE NOT NULL,
+    invited_by INTEGER REFERENCES users(id),
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'expired', 'cancelled')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL
+);
+
 -- Companies table
 CREATE TABLE IF NOT EXISTS companies (
     id SERIAL PRIMARY KEY,
