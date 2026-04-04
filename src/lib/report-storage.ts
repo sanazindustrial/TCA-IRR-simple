@@ -121,20 +121,58 @@ class ReportStorageService {
             Object.keys(data).filter(k => data[k as keyof ComprehensiveAnalysisOutput] !== null)
         );
 
-        // Save to localStorage
+        // Save to localStorage first (for offline support)
         await this.saveToLocalStorage(report);
 
-        // Save to backend API
-        try {
-            await this.saveToBackendAPI(report);
-            console.log(`Report ${reportId} saved to backend (Eval: ${evaluationId}, Company: ${companyId})`);
-        } catch (error) {
-            console.warn('Failed to save report to backend API (will retry later):', error);
-            // Store in pending sync queue for later retry
-            this.addToPendingSyncQueue(report);
+        // Save to backend API with immediate retry
+        let backendSaved = false;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                await this.saveToBackendAPI(report);
+                console.log(`Report ${reportId} saved to backend on attempt ${attempt} (Eval: ${evaluationId}, Company: ${companyId})`);
+                backendSaved = true;
+                
+                // Mark as synced in localStorage
+                report.metadata.status = 'completed';
+                await this.saveToLocalStorage(report);
+                
+                // Clear this report from pending queue if present
+                this.removeFromPendingSyncQueue(reportId);
+                break;
+            } catch (error) {
+                console.warn(`Backend save attempt ${attempt} failed:`, error);
+                if (attempt === 3) {
+                    console.warn('All retry attempts failed, adding to pending sync queue');
+                    this.addToPendingSyncQueue(report);
+                }
+                // Wait before retry
+                if (attempt < 3) await new Promise(r => setTimeout(r, 1000 * attempt));
+            }
         }
 
         return reportId;
+    }
+
+    /**
+     * Remove a report from the pending sync queue
+     */
+    private removeFromPendingSyncQueue(reportId: string): void {
+        try {
+            const queueKey = 'pending_report_sync';
+            const existingQueue = localStorage.getItem(queueKey);
+            if (!existingQueue) return;
+            
+            const queue: StoredReport[] = JSON.parse(existingQueue);
+            const filtered = queue.filter(r => r.id !== reportId && r.reportId !== reportId);
+            
+            if (filtered.length === 0) {
+                localStorage.removeItem(queueKey);
+            } else {
+                localStorage.setItem(queueKey, JSON.stringify(filtered));
+            }
+        } catch (error) {
+            console.error('Error removing from sync queue:', error);
+        }
     }
 
     /**
@@ -244,27 +282,49 @@ class ReportStorageService {
     /**
      * Retry syncing pending reports to backend
      */
-    async syncPendingReports(): Promise<void> {
+    async syncPendingReports(): Promise<{ synced: number; remaining: number }> {
         try {
             const queueKey = 'pending_report_sync';
             const existingQueue = localStorage.getItem(queueKey);
-            if (!existingQueue) return;
+            if (!existingQueue) return { synced: 0, remaining: 0 };
 
             const queue: StoredReport[] = JSON.parse(existingQueue);
             const stillPending: StoredReport[] = [];
+            let syncedCount = 0;
 
             for (const report of queue) {
                 try {
                     await this.saveToBackendAPI(report);
                     console.log(`Synced pending report: ${report.id}`);
+                    syncedCount++;
+                    
+                    // Update local storage status to completed
+                    report.metadata.status = 'completed';
+                    await this.saveToLocalStorage(report);
                 } catch (error) {
+                    console.warn(`Failed to sync report ${report.id}:`, error);
                     stillPending.push(report);
                 }
             }
 
-            localStorage.setItem(queueKey, JSON.stringify(stillPending));
+            // Update or clear the queue
+            if (stillPending.length === 0) {
+                localStorage.removeItem(queueKey);
+            } else {
+                localStorage.setItem(queueKey, JSON.stringify(stillPending));
+            }
+
+            // Dispatch event for UI updates
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('tca_sync_completed', { 
+                    detail: { synced: syncedCount, remaining: stillPending.length } 
+                }));
+            }
+
+            return { synced: syncedCount, remaining: stillPending.length };
         } catch (error) {
             console.error('Error syncing pending reports:', error);
+            return { synced: 0, remaining: -1 };
         }
     }
 
@@ -340,6 +400,48 @@ class ReportStorageService {
         } catch (error) {
             console.error('Error getting report:', error);
             return null;
+        }
+    }
+
+    /**
+     * Update an existing report with new data
+     */
+    async updateReport(reportId: string, updates: Partial<StoredReport>): Promise<boolean> {
+        try {
+            const report = await this.getReport(reportId);
+            if (!report) {
+                console.error('Report not found:', reportId);
+                return false;
+            }
+
+            // Merge updates
+            const updatedReport: StoredReport = {
+                ...report,
+                ...updates,
+                version: report.version + 1,
+                updatedAt: new Date().toISOString(),
+                metadata: {
+                    ...report.metadata,
+                    ...(updates.metadata || {})
+                }
+            };
+
+            // Save to localStorage
+            await this.saveToLocalStorage(updatedReport);
+
+            // Try to sync to backend
+            try {
+                await this.saveToBackendAPI(updatedReport);
+                console.log(`Report ${reportId} updated and synced to backend`);
+            } catch (error) {
+                console.warn('Failed to sync updated report to backend:', error);
+                this.addToPendingSyncQueue(updatedReport);
+            }
+
+            return true;
+        } catch (error) {
+            console.error('Error updating report:', error);
+            return false;
         }
     }
 
