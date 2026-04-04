@@ -45,6 +45,7 @@ import { cn } from '@/lib/utils';
 
 import { runAnalysis } from '@/app/analysis/actions';
 import { settingsApi, SettingsVersion, MODULE_DEFINITIONS as API_MODULE_DEFS } from '@/lib/settings-api';
+import { unifiedRecordTracking, generateSimulationId } from '@/lib/unified-record-tracking';
 
 interface ScoreRow {
   id: string;
@@ -62,16 +63,16 @@ interface ModuleConfig {
 }
 
 // Default module definitions (used as fallback)
-const MODULE_DEFINITIONS: Record<string, { name: string; description: string; }> = {
-  tca: { name: 'TCA Scorecard', description: 'Core technology capability assessment', },
-  risk: { name: 'Risk Assessment', description: 'Risk factors and mitigation analysis', },
-  macro: { name: 'Macro Trend Analysis', description: 'PESTEL framework analysis', },
-  benchmark: { name: 'Benchmark Comparison', description: 'Industry benchmark overlay', },
-  growth: { name: 'Growth Classification', description: 'Growth trajectory analysis', },
-  gap: { name: 'Gap Analysis', description: 'Capability gap heatmap', },
-  founderFit: { name: 'Founder Fit Analysis', description: 'Funding readiness assessment', },
-  team: { name: 'Team Assessment', description: 'Team effectiveness evaluation', },
-  strategicFit: { name: 'Strategic Fit Matrix', description: 'Strategic alignment scoring', },
+const MODULE_DEFINITIONS: Record<string, { name: string; description: string; weight: number }> = {
+  tca: { name: 'TCA Scorecard', description: 'Core technology capability assessment', weight: 15 },
+  risk: { name: 'Risk Assessment', description: 'Risk factors and mitigation analysis', weight: 13 },
+  macro: { name: 'Macro Trend Analysis', description: 'PESTEL framework analysis', weight: 12 },
+  benchmark: { name: 'Benchmark Comparison', description: 'Industry benchmark overlay', weight: 12 },
+  growth: { name: 'Growth Classification', description: 'Growth trajectory analysis', weight: 12 },
+  gap: { name: 'Gap Analysis', description: 'Capability gap heatmap', weight: 11 },
+  founderFit: { name: 'Founder Fit Analysis', description: 'Funding readiness assessment', weight: 12 },
+  team: { name: 'Team Assessment', description: 'Team effectiveness evaluation', weight: 13 },
+  strategicFit: { name: 'Strategic Fit Matrix', description: 'Strategic alignment scoring', weight: 0 },
 };
 
 const EditableScoreTable = ({
@@ -473,10 +474,10 @@ export default function SimulationPage() {
             console.error('Failed to fetch fresh analysis:', error);
             toast({
               title: 'Analysis Required',
-              description: 'Unable to load analysis data. Please run a new analysis first.',
+              description: 'Unable to load analysis data. Please run a new analysis from the evaluation page.',
               variant: 'destructive'
             });
-            router.push('/analysis');
+            router.push('/dashboard/evaluation');
             return;
           }
         }
@@ -498,10 +499,10 @@ export default function SimulationPage() {
             console.error('No TCA categories found in analysis data');
             toast({
               title: 'Invalid Analysis Data',
-              description: 'TCA scorecard data is missing. Please run a new analysis.',
+              description: 'TCA scorecard data is missing. Please run a new analysis from evaluation.',
               variant: 'destructive'
             });
-            router.push('/analysis');
+            router.push('/dashboard/evaluation');
             return;
           }
 
@@ -610,20 +611,20 @@ export default function SimulationPage() {
           console.error('No analysis data available');
           toast({
             title: 'No Analysis Data',
-            description: 'Please run an analysis first to use Simulation.',
+            description: 'Please run an analysis first from the evaluation page.',
             variant: 'destructive'
           });
-          router.push('/analysis');
+          router.push('/dashboard/evaluation');
         }
 
       } catch (error) {
         console.error('Error loading analysis data:', error);
         toast({
           title: 'Data Loading Error',
-          description: 'Failed to load analysis data. Please try running a new analysis.',
+          description: 'Failed to load analysis data. Please start a new evaluation.',
           variant: 'destructive'
         });
-        router.push('/analysis');
+        router.push('/dashboard/evaluation');
       } finally {
         setIsLoading(false);
       }
@@ -723,9 +724,11 @@ export default function SimulationPage() {
       const tcaScore = moduleScores['tca'] || 0;
 
       // Add simulation metadata for triage report generation
+      const simId = generateSimulationId();
       const finalData = {
         ...updatedData,
         simulationAnalysis: {
+          simulationId: simId,
           adjustedScores: editableScores,
           moduleScores: moduleScores,
           tcaScore: tcaScore,
@@ -741,6 +744,20 @@ export default function SimulationPage() {
       localStorage.setItem('analysisResult', JSON.stringify(finalData));
       localStorage.setItem('simulationAdjusted', 'true');
       localStorage.setItem('triageReportReady', 'true');
+      localStorage.setItem('currentSimulationId', simId);
+
+      // Update unified record with simulation results
+      unifiedRecordTracking.addSimulationResults(
+        {
+          adjustedScores: editableScores,
+          moduleScores: moduleScores,
+          settingsVersionId: selectedVersion?.id
+        },
+        {
+          tcaScore,
+          modulesAnalyzed: Object.keys(editableScores).length
+        }
+      );
 
       // Save simulation run to API (if settings version is available)
       if (selectedVersion?.id) {
@@ -773,9 +790,20 @@ export default function SimulationPage() {
         description: `TCA Score: ${tcaScore.toFixed(2)}/10. ${Object.keys(moduleScores).length} modules calculated. Generating report...`,
       });
 
+      // Build tracking params for redirect
+      const evalId = localStorage.getItem('currentEvaluationId') || '';
+      const anlId = localStorage.getItem('currentAnalysisId') || '';
+      const companyName = localStorage.getItem('analysisCompanyName') || '';
+      const trackingParams = new URLSearchParams();
+      if (evalId) trackingParams.set('evalId', evalId);
+      if (anlId) trackingParams.set('anlId', anlId);
+      if (companyName) trackingParams.set('company', encodeURIComponent(companyName));
+
+      const queryString = trackingParams.toString();
+
       // Redirect to result page to show the triage report
       setTimeout(() => {
-        router.push('/analysis/result');
+        router.push(`/analysis/result${queryString ? '?' + queryString : ''}`);
       }, 1500);
 
     } catch (error) {
@@ -799,7 +827,17 @@ export default function SimulationPage() {
       description: 'Proceeding with original analysis scores.',
     });
 
-    router.push('/analysis/result');
+    // Build tracking params for redirect
+    const evalId = localStorage.getItem('currentEvaluationId') || '';
+    const anlId = localStorage.getItem('currentAnalysisId') || '';
+    const companyName = localStorage.getItem('analysisCompanyName') || '';
+    const trackingParams = new URLSearchParams();
+    if (evalId) trackingParams.set('evalId', evalId);
+    if (anlId) trackingParams.set('anlId', anlId);
+    if (companyName) trackingParams.set('company', encodeURIComponent(companyName));
+
+    const queryString = trackingParams.toString();
+    router.push(`/analysis/result${queryString ? '?' + queryString : ''}`);
   }
 
   const allScores = Object.values(editableScores).flat().map(s => s.score);
@@ -849,7 +887,7 @@ export default function SimulationPage() {
                       }
                     }}
                   >
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger id="settings-version" className="w-[180px]">
                       <SelectValue placeholder="Select version" />
                     </SelectTrigger>
                     <SelectContent>

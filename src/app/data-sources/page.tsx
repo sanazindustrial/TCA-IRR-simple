@@ -633,7 +633,7 @@ export default function DataSourcesPage() {
               />
             </div>
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-full md:w-[200px]">
+              <SelectTrigger id="category-filter" className="w-full md:w-[200px]">
                 <SelectValue placeholder="All Categories" />
               </SelectTrigger>
               <SelectContent>
@@ -645,7 +645,7 @@ export default function DataSourcesPage() {
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full md:w-[180px]">
+              <SelectTrigger id="source-status-filter" className="w-full md:w-[180px]">
                 <SelectValue placeholder="All Statuses" />
               </SelectTrigger>
               <SelectContent>
@@ -657,7 +657,7 @@ export default function DataSourcesPage() {
               </SelectContent>
             </Select>
             <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-full md:w-[180px]">
+              <SelectTrigger id="source-type-filter" className="w-full md:w-[180px]">
                 <SelectValue placeholder="All Types" />
               </SelectTrigger>
               <SelectContent>
@@ -669,7 +669,7 @@ export default function DataSourcesPage() {
               </SelectContent>
             </Select>
             <Select value={pricingFilter} onValueChange={setPricingFilter}>
-              <SelectTrigger className="w-full md:w-[180px]">
+              <SelectTrigger id="pricing-filter" className="w-full md:w-[180px]">
                 <SelectValue placeholder="All Pricing" />
               </SelectTrigger>
               <SelectContent>

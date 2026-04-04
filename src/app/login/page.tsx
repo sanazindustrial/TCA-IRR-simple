@@ -49,8 +49,8 @@ export default function LoginPage() {
       }
     }
 
-    // Local authentication fallback
-    const user = users.find(u => u.email === email && u.password === password);
+    // Local authentication fallback (case-insensitive email)
+    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
 
     if (user) {
       localStorage.setItem('loggedInUser', JSON.stringify(user));

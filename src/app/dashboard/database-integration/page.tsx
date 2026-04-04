@@ -217,7 +217,7 @@ export default function DatabaseIntegrationPage() {
                      <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="type" className="text-right">Type</Label>
                         <Select value={newConnection.type} onValueChange={(value) => setNewConnection({...newConnection, type: value as Connection['type']})}>
-                            <SelectTrigger className="col-span-3">
+                            <SelectTrigger id="db-type" className="col-span-3">
                                 <SelectValue placeholder="Select type"/>
                             </SelectTrigger>
                             <SelectContent>
