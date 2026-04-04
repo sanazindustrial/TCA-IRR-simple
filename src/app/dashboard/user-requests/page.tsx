@@ -237,7 +237,7 @@ export default function UserRequestManagerPage() {
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger id="request-status-filter" className="w-[180px]">
                 <SelectValue placeholder="All Status" />
               </SelectTrigger>
               <SelectContent>
@@ -250,7 +250,7 @@ export default function UserRequestManagerPage() {
               </SelectContent>
             </Select>
             <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-[200px]">
+              <SelectTrigger id="request-type-filter" className="w-[200px]">
                 <SelectValue placeholder="All Types" />
               </SelectTrigger>
               <SelectContent>

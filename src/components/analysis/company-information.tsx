@@ -190,6 +190,7 @@ export function CompanyInformation({
             <Label htmlFor="company-name">Company Name *</Label>
             <Input
               id="company-name"
+              name="companyName"
               placeholder="Enter company name"
               value={companyName || currentInfo.companyName || ''}
               onChange={(e) => {
@@ -202,6 +203,7 @@ export function CompanyInformation({
             <Label htmlFor="legal-name">Legal Name</Label>
             <Input
               id="legal-name"
+              name="legalName"
               placeholder="Legal entity name (if different)"
               value={currentInfo.legalName || ''}
               onChange={(e) => updateCompanyInfo('legalName', e.target.value)}
@@ -214,6 +216,7 @@ export function CompanyInformation({
             <Label htmlFor="website">Website</Label>
             <Input
               id="website"
+              name="website"
               type="url"
               placeholder="https://www.example.com"
               value={currentInfo.website || ''}
@@ -224,6 +227,7 @@ export function CompanyInformation({
             <Label htmlFor="employees">Number of Employees</Label>
             <Input
               id="employees"
+              name="numberOfEmployees"
               type="number"
               placeholder="e.g., 25"
               value={currentInfo.numberOfEmployees || ''}
@@ -237,10 +241,11 @@ export function CompanyInformation({
           <div className="space-y-2">
             <Label htmlFor="industry">Industry Vertical *</Label>
             <Select
+              name="industryVertical"
               value={currentInfo.industryVertical || ''}
               onValueChange={(val) => updateCompanyInfo('industryVertical', val)}
             >
-              <SelectTrigger className={showValidation && isFieldEmpty('industryVertical') ? 'border-red-500' : ''}>
+              <SelectTrigger id="industry" className={showValidation && isFieldEmpty('industryVertical') ? 'border-red-500' : ''}>
                 <SelectValue placeholder="Select industry" />
               </SelectTrigger>
               <SelectContent>
@@ -253,10 +258,11 @@ export function CompanyInformation({
           <div className="space-y-2">
             <Label htmlFor="stage">Development Stage *</Label>
             <Select
+              name="developmentStage"
               value={currentInfo.developmentStage || ''}
               onValueChange={(val) => updateCompanyInfo('developmentStage', val)}
             >
-              <SelectTrigger className={showValidation && isFieldEmpty('developmentStage') ? 'border-red-500' : ''}>
+              <SelectTrigger id="stage" className={showValidation && isFieldEmpty('developmentStage') ? 'border-red-500' : ''}>
                 <SelectValue placeholder="Select stage" />
               </SelectTrigger>
               <SelectContent>
@@ -269,10 +275,11 @@ export function CompanyInformation({
           <div className="space-y-2">
             <Label htmlFor="business-model">Business Model *</Label>
             <Select
+              name="businessModel"
               value={currentInfo.businessModel || ''}
               onValueChange={(val) => updateCompanyInfo('businessModel', val)}
             >
-              <SelectTrigger className={showValidation && isFieldEmpty('businessModel') ? 'border-red-500' : ''}>
+              <SelectTrigger id="business-model" className={showValidation && isFieldEmpty('businessModel') ? 'border-red-500' : ''}>
                 <SelectValue placeholder="Select model" />
               </SelectTrigger>
               <SelectContent>
@@ -292,16 +299,22 @@ export function CompanyInformation({
           </Label>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Input
+              id="city"
+              name="city"
               placeholder="City"
               value={currentInfo.city || ''}
               onChange={(e) => updateCompanyInfo('city', e.target.value)}
             />
             <Input
+              id="state"
+              name="state"
               placeholder="State/Province"
               value={currentInfo.state || ''}
               onChange={(e) => updateCompanyInfo('state', e.target.value)}
             />
             <Input
+              id="country"
+              name="country"
               placeholder="Country"
               value={currentInfo.country || ''}
               onChange={(e) => updateCompanyInfo('country', e.target.value)}
@@ -314,6 +327,7 @@ export function CompanyInformation({
           <Label htmlFor="one-liner">One-Line Description *</Label>
           <Input
             id="one-liner"
+            name="oneLineDescription"
             placeholder="A brief one-sentence description of your company"
             value={currentInfo.oneLineDescription || ''}
             onChange={(e) => updateCompanyInfo('oneLineDescription', e.target.value)}
@@ -331,6 +345,7 @@ export function CompanyInformation({
           </Label>
           <Textarea
             id="company-description"
+            name="companyDescription"
             placeholder="Detailed description of your company and what it does..."
             rows={4}
             value={companyDescription || currentInfo.companyDescription || ''}
@@ -345,6 +360,7 @@ export function CompanyInformation({
           <Label htmlFor="product-description">Product Description *</Label>
           <Textarea
             id="product-description"
+            name="productDescription"
             placeholder="Describe your product or service offering in detail..."
             rows={3}
             value={currentInfo.productDescription || ''}

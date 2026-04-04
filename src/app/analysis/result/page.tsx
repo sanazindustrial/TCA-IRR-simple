@@ -17,6 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 // Hooks and Utils
 import { useToast } from '@/hooks/use-toast';
 import { saveAnalysisReport, reportStorage } from '@/lib/report-storage';
+import { unifiedRecordTracking, generateReportId } from '@/lib/unified-record-tracking';
 
 // Evaluation Components
 import { BenchmarkComparison } from '@/components/evaluation/benchmark-comparison';
@@ -323,6 +324,25 @@ function ReportView({
         }
     };
 
+    // Show message if no visible sections
+    if (visibleComponents.length === 0) {
+        return (
+            <Card className="border-orange-200 bg-orange-50/30">
+                <CardContent className="p-8 text-center">
+                    <AlertTriangle className="size-12 text-orange-500 mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold mb-2">No Report Sections Available</h3>
+                    <p className="text-muted-foreground mb-4">
+                        There are no visible sections configured for this report type.
+                        Please check your report configuration or contact an administrator.
+                    </p>
+                    <Button asChild variant="default">
+                        <Link href="/dashboard/evaluation">Start New Analysis</Link>
+                    </Button>
+                </CardContent>
+            </Card>
+        );
+    }
+
     return (
         <div className="space-y-8">
             {visibleComponents.map(({ id, component: Component }) => (
@@ -338,7 +358,7 @@ function ReportView({
 export default function AnalysisResultPage({
     searchParams
 }: {
-    searchParams: Promise<{ preview?: string; type?: string }>
+    searchParams: Promise<{ preview?: string; type?: string; evalId?: string; anlId?: string; company?: string; user?: string }>
 }) {
     const { toast } = useToast();
     const router = useRouter();
@@ -349,8 +369,15 @@ export default function AnalysisResultPage({
     const [visibleSections, setVisibleSections] = useState<ReportSection[]>([]);
     const [analysisData, setAnalysisData] = useState<ComprehensiveAnalysisOutput>(sampleAnalysisData);
     const [analysisDuration, setAnalysisDuration] = useState<number | null>(null);
-    const [params, setParams] = useState<{ preview?: string; type?: string }>({});
+    const [params, setParams] = useState<{ preview?: string; type?: string; evalId?: string; anlId?: string; company?: string; user?: string }>({});
     const [isPreview, setIsPreview] = useState(false);
+    const [isUsingSampleData, setIsUsingSampleData] = useState(false);
+
+    // Unified Record Tracking State
+    const [evaluationId, setEvaluationId] = useState<string | null>(null);
+    const [analysisId, setAnalysisId] = useState<string | null>(null);
+    const [companyId, setCompanyId] = useState<string | null>(null);
+    const [companyName, setCompanyName] = useState<string>('');
 
     // Reviewer Approval State
     const [approvalStatus, setApprovalStatus] = useState<ApprovalStatus>('pending');
@@ -359,11 +386,25 @@ export default function AnalysisResultPage({
     const [isSubmittingReview, setIsSubmittingReview] = useState(false);
     const [showApprovalPanel, setShowApprovalPanel] = useState(true);
 
-    // Unwrap searchParams
+    // Unwrap searchParams and load tracking IDs
     useEffect(() => {
         searchParams.then(p => {
             setParams(p);
             setIsPreview(p.preview === 'true');
+
+            // Load tracking IDs from URL params
+            if (p.evalId) {
+                setEvaluationId(p.evalId);
+                localStorage.setItem('currentEvaluationId', p.evalId);
+            }
+            if (p.anlId) {
+                setAnalysisId(p.anlId);
+                localStorage.setItem('currentAnalysisId', p.anlId);
+            }
+            if (p.company) {
+                const decodedCompany = decodeURIComponent(p.company);
+                setCompanyName(decodedCompany);
+            }
         });
     }, [searchParams]);
 
@@ -410,13 +451,61 @@ export default function AnalysisResultPage({
                 if (storedAnalysis && !isPreview) {
                     try {
                         const parsedAnalysis = JSON.parse(storedAnalysis);
+
+                        // Normalize TCA data to ensure correct composite score (0-10 scale)
+                        if (parsedAnalysis.tcaData) {
+                            let compositeScore = parsedAnalysis.tcaData.compositeScore || 0;
+
+                            // If score > 10, it's on 0-100 scale, convert to 0-10
+                            if (compositeScore > 10) {
+                                compositeScore = compositeScore / 10;
+                            }
+
+                            // If score is still 0 or too low, recalculate from categories
+                            if (compositeScore === 0 && parsedAnalysis.tcaData.categories?.length > 0) {
+                                compositeScore = parsedAnalysis.tcaData.categories.reduce((sum: number, cat: any) => {
+                                    const weight = cat.weight || 10;
+                                    const rawScore = cat.rawScore || 0;
+                                    return sum + (rawScore * weight / 100);
+                                }, 0);
+                            }
+
+                            // Clamp to 0-10 range
+                            compositeScore = Math.max(0, Math.min(10, compositeScore));
+                            parsedAnalysis.tcaData.compositeScore = compositeScore;
+                        }
+
+                        // Add company info if available from localStorage
+                        const storedCompanyName = localStorage.getItem('analysisCompanyName');
+                        if (storedCompanyName) {
+                            parsedAnalysis.companyName = storedCompanyName;
+                            if (!companyName) setCompanyName(storedCompanyName);
+                        }
+
                         setAnalysisData(parsedAnalysis);
+                        setIsUsingSampleData(false);
+                        console.log('Loaded analysis data with composite score:', parsedAnalysis.tcaData?.compositeScore);
                     } catch (e) {
                         console.error('Failed to parse analysis data:', e);
                         setAnalysisData(sampleAnalysisData);
+                        setIsUsingSampleData(true);
                     }
                 } else {
                     setAnalysisData(sampleAnalysisData);
+                    setIsUsingSampleData(true);
+                }
+
+                // Load unified record tracking IDs
+                const currentRecord = unifiedRecordTracking.getCurrentRecord();
+                if (currentRecord) {
+                    setEvaluationId(currentRecord.id.evaluationId);
+                    setCompanyId(currentRecord.id.companyId);
+                } else {
+                    // Try to get from localStorage directly
+                    const storedEvalId = localStorage.getItem('currentEvaluationId');
+                    if (storedEvalId) {
+                        setEvaluationId(storedEvalId);
+                    }
                 }
 
                 // Load analysis duration
@@ -470,6 +559,7 @@ export default function AnalysisResultPage({
                 setRole('user');
                 setReportType('triage');
                 setAnalysisData(sampleAnalysisData);
+                setIsUsingSampleData(true);
                 setAnalysisDuration(45.32);
             } finally {
                 setIsLoading(false);
@@ -598,14 +688,26 @@ export default function AnalysisResultPage({
                 localStorage.getItem('analysisCompanyName') ||
                 'Analysis Report';
 
-            // Save the report
+            // Get or create evaluation ID for tracking
+            let currentEvalId = evaluationId;
+            if (!currentEvalId) {
+                const currentRecord = unifiedRecordTracking.getCurrentRecord();
+                if (currentRecord) {
+                    currentEvalId = currentRecord.id.evaluationId;
+                    setEvaluationId(currentEvalId);
+                }
+            }
+
+            // Save the report with evaluation ID for tracking
             const reportId = await saveAnalysisReport(analysisData, {
                 reportType,
                 framework,
                 userId,
                 companyName,
                 analysisDuration: analysisDuration ?? undefined,
-                tags: [reportType, framework]
+                tags: [reportType, framework],
+                evaluationId: currentEvalId || undefined,
+                companyId: companyId || undefined,
             });
 
             console.log(`Report saved with ID: ${reportId}`);
@@ -658,19 +760,45 @@ export default function AnalysisResultPage({
         setIsSubmittingReview(true);
 
         try {
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            const reviewer = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
+            const reviewerEmail = reviewer?.email || 'Unknown';
+            const reviewerId = reviewer?.id || reviewer?.email || 'unknown';
 
             const approvalData = {
                 status,
                 comments: reviewerComments,
                 checklist: reviewChecklist,
                 timestamp: new Date().toISOString(),
-                reviewer: JSON.parse(localStorage.getItem('loggedInUser') || '{}')?.email || 'Unknown'
+                reviewer: reviewerEmail
             };
 
             localStorage.setItem('reportApprovalStatus', JSON.stringify(approvalData));
             setApprovalStatus(status);
+
+            // Update unified record tracking with approval status
+            if (evaluationId) {
+                const allChecked = reviewChecklist.every(item => item.checked);
+                unifiedRecordTracking.updateReviewerApproval(
+                    reviewChecklist.map(item => ({ id: item.id, checked: item.checked })),
+                    reviewerComments,
+                    status === 'approved' && allChecked
+                );
+            }
+
+            // Update report storage with approval status
+            const currentReportId = localStorage.getItem('currentReportId');
+            if (currentReportId) {
+                const report = await reportStorage.getReport(currentReportId);
+                if (report) {
+                    report.metadata.approvalStatus = status === 'approved' ? 'approved' :
+                        status === 'rejected' ? 'rejected' : 'needs_revision';
+                    report.metadata.status = status === 'approved' ? 'completed' : 'pending_approval';
+                    report.metadata.reviewerId = reviewerId;
+                    report.metadata.reviewedAt = new Date().toISOString();
+                    report.metadata.reviewerComments = reviewerComments;
+                    report.updatedAt = new Date().toISOString();
+                }
+            }
 
             toast({
                 title: status === 'approved' ? '✅ Report Approved' :
@@ -711,36 +839,60 @@ export default function AnalysisResultPage({
     // Auto-save analysis when data is loaded
     useEffect(() => {
         const autoSaveAnalysis = async () => {
-            if (!analysisData || !role || isPreview) return;
+            // Don't auto-save if using sample data, in preview mode, or missing required data
+            if (!analysisData || !role || isPreview || isUsingSampleData) {
+                if (isUsingSampleData) {
+                    console.log('Skipping auto-save: Using sample data');
+                }
+                return;
+            }
 
             try {
                 const user = localStorage.getItem('loggedInUser') || localStorage.getItem('user');
-                if (!user) return;
+                if (!user) {
+                    console.log('Skipping auto-save: No user logged in');
+                    return;
+                }
 
                 const userData = JSON.parse(user);
                 const userId = userData.id || userData.email || 'anonymous';
-                const companyName = (analysisData as any).companyName || 'Analysis Report';
+                const savedCompanyName = companyName || (analysisData as any).companyName || localStorage.getItem('analysisCompanyName') || 'Analysis Report';
 
-                // Auto-save the current analysis
+                // Get evaluation ID from state or localStorage
+                const savedEvalId = evaluationId || localStorage.getItem('currentEvaluationId');
+                const savedCompanyId = companyId || localStorage.getItem('currentCompanyId');
+
+                // Auto-save the current analysis with tracking IDs
                 const reportId = await saveAnalysisReport(analysisData, {
                     reportType,
                     framework,
                     userId,
-                    companyName,
+                    companyName: savedCompanyName,
                     analysisDuration: analysisDuration ?? undefined,
-                    tags: [reportType, framework]
+                    tags: [reportType, framework, 'auto-saved'],
+                    evaluationId: savedEvalId || undefined,
+                    companyId: savedCompanyId || undefined,
                 });
 
-                console.log(`Analysis auto-saved with ID: ${reportId}`);
+                console.log(`Analysis auto-saved with ID: ${reportId}, EvalID: ${savedEvalId}`);
+                toast({
+                    title: 'Report Saved',
+                    description: `Your ${reportType} report has been saved with pending approval status.`,
+                });
             } catch (error) {
                 console.error('Auto-save failed:', error);
+                toast({
+                    variant: 'destructive',
+                    title: 'Save Failed',
+                    description: 'Failed to auto-save the report. You can manually save it.',
+                });
             }
         };
 
         // Delay auto-save to ensure all data is loaded
         const saveTimeout = setTimeout(autoSaveAnalysis, 2000);
         return () => clearTimeout(saveTimeout);
-    }, [analysisData, reportType, framework, role, analysisDuration, isPreview]);
+    }, [analysisData, reportType, framework, role, analysisDuration, isPreview, isUsingSampleData, evaluationId, companyId, companyName, toast]);
 
     if (isLoading) {
         return <Loading />;
@@ -764,6 +916,29 @@ export default function AnalysisResultPage({
         >
             <main className="bg-background text-foreground min-h-screen">
                 <div className="container mx-auto p-4 md:p-8">
+                    {/* Sample Data Warning Banner */}
+                    {isUsingSampleData && !isPreview && (
+                        <Card className="mb-6 border-amber-500 bg-amber-50/50 dark:bg-amber-900/20">
+                            <CardContent className="py-4">
+                                <div className="flex items-center gap-3">
+                                    <AlertTriangle className="size-5 text-amber-600 flex-shrink-0" />
+                                    <div className="flex-1">
+                                        <p className="font-medium text-amber-800 dark:text-amber-200">
+                                            Viewing Sample Data
+                                        </p>
+                                        <p className="text-sm text-amber-700 dark:text-amber-300">
+                                            No analysis results found. This is sample demonstration data.
+                                            To generate a real report, please run an analysis first.
+                                        </p>
+                                    </div>
+                                    <Button asChild variant="outline" size="sm" className="border-amber-500 text-amber-700 hover:bg-amber-100">
+                                        <Link href="/dashboard/evaluation">Run Analysis</Link>
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+
                     <header className="mb-12">
                         {/* Main Header with Title and Action Buttons */}
                         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-6">

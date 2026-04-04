@@ -7,13 +7,16 @@ Enhanced with:
 - Audit logging
 - Token blacklisting for secure logout
 - Password reset functionality
+- Invite-based signup for admin/analyst roles
 """
 
 import logging
 import secrets
 from datetime import timedelta, datetime
+from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from pydantic import BaseModel, Field, field_validator
 import asyncpg
 
 from app.core import (settings, create_access_token, verify_token, 
@@ -366,6 +369,9 @@ async def register(request: Request,
         # Hash password
         hashed_password = get_password_hash(user_data.password)
 
+        # Public signup always creates 'user' role - admin/analyst require invitation
+        signup_role = 'user'
+
         # Insert new user - using correct column names (password_hash not password)
         user_id = await db.fetchval(
             """
@@ -373,7 +379,7 @@ async def register(request: Request,
             VALUES ($1, $2, $3, $4, $5, NOW())
             RETURNING id
             """, user_data.username, user_data.email, hashed_password,
-            user_data.role.value, user_data.is_active)
+            signup_role, user_data.is_active)
 
         # Fetch created user
         created_user_row = await db.fetchrow(
@@ -393,7 +399,7 @@ async def register(request: Request,
             username=user_data.username,
             ip_address=client_ip,
             user_agent=user_agent,
-            action_details={"email": user_data.email, "role": user_data.role.value},
+            action_details={"email": user_data.email, "role": signup_role},
             success=True,
             db=db
         )
@@ -680,3 +686,369 @@ async def get_reset_token_for_testing(email: str):
         status_code=status.HTTP_404_NOT_FOUND,
         detail="No reset token found for this email"
     )
+
+
+# =============================================
+# INVITE-BASED SIGNUP FOR ADMIN/ANALYST ROLES
+# =============================================
+
+# In-memory invite token storage (for production, use Redis or database)
+invite_tokens: dict = {}
+
+
+class InviteRequest(BaseModel):
+    """Request model for creating user invitation"""
+    email: str = Field(..., pattern=r'^[^@]+@[^@]+\.[^@]+$')
+    role: str = Field(..., description="Role to assign: 'admin' or 'analyst'")
+
+
+class InviteResponse(BaseModel):
+    """Response model for invitation creation"""
+    success: bool
+    message: str
+    invite_token: Optional[str] = None
+    expires_at: Optional[str] = None
+
+
+class AcceptInviteRequest(BaseModel):
+    """Request model for accepting an invitation"""
+    token: str
+    username: str = Field(..., min_length=3, max_length=50)
+    password: str = Field(..., min_length=8)
+    confirm_password: str
+    full_name: Optional[str] = None
+
+    @field_validator('confirm_password')
+    @classmethod
+    def passwords_match(cls, v, info):
+        password = info.data.get('password')
+        if password and v != password:
+            raise ValueError('Passwords do not match')
+        return v
+
+
+@router.post("/invite", response_model=InviteResponse)
+async def invite_user(
+    request: Request,
+    invite_data: InviteRequest,
+    current_user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db)
+):
+    """
+    Invite a new admin or analyst user (admin only)
+    
+    - **email**: Email address to send invitation to
+    - **role**: Role to assign ('admin' or 'analyst')
+    
+    Only admins can create invitations for privileged roles.
+    """
+    # Get client info for logging
+    client_ip = request.client.host if request.client else "unknown"
+    user_agent = request.headers.get("user-agent", "unknown")
+    
+    # Check if current user is admin
+    if current_user.get('role') != 'admin':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins can invite admin or analyst users"
+        )
+    
+    # Validate role
+    if invite_data.role not in ['admin', 'analyst']:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Role must be 'admin' or 'analyst'"
+        )
+    
+    try:
+        # Check if email already exists
+        existing_user = await db.fetchrow(
+            "SELECT id FROM users WHERE email = $1",
+            invite_data.email
+        )
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="A user with this email already exists"
+            )
+        
+        # Check if there's already a pending invite for this email
+        for token, data in invite_tokens.items():
+            if data['email'] == invite_data.email and datetime.utcnow() < data['expires_at']:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="An active invitation already exists for this email"
+                )
+        
+        # Generate invite token
+        invite_token = secrets.token_urlsafe(32)
+        expires_at = datetime.utcnow() + timedelta(days=7)  # Invite valid for 7 days
+        
+        # Store the invite token
+        invite_tokens[invite_token] = {
+            "email": invite_data.email,
+            "role": invite_data.role,
+            "invited_by": current_user['id'],
+            "invited_by_username": current_user['username'],
+            "expires_at": expires_at,
+            "created_at": datetime.utcnow()
+        }
+        
+        # Log the invitation
+        await audit_logger.log(
+            AuditEventType.USER_CREATED,  # Use USER_CREATED for invite events
+            user_id=current_user['id'],
+            username=current_user['username'],
+            ip_address=client_ip,
+            user_agent=user_agent,
+            action_details={
+                "action": "invite_created",
+                "invited_email": invite_data.email,
+                "invited_role": invite_data.role
+            },
+            success=True,
+            db=db
+        )
+        
+        logger.info(f"Invite created by {current_user['username']} for {invite_data.email} as {invite_data.role}")
+        
+        return InviteResponse(
+            success=True,
+            message=f"Invitation created for {invite_data.email}. Token valid for 7 days.",
+            invite_token=invite_token,
+            expires_at=expires_at.isoformat()
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating invite: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error creating invitation"
+        )
+
+
+@router.post("/accept-invite", response_model=UserResponse)
+async def accept_invite(
+    request: Request,
+    accept_data: AcceptInviteRequest,
+    db: asyncpg.Connection = Depends(get_db)
+):
+    """
+    Accept an invitation and create an admin/analyst account
+    
+    - **token**: The invitation token received
+    - **username**: Desired username
+    - **password**: Password (minimum 8 characters with complexity requirements)
+    - **confirm_password**: Password confirmation
+    - **full_name**: Optional full name
+    """
+    # Get client info for logging
+    client_ip = request.client.host if request.client else "unknown"
+    user_agent = request.headers.get("user-agent", "unknown")
+    
+    try:
+        # Validate the invite token
+        token_data = invite_tokens.get(accept_data.token)
+        
+        if not token_data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired invitation token"
+            )
+        
+        # Check if token has expired
+        if datetime.utcnow() > token_data['expires_at']:
+            # Remove expired token
+            del invite_tokens[accept_data.token]
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invitation token has expired"
+            )
+        
+        # Validate password strength
+        is_valid, errors = PasswordPolicy.validate(
+            accept_data.password,
+            username=accept_data.username,
+            email=token_data['email']
+        )
+        if not is_valid:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={"password_errors": errors}
+            )
+        
+        # Check if username already exists
+        existing_user = await db.fetchrow(
+            "SELECT id FROM users WHERE username = $1 OR email = $2",
+            accept_data.username, token_data['email']
+        )
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Username or email already registered"
+            )
+        
+        # Hash password
+        hashed_password = get_password_hash(accept_data.password)
+        
+        # Create the user with the invited role
+        user_id = await db.fetchval(
+            """
+            INSERT INTO users (username, email, password_hash, role, is_active, created_at)
+            VALUES ($1, $2, $3, $4, TRUE, NOW())
+            RETURNING id
+            """,
+            accept_data.username,
+            token_data['email'],
+            hashed_password,
+            token_data['role']
+        )
+        
+        # Remove the used invite token
+        del invite_tokens[accept_data.token]
+        
+        # Fetch created user
+        created_user_row = await db.fetchrow(
+            """
+            SELECT id, username, email, role, is_active, created_at, updated_at
+            FROM users WHERE id = $1
+            """, user_id
+        )
+        
+        created_user = dict(created_user_row)
+        created_user['full_name'] = accept_data.full_name
+        
+        # Log the account creation
+        await audit_logger.log(
+            AuditEventType.USER_CREATED,
+            user_id=user_id,
+            username=accept_data.username,
+            ip_address=client_ip,
+            user_agent=user_agent,
+            action_details={
+                "email": token_data['email'],
+                "role": token_data['role'],
+                "invited_by": token_data['invited_by_username'],
+                "method": "invitation"
+            },
+            success=True,
+            db=db
+        )
+        
+        logger.info(f"User {accept_data.username} accepted invite as {token_data['role']}")
+        
+        return UserResponse(**created_user)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error accepting invite: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error creating account"
+        )
+
+
+@router.get("/invite/validate/{token}")
+async def validate_invite_token(token: str):
+    """
+    Validate an invitation token without using it
+    
+    - **token**: The invitation token to validate
+    
+    Returns whether the token is valid and what role it's for.
+    """
+    token_data = invite_tokens.get(token)
+    
+    if not token_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid invitation token"
+        )
+    
+    if datetime.utcnow() > token_data['expires_at']:
+        # Remove expired token
+        del invite_tokens[token]
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invitation token has expired"
+        )
+    
+    # Mask email for privacy
+    email = token_data['email']
+    masked_email = email[:3] + "***" + email[email.index('@'):]
+    
+    return {
+        "valid": True,
+        "email": masked_email,
+        "role": token_data['role'],
+        "invited_by": token_data['invited_by_username'],
+        "expires_in_days": int((token_data['expires_at'] - datetime.utcnow()).total_seconds() / 86400)
+    }
+
+
+@router.get("/invites", response_model=List[dict])
+async def list_pending_invites(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    List all pending invitations (admin only)
+    """
+    if current_user.get('role') != 'admin':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins can view pending invitations"
+        )
+    
+    pending_invites = []
+    current_time = datetime.utcnow()
+    
+    for token, data in invite_tokens.items():
+        if current_time < data['expires_at']:
+            pending_invites.append({
+                "email": data['email'],
+                "role": data['role'],
+                "invited_by": data['invited_by_username'],
+                "created_at": data['created_at'].isoformat(),
+                "expires_at": data['expires_at'].isoformat(),
+                "token_preview": token[:8] + "..."  # Show partial token for reference
+            })
+    
+    return pending_invites
+
+
+@router.delete("/invite/{email}")
+async def revoke_invite(
+    email: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Revoke a pending invitation (admin only)
+    
+    - **email**: Email address of the invitation to revoke
+    """
+    if current_user.get('role') != 'admin':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins can revoke invitations"
+        )
+    
+    # Find and remove the invite for this email
+    token_to_remove = None
+    for token, data in invite_tokens.items():
+        if data['email'] == email:
+            token_to_remove = token
+            break
+    
+    if token_to_remove:
+        del invite_tokens[token_to_remove]
+        logger.info(f"Invite for {email} revoked by {current_user['username']}")
+        return {"success": True, "message": f"Invitation for {email} has been revoked"}
+    
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="No pending invitation found for this email"
+    )
+

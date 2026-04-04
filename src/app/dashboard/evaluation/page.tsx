@@ -629,8 +629,18 @@ export default function EvaluationPage() {
         if (!hasContent) return;
 
         autoExtractionTriggered.current = true;
+
+        // Show toast that extraction is starting
+        toast({
+            title: 'Starting Extraction',
+            description: 'Analyzing uploaded documents for company information...',
+        });
+
         await handleExtractFromDocuments();
-    }, [uploadedFiles, importedUrls, submittedTexts, isExtracting]);
+
+        // Auto-navigate to step 2 after successful extraction to show filled form
+        setCurrentStep(2);
+    }, [uploadedFiles, importedUrls, submittedTexts, isExtracting, toast]);
 
     // Auto-trigger extraction when documents change (only in step 1)
     useEffect(() => {
@@ -639,7 +649,7 @@ export default function EvaluationPage() {
             // Delay auto-extraction slightly to allow batch uploads
             const timer = setTimeout(() => {
                 triggerAutoExtraction();
-            }, 2000); // 2 second delay for batch uploads
+            }, 1500); // 1.5 second delay for batch uploads (reduced from 2s)
             return () => clearTimeout(timer);
         }
     }, [uploadedFiles.length, importedUrls.length, submittedTexts.length, isInitialized, extractionComplete, isExtracting, currentStep, triggerAutoExtraction]);
@@ -648,6 +658,9 @@ export default function EvaluationPage() {
     const handleExtractFromDocuments = async () => {
         setIsExtracting(true);
         try {
+            // Wait a bit for document processing to complete
+            await new Promise(resolve => setTimeout(resolve, 500));
+
             // Get processed files from localStorage (set by document-submission component)
             const processedFiles = JSON.parse(localStorage.getItem('processedFiles') || '[]');
             const processedUrls = JSON.parse(localStorage.getItem('processedUrls') || '[]');
@@ -659,7 +672,18 @@ export default function EvaluationPage() {
                 ...processedUrls.map((u: { extracted_data?: { text_content?: string } }) => u.extracted_data?.text_content || ''),
                 ...processedTexts.map((t: { content?: string }) => t.content || ''),
                 ...submittedTexts,
-            ].join('\n\n');
+            ].filter(c => c.length > 0).join('\n\n');
+
+            // If no content to extract, show message and exit
+            if (allContent.trim().length < 50) {
+                toast({
+                    title: 'Processing Documents',
+                    description: 'Please wait for document processing to complete, then extraction will run automatically.',
+                });
+                setIsExtracting(false);
+                autoExtractionTriggered.current = false; // Allow retry
+                return;
+            }
 
             // Call backend extraction API
             const response = await fetch('https://tcairrapiccontainer.azurewebsites.net/api/v1/analysis/extract-company-info', {
@@ -673,23 +697,30 @@ export default function EvaluationPage() {
 
             if (response.ok) {
                 const extractedData = await response.json();
+                console.log('Extraction API response:', extractedData);
 
-                // Auto-fill company information fields using unified state update
-                updateCompanyInfo({
-                    companyName: extractedData.company_name || companyInfo.companyName,
-                    legalName: extractedData.legal_name || companyInfo.legalName,
-                    website: extractedData.website || companyInfo.website,
-                    companyDescription: extractedData.description || companyInfo.companyDescription,
-                    oneLineDescription: extractedData.one_line_description || companyInfo.oneLineDescription,
-                    productDescription: extractedData.product_description || companyInfo.productDescription,
-                    industryVertical: extractedData.industry_vertical || companyInfo.industryVertical,
-                    developmentStage: extractedData.development_stage || companyInfo.developmentStage,
-                    businessModel: extractedData.business_model || companyInfo.businessModel,
-                    country: extractedData.country || companyInfo.country,
-                    state: extractedData.state || companyInfo.state,
-                    city: extractedData.city || companyInfo.city,
-                    numberOfEmployees: extractedData.number_of_employees || companyInfo.numberOfEmployees,
-                });
+                // Build update object only with extracted values
+                const updates: Partial<CompanyInformationData> = {};
+
+                if (extractedData.company_name) updates.companyName = extractedData.company_name;
+                if (extractedData.legal_name) updates.legalName = extractedData.legal_name;
+                if (extractedData.website) updates.website = extractedData.website;
+                if (extractedData.description) updates.companyDescription = extractedData.description;
+                if (extractedData.one_line_description) updates.oneLineDescription = extractedData.one_line_description;
+                if (extractedData.product_description) updates.productDescription = extractedData.product_description;
+                if (extractedData.industry_vertical) updates.industryVertical = extractedData.industry_vertical;
+                if (extractedData.development_stage) updates.developmentStage = extractedData.development_stage;
+                if (extractedData.business_model) updates.businessModel = extractedData.business_model;
+                if (extractedData.country) updates.country = extractedData.country;
+                if (extractedData.state) updates.state = extractedData.state;
+                if (extractedData.city) updates.city = extractedData.city;
+                if (extractedData.number_of_employees) updates.numberOfEmployees = extractedData.number_of_employees;
+
+                // Update company info with extracted data
+                if (Object.keys(updates).length > 0) {
+                    setCompanyInfo(prev => ({ ...prev, ...updates }));
+                    console.log('Updated company info with:', updates);
+                }
 
                 // Generate company ID based on extracted name
                 if (extractedData.company_name) {
@@ -697,11 +728,13 @@ export default function EvaluationPage() {
                     setCompanyId(newCompanyId);
                 }
 
+                const fieldsExtracted = Object.keys(updates).length;
                 toast({
                     title: 'Extraction Complete!',
-                    description: 'Company information has been extracted. Please review and confirm the details.',
+                    description: `Extracted ${fieldsExtracted} field(s). Please review and confirm the details.`,
                 });
             } else {
+                console.log('Extraction API failed, using fallback extraction');
                 // Robust fallback: Extract as much info as possible from content using patterns
                 const extractedName = extractNameFromContent(allContent);
                 const extractedDescription = extractDescriptionFromContent(allContent);
@@ -711,14 +744,15 @@ export default function EvaluationPage() {
 
                 // Update all fields that we could extract
                 const updates: Partial<CompanyInformationData> = {};
-                if (extractedName && !companyInfo.companyName) updates.companyName = extractedName;
-                if (extractedDescription && !companyInfo.companyDescription) updates.companyDescription = extractedDescription;
-                if (extractedWebsite && !companyInfo.website) updates.website = extractedWebsite;
-                if (extractedIndustry && !companyInfo.industryVertical) updates.industryVertical = extractedIndustry;
-                if (extractedStage && !companyInfo.developmentStage) updates.developmentStage = extractedStage;
+                if (extractedName) updates.companyName = extractedName;
+                if (extractedDescription) updates.companyDescription = extractedDescription;
+                if (extractedWebsite) updates.website = extractedWebsite;
+                if (extractedIndustry) updates.industryVertical = extractedIndustry;
+                if (extractedStage) updates.developmentStage = extractedStage;
 
                 if (Object.keys(updates).length > 0) {
-                    updateCompanyInfo(updates);
+                    setCompanyInfo(prev => ({ ...prev, ...updates }));
+                    console.log('Fallback extraction found:', updates);
 
                     // Generate company ID if we found a name
                     if (updates.companyName) {
@@ -744,6 +778,7 @@ export default function EvaluationPage() {
                 title: 'Extraction Failed',
                 description: 'Could not extract company info. Please fill in the details manually.',
             });
+            setExtractionComplete(true); // Still mark complete so user can proceed
         } finally {
             setIsExtracting(false);
         }
@@ -930,8 +965,6 @@ export default function EvaluationPage() {
     const handleRunAnalysis = async () => {
         const hasData = uploadedFiles.length > 0 || importedUrls.length > 0 || submittedTexts.length > 0 || companyInfo.companyName;
 
-        setIsLoading(true);
-
         // NO MOCK DATA - Require real company data
         if (!hasData) {
             toast({
@@ -939,7 +972,6 @@ export default function EvaluationPage() {
                 title: 'No Data Provided',
                 description: 'Please upload documents or enter company information to run analysis.',
             });
-            setIsLoading(false);
             return;
         }
 
@@ -949,11 +981,10 @@ export default function EvaluationPage() {
                 title: 'Company Name Required',
                 description: 'Please enter a company name before running analysis.',
             });
-            setIsLoading(false);
             return;
         }
 
-        const startTime = Date.now();
+        setIsLoading(true);
 
         // Track analysis start
         trackingService.trackAnalysis(
@@ -963,109 +994,65 @@ export default function EvaluationPage() {
             { companyName: companyInfo.companyName, framework, documentCount: uploadedFiles.length }
         );
 
+        // Prepare company data for analysis
+        const companyData = {
+            company_id: companyId,
+            evaluation_id: evaluationId,
+            company_name: companyInfo.companyName,
+            legal_name: companyInfo.legalName,
+            website: companyInfo.website,
+            description: companyInfo.companyDescription,
+            one_line_description: companyInfo.oneLineDescription,
+            product_description: companyInfo.productDescription,
+            industry_vertical: companyInfo.industryVertical,
+            development_stage: companyInfo.developmentStage,
+            business_model: companyInfo.businessModel,
+            country: companyInfo.country,
+            state: companyInfo.state,
+            city: companyInfo.city,
+            number_of_employees: companyInfo.numberOfEmployees,
+            framework,
+        };
+
+        // Save to company history in database
+        try {
+            await fetch('https://tcairrapiccontainer.azurewebsites.net/api/v1/companies', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(companyData),
+            });
+            console.log('Company data saved to database');
+        } catch (saveError) {
+            console.warn('Failed to save company data to database:', saveError);
+        }
+
+        // Store all data in localStorage for the analysis/run page to use
+        localStorage.setItem('analysisCompanyName', companyInfo.companyName);
+        localStorage.setItem('analysisFramework', framework);
+        localStorage.setItem('analysisEvaluationId', evaluationId);
+        localStorage.setItem('analysisCompanyId', companyId);
+        localStorage.setItem('uploadedFiles', JSON.stringify(uploadedFiles));
+        localStorage.setItem('importedUrls', JSON.stringify(importedUrls));
+        localStorage.setItem('submittedTexts', JSON.stringify(submittedTexts));
+        localStorage.setItem('companyData', JSON.stringify({
+            uploadedFiles,
+            importedUrls,
+            submittedTexts,
+            companyName: companyInfo.companyName,
+            companyDescription: companyInfo.companyDescription || submittedTexts[0] || '',
+            ...companyData,
+        }));
+
+        // Clear autosave before navigating
+        clearAutosave();
+
         toast({
-            title: 'Running Analysis...',
-            description: `Processing ${companyInfo.companyName} - ${uploadedFiles.length} files, ${importedUrls.length} URLs.`,
+            title: 'Starting Analysis',
+            description: `Redirecting to run all 9 modules for ${companyInfo.companyName}...`,
         });
 
-        try {
-            // Save company info to database before analysis with tracking
-            const companyData = {
-                company_id: companyId,
-                evaluation_id: evaluationId,
-                company_name: companyInfo.companyName,
-                legal_name: companyInfo.legalName,
-                website: companyInfo.website,
-                description: companyInfo.companyDescription,
-                one_line_description: companyInfo.oneLineDescription,
-                product_description: companyInfo.productDescription,
-                industry_vertical: companyInfo.industryVertical,
-                development_stage: companyInfo.developmentStage,
-                business_model: companyInfo.businessModel,
-                country: companyInfo.country,
-                state: companyInfo.state,
-                city: companyInfo.city,
-                number_of_employees: companyInfo.numberOfEmployees,
-                framework,
-            };
-
-            // Save to company history in database
-            try {
-                await fetch('https://tcairrapiccontainer.azurewebsites.net/api/v1/companies', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(companyData),
-                });
-                console.log('Company data saved to database');
-            } catch (saveError) {
-                console.warn('Failed to save company data to database:', saveError);
-                // Continue with analysis even if save fails
-            }
-
-            // Pass real user data to runAnalysis
-            const userData = {
-                uploadedFiles,
-                importedUrls,
-                submittedTexts,
-                companyName: companyInfo.companyName || 'Unknown Company',
-                companyDescription: companyInfo.companyDescription || submittedTexts[0] || 'User-provided company description',
-                companyData, // Include all company fields
-            };
-
-            const comprehensiveData = await runAnalysis(framework, userData);
-            const endTime = Date.now();
-            const duration = (endTime - startTime) / 1000;
-
-            // Store analysis result with unique tracking IDs
-            localStorage.setItem('analysisResult', JSON.stringify(comprehensiveData));
-            localStorage.setItem('analysisDuration', duration.toString());
-            localStorage.setItem('analysisFramework', framework);
-            localStorage.setItem('analysisEvaluationId', evaluationId);
-            localStorage.setItem('analysisCompanyId', companyId);
-            localStorage.setItem('analysisCompanyName', companyInfo.companyName);
-
-            // Update tracking service
-            trackingService.updateEvaluation(evaluationId, {
-                status: 'completed',
-                companyName: companyInfo.companyName,
-            });
-
-            toast({
-                title: 'Analysis Complete!',
-                description: `Analysis ${evaluationId} completed in ${duration.toFixed(1)}s`,
-            });
-
-            // Clear autosave after successful analysis
-            clearAutosave();
-
-            // Role-based navigation:
-            // - Admin/Analyst: Must go to what-if to review and adjust 9 module scores
-            // - Standard user: Skip what-if, go directly to result page for triage report
-            if (role === 'admin' || role === 'analyst') {
-                toast({
-                    title: 'Redirecting to Score Review',
-                    description: 'As an admin/analyst, please review and adjust scores from 9 modules before generating the report.',
-                });
-                router.push('/analysis/what-if');
-            } else {
-                router.push('/analysis/result');
-            }
-
-        } catch (error) {
-            console.error('Failed to run analysis:', error);
-
-            // Track failure
-            trackingService.updateEvaluation(evaluationId, {
-                status: 'failed',
-            });
-
-            toast({
-                variant: 'destructive',
-                title: 'Analysis Failed',
-                description: error instanceof Error ? error.message : 'An unknown error occurred.',
-            });
-            setIsLoading(false);
-        }
+        // Redirect to the analysis runner page which shows 9-module progress
+        router.push('/analysis/run');
     };
 
     const isPrivilegedUser = role === 'admin' || role === 'analyst';
