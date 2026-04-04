@@ -797,7 +797,7 @@ export default function AnalysisResultPage({
                     report.metadata.reviewedAt = new Date().toISOString();
                     report.metadata.reviewerComments = reviewerComments;
                     report.updatedAt = new Date().toISOString();
-                    
+
                     // Save the updated report back to storage and sync to backend
                     await reportStorage.updateReport(currentReportId, {
                         metadata: report.metadata,
