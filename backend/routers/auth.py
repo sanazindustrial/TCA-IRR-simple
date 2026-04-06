@@ -296,6 +296,11 @@ async def accept_invite(accept_data: AcceptInviteRequest):
                     "permissions": get_permissions_for_role(user['role'])
                 }
             )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Accept invite error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to accept invite: {str(e)}")
 
 
 @router.post("/refresh")

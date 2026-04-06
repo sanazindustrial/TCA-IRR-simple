@@ -23,9 +23,51 @@
         {
           "key": "X-Content-Type-Options",
           "value": "nosniff"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store, no-cache, must-revalidate, proxy-revalidate"
+        },
+        {
+          "key": "Pragma",
+          "value": "no-cache"
+        },
+        {
+          "key": "Expires",
+          "value": "0"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; frame-ancestors 'self';"
         }
       ],
       "regex": "^(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))?(?:/)?$"
+    },
+    {
+      "source": "/:path*.map",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ],
+      "regex": "^(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))?\\.map(?:/)?$"
     }
   ],
   "dynamicRoutes": [
@@ -50,6 +92,12 @@
       "regex": "^/_not\\-found(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/_not\\-found(?:/)?$"
+    },
+    {
+      "page": "/analysis/modules/analyst",
+      "regex": "^/analysis/modules/analyst(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/analysis/modules/analyst(?:/)?$"
     },
     {
       "page": "/analysis/modules/benchmark",
@@ -82,12 +130,6 @@
       "namedRegex": "^/analysis/modules/macro(?:/)?$"
     },
     {
-      "page": "/analysis/modules/reviewer",
-      "regex": "^/analysis/modules/reviewer(?:/)?$",
-      "routeKeys": {},
-      "namedRegex": "^/analysis/modules/reviewer(?:/)?$"
-    },
-    {
       "page": "/analysis/modules/risk",
       "regex": "^/analysis/modules/risk(?:/)?$",
       "routeKeys": {},
@@ -116,6 +158,12 @@
       "regex": "^/analysis/result(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/analysis/result(?:/)?$"
+    },
+    {
+      "page": "/analysis/run",
+      "regex": "^/analysis/run(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/analysis/run(?:/)?$"
     },
     {
       "page": "/analysis/tca",
@@ -158,6 +206,12 @@
       "regex": "^/dashboard/ai\\-training/performance(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/dashboard/ai\\-training/performance(?:/)?$"
+    },
+    {
+      "page": "/dashboard/analyst",
+      "regex": "^/dashboard/analyst(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/analyst(?:/)?$"
     },
     {
       "page": "/dashboard/backup",
@@ -214,6 +268,12 @@
       "namedRegex": "^/dashboard/help/admin\\-configuration(?:/)?$"
     },
     {
+      "page": "/dashboard/help/analyst-analysis",
+      "regex": "^/dashboard/help/analyst\\-analysis(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/help/analyst\\-analysis(?:/)?$"
+    },
+    {
       "page": "/dashboard/help/cost-analysis",
       "regex": "^/dashboard/help/cost\\-analysis(?:/)?$",
       "routeKeys": {},
@@ -238,12 +298,6 @@
       "namedRegex": "^/dashboard/help/module\\-guides(?:/)?$"
     },
     {
-      "page": "/dashboard/help/reviewer-analysis",
-      "regex": "^/dashboard/help/reviewer\\-analysis(?:/)?$",
-      "routeKeys": {},
-      "namedRegex": "^/dashboard/help/reviewer\\-analysis(?:/)?$"
-    },
-    {
       "page": "/dashboard/help/triage-report",
       "regex": "^/dashboard/help/triage\\-report(?:/)?$",
       "routeKeys": {},
@@ -260,6 +314,12 @@
       "regex": "^/dashboard/help/what\\-if\\-analysis(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/dashboard/help/what\\-if\\-analysis(?:/)?$"
+    },
+    {
+      "page": "/dashboard/module-settings",
+      "regex": "^/dashboard/module\\-settings(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/module\\-settings(?:/)?$"
     },
     {
       "page": "/dashboard/my-requests",
@@ -308,12 +368,6 @@
       "regex": "^/dashboard/request(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/dashboard/request(?:/)?$"
-    },
-    {
-      "page": "/dashboard/reviewer",
-      "regex": "^/dashboard/reviewer(?:/)?$",
-      "routeKeys": {},
-      "namedRegex": "^/dashboard/reviewer(?:/)?$"
     },
     {
       "page": "/dashboard/schema",
@@ -410,6 +464,12 @@
       "regex": "^/logout(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/logout(?:/)?$"
+    },
+    {
+      "page": "/maintenance",
+      "regex": "^/maintenance(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/maintenance(?:/)?$"
     },
     {
       "page": "/reset-password",

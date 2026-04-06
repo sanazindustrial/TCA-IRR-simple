@@ -8,7 +8,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Timer, Eye, Save, Loader2, CheckCircle2, XCircle, AlertTriangle, ClipboardCheck, Shield, ArrowRight, MessageSquare } from 'lucide-react';
+import { Timer, Eye, Save, Loader2, CheckCircle2, XCircle, AlertTriangle, ClipboardCheck, Shield, ArrowRight, MessageSquare, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -378,6 +378,7 @@ export default function AnalysisResultPage({
     const [analysisId, setAnalysisId] = useState<string | null>(null);
     const [companyId, setCompanyId] = useState<string | null>(null);
     const [companyName, setCompanyName] = useState<string>('');
+    const [currentUserName, setCurrentUserName] = useState<string>('');
 
     // Reviewer Approval State
     const [approvalStatus, setApprovalStatus] = useState<ApprovalStatus>('pending');
@@ -402,10 +403,29 @@ export default function AnalysisResultPage({
                 localStorage.setItem('currentAnalysisId', p.anlId);
             }
             if (p.company) {
-                const decodedCompany = decodeURIComponent(p.company);
+                // Decode and sanitize company name (remove newlines and extra whitespace)
+                const decodedCompany = decodeURIComponent(p.company).replace(/[\r\n]+/g, ' ').trim();
                 setCompanyName(decodedCompany);
+                console.log('Loaded company name from URL:', decodedCompany);
+            }
+            if (p.user) {
+                const decodedUser = decodeURIComponent(p.user).trim();
+                setCurrentUserName(decodedUser);
             }
         });
+
+        // Load user name from localStorage if not in URL params
+        const storedUser = localStorage.getItem('loggedInUser') || localStorage.getItem('user');
+        if (storedUser) {
+            try {
+                const user = JSON.parse(storedUser);
+                if (!currentUserName) {
+                    setCurrentUserName(user.name || user.email?.split('@')[0] || 'User');
+                }
+            } catch (e) {
+                console.error('Failed to parse user data for name:', e);
+            }
+        }
     }, [searchParams]);
 
     // Load approval status from localStorage
@@ -447,6 +467,27 @@ export default function AnalysisResultPage({
                 }
 
                 // Load analysis data from localStorage or use sample data
+                // First, validate that stored analysis belongs to current evaluation
+                const storedEvalIdForValidation = localStorage.getItem('currentEvaluationId');
+                const urlEvalId = params?.evalId;
+
+                // If URL has an evalId that doesn't match stored data, clear stale data
+                if (urlEvalId && storedEvalIdForValidation && urlEvalId !== storedEvalIdForValidation) {
+                    console.log('Clearing stale analysis data - URL evalId:', urlEvalId, 'stored:', storedEvalIdForValidation);
+                    localStorage.removeItem('analysisResult');
+                    localStorage.removeItem('analysisTrackingInfo');
+                    localStorage.removeItem('reportApprovalStatus');
+                    setAnalysisData(sampleAnalysisData);
+                    setIsUsingSampleData(true);
+                    setIsLoading(false);
+                    toast({
+                        variant: 'destructive',
+                        title: 'No Analysis Data',
+                        description: 'No analysis data found for this evaluation. Please run analysis first.',
+                    });
+                    return;
+                }
+
                 const storedAnalysis = localStorage.getItem('analysisResult');
                 if (storedAnalysis && !isPreview) {
                     try {
@@ -475,11 +516,21 @@ export default function AnalysisResultPage({
                             parsedAnalysis.tcaData.compositeScore = compositeScore;
                         }
 
-                        // Add company info if available from localStorage
-                        const storedCompanyName = localStorage.getItem('analysisCompanyName');
-                        if (storedCompanyName) {
-                            parsedAnalysis.companyName = storedCompanyName;
-                            if (!companyName) setCompanyName(storedCompanyName);
+                        // Add company info - URL params take priority over localStorage
+                        if (params?.company) {
+                            // URL company param is authoritative
+                            const decodedCompany = decodeURIComponent(params.company).replace(/[\r\n]+/g, ' ').trim();
+                            parsedAnalysis.companyName = decodedCompany;
+                        } else {
+                            // Fall back to localStorage if no URL param
+                            const storedCompanyName = localStorage.getItem('analysisCompanyName');
+                            if (storedCompanyName) {
+                                parsedAnalysis.companyName = storedCompanyName;
+                                // Only set state from localStorage if URL didn't provide company
+                                if (!companyName) {
+                                    setCompanyName(storedCompanyName);
+                                }
+                            }
                         }
 
                         setAnalysisData(parsedAnalysis);
@@ -660,9 +711,18 @@ export default function AnalysisResultPage({
     }, [role, reportType, isPreview]);
 
     const handleRunAnalysis = async () => {
+        // Clear all analysis-related localStorage data before starting fresh
+        const keysToRemove = [
+            'analysisResult', 'analysisTrackingInfo', 'currentEvaluationId',
+            'currentAnalysisId', 'reportApprovalStatus', 'analysisCompanyName',
+            'analysisFramework', 'analysisCompanyId', 'companyData',
+            'uploadedFiles', 'importedUrls', 'submittedTexts'
+        ];
+        keysToRemove.forEach(key => localStorage.removeItem(key));
+
         toast({
-            title: 'Navigating to New Analysis',
-            description: 'Redirecting to the analysis page...'
+            title: 'Starting New Analysis',
+            description: 'Previous analysis data cleared. Redirecting to evaluation page...'
         });
         router.push('/dashboard/evaluation');
     };
@@ -945,6 +1005,49 @@ export default function AnalysisResultPage({
                         </Card>
                     )}
 
+                    {/* Evaluation Context Banner - Company, User, Evaluation ID */}
+                    {(companyName || evaluationId || currentUserName) && !isPreview && (
+                        <Card className="mb-6 border-primary/30 bg-gradient-to-r from-primary/5 to-primary/10">
+                            <CardContent className="py-4">
+                                <div className="flex flex-wrap items-center justify-between gap-4">
+                                    {/* Company Name - Left Side */}
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 rounded-full bg-primary/10">
+                                            <Shield className="size-5 text-primary" />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-muted-foreground uppercase tracking-wider">Company Analysis</p>
+                                            <p className="text-lg font-semibold text-foreground">
+                                                {companyName || 'Untitled Analysis'}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Evaluation Info & User - Right Side */}
+                                    <div className="flex flex-wrap items-center gap-3">
+                                        {evaluationId && (
+                                            <Badge variant="outline" className="px-3 py-1 font-mono text-xs bg-background">
+                                                <ClipboardCheck className="size-3 mr-1.5" />
+                                                {evaluationId}
+                                            </Badge>
+                                        )}
+                                        {analysisId && (
+                                            <Badge variant="secondary" className="px-3 py-1 font-mono text-xs">
+                                                ANL: {analysisId}
+                                            </Badge>
+                                        )}
+                                        {currentUserName && (
+                                            <Badge variant="default" className="px-3 py-1">
+                                                <span className="size-2 rounded-full bg-green-400 mr-1.5 animate-pulse" />
+                                                {currentUserName}
+                                            </Badge>
+                                        )}
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+
                     <header className="mb-12">
                         {/* Main Header with Title and Action Buttons */}
                         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-6">
@@ -986,10 +1089,13 @@ export default function AnalysisResultPage({
                                                 DD Report (Admin Only)
                                             </Button>
                                         )}
-                                        <Button asChild variant="outline" size="sm">
-                                            <Link href="/dashboard/evaluation">
-                                                New Analysis
-                                            </Link>
+                                        <Button
+                                            onClick={handleRunAnalysis}
+                                            variant="outline"
+                                            size="sm"
+                                        >
+                                            <RefreshCw className="h-4 w-4 mr-2" />
+                                            New Analysis
                                         </Button>
                                         <Button
                                             onClick={handleSaveToReports}

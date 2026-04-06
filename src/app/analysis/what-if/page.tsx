@@ -426,6 +426,26 @@ export default function SimulationPage() {
       try {
         setIsLoading(true);
 
+        // Validate that stored analysis belongs to current evaluation
+        const storedEvalId = localStorage.getItem('currentEvaluationId');
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlEvalId = urlParams.get('evalId');
+
+        // If URL has an evalId that doesn't match stored data, clear stale data
+        if (urlEvalId && storedEvalId && urlEvalId !== storedEvalId) {
+          console.log('Clearing stale analysis data - URL evalId:', urlEvalId, 'stored:', storedEvalId);
+          localStorage.removeItem('analysisResult');
+          localStorage.removeItem('analysisTrackingInfo');
+          localStorage.removeItem('simulationAdjusted');
+          toast({
+            title: 'No Analysis Data',
+            description: 'No analysis data found for this evaluation. Please run analysis first.',
+            variant: 'destructive'
+          });
+          router.push('/dashboard/evaluation');
+          return;
+        }
+
         // First, check if we have stored analysis data
         const storedData = localStorage.getItem('analysisResult');
         let data: ComprehensiveAnalysisOutput | null = null;
@@ -793,11 +813,14 @@ export default function SimulationPage() {
       // Build tracking params for redirect
       const evalId = localStorage.getItem('currentEvaluationId') || '';
       const anlId = localStorage.getItem('currentAnalysisId') || '';
-      const companyName = localStorage.getItem('analysisCompanyName') || '';
+      // Sanitize company name - remove newlines and extra whitespace
+      const rawCompanyName = localStorage.getItem('analysisCompanyName') || '';
+      const companyName = rawCompanyName.replace(/[\r\n]+/g, ' ').trim();
       const trackingParams = new URLSearchParams();
       if (evalId) trackingParams.set('evalId', evalId);
       if (anlId) trackingParams.set('anlId', anlId);
-      if (companyName) trackingParams.set('company', encodeURIComponent(companyName));
+      // Note: URLSearchParams.set() auto-encodes, don't double-encode!
+      if (companyName) trackingParams.set('company', companyName);
 
       const queryString = trackingParams.toString();
 
@@ -830,11 +853,14 @@ export default function SimulationPage() {
     // Build tracking params for redirect
     const evalId = localStorage.getItem('currentEvaluationId') || '';
     const anlId = localStorage.getItem('currentAnalysisId') || '';
-    const companyName = localStorage.getItem('analysisCompanyName') || '';
+    // Sanitize company name - remove newlines and extra whitespace
+    const rawCompanyName = localStorage.getItem('analysisCompanyName') || '';
+    const companyName = rawCompanyName.replace(/[\r\n]+/g, ' ').trim();
     const trackingParams = new URLSearchParams();
     if (evalId) trackingParams.set('evalId', evalId);
     if (anlId) trackingParams.set('anlId', anlId);
-    if (companyName) trackingParams.set('company', encodeURIComponent(companyName));
+    // Note: URLSearchParams.set() auto-encodes, don't double-encode!
+    if (companyName) trackingParams.set('company', companyName);
 
     const queryString = trackingParams.toString();
     router.push(`/analysis/result${queryString ? '?' + queryString : ''}`);
