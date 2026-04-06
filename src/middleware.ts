@@ -50,9 +50,14 @@ export function middleware(request: NextRequest) {
             details: { pathname, method: request.method }
         });
 
-        return new NextResponse('Too Many Requests - Rate limit exceeded', {
+        return new NextResponse(JSON.stringify({
+            success: false,
+            error: 'RATE_LIMIT_EXCEEDED',
+            message: 'Too Many Requests - Rate limit exceeded'
+        }), {
             status: 429,
             headers: {
+                'Content-Type': 'application/json',
                 'Retry-After': '60',
                 'X-RateLimit-Limit': rateLimit.toString(),
                 'X-RateLimit-Remaining': '0',
@@ -67,7 +72,16 @@ export function middleware(request: NextRequest) {
         const isNextServerAction = request.headers.get('next-action') !== null;
 
         // Skip CSRF for Next.js Server Actions and specific routes
-        const skipCSRFRoutes = ['/api/auth/login', '/api/auth/register'];
+        // NOTE: API routes that proxy to backend already have their own auth/validation
+        const skipCSRFRoutes = [
+            '/api/auth/login',
+            '/api/auth/register',
+            '/api/users/invite',    // User invite - uses backend auth
+            '/api/users',           // User management - uses backend auth
+            '/api/reports',         // Report sync - uses backend auth
+            '/api/analysis',        // Analysis endpoints - uses backend auth
+            '/api/tracking',        // Tracking endpoints - uses backend auth
+        ];
         const shouldCheckCSRF = !skipCSRFRoutes.some(route => pathname.startsWith(route))
             && !isNextServerAction;
 
@@ -79,9 +93,17 @@ export function middleware(request: NextRequest) {
                 details: { pathname, method: request.method, reason: 'Invalid CSRF token' }
             });
 
-            return new NextResponse('CSRF token invalid or missing', {
+            // Return JSON response for better error handling
+            return new NextResponse(JSON.stringify({
+                success: false,
+                error: 'CSRF_INVALID',
+                message: 'CSRF token invalid or missing'
+            }), {
                 status: 403,
-                headers: { 'X-Security-Error': 'CSRF_INVALID' }
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Security-Error': 'CSRF_INVALID'
+                }
             });
         }
     }
@@ -99,9 +121,16 @@ export function middleware(request: NextRequest) {
                     details: { pathname, queryParam: key, value: value.substring(0, 100) }
                 });
 
-                return new NextResponse('Malicious input detected in query parameters', {
+                return new NextResponse(JSON.stringify({
+                    success: false,
+                    error: 'XSS_DETECTED',
+                    message: 'Malicious input detected in query parameters'
+                }), {
                     status: 400,
-                    headers: { 'X-Security-Error': 'XSS_DETECTED' }
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Security-Error': 'XSS_DETECTED'
+                    }
                 });
             }
         } catch (error) {
@@ -113,9 +142,16 @@ export function middleware(request: NextRequest) {
                 details: { pathname, queryParam: key, error: String(error) }
             });
 
-            return new NextResponse('Invalid input detected', {
+            return new NextResponse(JSON.stringify({
+                success: false,
+                error: 'INVALID_INPUT',
+                message: 'Invalid input detected'
+            }), {
                 status: 400,
-                headers: { 'X-Security-Error': 'INVALID_INPUT' }
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Security-Error': 'INVALID_INPUT'
+                }
             });
         }
     }

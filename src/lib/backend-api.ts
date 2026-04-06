@@ -172,6 +172,64 @@ export class BackendAPIClient {
 
         return response.json();
     }
+
+    // User Management Methods
+    async getUsers() {
+        const response = await fetch(`${this.baseURL}/api/v1/users`, {
+            method: 'GET',
+            headers: this.getHeaders(),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to get users: ${response.statusText}`);
+        }
+
+        return response.json();
+    }
+
+    async createUser(userData: { email: string; password: string; name: string; role: string }) {
+        const response = await fetch(`${this.baseURL}/api/v1/auth/register`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(userData),
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ detail: 'Registration failed' }));
+            throw new Error(error.detail || `User creation failed: ${response.statusText}`);
+        }
+
+        return response.json();
+    }
+
+    async updateUser(userId: string, userData: Partial<{ name: string; role: string; status: string }>) {
+        const response = await fetch(`${this.baseURL}/api/v1/users/${userId}`, {
+            method: 'PUT',
+            headers: this.getHeaders(),
+            body: JSON.stringify(userData),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to update user: ${response.statusText}`);
+        }
+
+        return response.json();
+    }
+
+    async deleteUser(userId: string) {
+        const response = await fetch(`${this.baseURL}/api/v1/users/${userId}`, {
+            method: 'DELETE',
+            headers: this.getHeaders(),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to delete user: ${response.statusText}`);
+        }
+
+        return response.json();
+    }
 }
 
 export const backendAPI = new BackendAPIClient();

@@ -12,7 +12,7 @@ import { Switch } from '@/components/ui/switch';
 import { EvaluationProvider, useEvaluationContext, type CompanyInformationData } from '@/components/evaluation/evaluation-provider';
 import { useRouter } from 'next/navigation';
 import { runAnalysis } from '@/app/analysis/actions';
-import { ChevronLeft, ChevronRight, Check, Lock, FileText, Database, Settings, Play, Upload, RefreshCw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Lock, FileText, Database, Settings, Play, Upload, RefreshCw, GitBranch, FileCheck2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { trackingService } from '@/lib/tracking-service';
 import { startFreshEvaluation, clearEvaluationState, archiveCurrentEvaluation } from '@/lib/auto-extraction-service';
@@ -68,6 +68,7 @@ interface WorkflowData {
     extractionComplete: boolean;
     hasCompanyInfo: boolean;
     hasExternalData: boolean;
+    analysisComplete: boolean;
     hasModuleConfig: boolean;
 }
 
@@ -103,7 +104,7 @@ const DEFAULT_COMPANY_INFO: CompanyInformationData = {
     numberOfEmployees: null,
 };
 
-// Workflow steps configuration
+// Workflow steps configuration - Complete 7-step workflow
 const WORKFLOW_STEPS: WorkflowStep[] = [
     {
         id: 1,
@@ -143,7 +144,23 @@ const WORKFLOW_STEPS: WorkflowStep[] = [
         description: 'Execute the startup evaluation',
         icon: <Play className="h-5 w-5" />,
         isLocked: (data) => !data.hasCompanyInfo && !data.hasDocuments,
-        isComplete: () => false,
+        isComplete: (data) => data.analysisComplete,
+    },
+    {
+        id: 6,
+        name: 'What-If Analysis',
+        description: 'Explore scenarios and adjust parameters',
+        icon: <GitBranch className="h-5 w-5" />,
+        isLocked: (data) => !data.analysisComplete,
+        isComplete: () => false, // Completed externally on what-if page
+    },
+    {
+        id: 7,
+        name: 'Generate Report',
+        description: 'View and export final analysis report',
+        icon: <FileCheck2 className="h-5 w-5" />,
+        isLocked: (data) => !data.analysisComplete,
+        isComplete: () => false, // Completed externally on result page
     },
 ];
 
@@ -382,7 +399,10 @@ function AnalysisSetup({
                         <p className="text-sm text-muted-foreground mb-4">
                             Configure external data sources to enrich the analysis with market data, competitor info, and more.
                         </p>
-                        <ExternalDataSources framework={framework} />
+                        <ExternalDataSources
+                            framework={framework}
+                            companyName={companyInfo?.companyName || ''}
+                        />
                     </div>
                 )}
 
@@ -1026,8 +1046,30 @@ export default function EvaluationPage() {
             console.warn('Failed to save company data to database:', saveError);
         }
 
+        // IMPORTANT: Clear ALL old analysis data before starting new evaluation
+        // This prevents stale data from previous runs appearing in results
+        const keysToBeforeNewAnalysis = [
+            'analysisResult',
+            'analysisTrackingInfo',
+            'currentEvaluationId',
+            'currentAnalysisId',
+            'reportApprovalStatus',
+            'analysisCompanyName',
+            'analysisFramework',
+            'analysisEvaluationId',
+            'analysisCompanyId',
+            'uploadedFiles',
+            'importedUrls',
+            'submittedTexts',
+            'companyData'
+        ];
+        keysToBeforeNewAnalysis.forEach(key => localStorage.removeItem(key));
+        console.log('🧹 Cleared old analysis data before new evaluation');
+
         // Store all data in localStorage for the analysis/run page to use
-        localStorage.setItem('analysisCompanyName', companyInfo.companyName);
+        // Sanitize company name - remove newlines, carriage returns, and extra whitespace
+        const sanitizedCompanyName = companyInfo.companyName.replace(/[\r\n]+/g, ' ').trim();
+        localStorage.setItem('analysisCompanyName', sanitizedCompanyName);
         localStorage.setItem('analysisFramework', framework);
         localStorage.setItem('analysisEvaluationId', evaluationId);
         localStorage.setItem('analysisCompanyId', companyId);
@@ -1038,7 +1080,7 @@ export default function EvaluationPage() {
             uploadedFiles,
             importedUrls,
             submittedTexts,
-            companyName: companyInfo.companyName,
+            companyName: sanitizedCompanyName,
             companyDescription: companyInfo.companyDescription || submittedTexts[0] || '',
             ...companyData,
         }));
@@ -1048,7 +1090,7 @@ export default function EvaluationPage() {
 
         toast({
             title: 'Starting Analysis',
-            description: `Redirecting to run all 9 modules for ${companyInfo.companyName}...`,
+            description: `Redirecting to run all 9 modules for ${sanitizedCompanyName}...`,
         });
 
         // Redirect to the analysis runner page which shows 9-module progress

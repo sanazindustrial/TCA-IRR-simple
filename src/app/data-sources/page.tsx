@@ -1,7 +1,7 @@
 
 'use client';
 import * as React from 'react';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import * as Lucide from 'lucide-react';
 import {
   sources as initialSources,
@@ -13,6 +13,7 @@ import {
   REQUIREMENT_GROUPS,
   type RequirementGroup,
 } from '@/lib/external-sources-config';
+import { azureStorage } from '@/lib/azure-storage-service';
 import {
   ArrowLeft,
   CheckCircle2,
@@ -40,6 +41,9 @@ import {
   Trash2,
   Key,
   ExternalLink,
+  Save,
+  Cloud,
+  CloudOff,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
@@ -338,13 +342,74 @@ export default function DataSourcesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogSource, setDialogSource] = useState<Source | null>(null);
   const [dialogType, setDialogType] = useState<'add' | 'edit'>('add');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [cloudSynced, setCloudSynced] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Load sources from Azure Storage on mount
+  useEffect(() => {
+    const loadSources = async () => {
+      try {
+        setIsLoading(true);
+        const savedSources = await azureStorage.getItem<Source[]>('data-sources-config');
+        if (savedSources && Array.isArray(savedSources) && savedSources.length > 0) {
+          setSources(savedSources);
+          setCloudSynced(true);
+          toast({
+            title: 'Sources Loaded',
+            description: `Loaded ${savedSources.length} sources from cloud storage.`,
+          });
+        }
+      } catch (error) {
+        console.warn('Could not load sources from cloud, using defaults:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadSources();
+  }, []);
+
+  // Save sources to Azure Storage
+  const saveToCloud = useCallback(async () => {
+    try {
+      setIsSaving(true);
+      await azureStorage.setItem('data-sources-config', sources);
+      setCloudSynced(true);
+      setHasUnsavedChanges(false);
+      toast({
+        title: 'Configuration Saved',
+        description: `Successfully saved ${sources.length} sources to cloud storage.`,
+      });
+    } catch (error) {
+      console.error('Failed to save to cloud:', error);
+      setCloudSynced(false);
+      toast({
+        variant: 'destructive',
+        title: 'Save Failed',
+        description: 'Could not save configuration to cloud storage.',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  }, [sources, toast]);
+
+  // Mark as unsaved when sources change
+  const updateSources = useCallback((updater: (prev: Source[]) => Source[]) => {
+    setSources(prev => {
+      const newSources = updater(prev);
+      setHasUnsavedChanges(true);
+      setCloudSynced(false);
+      return newSources;
+    });
+  }, []);
+
 
   const handleActiveChange = (sourceId: string, checked: boolean) => {
-    setSources(prevSources =>
+    updateSources(prevSources =>
       prevSources.map(s =>
         s.id === sourceId ? { ...s, active: checked } : s
       )
@@ -357,14 +422,14 @@ export default function DataSourcesPage() {
   };
 
   const handleApiKeyChange = (sourceId: string, value: string) => {
-    setSources(prevSources =>
+    updateSources(prevSources =>
       prevSources.map(s => (s.id === sourceId ? { ...s, apiKey: value } : s))
     );
   };
 
   const handleDeleteSource = (sourceId: string) => {
     const sourceName = sources.find(s => s.id === sourceId)?.name;
-    setSources(prevSources => prevSources.filter(s => s.id !== sourceId));
+    updateSources(prevSources => prevSources.filter(s => s.id !== sourceId));
     toast({
       variant: 'destructive',
       title: `Source Deleted`,
@@ -407,9 +472,11 @@ export default function DataSourcesPage() {
         }
 
         setSources(importedSources);
+        setHasUnsavedChanges(true);
+        setCloudSynced(false);
         toast({
           title: 'Import Successful',
-          description: `Successfully imported ${importedSources.length} sources.`,
+          description: `Successfully imported ${importedSources.length} sources. Click "Save to Cloud" to persist changes.`,
         });
       } catch (error) {
         console.error("Failed to import configuration:", error);
@@ -437,13 +504,13 @@ export default function DataSourcesPage() {
 
   const handleSaveSource = (savedSource: Source) => {
     if (dialogType === 'add') {
-      setSources(prev => [{ ...savedSource, id: `new-${Date.now()}` }, ...prev]);
+      updateSources(prev => [{ ...savedSource, id: `new-${Date.now()}` }, ...prev]);
       toast({
         title: 'Source Added',
         description: `${savedSource.name} has been successfully added.`,
       });
     } else {
-      setSources(prev => prev.map(s => s.id === savedSource.id ? savedSource : s));
+      updateSources(prev => prev.map(s => s.id === savedSource.id ? savedSource : s));
       toast({
         title: 'Source Updated',
         description: `${savedSource.name} has been successfully updated.`,
@@ -502,6 +569,27 @@ export default function DataSourcesPage() {
               </p>
             </div>
             <div className='flex gap-2 flex-shrink-0 mt-2'>
+              {hasUnsavedChanges && (
+                <Button
+                  variant="default"
+                  onClick={saveToCloud}
+                  disabled={isSaving}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  {isSaving ? (
+                    <>Saving...</>
+                  ) : (
+                    <><Save className="mr-2 size-4" /> Save to Cloud</>
+                  )}
+                </Button>
+              )}
+              <div className="flex items-center gap-1 px-2 text-xs">
+                {cloudSynced ? (
+                  <><Cloud className="size-4 text-green-500" /><span className="text-green-600">Synced</span></>
+                ) : (
+                  <><CloudOff className="size-4 text-yellow-500" /><span className="text-yellow-600">Unsaved</span></>
+                )}
+              </div>
               <Button variant="outline" onClick={() => toast({ title: 'Testing All Connections', description: 'This may take a moment...' })}><TestTube className="mr-2" /> Test All</Button>
               <Button variant="outline" onClick={() => toast({ title: 'Exporting Configuration', description: 'Your configuration file is being downloaded.' })}><Upload className="mr-2" /> Export Config</Button>
               <Button variant="outline" onClick={triggerFileSelect}><Import className="mr-2" /> Import Config</Button>
