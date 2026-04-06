@@ -578,26 +578,42 @@ export default function ReportsPage() {
         }
       }
 
-      // Merge reports: localStorage first, then API
-      // Use a Set to track unique company names to avoid duplicates
+      // When backend is connected, prioritize API reports (Azure storage)
+      // Only use localStorage as fallback when API is unavailable
       const seenCompanies = new Set<string>();
       const mergedReports: Report[] = [];
 
-      // Add local reports first (most recent saves)
-      for (const report of localReports) {
-        const key = report.company.toLowerCase();
-        if (!seenCompanies.has(key)) {
-          seenCompanies.add(key);
-          mergedReports.push(report);
+      if (apiConnected && apiReports.length > 0) {
+        // Backend connected - use API reports only (Azure storage is source of truth)
+        console.log('Using Azure storage as source of truth');
+        for (const report of apiReports) {
+          const key = report.company.toLowerCase();
+          if (!seenCompanies.has(key)) {
+            seenCompanies.add(key);
+            mergedReports.push(report);
+          }
         }
-      }
+        // Clear localStorage count since we're using Azure
+        setLocalStorageCount(0);
+      } else {
+        // Fallback: merge localStorage and API reports
+        console.log('Using localStorage as fallback');
+        // Add local reports first (most recent saves)
+        for (const report of localReports) {
+          const key = report.company.toLowerCase();
+          if (!seenCompanies.has(key)) {
+            seenCompanies.add(key);
+            mergedReports.push(report);
+          }
+        }
 
-      // Add API reports that aren't duplicates
-      for (const report of apiReports) {
-        const key = report.company.toLowerCase();
-        if (!seenCompanies.has(key)) {
-          seenCompanies.add(key);
-          mergedReports.push(report);
+        // Add API reports that aren't duplicates
+        for (const report of apiReports) {
+          const key = report.company.toLowerCase();
+          if (!seenCompanies.has(key)) {
+            seenCompanies.add(key);
+            mergedReports.push(report);
+          }
         }
       }
 
@@ -803,13 +819,25 @@ export default function ReportsPage() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {/* Local Storage */}
+                {/* Storage Display - Show Azure when connected, Local when offline */}
                 <div className="flex items-center gap-3 p-3 rounded-lg bg-background/50">
-                  <HardDrive className="size-8 text-blue-500" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Local Storage</p>
-                    <p className="text-xl font-bold">{localStorageCount} reports</p>
-                  </div>
+                  {backendConnected ? (
+                    <>
+                      <Cloud className="size-8 text-green-500" />
+                      <div>
+                        <p className="text-sm text-muted-foreground">Azure Storage</p>
+                        <p className="text-xl font-bold">{allReports.length} reports</p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <HardDrive className="size-8 text-blue-500" />
+                      <div>
+                        <p className="text-sm text-muted-foreground">Local Storage</p>
+                        <p className="text-xl font-bold">{localStorageCount} reports</p>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {/* Backend Connection */}
