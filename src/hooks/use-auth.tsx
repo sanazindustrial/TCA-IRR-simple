@@ -57,9 +57,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         setMounted(true);
         try {
-            const userJson = localStorage.getItem('currentUser');
+            // Check both possible localStorage keys (loggedInUser from login page, currentUser as fallback)
+            const userJson = localStorage.getItem('loggedInUser') || localStorage.getItem('currentUser');
             if (userJson) {
-                const user = JSON.parse(userJson);
+                const rawUser = JSON.parse(userJson);
+                // Map backend fields to frontend User type
+                const user: User = {
+                    id: String(rawUser.id),
+                    name: rawUser.name || rawUser.full_name || rawUser.username || 'Unknown',
+                    email: rawUser.email,
+                    role: rawUser.role || 'User',
+                    avatarUrl: rawUser.avatarUrl || rawUser.avatar_url || `https://picsum.photos/seed/${rawUser.email}/100/100`
+                };
                 setCurrentUser(user);
                 setIsAuthenticated(true);
             } else {
@@ -68,18 +77,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 setCurrentUser(null);
             }
         } catch (e) {
+            console.error('Error loading user from localStorage:', e);
             setIsAuthenticated(false);
         }
     }, []);
 
     const login = async (email: string, password?: string) => {
         try {
-            // Mock login - find user by email
-            const user = mockUsers.find(u => u.email === email);
-            if (user) {
-                setCurrentUser(user);
+            // Try backend API first
+            const useBackendAPI = typeof window !== 'undefined' && process.env.NEXT_PUBLIC_USE_MOCK_DATA !== 'true';
+            
+            if (useBackendAPI && password) {
+                try {
+                    const { backendAPI } = await import('@/lib/backend-api');
+                    const response = await backendAPI.login(email, password);
+                    
+                    if (response.success && response.user) {
+                        const user: User = {
+                            id: String(response.user.id),
+                            name: response.user.name || response.user.full_name || response.user.username || 'Unknown',
+                            email: response.user.email,
+                            role: response.user.role || 'User',
+                            avatarUrl: response.user.avatarUrl || response.user.avatar_url || `https://picsum.photos/seed/${response.user.email}/100/100`
+                        };
+                        setCurrentUser(user);
+                        setIsAuthenticated(true);
+                        localStorage.setItem('loggedInUser', JSON.stringify(response.user));
+                        localStorage.setItem('authToken', response.access_token);
+                        return;
+                    }
+                } catch (backendError) {
+                    console.warn('Backend login failed, trying local auth:', backendError);
+                }
+            }
+            
+            // Fallback to mock users
+            const localUser = mockUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
+            if (localUser) {
+                setCurrentUser(localUser);
                 setIsAuthenticated(true);
-                localStorage.setItem('currentUser', JSON.stringify(user));
+                localStorage.setItem('loggedInUser', JSON.stringify(localUser));
             } else {
                 throw new Error('User not found');
             }
@@ -92,7 +129,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const logout = () => {
         setCurrentUser(null);
         setIsAuthenticated(false);
+        localStorage.removeItem('loggedInUser');
         localStorage.removeItem('currentUser');
+        localStorage.removeItem('authToken');
         router.push('/login');
     };
 
@@ -101,7 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (user) {
             setCurrentUser(user);
             setIsAuthenticated(true);
-            localStorage.setItem('currentUser', JSON.stringify(user));
+            localStorage.setItem('loggedInUser', JSON.stringify(user));
         }
     };
 
