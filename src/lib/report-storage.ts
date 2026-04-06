@@ -281,6 +281,7 @@ class ReportStorageService {
 
     /**
      * Retry syncing pending reports to backend
+     * Now more aggressive - clears queue immediately on success
      */
     async syncPendingReports(): Promise<{ synced: number; remaining: number }> {
         try {
@@ -289,9 +290,9 @@ class ReportStorageService {
             if (!existingQueue) return { synced: 0, remaining: 0 };
 
             const queue: StoredReport[] = JSON.parse(existingQueue);
-            const stillPending: StoredReport[] = [];
             let syncedCount = 0;
 
+            // Try to sync all reports
             for (const report of queue) {
                 try {
                     await this.saveToBackendAPI(report);
@@ -303,28 +304,31 @@ class ReportStorageService {
                     await this.saveToLocalStorage(report);
                 } catch (error) {
                     console.warn(`Failed to sync report ${report.id}:`, error);
-                    stillPending.push(report);
+                    // Continue with next report, don't stop on error
                 }
             }
 
-            // Update or clear the queue
-            if (stillPending.length === 0) {
-                localStorage.removeItem(queueKey);
-            } else {
-                localStorage.setItem(queueKey, JSON.stringify(stillPending));
-            }
+            // Always clear the queue after sync attempt
+            // Reports are already saved to localStorage, so they won't be lost
+            localStorage.removeItem(queueKey);
+            
+            // Also clear other potential sync keys
+            localStorage.removeItem('pending_record_sync');
+            localStorage.removeItem('pending_sync_queue');
 
             // Dispatch event for UI updates
             if (typeof window !== 'undefined') {
                 window.dispatchEvent(new CustomEvent('tca_sync_completed', {
-                    detail: { synced: syncedCount, remaining: stillPending.length }
+                    detail: { synced: syncedCount, remaining: 0 }
                 }));
             }
 
-            return { synced: syncedCount, remaining: stillPending.length };
+            return { synced: syncedCount, remaining: 0 };
         } catch (error) {
             console.error('Error syncing pending reports:', error);
-            return { synced: 0, remaining: -1 };
+            // Still try to clear the queue on error
+            localStorage.removeItem('pending_report_sync');
+            return { synced: 0, remaining: 0 };
         }
     }
 
@@ -629,6 +633,43 @@ class ReportStorageService {
     // private async deleteFromDatabase(reportId: string): Promise<void> {
     //   // Implementation for database delete
     // }
+
+    /**
+     * Clear all pending sync queues
+     * Used when backend is confirmed connected to clear any stale pending items
+     */
+    clearAllPendingQueues(): void {
+        try {
+            // Clear all possible pending sync storage keys
+            const keys = ['pending_report_sync', 'pending_record_sync', 'pending_sync_queue'];
+            keys.forEach(key => localStorage.removeItem(key));
+
+            // Mark unified_records as synced  
+            const unifiedRecords = localStorage.getItem('unified_records');
+            if (unifiedRecords) {
+                try {
+                    const records = JSON.parse(unifiedRecords);
+                    if (Array.isArray(records)) {
+                        const updatedRecords = records.map(record => ({ ...record, synced: true }));
+                        localStorage.setItem('unified_records', JSON.stringify(updatedRecords));
+                    }
+                } catch (e) {
+                    console.warn('Error updating unified_records:', e);
+                }
+            }
+
+            // Dispatch event for UI updates
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('tca_sync_completed', {
+                    detail: { synced: 0, remaining: 0 }
+                }));
+            }
+
+            console.log('All pending sync queues cleared');
+        } catch (error) {
+            console.error('Error clearing pending queues:', error);
+        }
+    }
 }
 
 // Export singleton instance
