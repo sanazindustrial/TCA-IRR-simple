@@ -66,7 +66,7 @@ export async function POST(request: Request) {
             // Generate a temporary password for the invited user
             const tempPassword = `TCA_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 8)}`;
             
-            const response = await fetch(`${backendUrl}/auth/register`, {
+            const response = await fetch(`${backendUrl}/api/v1/auth/register`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -74,8 +74,10 @@ export async function POST(request: Request) {
                 },
                 body: JSON.stringify({
                     email,
-                    full_name: email.split('@')[0], // Use email prefix as username
+                    username: email.split('@')[0], // Use email prefix as username
+                    full_name: email.split('@')[0], // Use email prefix as name
                     password: tempPassword,
+                    confirm_password: tempPassword,
                     role: role.toLowerCase(),
                 }),
             });
