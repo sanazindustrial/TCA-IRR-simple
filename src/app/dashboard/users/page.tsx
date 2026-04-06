@@ -1,6 +1,6 @@
 
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -43,6 +43,7 @@ import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/use-auth';
 
 // User interface with proper types
 interface User {
@@ -161,7 +162,63 @@ export default function UserManagementPage() {
   const [inviteRole, setInviteRole] = useState('User');
   const [isInviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [isInviteLoading, setInviteLoading] = useState(false);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
   const { toast } = useToast();
+  const { currentUser } = useAuth();
+
+  // Load users from backend on mount
+  useEffect(() => {
+    const loadBackendUsers = async () => {
+      try {
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://tcairrapiccontainer.azurewebsites.net';
+        const token = localStorage.getItem('authToken');
+
+        const response = await fetch(`${backendUrl}/api/v1/users`, {
+          headers: {
+            'Accept': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          },
+        });
+
+        if (response.ok) {
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const backendUsers = await response.json();
+
+            if (Array.isArray(backendUsers) && backendUsers.length > 0) {
+              // Merge backend users with initial users, avoiding duplicates
+              const mergedUsers = [...initialUsers];
+              backendUsers.forEach((bu: { id?: string; email: string; name?: string; role?: string; status?: string }) => {
+                const exists = mergedUsers.some(u => u.email.toLowerCase() === bu.email.toLowerCase());
+                if (!exists) {
+                  mergedUsers.push({
+                    id: bu.id || `usr_${Date.now()}`,
+                    name: bu.name || bu.email.split('@')[0],
+                    email: bu.email,
+                    role: bu.role || 'User',
+                    triageReports: bu.role === 'admin' ? 'Unlimited' : 10,
+                    ddReports: bu.role === 'admin' ? 'Unlimited' : 2,
+                    permissions: bu.role === 'admin' ? 'Full system administration' : 'Standard',
+                    status: bu.status || 'Active',
+                    lastActivity: 'Recently',
+                    cost: { ytd: 0, mtd: 0 },
+                    avatarId: 'avatar1',
+                  });
+                }
+              });
+              setUsers(mergedUsers);
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('Could not load users from backend:', error);
+      } finally {
+        setIsLoadingUsers(false);
+      }
+    };
+
+    loadBackendUsers();
+  }, []);
 
   const filteredUsers = users.filter(user =>
     user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -207,38 +264,68 @@ export default function UserManagementPage() {
       return;
     }
 
+    // Ensure current user is logged in
+    if (!currentUser?.email) {
+      toast({
+        variant: 'destructive',
+        title: 'Not Authenticated',
+        description: 'You must be logged in to invite users.',
+      });
+      return;
+    }
+
     setInviteLoading(true);
     try {
+      // Use Next.js API route to avoid CSRF issues
       const response = await fetch('/api/users/invite', {
         method: 'POST',
+        credentials: 'include', // Include cookies for session
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
         body: JSON.stringify({
           email: inviteEmail,
-          role: inviteRole,
+          role: inviteRole.toLowerCase(),
+          invited_by_email: currentUser.email, // Include inviter's email for backend
         }),
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to send invitation');
+      // Safe response handling - parse text first, then try JSON
+      const responseText = await response.text();
+      let userData;
+
+      try {
+        userData = JSON.parse(responseText);
+      } catch {
+        // Non-JSON response - log and create locally
+        console.warn('Non-JSON response from invite API:', responseText);
+        userData = {
+          id: `usr_${Date.now()}`,
+          email: inviteEmail,
+          role: inviteRole,
+          status: 'pending',
+          local: true,
+          message: responseText,
+        };
       }
 
-      const newUser = await response.json();
+      if (!response.ok) {
+        throw new Error(userData.message || userData.detail || 'Failed to send invitation');
+      }
 
       // Add new user to the list
       setUsers(currentUsers => [
         ...currentUsers,
         {
-          id: newUser.id || `usr_${Date.now()}`,
-          name: inviteEmail.split('@')[0],
+          id: userData.id || `usr_${Date.now()}`,
+          name: userData.name || inviteEmail.split('@')[0],
           email: inviteEmail,
           role: inviteRole,
           triageReports: inviteRole === 'Admin' ? 'Unlimited' : 10,
           ddReports: inviteRole === 'Admin' ? 'Unlimited' : 2,
           permissions: inviteRole === 'Admin' ? 'Full system administration' : 'Standard',
-          status: 'Pending',
+          status: userData.local ? 'Pending (Local)' : 'Active',
           lastActivity: 'Just now',
           cost: { ytd: 0, mtd: 0 },
           avatarId: 'avatar1',
@@ -246,8 +333,10 @@ export default function UserManagementPage() {
       ]);
 
       toast({
-        title: 'Invitation Sent',
-        description: `An invitation has been sent to ${inviteEmail} for the ${inviteRole} role.`,
+        title: userData.local ? 'User Created Locally' : 'User Created',
+        description: userData.local
+          ? `${inviteEmail} added locally. Backend sync pending.`
+          : `${inviteEmail} has been registered as ${inviteRole}.`,
       });
       setInviteDialogOpen(false);
       setInviteEmail('');
@@ -289,11 +378,11 @@ export default function UserManagementPage() {
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
                   <Label htmlFor="invite-email">Email Address</Label>
-                  <Input id="invite-email" type="email" placeholder="new.user@example.com" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} />
+                  <Input id="invite-email" name="email" type="email" placeholder="new.user@example.com" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} autoComplete="email" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="invite-role">Role</Label>
-                  <Select value={inviteRole} onValueChange={setInviteRole}>
+                  <Select value={inviteRole} onValueChange={setInviteRole} name="role">
                     <SelectTrigger id="invite-role">
                       <SelectValue placeholder="Select a role" />
                     </SelectTrigger>

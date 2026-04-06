@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,7 +23,11 @@ import {
     Layers,
     Compass,
     Clock,
-    Database
+    Database,
+    SlidersHorizontal,
+    Download,
+    Save,
+    RefreshCw
 } from 'lucide-react';
 import Link from 'next/link';
 import { runAnalysis } from '@/app/analysis/actions';
@@ -152,6 +156,7 @@ export default function AnalysisRunPage() {
     const activeModules = useMemo(() => modules.filter(m => m.active), [modules]);
 
     const [isStarted, setIsStarted] = useState(false);
+    const analysisInitiatedRef = useRef(false); // Ref to prevent multiple analysis runs
     const [userRole, setUserRole] = useState<'user' | 'admin' | 'analyst'>('user');
     const [userName, setUserName] = useState<string>('');
     const [userId, setUserId] = useState<string>('');
@@ -170,6 +175,7 @@ export default function AnalysisRunPage() {
     const [analysisResult, setAnalysisResult] = useState<ComprehensiveAnalysisOutput | null>(null);
     const [startTime, setStartTime] = useState<number>(0);
     const [totalTime, setTotalTime] = useState<string>('0.0s');
+    const [storedTrackingParams, setStoredTrackingParams] = useState<string>('');
 
     // Load active module settings from API
     useEffect(() => {
@@ -212,19 +218,24 @@ export default function AnalysisRunPage() {
 
     // Load company info and user role from localStorage
     useEffect(() => {
-        const companyName = localStorage.getItem('analysisCompanyName') || 'Unknown Company';
+        // Sanitize company name - remove newlines and extra whitespace
+        const rawCompanyName = localStorage.getItem('analysisCompanyName') || 'Unknown Company';
+        const companyName = rawCompanyName.replace(/[\r\n]+/g, ' ').trim();
         const framework = localStorage.getItem('analysisFramework') || 'general';
 
-        // Load user role and info
+        // Load user role and info - IMPORTANT: Check both 'user' and 'loggedInUser' keys
         try {
-            const storedUser = localStorage.getItem('user');
+            const storedUser = localStorage.getItem('loggedInUser') || localStorage.getItem('user');
             if (storedUser) {
                 const user = JSON.parse(storedUser);
-                setUserRole(user.role?.toLowerCase() || 'user');
+                const role = user.role?.toLowerCase() || 'user';
+                console.log('Loaded user role for analysis:', role, user);
+                setUserRole(role);
                 setUserName(user.name || user.username || 'Unknown User');
                 setUserId(user.id || user.user_id || '');
             }
         } catch (e) {
+            console.error('Failed to parse user data:', e);
             setUserRole('user');
         }
 
@@ -439,20 +450,33 @@ export default function AnalysisRunPage() {
             // Admin/Analyst: Go to what-if to review and adjust module scores
             // Standard user: Go directly to result page for triage report
             // Include tracking parameters in the redirect URL
+            // Note: URLSearchParams auto-encodes values, so don't double-encode!
+            // Also sanitize company name to remove newlines
+            const sanitizedCompanyName = companyInfo.name.replace(/[\r\n]+/g, ' ').trim();
             const trackingParams = new URLSearchParams({
                 evalId: evaluationId,
                 anlId: analysisId,
-                company: encodeURIComponent(companyInfo.name),
-                user: encodeURIComponent(userName)
+                company: sanitizedCompanyName,
+                user: userName
             }).toString();
 
-            setTimeout(() => {
-                if (userRole === 'admin' || userRole === 'analyst') {
-                    router.push(`/analysis/what-if?${trackingParams}`);
-                } else {
-                    router.push(`/analysis/result?${trackingParams}`);
+            // Re-check role from localStorage to ensure we have the latest value
+            // (in case the useEffect hasn't updated the state yet)
+            let currentRole = userRole;
+            try {
+                const storedUser = localStorage.getItem('loggedInUser') || localStorage.getItem('user');
+                if (storedUser) {
+                    const user = JSON.parse(storedUser);
+                    currentRole = user.role?.toLowerCase() || 'user';
                 }
-            }, 2000);
+            } catch (e) {
+                console.warn('Could not re-check user role');
+            }
+
+            // Store tracking params for manual navigation (no auto-redirect)
+            // User must click to proceed to What-If or Results
+            setStoredTrackingParams(trackingParams);
+            console.log('Analysis complete. User can navigate to:', currentRole === 'admin' || currentRole === 'analyst' ? 'What-If or Results' : 'Results');
 
         } catch (error) {
             console.error('Analysis failed:', error);
@@ -478,15 +502,19 @@ export default function AnalysisRunPage() {
                 description: error instanceof Error ? error.message : 'Unknown error occurred',
             });
         }
-    }, [companyInfo, simulateModuleProgress, toast, router, startTime, activeModules, userRole]);
+        // Note: Removed startTime from dependencies since it's set inside the callback
+    }, [companyInfo, simulateModuleProgress, toast, router, activeModules, userRole, evaluationId, analysisId, userId, userName]);
 
     // Auto-start analysis on mount if we have data
+    // Using a ref to prevent multiple runs (more reliable than state-based check)
     useEffect(() => {
         const hasData = localStorage.getItem('analysisCompanyName');
-        if (hasData && !isStarted && settingsLoaded && activeModules.length > 0) {
+        if (hasData && !analysisInitiatedRef.current && settingsLoaded && activeModules.length > 0) {
+            analysisInitiatedRef.current = true; // Set immediately to prevent re-runs
             runFullAnalysis();
         }
-    }, [isStarted, runFullAnalysis, settingsLoaded, activeModules.length]);
+    }, [settingsLoaded, activeModules.length]); // Intentionally exclude runFullAnalysis to prevent re-runs
+    // eslint-disable-next-line react-hooks/exhaustive-deps
 
     // Calculate overall progress based on active modules
     useEffect(() => {
@@ -709,42 +737,69 @@ export default function AnalysisRunPage() {
                     })}
                 </div>
 
-                {/* Actions */}
+                {/* Workflow Actions */}
                 <div className="mt-8 flex flex-col items-center gap-4">
                     {extractionPhase === 'complete' && (
                         <>
-                            <div className="flex gap-4">
+                            {/* Workflow Steps Indicator */}
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                                <Badge variant="secondary">Step 1: Analysis</Badge>
+                                <span>→</span>
+                                <Badge variant="outline">Step 2: What-If Review</Badge>
+                                <span>→</span>
+                                <Badge variant="outline">Step 3: Report & Export</Badge>
+                            </div>
+
+                            <div className="flex flex-wrap gap-4 justify-center">
                                 {(userRole === 'admin' || userRole === 'analyst') && (
                                     <>
                                         <Button
                                             size="lg"
-                                            onClick={() => router.push('/analysis/what-if')}
+                                            onClick={() => router.push(`/analysis/what-if?${storedTrackingParams}`)}
                                             className="gap-2"
                                         >
-                                            <Play className="size-4" />
+                                            <SlidersHorizontal className="size-4" />
                                             Continue to What-If Analysis
                                         </Button>
                                         <Button
                                             size="lg"
-                                            variant="outline"
-                                            onClick={() => router.push('/analysis/result')}
+                                            variant="secondary"
+                                            onClick={() => router.push(`/analysis/result?${storedTrackingParams}`)}
                                             className="gap-2"
                                         >
                                             <FileText className="size-4" />
-                                            Skip to Results
+                                            View Triage Report
                                         </Button>
                                     </>
                                 )}
                                 {userRole === 'user' && (
                                     <Button
                                         size="lg"
-                                        onClick={() => router.push('/analysis/result')}
+                                        onClick={() => router.push(`/analysis/result?${storedTrackingParams}`)}
                                         className="gap-2"
                                     >
-                                        <Play className="size-4" />
+                                        <FileText className="size-4" />
                                         View Analysis Results
                                     </Button>
                                 )}
+                                <Button
+                                    size="lg"
+                                    variant="outline"
+                                    onClick={() => {
+                                        // Clear analysis data and start fresh
+                                        const keysToRemove = [
+                                            'analysisResult', 'analysisTrackingInfo', 'currentEvaluationId',
+                                            'currentAnalysisId', 'reportApprovalStatus', 'analysisCompanyName',
+                                            'analysisFramework', 'analysisCompanyId', 'companyData'
+                                        ];
+                                        keysToRemove.forEach(key => localStorage.removeItem(key));
+                                        router.push('/dashboard/evaluation');
+                                    }}
+                                    className="gap-2"
+                                >
+                                    <ArrowLeft className="size-4" />
+                                    New Analysis
+                                </Button>
                             </div>
                         </>
                     )}
@@ -768,10 +823,10 @@ export default function AnalysisRunPage() {
                     )}
                 </div>
 
-                {/* Auto-redirect notice */}
+                {/* Manual navigation notice */}
                 {extractionPhase === 'complete' && (
                     <p className="text-center text-sm text-muted-foreground mt-4">
-                        Redirecting to {userRole === 'admin' || userRole === 'analyst' ? 'What-If Analysis' : 'Analysis Results'} in 2 seconds...
+                        Analysis complete! Select your next step above to continue the workflow.
                     </p>
                 )}
             </div>
