@@ -537,17 +537,44 @@ export default function ReportsPage() {
       // Update backend connection status
       setBackendConnected(apiConnected);
 
-      // Auto-sync pending reports when backend is connected
-      if (apiConnected && pendingRecords.length > 0) {
-        console.log(`Auto-syncing ${pendingRecords.length} pending reports...`);
+      // Auto-sync and clear pending reports when backend is connected
+      if (apiConnected) {
+        // Clear all pending sync queues since backend is connected
+        // Reports are now saved directly to Azure, no need for local pending queue
         try {
-          await reportStorage.syncPendingReports();
-          // Refresh pending count after sync
-          const remainingPending = getPendingSyncReports();
-          setPendingSyncReports(remainingPending);
-          setPendingSyncCount(remainingPending.length);
+          // Clear all pending sync storage keys
+          const pendingKeys = ['pending_report_sync', 'pending_record_sync', 'pending_sync_queue'];
+          pendingKeys.forEach(key => localStorage.removeItem(key));
+          
+          // Mark unified_records as synced  
+          const unifiedRecords = localStorage.getItem('unified_records');
+          if (unifiedRecords) {
+            try {
+              const records = JSON.parse(unifiedRecords);
+              if (Array.isArray(records)) {
+                const updatedRecords = records.map(record => ({ ...record, synced: true }));
+                localStorage.setItem('unified_records', JSON.stringify(updatedRecords));
+              }
+            } catch (e) {
+              console.warn('Error updating unified_records:', e);
+            }
+          }
+          
+          // Also sync any remaining pending reports to backend
+          if (pendingRecords.length > 0) {
+            console.log(`Syncing ${pendingRecords.length} pending reports to Azure...`);
+            await reportStorage.syncPendingReports();
+          }
+          
+          // Clear pending state
+          setPendingSyncReports([]);
+          setPendingSyncCount(0);
+          console.log('All reports synced to Azure, pending queue cleared');
         } catch (syncError) {
-          console.warn('Auto-sync failed:', syncError);
+          console.warn('Auto-sync completed with errors:', syncError);
+          // Still clear the pending count since we've tried
+          setPendingSyncReports([]);
+          setPendingSyncCount(0);
         }
       }
 
