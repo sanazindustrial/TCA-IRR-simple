@@ -15,6 +15,10 @@ python-jose[cryptography]>=3.3.0
 # HTTP Client
 httpx>=0.25.0
 
+# Email Services
+azure-communication-email>=1.0.0
+sendgrid>=6.9.0
+
 # AI/LLM Integration
 openai>=1.12.0
 

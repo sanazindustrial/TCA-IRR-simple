@@ -545,7 +545,7 @@ export default function ReportsPage() {
           // Clear all pending sync storage keys
           const pendingKeys = ['pending_report_sync', 'pending_record_sync', 'pending_sync_queue'];
           pendingKeys.forEach(key => localStorage.removeItem(key));
-          
+
           // Mark unified_records as synced  
           const unifiedRecords = localStorage.getItem('unified_records');
           if (unifiedRecords) {
@@ -559,13 +559,13 @@ export default function ReportsPage() {
               console.warn('Error updating unified_records:', e);
             }
           }
-          
+
           // Also sync any remaining pending reports to backend
           if (pendingRecords.length > 0) {
             console.log(`Syncing ${pendingRecords.length} pending reports to Azure...`);
             await reportStorage.syncPendingReports();
           }
-          
+
           // Clear pending state
           setPendingSyncReports([]);
           setPendingSyncCount(0);
