@@ -28,6 +28,12 @@ from app.models import (UserLogin, UserCreate, UserResponse, Token,
                         BaseResponse, ErrorResponse,
                         ForgotPasswordRequest, ForgotPasswordResponse,
                         ResetPasswordRequest, ResetPasswordResponse)
+from app.services.email_service import (
+    send_password_reset_email, 
+    send_welcome_email, 
+    send_invite_email,
+    email_service
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -405,6 +411,19 @@ async def register(request: Request,
         )
         
         logger.info(f"New user registered: {user_data.username}")
+        
+        # Send welcome email
+        try:
+            email_sent = await send_welcome_email(
+                to_email=user_data.email,
+                username=user_data.username
+            )
+            if email_sent:
+                logger.info(f"Welcome email sent to {user_data.email}")
+            else:
+                logger.warning(f"Failed to send welcome email to {user_data.email} - email service may not be configured")
+        except Exception as email_error:
+            logger.error(f"Error sending welcome email: {email_error}")
 
         return UserResponse(**created_user)
 
@@ -514,8 +533,19 @@ async def forgot_password(
             
             logger.info(f"Password reset requested for user: {user['username']}, token: {reset_token[:8]}...")
             
-            # In a production system, you would send an email here with the reset link
-            # For now, we just log the token (in real app, send email)
+            # Send password reset email
+            try:
+                email_sent = await send_password_reset_email(
+                    to_email=user['email'],
+                    reset_token=reset_token,
+                    username=user['username']
+                )
+                if email_sent:
+                    logger.info(f"Password reset email sent to {user['email']}")
+                else:
+                    logger.warning(f"Failed to send password reset email to {user['email']} - email service may not be configured")
+            except Exception as email_error:
+                logger.error(f"Error sending password reset email: {email_error}")
         else:
             # Log the attempt even if user doesn't exist (for security monitoring)
             logger.info(f"Password reset requested for non-existent email: {forgot_request.email}")
@@ -812,6 +842,21 @@ async def invite_user(
         
         logger.info(f"Invite created by {current_user['username']} for {invite_data.email} as {invite_data.role}")
         
+        # Send invitation email
+        try:
+            email_sent = await send_invite_email(
+                to_email=invite_data.email,
+                invite_token=invite_token,
+                role=invite_data.role,
+                invited_by=current_user['username']
+            )
+            if email_sent:
+                logger.info(f"Invitation email sent to {invite_data.email}")
+            else:
+                logger.warning(f"Failed to send invitation email to {invite_data.email} - email service may not be configured")
+        except Exception as email_error:
+            logger.error(f"Error sending invitation email: {email_error}")
+        
         return InviteResponse(
             success=True,
             message=f"Invitation created for {invite_data.email}. Token valid for 7 days.",
@@ -1052,3 +1097,102 @@ async def revoke_invite(
         detail="No pending invitation found for this email"
     )
 
+
+# =============================================
+# EMAIL SERVICE STATUS & TESTING ENDPOINTS
+# =============================================
+
+@router.get("/email/status")
+async def email_service_status(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Check email service configuration status (admin only)
+    
+    Returns whether email service is configured and what provider is active.
+    """
+    if current_user.get('role') != 'admin':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins can check email service status"
+        )
+    
+    sendgrid_configured = bool(email_service.settings.sendgrid_api_key)
+    smtp_configured = bool(email_service.settings.smtp_user and email_service.settings.smtp_password)
+    
+    return {
+        "is_configured": email_service.is_configured,
+        "provider": "sendgrid" if sendgrid_configured else ("smtp" if smtp_configured else "none"),
+        "sendgrid_configured": sendgrid_configured,
+        "smtp_configured": smtp_configured,
+        "smtp_host": email_service.settings.smtp_host if smtp_configured else None,
+        "from_email": email_service.settings.smtp_from_email,
+        "from_name": email_service.settings.smtp_from_name,
+        "frontend_url": email_service.settings.frontend_url,
+        "message": "Email service is ready" if email_service.is_configured else "Email service not configured - set SENDGRID_API_KEY or SMTP_USER/SMTP_PASSWORD"
+    }
+
+
+class TestEmailRequest(BaseModel):
+    """Request model for test email"""
+    to_email: str = Field(..., pattern=r'^[^@]+@[^@]+\.[^@]+$')
+
+
+@router.post("/email/test")
+async def send_test_email(
+    request: TestEmailRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Send a test email to verify email service configuration (admin only)
+    
+    - **to_email**: Email address to send test email to
+    """
+    if current_user.get('role') != 'admin':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins can send test emails"
+        )
+    
+    if not email_service.is_configured:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Email service is not configured. Set SENDGRID_API_KEY or SMTP credentials in Azure App Service settings."
+        )
+    
+    try:
+        # Send a test email
+        test_content = f"""
+        <h2>TCA Platform Email Test</h2>
+        <p>This is a test email sent from the TCA Investment Platform.</p>
+        <p><strong>Sent by:</strong> {current_user['username']}</p>
+        <p><strong>Sent at:</strong> {datetime.utcnow().isoformat()}</p>
+        <p>If you received this email, your email configuration is working correctly!</p>
+        """
+        
+        result = await email_service.send_email(
+            to_email=request.to_email,
+            subject="TCA Platform - Email Test",
+            html_content=email_service._get_base_template(test_content),
+            text_content=f"This is a test email from TCA Platform. Sent by {current_user['username']} at {datetime.utcnow().isoformat()}"
+        )
+        
+        if result:
+            logger.info(f"Test email sent to {request.to_email} by {current_user['username']}")
+            return {
+                "success": True,
+                "message": f"Test email sent successfully to {request.to_email}"
+            }
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to send test email. Check server logs for details."
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error sending test email: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error sending test email: {str(e)}"
+        )
