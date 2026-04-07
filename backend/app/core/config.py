@@ -89,6 +89,25 @@ class Settings(BaseSettings):
     ssd_api_key: Optional[str] = None  # API key for SSD third-party integration
     ssd_callback_url: Optional[str] = None  # SSD callback URL for report delivery
 
+    # Email Settings
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_user: Optional[str] = None
+    smtp_password: Optional[str] = None
+    smtp_from_email: str = "noreply@tca-platform.com"
+    smtp_from_name: str = "TCA Investment Platform"
+    smtp_use_tls: bool = True
+    
+    # SendGrid Settings (alternative to SMTP)
+    sendgrid_api_key: Optional[str] = None
+    
+    # Azure Communication Services Settings (recommended for Azure)
+    azure_communication_connection_string: Optional[str] = None
+    azure_communication_sender_address: Optional[str] = None  # e.g., "DoNotReply@your-domain.azurecomm.net"
+    
+    # Application URLs for email links
+    frontend_url: str = "https://tca-irr.azurewebsites.net"
+    
     # External API Settings
     external_api_timeout: int = 30
     external_api_retries: int = 3
