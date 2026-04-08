@@ -222,6 +222,18 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
                                     <SidebarMenuSubItem>
+                                        <SidebarMenuSubButton href="/analysis/modules/funder" isActive={pathname === '/analysis/modules/funder'}>
+                                            <UserIcon className="size-4" />
+                                            <span>Founder Fit</span>
+                                        </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                    <SidebarMenuSubItem>
+                                        <SidebarMenuSubButton href="/analysis/modules/strategic" isActive={pathname === '/analysis/modules/strategic'}>
+                                            <Target className="size-4" />
+                                            <span>Strategic Fit</span>
+                                        </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                    <SidebarMenuSubItem>
                                         <SidebarMenuSubButton href="/analysis/what-if" isActive={pathname === '/analysis/what-if'}>
                                             <Lightbulb className="size-4" />
                                             <span>Simulation</span>
