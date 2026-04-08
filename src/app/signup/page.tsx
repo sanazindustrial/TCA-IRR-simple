@@ -63,7 +63,7 @@ export default function SignupPage() {
       const username = email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '_').substring(0, 50);
       const fullName = `${firstName} ${lastName}`.trim();
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
+      const response = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

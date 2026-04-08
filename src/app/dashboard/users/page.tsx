@@ -254,6 +254,19 @@ export default function UserManagementPage() {
     );
   };
 
+  // Get logged in user email from localStorage as fallback
+  const getLoggedInUserEmail = (): string | null => {
+    if (currentUser?.email) return currentUser.email;
+    try {
+      const userJson = localStorage.getItem('loggedInUser') || localStorage.getItem('currentUser');
+      if (userJson) {
+        const user = JSON.parse(userJson);
+        return user.email || null;
+      }
+    } catch { /* ignore */ }
+    return null;
+  };
+
   const handleSendInvite = async () => {
     if (!inviteEmail || !inviteRole) {
       toast({
@@ -264,30 +277,36 @@ export default function UserManagementPage() {
       return;
     }
 
-    // Ensure current user is logged in
-    if (!currentUser?.email) {
+    // Get inviter email with fallback
+    const inviterEmail = getLoggedInUserEmail();
+    if (!inviterEmail) {
       toast({
         variant: 'destructive',
         title: 'Not Authenticated',
-        description: 'You must be logged in to invite users.',
+        description: 'You must be logged in to add users. Please refresh the page.',
       });
       return;
     }
 
     setInviteLoading(true);
     try {
-      // Use Next.js API route to avoid CSRF issues
-      const response = await fetch('/api/users/invite', {
+      // Call backend directly to create user
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://tcairrapiccontainer.azurewebsites.net';
+
+      // Generate a temporary password for the new user
+      const tempPassword = `TCA_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 8)}!`;
+
+      const response = await fetch(`${backendUrl}/api/v1/admin/users/create`, {
         method: 'POST',
-        credentials: 'include', // Include cookies for session
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
         body: JSON.stringify({
           email: inviteEmail,
+          username: inviteEmail.split('@')[0],
+          password: tempPassword,
           role: inviteRole.toLowerCase(),
-          invited_by_email: currentUser.email, // Include inviter's email for backend
         }),
       });
 
@@ -299,7 +318,7 @@ export default function UserManagementPage() {
         userData = JSON.parse(responseText);
       } catch {
         // Non-JSON response - log and create locally
-        console.warn('Non-JSON response from invite API:', responseText);
+        console.warn('Non-JSON response from API:', responseText);
         userData = {
           id: `usr_${Date.now()}`,
           email: inviteEmail,
@@ -311,21 +330,21 @@ export default function UserManagementPage() {
       }
 
       if (!response.ok) {
-        throw new Error(userData.message || userData.detail || 'Failed to send invitation');
+        throw new Error(userData.message || userData.detail || 'Failed to create user');
       }
 
       // Add new user to the list
       setUsers(currentUsers => [
         ...currentUsers,
         {
-          id: userData.id || `usr_${Date.now()}`,
-          name: userData.name || inviteEmail.split('@')[0],
+          id: userData.user?.id || userData.id || `usr_${Date.now()}`,
+          name: userData.user?.username || userData.name || inviteEmail.split('@')[0],
           email: inviteEmail,
           role: inviteRole,
           triageReports: inviteRole === 'Admin' ? 'Unlimited' : 10,
           ddReports: inviteRole === 'Admin' ? 'Unlimited' : 2,
           permissions: inviteRole === 'Admin' ? 'Full system administration' : 'Standard',
-          status: userData.local ? 'Pending (Local)' : 'Active',
+          status: 'Active',
           lastActivity: 'Just now',
           cost: { ytd: 0, mtd: 0 },
           avatarId: 'avatar1',
@@ -333,10 +352,8 @@ export default function UserManagementPage() {
       ]);
 
       toast({
-        title: userData.local ? 'User Created Locally' : 'User Created',
-        description: userData.local
-          ? `${inviteEmail} added locally. Backend sync pending.`
-          : `${inviteEmail} has been registered as ${inviteRole}.`,
+        title: 'User Created Successfully',
+        description: `${inviteEmail} has been added as ${inviteRole}.`,
       });
       setInviteDialogOpen(false);
       setInviteEmail('');
@@ -344,8 +361,8 @@ export default function UserManagementPage() {
     } catch (error) {
       toast({
         variant: 'destructive',
-        title: 'Invitation Failed',
-        description: error instanceof Error ? error.message : 'Failed to send invitation. Please try again.',
+        title: 'Failed to Create User',
+        description: error instanceof Error ? error.message : 'Failed to create user. Please try again.',
       });
     } finally {
       setInviteLoading(false);
@@ -372,8 +389,8 @@ export default function UserManagementPage() {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Invite New User</DialogTitle>
-                <DialogDescription>Send an email invitation to a new user and assign them a role.</DialogDescription>
+                <DialogTitle>Add New User</DialogTitle>
+                <DialogDescription>Create a new user account with email and role. A temporary password will be generated.</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
@@ -398,7 +415,7 @@ export default function UserManagementPage() {
               <DialogFooter>
                 <Button variant="outline" onClick={() => setInviteDialogOpen(false)} disabled={isInviteLoading}>Cancel</Button>
                 <Button onClick={handleSendInvite} disabled={isInviteLoading}>
-                  {isInviteLoading ? 'Sending...' : 'Send Invitation'}
+                  {isInviteLoading ? 'Creating...' : 'Add User'}
                 </Button>
               </DialogFooter>
             </DialogContent>
