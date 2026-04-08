@@ -26,7 +26,7 @@ export class BackendAPIClient {
     }
 
     async login(email: string, password: string) {
-        const response = await fetch(`${this.baseURL}/api/v1/auth/login`, {
+        const response = await fetch(`${this.baseURL}/auth/login`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -188,7 +188,7 @@ export class BackendAPIClient {
     }
 
     async createUser(userData: { email: string; password: string; name: string; role: string }) {
-        const response = await fetch(`${this.baseURL}/api/v1/auth/register`, {
+        const response = await fetch(`${this.baseURL}/auth/register`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
