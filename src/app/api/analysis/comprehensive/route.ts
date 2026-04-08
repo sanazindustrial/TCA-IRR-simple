@@ -4,7 +4,7 @@ import type { ComprehensiveAnalysisOutput } from '@/ai/flows/schemas';
 
 // Use the correct production API URL - check multiple env vars for compatibility
 const BACKEND_API_URL = process.env.API_URL || process.env.BACKEND_URL || process.env.BACKEND_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
-const API_VERSION = '/api/v1';
+const API_VERSION = '/api';
 
 // GET - Return API information and status
 export async function GET() {

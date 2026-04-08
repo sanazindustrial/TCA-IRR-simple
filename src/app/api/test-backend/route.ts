@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // Use environment variable or fallback to production API
 const BACKEND_API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
-const API_VERSION = '/api/v1';
+const API_VERSION = '/api';
 
 export async function GET() {
     try {

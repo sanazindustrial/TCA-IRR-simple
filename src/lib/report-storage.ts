@@ -3,7 +3,7 @@ import type { ComprehensiveAnalysisOutput } from '@/ai/flows/schemas';
 import { reportsApi, type CreateReportRequest } from './reports-api';
 import { trackingService, generateReportId as genRepId, generateCompanyId as genCoId } from './tracking-service';
 
-// Backend API URL for report storage (base URL - endpoints add /api/v1)
+// Backend API URL for report storage (base URL - endpoints add /api prefix)
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
 
 export type StoredReport = {
@@ -238,7 +238,7 @@ class ReportStorageService {
             };
 
             // Try to create the report in the backend
-            const response = await fetch(`${API_BASE_URL}/api/v1/reports?user_id=${report.userId || 1}`, {
+            const response = await fetch(`${API_BASE_URL}/api/reports?user_id=${report.userId || 1}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -311,7 +311,7 @@ class ReportStorageService {
             // Always clear the queue after sync attempt
             // Reports are already saved to localStorage, so they won't be lost
             localStorage.removeItem(queueKey);
-            
+
             // Also clear other potential sync keys
             localStorage.removeItem('pending_record_sync');
             localStorage.removeItem('pending_sync_queue');
