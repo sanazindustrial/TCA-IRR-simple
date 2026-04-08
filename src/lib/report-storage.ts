@@ -238,7 +238,7 @@ class ReportStorageService {
             };
 
             // Try to create the report in the backend
-            const response = await fetch(`${API_BASE_URL}/api/reports?user_id=${report.userId || 1}`, {
+            const response = await fetch(`${API_BASE_URL}/api/v1/reports?user_id=${report.userId || 1}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

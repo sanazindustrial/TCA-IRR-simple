@@ -66,7 +66,7 @@ export class BackendAPIClient {
             ...additionalData
         };
 
-        const response = await fetch(`${this.baseURL}/analysis/comprehensive`, {
+        const response = await fetch(`${this.baseURL}/api/v1/analysis/comprehensive`, {
             method: 'POST',
             headers: this.getHeaders(),
             body: JSON.stringify(payload),
@@ -81,7 +81,7 @@ export class BackendAPIClient {
 
     // TCA Analysis Methods
     async runQuickTCA(framework: 'general' | 'medtech', companyData?: any) {
-        const response = await fetch(`${this.baseURL}/tca/quick`, {
+        const response = await fetch(`${this.baseURL}/api/v1/tca/quick`, {
             method: 'POST',
             headers: this.getHeaders(),
             body: JSON.stringify({
@@ -99,7 +99,7 @@ export class BackendAPIClient {
     }
 
     async runSectorSpecificTCA(framework: 'general' | 'medtech', companyData?: any) {
-        const response = await fetch(`${this.baseURL}/tca/sector-analysis`, {
+        const response = await fetch(`${this.baseURL}/api/v1/tca/sector-analysis`, {
             method: 'POST',
             headers: this.getHeaders(),
             body: JSON.stringify({
@@ -118,7 +118,7 @@ export class BackendAPIClient {
     }
 
     async runBatchTCA(companies: any[], analysisType: 'quick' | 'comprehensive' = 'quick') {
-        const response = await fetch(`${this.baseURL}/tca/batch`, {
+        const response = await fetch(`${this.baseURL}/api/v1/tca/batch`, {
             method: 'POST',
             headers: this.getHeaders(),
             body: JSON.stringify({
@@ -135,7 +135,7 @@ export class BackendAPIClient {
     }
 
     async getDashboardStats() {
-        const response = await fetch(`${this.baseURL}/dashboard/stats`, {
+        const response = await fetch(`${this.baseURL}/api/v1/dashboard/stats`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
@@ -162,7 +162,7 @@ export class BackendAPIClient {
     }
 
     async getTCASystemStatus() {
-        const response = await fetch(`${this.baseURL}/tca/system-status`, {
+        const response = await fetch(`${this.baseURL}/api/v1/tca/system-status`, {
             method: 'GET',
         });
 

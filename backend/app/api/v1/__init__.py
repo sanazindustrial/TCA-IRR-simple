@@ -2,7 +2,8 @@
 
 from fastapi import APIRouter
 from .endpoints import (auth, users, companies, analysis, investments, admin,
-                        tca, dashboard, ssd, settings, reports, cost)
+                        tca, dashboard, ssd, settings, reports, cost, 
+                        external_sources, api_routes)
 
 api_router = APIRouter()
 
@@ -39,3 +40,35 @@ api_router.include_router(ssd.router,
 api_router.include_router(cost.router,
                           prefix="/cost",
                           tags=["Cost Management"])
+
+api_router.include_router(external_sources.router,
+                          prefix="/external",
+                          tags=["External Sources"])
+
+# API routes for files, uploads, modules, extraction, etc. (mounted at /api/*)
+api_router.include_router(api_routes.files_router,
+                          prefix="/files",
+                          tags=["Files"])
+api_router.include_router(api_routes.uploads_router,
+                          prefix="/uploads",
+                          tags=["Uploads"])
+api_router.include_router(api_routes.modules_router,
+                          prefix="/modules",
+                          tags=["Modules"])
+api_router.include_router(api_routes.extraction_router,
+                          prefix="/extraction",
+                          tags=["Extraction"])
+api_router.include_router(api_routes.urls_router,
+                          prefix="/urls",
+                          tags=["URLs"])
+api_router.include_router(api_routes.text_router,
+                          prefix="/text",
+                          tags=["Text"])
+api_router.include_router(api_routes.requests_router,
+                          prefix="/requests",
+                          tags=["App Requests"])
+api_router.include_router(api_routes.evaluations_router,
+                          prefix="/evaluations",
+                          tags=["Evaluations"])
+api_router.include_router(api_routes.api_health_router,
+                          tags=["API Health"])
