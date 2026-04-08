@@ -268,7 +268,7 @@ const EnhancedBackendTestComponent: React.FC = () => {
             console.log('🔐 Testing login endpoint...');
             const startTime = Date.now();
 
-            const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+            const response = await fetch(`${API_BASE_URL}/auth/login`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -426,8 +426,8 @@ const EnhancedBackendTestComponent: React.FC = () => {
                 {/* Test Results Display */}
                 {testResults && (
                     <div className={`rounded-lg p-4 border-2 ${testResults.success
-                            ? 'bg-green-50 border-green-200'
-                            : 'bg-red-50 border-red-200'
+                        ? 'bg-green-50 border-green-200'
+                        : 'bg-red-50 border-red-200'
                         }`}>
                         <div className="flex items-center justify-between mb-3">
                             <h4 className="font-semibold text-lg flex items-center gap-2">
