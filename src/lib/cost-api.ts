@@ -3,9 +3,9 @@
  * Handles all cost-related API calls
  */
 
-// Base URL for API - endpoints add /api/v1 prefix
+// Base URL for API - endpoints add /api prefix (no version)
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
-const API_PREFIX = '/api/v1';
+const API_PREFIX = '/api';
 
 export interface CostBreakdown {
     category: string;

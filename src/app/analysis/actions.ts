@@ -5,7 +5,7 @@ import { sampleAnalysisData } from '@/lib/sample-data';
 
 // Try different backend URLs based on environment
 const BACKEND_API_URL = 'https://tcairrapiccontainer.azurewebsites.net'; // Production fallback
-const API_VERSION = '/api/v1'; // API version prefix
+const API_VERSION = '/api'; // API prefix (no version)
 
 console.log('Backend API URL:', BACKEND_API_URL);
 console.log('Environment:', process.env.NODE_ENV);
