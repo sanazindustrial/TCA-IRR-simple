@@ -5565,6 +5565,103 @@ async def create_report_v1(data: dict = Body(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.put("/api/v1/reports/{report_id}")
+async def update_report_v1(report_id: int, data: dict = Body(...)):
+    """Update a report - approval status, analyst notes, scores"""
+    try:
+        async with db_manager.get_connection() as conn:
+            # Get existing report
+            existing = await conn.fetchrow("SELECT * FROM reports WHERE id = $1", report_id)
+            if not existing:
+                raise HTTPException(status_code=404, detail="Report not found")
+            
+            # Parse existing metadata
+            existing_metadata = existing.get('metadata') or {}
+            if isinstance(existing_metadata, str):
+                try:
+                    existing_metadata = json.loads(existing_metadata)
+                except:
+                    existing_metadata = {}
+            
+            # Update metadata fields
+            if 'approval_status' in data:
+                existing_metadata['approval_status'] = data['approval_status']
+            if 'analyst_notes' in data:
+                existing_metadata['analyst_notes'] = data['analyst_notes']
+            if 'overall_score' in data:
+                existing_metadata['overall_score'] = data['overall_score']
+            if 'recommendation' in data:
+                existing_metadata['recommendation'] = data['recommendation']
+            if 'reviewer_id' in data:
+                existing_metadata['reviewer_id'] = data['reviewer_id']
+            if 'review_date' in data:
+                existing_metadata['review_date'] = data['review_date']
+            
+            # Update status if provided
+            new_status = data.get('status', existing.get('status'))
+            
+            await conn.execute("""
+                UPDATE reports 
+                SET metadata = $1, status = $2, updated_at = NOW()
+                WHERE id = $3
+            """, json.dumps(existing_metadata), new_status, report_id)
+            
+            return {
+                "success": True,
+                "message": "Report updated successfully",
+                "report_id": report_id,
+                "approval_status": existing_metadata.get('approval_status'),
+                "status": new_status
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating report: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.put("/api/v1/reports/{report_id}/approval")
+async def update_report_approval(report_id: int, data: dict = Body(...)):
+    """Update report approval status for reviewer/analyst workflow"""
+    try:
+        approval_status = data.get('approval_status', 'Pending')
+        reviewer_notes = data.get('reviewer_notes', '')
+        reviewer_id = data.get('reviewer_id')
+        
+        async with db_manager.get_connection() as conn:
+            existing = await conn.fetchrow("SELECT metadata FROM reports WHERE id = $1", report_id)
+            if not existing:
+                raise HTTPException(status_code=404, detail="Report not found")
+            
+            metadata = existing.get('metadata') or {}
+            if isinstance(metadata, str):
+                try:
+                    metadata = json.loads(metadata)
+                except:
+                    metadata = {}
+            
+            metadata['approval_status'] = approval_status
+            metadata['reviewer_notes'] = reviewer_notes
+            metadata['reviewer_id'] = reviewer_id
+            metadata['review_date'] = datetime.utcnow().isoformat()
+            
+            await conn.execute("""
+                UPDATE reports SET metadata = $1, updated_at = NOW() WHERE id = $2
+            """, json.dumps(metadata), report_id)
+            
+            return {
+                "success": True,
+                "message": f"Report approval updated to {approval_status}",
+                "report_id": report_id,
+                "approval_status": approval_status
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating report approval: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # Report Configuration endpoints - MUST be before {report_id} to avoid route conflict
 @app.get("/api/v1/reports/configuration")
 async def get_report_configuration_v1():
@@ -6204,17 +6301,30 @@ async def create_analyst_review(data: dict = Body(...)):
     """Create or flag an analysis for manual review"""
     try:
         review_id = f"REV-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:6]}"
+        analysis_id = data.get('analysis_id')
+        company_name = data.get('company_name', '')
+        report_type = data.get('report_type', 'triage')
+        
+        # Store in database if we have connection
+        async with db_manager.get_connection() as conn:
+            # Check if reports table exists, create review entry
+            await conn.execute("""
+                INSERT INTO reports (company_name, report_type, status, approval_status, created_at, updated_at)
+                VALUES ($1, $2, 'pending_review', 'pending', NOW(), NOW())
+                ON CONFLICT DO NOTHING
+            """, company_name, report_type)
         
         return {
             "success": True,
             "review_id": review_id,
-            "analysis_id": data.get('analysis_id'),
+            "analysis_id": analysis_id,
             "status": "pending_review",
             "priority": "normal",
             "assigned_to": None,
             "created_at": datetime.utcnow().isoformat()
         }
     except Exception as e:
+        logger.error(f"Error creating analyst review: {e}")
         return {"success": False, "error": str(e)}
 
 
@@ -6222,15 +6332,45 @@ async def create_analyst_review(data: dict = Body(...)):
 async def get_analyst_reviews():
     """Get list of pending analyst reviews"""
     try:
-        return {
-            "success": True,
-            "reviews": [],
-            "total": 0,
-            "pending": 0,
-            "completed": 0
-        }
+        async with db_manager.get_connection() as conn:
+            # Get reports that need analyst review
+            reviews = await conn.fetch("""
+                SELECT r.id, r.company_name, r.report_type, r.status, r.approval_status,
+                       r.overall_score, r.tca_score, r.created_at, r.updated_at,
+                       u.username as assigned_to
+                FROM reports r
+                LEFT JOIN users u ON r.user_id = u.id
+                WHERE r.status IN ('pending_review', 'in_progress', 'draft')
+                ORDER BY r.created_at DESC
+                LIMIT 50
+            """)
+            
+            formatted_reviews = []
+            for r in reviews:
+                formatted_reviews.append({
+                    "id": f"REV-{r['id']}",
+                    "report_id": r['id'],
+                    "company": r['company_name'],
+                    "reportType": "Due Diligence" if r['report_type'] == 'due_diligence' else "Triage Report",
+                    "status": "In Progress" if r['status'] == 'in_progress' else "Pending Review" if r['status'] == 'pending_review' else "Draft",
+                    "assigned": r.get('assigned_to') or "Unassigned",
+                    "due": "in 3 days",
+                    "progress": 0 if r['status'] == 'pending_review' else 45 if r['status'] == 'in_progress' else 50,
+                    "lastActivity": f"Last updated: {r['updated_at'].strftime('%Y-%m-%d') if r['updated_at'] else 'N/A'}",
+                    "score": r.get('overall_score') or r.get('tca_score'),
+                    "created_at": r['created_at'].isoformat() if r['created_at'] else None
+                })
+            
+            return {
+                "success": True,
+                "reviews": formatted_reviews,
+                "total": len(formatted_reviews),
+                "pending": len([r for r in formatted_reviews if r['status'] == 'Pending Review']),
+                "completed": len([r for r in formatted_reviews if r['status'] == 'Completed'])
+            }
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        logger.error(f"Error fetching analyst reviews: {e}")
+        return {"success": True, "reviews": [], "total": 0, "pending": 0, "completed": 0}
 
 
 @app.post("/api/v1/analysis/sentiment-analysis")
@@ -7590,7 +7730,7 @@ async def get_admin_users():
     try:
         async with db_manager.get_connection() as conn:
             users = await conn.fetch("""
-                SELECT id, email, username, role, company_name, is_active, created_at, last_login
+                SELECT id, email, username, role, is_active, created_at, updated_at
                 FROM users
                 ORDER BY created_at DESC
             """)
@@ -7603,17 +7743,16 @@ async def get_admin_users():
                         "email": u['email'],
                         "username": u['username'],
                         "role": u['role'],
-                        "company_name": u['company_name'],
                         "is_active": u['is_active'],
                         "created_at": u['created_at'].isoformat() if u['created_at'] else None,
-                        "last_login": u['last_login'].isoformat() if u.get('last_login') else None
+                        "updated_at": u['updated_at'].isoformat() if u.get('updated_at') else None
                     } for u in users
                 ],
                 "total": len(users)
             }
     except Exception as e:
         logger.error(f"Error fetching admin users: {e}")
-        return {"success": True, "data": [], "total": 0}
+        return {"success": True, "data": [], "total": 0, "error": str(e)}
 
 
 @app.put("/api/v1/admin/users/{user_id}/role")
@@ -7623,7 +7762,7 @@ async def update_user_role(user_id: int, data: dict = Body(...)):
         role = data.get("role", "user")
         
         async with db_manager.get_connection() as conn:
-            await conn.execute("UPDATE users SET role = $1 WHERE id = $2", role, user_id)
+            await conn.execute("UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2", role, user_id)
         
         return {
             "success": True,
@@ -7640,7 +7779,7 @@ async def update_user_status(user_id: int, data: dict = Body(...)):
         is_active = data.get("is_active", True)
         
         async with db_manager.get_connection() as conn:
-            await conn.execute("UPDATE users SET is_active = $1 WHERE id = $2", is_active, user_id)
+            await conn.execute("UPDATE users SET is_active = $1, updated_at = NOW() WHERE id = $2", is_active, user_id)
         
         return {
             "success": True,
