@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 TCA IRR App Backend
 FastAPI backend server for the TCA Investment Risk Rating application
