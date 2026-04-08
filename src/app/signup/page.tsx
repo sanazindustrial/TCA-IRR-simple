@@ -11,7 +11,7 @@ import { UserPlus, Mail, Lock, User, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
-const API_BASE_URL = 'https://tcairrapiccontainer.azurewebsites.net';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
 
 export default function SignupPage() {
   const [email, setEmail] = useState('');
