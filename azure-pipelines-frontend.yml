@@ -109,18 +109,20 @@ stages:
                   <handlers>
                     <add name="iisnode" path="server.js" verb="*" modules="iisnode"/>
                   </handlers>
+                  <staticContent>
+                    <mimeMap fileExtension=".js" mimeType="application/javascript" />
+                    <mimeMap fileExtension=".css" mimeType="text/css" />
+                    <mimeMap fileExtension=".json" mimeType="application/json" />
+                    <mimeMap fileExtension=".woff" mimeType="application/font-woff" />
+                    <mimeMap fileExtension=".woff2" mimeType="font/woff2" />
+                  </staticContent>
                   <rewrite>
                     <rules>
                       <rule name="NodeInspector" patternSyntax="ECMAScript" stopProcessing="true">
                         <match url="^server.js\/debug[\/]?" />
                       </rule>
-                      <rule name="StaticContent">
-                        <action type="Rewrite" url="public{REQUEST_URI}"/>
-                      </rule>
-                      <rule name="DynamicContent">
-                        <conditions>
-                          <add input="{REQUEST_FILENAME}" matchType="IsFile" negate="True"/>
-                        </conditions>
+                      <rule name="AllToNode">
+                        <match url=".*" />
                         <action type="Rewrite" url="server.js"/>
                       </rule>
                     </rules>
