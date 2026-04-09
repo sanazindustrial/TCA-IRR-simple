@@ -1,4 +1,5 @@
 # Azure DevOps Pipeline for TCA-IRR Frontend
+# Last trigger: 2026-04-08 21:23:33
 # Deploys Next.js frontend to Azure App Service via ZIP Deploy
 # 
 # SETUP INSTRUCTIONS:
@@ -227,3 +228,4 @@ stages:
               echo "Backend:  https://tcairrapiccontainer.azurewebsites.net"
               echo "================================================"
             displayName: 'Verify Deployment'
+
