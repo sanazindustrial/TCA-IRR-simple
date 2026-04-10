@@ -21,15 +21,15 @@ export default function DashboardHome() {
           <CardHeader>
             <CardTitle className="flex items-center gap-3">
               <BarChart2 className="text-primary" />
-              New Analysis
+              Company Analysis
             </CardTitle>
             <CardDescription>
-              Start a new evaluation by providing company information, documents, and configuring analysis modules.
+              Start a new company analysis by providing company information, documents, and configuring analysis modules.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Button asChild size="lg" className="w-full">
-              <Link href="/dashboard/evaluation">Run New Analysis</Link>
+              <Link href="/dashboard/evaluation">Run Company Analysis</Link>
             </Button>
           </CardContent>
         </Card>

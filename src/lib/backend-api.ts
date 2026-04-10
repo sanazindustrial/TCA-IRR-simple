@@ -39,14 +39,27 @@ export class BackendAPIClient {
         }
 
         const result = await response.json();
-        if (result.success && result.access_token) {
+
+        // Backend returns { access_token, refresh_token, user, ... } directly
+        if (result.access_token) {
             this.authToken = result.access_token;
             if (typeof window !== 'undefined') {
                 localStorage.setItem('authToken', result.access_token);
+                if (result.refresh_token) {
+                    localStorage.setItem('refreshToken', result.refresh_token);
+                }
             }
+            // Normalize response for frontend consumption
+            return {
+                success: true,
+                access_token: result.access_token,
+                refresh_token: result.refresh_token,
+                user: result.user,
+                expires_in: result.expires_in
+            };
         }
 
-        return result;
+        return { success: false, error: 'Invalid response from server' };
     }
 
     async runComprehensiveAnalysis(framework: 'general' | 'medtech', additionalData?: any) {

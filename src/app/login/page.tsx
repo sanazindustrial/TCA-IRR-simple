@@ -23,47 +23,39 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Check if backend API should be used
-    const useBackendAPI = process.env.NEXT_PUBLIC_USE_MOCK_DATA !== 'true';
+    // Always use backend API for authentication
+    try {
+      const { backendAPI } = await import('@/lib/backend-api');
+      const response = await backendAPI.login(email, password);
 
-    if (useBackendAPI) {
-      try {
-        const { backendAPI } = await import('@/lib/backend-api');
-        const response = await backendAPI.login(email, password);
-
-        if (response.success) {
-          localStorage.setItem('loggedInUser', JSON.stringify(response.user));
-          localStorage.setItem('authToken', response.access_token);
-          toast({
-            title: 'Login Successful',
-            description: 'Redirecting to your dashboard...',
-          });
-          router.push('/dashboard');
-          return;
-        } else {
-          throw new Error(response.error || 'Login failed');
+      if (response.success && response.user) {
+        // Store user data with role information
+        const userData = {
+          ...response.user,
+          id: response.user.user_id || response.user.id,
+          name: response.user.full_name || response.user.name || response.user.email,
+          role: response.user.role || 'User'
+        };
+        localStorage.setItem('loggedInUser', JSON.stringify(userData));
+        localStorage.setItem('authToken', response.access_token);
+        if (response.refresh_token) {
+          localStorage.setItem('refreshToken', response.refresh_token);
         }
-      } catch (error) {
-        console.warn('Backend login failed, falling back to local auth:', error);
-        // Fall back to local authentication below
+        toast({
+          title: 'Login Successful',
+          description: `Welcome back, ${userData.name}!`,
+        });
+        router.push('/dashboard');
+        return;
+      } else {
+        throw new Error(response.error || 'Login failed');
       }
-    }
-
-    // Local authentication fallback (case-insensitive email)
-    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
-
-    if (user) {
-      localStorage.setItem('loggedInUser', JSON.stringify(user));
-      toast({
-        title: 'Login Successful',
-        description: 'Redirecting to your dashboard...',
-      });
-      router.push('/dashboard');
-    } else {
+    } catch (error: any) {
+      console.error('Login error:', error);
       toast({
         variant: 'destructive',
         title: 'Login Failed',
-        description: 'Invalid email or password.',
+        description: error.message || 'Invalid email or password.',
       });
     }
   };

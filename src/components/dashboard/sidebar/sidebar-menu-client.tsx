@@ -150,9 +150,9 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
                     </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                    <SidebarMenuButton href="/dashboard/evaluation" isActive={pathname === '/dashboard/evaluation'} tooltip="New Evaluation">
+                    <SidebarMenuButton href="/dashboard/evaluation" isActive={pathname === '/dashboard/evaluation'} tooltip="Company Analysis">
                         <Upload />
-                        <span>New Evaluation</span>
+                        <span>Company Analysis</span>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
