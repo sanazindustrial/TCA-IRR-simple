@@ -54,10 +54,10 @@ const nextConfig: NextConfig = {
           { key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate, proxy-revalidate' },
           { key: 'Pragma', value: 'no-cache' },
           { key: 'Expires', value: '0' },
-          // Content Security Policy - block inline scripts that could expose code
+          // Content Security Policy - allow external API connections
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; frame-ancestors 'self';"
+            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data: https:; connect-src 'self' https: wss: http://localhost:* https://api.stlouisfed.org https://hacker-news.firebaseio.com https://newsapi.org https://*.azurewebsites.net https://*.azure.com; frame-ancestors 'self'; worker-src 'self' blob:;"
           },
         ],
       },

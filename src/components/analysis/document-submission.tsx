@@ -33,6 +33,10 @@ type DocumentSubmissionProps = {
   setImportedUrls: React.Dispatch<React.SetStateAction<string[]>>;
   submittedTexts: string[];
   setSubmittedTexts: React.Dispatch<React.SetStateAction<string[]>>;
+  showUrlInput?: boolean;
+  showTextInput?: boolean;
+  title?: string;
+  description?: string;
 }
 
 // Helper function to convert file to base64
@@ -56,7 +60,11 @@ export function DocumentSubmission({
   importedUrls,
   setImportedUrls,
   submittedTexts,
-  setSubmittedTexts
+  setSubmittedTexts,
+  showUrlInput = true,
+  showTextInput = true,
+  title = "Document Submission",
+  description,
 }: DocumentSubmissionProps) {
   const [urlInput, setUrlInput] = useState('');
   const [textInput, setTextInput] = useState('');
@@ -210,21 +218,28 @@ export function DocumentSubmission({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <FileUp className="text-primary" />
-          Document Submission
+          {title}
         </CardTitle>
+        {description && (
+          <p className="text-sm text-muted-foreground">{description}</p>
+        )}
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="file">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className={`grid w-full ${showUrlInput && showTextInput ? 'grid-cols-3' : showUrlInput || showTextInput ? 'grid-cols-2' : 'grid-cols-1'}`}>
             <TabsTrigger value="file">
               <UploadCloud className="mr-2" /> File Upload
             </TabsTrigger>
-            <TabsTrigger value="url">
-              <Link className="mr-2" /> URL Import
-            </TabsTrigger>
-            <TabsTrigger value="text">
-              <Type className="mr-2" /> Text Input
-            </TabsTrigger>
+            {showUrlInput && (
+              <TabsTrigger value="url">
+                <Link className="mr-2" /> URL Import
+              </TabsTrigger>
+            )}
+            {showTextInput && (
+              <TabsTrigger value="text">
+                <Type className="mr-2" /> Text Input
+              </TabsTrigger>
+            )}
           </TabsList>
           <TabsContent value="file">
             <div
@@ -285,93 +300,97 @@ export function DocumentSubmission({
               </div>
             )}
           </TabsContent>
-          <TabsContent value="url">
-            <div className="mt-4 space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Enter URLs to import data from. One URL per line.
-              </p>
-              <Textarea
-                placeholder="https://example.com/pitch-deck.pdf\nhttps://medium.com/my-startup/our-vision"
-                rows={5}
-                value={urlInput}
-                onChange={(e) => setUrlInput(e.target.value)}
-              />
-              <Button onClick={handleImportUrls}>Import from URLs</Button>
-            </div>
-            {importedUrls.length > 0 && (
-              <div className="mt-4 space-y-2">
-                <h4 className="font-semibold text-muted-foreground">
-                  Imported URLs
-                </h4>
-                <ul className="space-y-2">
-                  {importedUrls.map((url, index) => (
-                    <li
-                      key={index}
-                      className="flex items-center justify-between rounded-md border bg-muted/30 p-2"
-                    >
-                      <div className="flex items-center gap-2 overflow-hidden">
-                        <Globe className="size-5 flex-shrink-0 text-primary" />
-                        <span className="truncate font-medium">{url}</span>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeUrl(index)}
-                        className="size-6"
-                      >
-                        <X className="size-4" />
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
+          {showUrlInput && (
+            <TabsContent value="url">
+              <div className="mt-4 space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Enter URLs to import data from. One URL per line.
+                </p>
+                <Textarea
+                  placeholder="https://example.com/pitch-deck.pdf\nhttps://medium.com/my-startup/our-vision"
+                  rows={5}
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                />
+                <Button onClick={handleImportUrls}>Import from URLs</Button>
               </div>
-            )}
-          </TabsContent>
-          <TabsContent value="text">
-            <div className="mt-4 space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Paste any relevant text content below, such as a business plan
-                or executive summary.
-              </p>
-              <Textarea
-                placeholder="Paste your content here..."
-                rows={8}
-                value={textInput}
-                onChange={(e) => setTextInput(e.target.value)}
-              />
-              <Button onClick={handleSubmitText}>Submit Text</Button>
-            </div>
-            {submittedTexts.length > 0 && (
-              <div className="mt-4 space-y-2">
-                <h4 className="font-semibold text-muted-foreground">
-                  Submitted Texts
-                </h4>
-                <ul className="space-y-2">
-                  {submittedTexts.map((text, index) => (
-                    <li
-                      key={index}
-                      className="flex items-center justify-between rounded-md border bg-muted/30 p-2"
-                    >
-                      <div className="flex items-center gap-2 overflow-hidden">
-                        <Type className="size-5 flex-shrink-0 text-primary" />
-                        <p className="truncate text-sm font-medium">
-                          {text}
-                        </p>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeText(index)}
-                        className="size-6"
+              {importedUrls.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  <h4 className="font-semibold text-muted-foreground">
+                    Imported URLs
+                  </h4>
+                  <ul className="space-y-2">
+                    {importedUrls.map((url, index) => (
+                      <li
+                        key={index}
+                        className="flex items-center justify-between rounded-md border bg-muted/30 p-2"
                       >
-                        <X className="size-4" />
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          <Globe className="size-5 flex-shrink-0 text-primary" />
+                          <span className="truncate font-medium">{url}</span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeUrl(index)}
+                          className="size-6"
+                        >
+                          <X className="size-4" />
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </TabsContent>
+          )}
+          {showTextInput && (
+            <TabsContent value="text">
+              <div className="mt-4 space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Paste any relevant text content below, such as a business plan
+                  or executive summary.
+                </p>
+                <Textarea
+                  placeholder="Paste your content here..."
+                  rows={8}
+                  value={textInput}
+                  onChange={(e) => setTextInput(e.target.value)}
+                />
+                <Button onClick={handleSubmitText}>Submit Text</Button>
               </div>
-            )}
-          </TabsContent>
+              {submittedTexts.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  <h4 className="font-semibold text-muted-foreground">
+                    Submitted Texts
+                  </h4>
+                  <ul className="space-y-2">
+                    {submittedTexts.map((text, index) => (
+                      <li
+                        key={index}
+                        className="flex items-center justify-between rounded-md border bg-muted/30 p-2"
+                      >
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          <Type className="size-5 flex-shrink-0 text-primary" />
+                          <p className="truncate text-sm font-medium">
+                            {text}
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeText(index)}
+                          className="size-6"
+                        >
+                          <X className="size-4" />
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </TabsContent>
+          )}
         </Tabs>
       </CardContent>
     </Card>
