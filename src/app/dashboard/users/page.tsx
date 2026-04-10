@@ -360,6 +360,122 @@ export default function UserManagementPage() {
     }
   };
 
+  // Suspend/Activate user handler
+  const handleToggleUserStatus = async (user: User) => {
+    if (!user.backendId) return;
+
+    const token = getAuthToken();
+    if (!token) {
+      toast({ variant: 'destructive', title: 'Not Authenticated', description: 'Please log in.' });
+      return;
+    }
+
+    const action = user.status === 'Active' ? 'suspend' : 'activate';
+    try {
+      const response = await fetch(`${backendUrl}/api/v1/users/${user.backendId}/${action}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.detail || `Failed to ${action} user`);
+      }
+
+      toast({ title: 'Success', description: `User ${action}d successfully.` });
+      loadUsers();
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Error', description: error instanceof Error ? error.message : `Failed to ${action} user.` });
+    }
+  };
+
+  // Reset password handler
+  const handleResetPassword = async (user: User) => {
+    if (!user.backendId) return;
+
+    const token = getAuthToken();
+    if (!token) {
+      toast({ variant: 'destructive', title: 'Not Authenticated', description: 'Please log in.' });
+      return;
+    }
+
+    try {
+      const response = await fetch(`${backendUrl}/api/v1/users/${user.backendId}/reset-password`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.detail || 'Failed to reset password');
+      }
+
+      const data = await response.json();
+      toast({ title: 'Password Reset Link Generated', description: `Reset link sent to ${data.email || user.email}.` });
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Error', description: error instanceof Error ? error.message : 'Failed to reset password.' });
+    }
+  };
+
+  // Export users handler
+  const handleExportUsers = async () => {
+    const token = getAuthToken();
+    if (!token) {
+      toast({ variant: 'destructive', title: 'Not Authenticated', description: 'Please log in.' });
+      return;
+    }
+
+    try {
+      const response = await fetch(`${backendUrl}/api/v1/users/export?format=csv`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      if (!response.ok) throw new Error('Failed to export users');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `users_export_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+      toast({ title: 'Export Complete', description: 'Users exported successfully.' });
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Export Failed', description: error instanceof Error ? error.message : 'Failed to export users.' });
+    }
+  };
+
+  // Edit user handler (update role/status)
+  const handleEditUser = async (user: User, updates: { role?: string; is_active?: boolean }) => {
+    if (!user.backendId) return;
+
+    const token = getAuthToken();
+    if (!token) return;
+
+    try {
+      const response = await fetch(`${backendUrl}/api/v1/users/${user.backendId}`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+
+      if (!response.ok) throw new Error('Failed to update user');
+
+      toast({ title: 'User Updated', description: 'User details updated successfully.' });
+      loadUsers();
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Error', description: error instanceof Error ? error.message : 'Failed to update user.' });
+    }
+  };
+
+  // Filter states
+  const [roleFilter, setRoleFilter] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>('');
+
   // Get user to delete
   const userToDelete = deleteUserId ? users.find(u => u.id === deleteUserId) : null;
 
