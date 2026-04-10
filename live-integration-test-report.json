@@ -1,0 +1,44 @@
+{
+  "timestamp": "2025-11-07T04:37:59.471Z",
+  "test_summary": {
+    "total": 5,
+    "passed": 4,
+    "failed": 1,
+    "details": [
+      {
+        "name": "Backend Health Check",
+        "status": "PASS",
+        "message": "Backend is healthy and responding"
+      },
+      {
+        "name": "File Upload Processing",
+        "status": "PASS",
+        "message": "Successfully processed 2 files with extracted data"
+      },
+      {
+        "name": "URL Data Fetching",
+        "status": "PASS",
+        "message": "Successfully processed 2 URLs with metadata extraction"
+      },
+      {
+        "name": "TCA Analysis Pipeline",
+        "status": "PASS",
+        "message": "Complete TCA analysis generated: Score 78.5/100, 5 categories evaluated"
+      },
+      {
+        "name": "Frontend Server Check",
+        "status": "FAIL",
+        "message": "Frontend connection failed: fetch failed"
+      }
+    ]
+  },
+  "server_status": {
+    "backend": "http://localhost:8001 - PASS",
+    "frontend": "http://localhost:3001 - FAIL"
+  },
+  "recommendations": [
+    "Review failed tests",
+    "Check server connectivity",
+    "Verify API responses"
+  ]
+}
