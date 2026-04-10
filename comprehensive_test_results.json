@@ -1,0 +1,371 @@
+{
+  "summary": {
+    "total": 45,
+    "passed": 45,
+    "failed": 0,
+    "pass_rate": 100.0,
+    "timestamp": "2026-02-12T23:41:50.026748"
+  },
+  "tests": [
+    {
+      "section": "Connectivity",
+      "test": "Health Endpoint",
+      "passed": true,
+      "details": "Status: 200",
+      "response_time_ms": 5919.01,
+      "timestamp": "2026-02-12T23:38:47.489786"
+    },
+    {
+      "section": "Connectivity",
+      "test": "API Root",
+      "passed": true,
+      "details": "Status: 200",
+      "response_time_ms": 2044.52,
+      "timestamp": "2026-02-12T23:38:49.563057"
+    },
+    {
+      "section": "Connectivity",
+      "test": "API v1 Prefix",
+      "passed": true,
+      "details": "Status: 404",
+      "response_time_ms": 2064.68,
+      "timestamp": "2026-02-12T23:38:51.654063"
+    },
+    {
+      "section": "Connectivity",
+      "test": "404 on Invalid Endpoint",
+      "passed": true,
+      "details": "Status: 404",
+      "response_time_ms": 2043.95,
+      "timestamp": "2026-02-12T23:38:53.704823"
+    },
+    {
+      "section": "Registration",
+      "test": "Valid Registration",
+      "passed": true,
+      "details": "Status: 201",
+      "response_time_ms": 2765.19,
+      "timestamp": "2026-02-12T23:38:56.488157"
+    },
+    {
+      "section": "Registration",
+      "test": "Reject Duplicate Email",
+      "passed": true,
+      "details": "Status: 400",
+      "response_time_ms": 2170.44,
+      "timestamp": "2026-02-12T23:38:58.659142"
+    },
+    {
+      "section": "Registration",
+      "test": "Reject Incomplete Data",
+      "passed": true,
+      "details": "Status: 422",
+      "response_time_ms": 2077.32,
+      "timestamp": "2026-02-12T23:39:00.738464"
+    },
+    {
+      "section": "Registration",
+      "test": "Reject Password Mismatch",
+      "passed": true,
+      "details": "Status: 422",
+      "response_time_ms": 2119.21,
+      "timestamp": "2026-02-12T23:39:02.859798"
+    },
+    {
+      "section": "Registration",
+      "test": "Reject Short Password",
+      "passed": true,
+      "details": "Status: 422",
+      "response_time_ms": 2108.55,
+      "timestamp": "2026-02-12T23:39:04.969348"
+    },
+    {
+      "section": "Registration",
+      "test": "Reject Invalid Email",
+      "passed": true,
+      "details": "Status: 422",
+      "response_time_ms": 2092.96,
+      "timestamp": "2026-02-12T23:39:07.063307"
+    },
+    {
+      "section": "Registration",
+      "test": "Reject Empty Username",
+      "passed": true,
+      "details": "Status: 422",
+      "response_time_ms": 2111.77,
+      "timestamp": "2026-02-12T23:39:09.175077"
+    },
+    {
+      "section": "Login",
+      "test": "Valid Login",
+      "passed": true,
+      "details": "Status: 200, Token received: True",
+      "response_time_ms": 2722.57,
+      "timestamp": "2026-02-12T23:39:11.899651"
+    },
+    {
+      "section": "Login",
+      "test": "Reject Wrong Password",
+      "passed": true,
+      "details": "Status: 401",
+      "response_time_ms": 2703.38,
+      "timestamp": "2026-02-12T23:39:14.603030"
+    },
+    {
+      "section": "Login",
+      "test": "Reject Non-existent User",
+      "passed": true,
+      "details": "Status: 401",
+      "response_time_ms": 2182.29,
+      "timestamp": "2026-02-12T23:39:16.786322"
+    },
+    {
+      "section": "Login",
+      "test": "Reject Missing Password",
+      "passed": true,
+      "details": "Status: 422",
+      "response_time_ms": 2112.92,
+      "timestamp": "2026-02-12T23:39:18.899242"
+    },
+    {
+      "section": "Login",
+      "test": "Reject Empty Credentials",
+      "passed": true,
+      "details": "Status: 401",
+      "response_time_ms": 2158.96,
+      "timestamp": "2026-02-12T23:39:21.059199"
+    },
+    {
+      "section": "Login",
+      "test": "Case Sensitivity Check",
+      "passed": true,
+      "details": "Status: 401",
+      "response_time_ms": 2148.45,
+      "timestamp": "2026-02-12T23:39:23.207653"
+    },
+    {
+      "section": "Token",
+      "test": "Valid Token Access",
+      "passed": true,
+      "details": "Status: 200",
+      "response_time_ms": 2143.31,
+      "timestamp": "2026-02-12T23:39:25.352553"
+    },
+    {
+      "section": "Token",
+      "test": "Reject Invalid Token",
+      "passed": true,
+      "details": "Status: 401",
+      "response_time_ms": 2104.52,
+      "timestamp": "2026-02-12T23:39:27.458704"
+    },
+    {
+      "section": "Token",
+      "test": "Reject Malformed Token",
+      "passed": true,
+      "details": "Status: 401",
+      "response_time_ms": 2139.22,
+      "timestamp": "2026-02-12T23:39:29.597923"
+    },
+    {
+      "section": "Token",
+      "test": "Reject No Bearer Prefix",
+      "passed": true,
+      "details": "Status: 403",
+      "response_time_ms": 2039.17,
+      "timestamp": "2026-02-12T23:39:31.637093"
+    },
+    {
+      "section": "Token",
+      "test": "Reject No Auth Header",
+      "passed": true,
+      "details": "Status: 403",
+      "response_time_ms": 2038.78,
+      "timestamp": "2026-02-12T23:39:33.676398"
+    },
+    {
+      "section": "Token",
+      "test": "Reject Empty Token",
+      "passed": true,
+      "details": "Status: 403",
+      "response_time_ms": 2026.77,
+      "timestamp": "2026-02-12T23:39:35.704165"
+    },
+    {
+      "section": "Security",
+      "test": "SQL Injection Prevention: ' OR '1'='1...",
+      "passed": true,
+      "details": "Status: 401",
+      "response_time_ms": 2177.83,
+      "timestamp": "2026-02-12T23:39:37.883474"
+    },
+    {
+      "section": "Security",
+      "test": "SQL Injection Prevention: admin'--...",
+      "passed": true,
+      "details": "Status: 401",
+      "response_time_ms": 2181.27,
+      "timestamp": "2026-02-12T23:39:40.065748"
+    },
+    {
+      "section": "Security",
+      "test": "SQL Injection Prevention: '; DROP TABLE users;...",
+      "passed": true,
+      "details": "Status: 401",
+      "response_time_ms": 2155.88,
+      "timestamp": "2026-02-12T23:39:42.221626"
+    },
+    {
+      "section": "Security",
+      "test": "SQL Injection Prevention: 1' OR '1'='1' /*...",
+      "passed": true,
+      "details": "Status: 401",
+      "response_time_ms": 2155.38,
+      "timestamp": "2026-02-12T23:39:44.377438"
+    },
+    {
+      "section": "Security",
+      "test": "XSS Prevention: <script>alert('xss')...",
+      "passed": true,
+      "details": "Status: 401",
+      "response_time_ms": 2222.48,
+      "timestamp": "2026-02-12T23:39:46.599916"
+    },
+    {
+      "section": "Security",
+      "test": "XSS Prevention: javascript:alert('xs...",
+      "passed": true,
+      "details": "Status: 401",
+      "response_time_ms": 2286.77,
+      "timestamp": "2026-02-12T23:39:48.886683"
+    },
+    {
+      "section": "Security",
+      "test": "XSS Prevention: <img src=x onerror=a...",
+      "passed": true,
+      "details": "Status: 401",
+      "response_time_ms": 2394.57,
+      "timestamp": "2026-02-12T23:39:51.292174"
+    },
+    {
+      "section": "Security",
+      "test": "CORS Configured",
+      "passed": true,
+      "details": "Status: 405",
+      "response_time_ms": 2127.64,
+      "timestamp": "2026-02-12T23:39:53.765299"
+    },
+    {
+      "section": "Security",
+      "test": "No Sensitive Data in Errors",
+      "passed": true,
+      "details": "Checked for sensitive keywords",
+      "response_time_ms": 2207.6,
+      "timestamp": "2026-02-12T23:39:56.019536"
+    },
+    {
+      "section": "Security",
+      "test": "Content-Type Validation",
+      "passed": true,
+      "details": "Status: 422",
+      "response_time_ms": 2077.91,
+      "timestamp": "2026-02-12T23:39:58.101610"
+    },
+    {
+      "section": "EdgeCases",
+      "test": "Reject Very Long Username",
+      "passed": true,
+      "details": "Status: 422",
+      "response_time_ms": 2101.22,
+      "timestamp": "2026-02-12T23:40:00.205825"
+    },
+    {
+      "section": "EdgeCases",
+      "test": "Handle Unicode Username",
+      "passed": true,
+      "details": "Status: 201",
+      "response_time_ms": 2721.36,
+      "timestamp": "2026-02-12T23:40:02.927184"
+    },
+    {
+      "section": "EdgeCases",
+      "test": "Accept Special Chars in Password",
+      "passed": true,
+      "details": "Status: 201",
+      "response_time_ms": 2798.16,
+      "timestamp": "2026-02-12T23:40:05.726337"
+    },
+    {
+      "section": "EdgeCases",
+      "test": "Handle Whitespace",
+      "passed": true,
+      "details": "Status: 400",
+      "response_time_ms": 2205.52,
+      "timestamp": "2026-02-12T23:40:07.938277"
+    },
+    {
+      "section": "EdgeCases",
+      "test": "Reject Null Values",
+      "passed": true,
+      "details": "Status: 422",
+      "response_time_ms": 2114.47,
+      "timestamp": "2026-02-12T23:40:10.054163"
+    },
+    {
+      "section": "EdgeCases",
+      "test": "Method Not Allowed",
+      "passed": true,
+      "details": "Status: 405",
+      "response_time_ms": 2056.75,
+      "timestamp": "2026-02-12T23:40:12.115582"
+    },
+    {
+      "section": "Stress",
+      "test": "Sequential Load (10 requests)",
+      "passed": true,
+      "details": "Passed: 10/10, Avg: 5538ms, Total: 55.4s",
+      "response_time_ms": 0,
+      "timestamp": "2026-02-12T23:41:07.591226"
+    },
+    {
+      "section": "Stress",
+      "test": "Concurrent Load (5 parallel)",
+      "passed": true,
+      "details": "Passed: 5/5, Avg: 7611ms, Total: 7.6s",
+      "response_time_ms": 0,
+      "timestamp": "2026-02-12T23:41:15.217629"
+    },
+    {
+      "section": "Stress",
+      "test": "Login Stress (5 requests)",
+      "passed": true,
+      "details": "Passed: 5/5, Avg: 2704ms, Total: 13.5s",
+      "response_time_ms": 0,
+      "timestamp": "2026-02-12T23:41:31.694247"
+    },
+    {
+      "section": "Stress",
+      "test": "Registration Stress (3 users)",
+      "passed": true,
+      "details": "Passed: 3/3, Avg: 2866ms, Total: 8.6s",
+      "response_time_ms": 0,
+      "timestamp": "2026-02-12T23:41:40.297840"
+    },
+    {
+      "section": "Logout",
+      "test": "Valid Logout",
+      "passed": true,
+      "details": "Status: 200",
+      "response_time_ms": 2216.3,
+      "timestamp": "2026-02-12T23:41:47.973528"
+    },
+    {
+      "section": "Logout",
+      "test": "Reject Logout Without Token",
+      "passed": true,
+      "details": "Status: 403",
+      "response_time_ms": 2045.21,
+      "timestamp": "2026-02-12T23:41:50.020749"
+    }
+  ]
+}
