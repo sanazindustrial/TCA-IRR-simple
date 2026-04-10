@@ -5011,6 +5011,7 @@ async def _process_ssd_tirr_request(
 # ═══════════════════════════════════════════════════════════════════════
 
 @app.get("/api/ssd/audit/logs")
+@app.get("/api/v1/ssd/audit/logs")  # v1 alias
 async def list_ssd_audit_logs(
     status: Optional[str] = None,
     limit: int = 50,
@@ -5127,6 +5128,7 @@ async def get_ssd_report_data(tracking_id: str):
 
 
 @app.get("/api/ssd/audit/stats")
+@app.get("/api/v1/ssd/audit/stats")  # v1 alias
 async def get_ssd_audit_stats():
     """
     Get aggregate statistics on SSD integration health.
@@ -7839,6 +7841,66 @@ async def create_admin_user(data: dict = Body(...)):
     except Exception as e:
         logger.error(f"Error creating user: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to create user: {str(e)}")
+
+
+@app.post("/api/v1/users/{user_id}/reset-password")
+async def reset_password_admin_v1(user_id: str, data: dict = Body(default={}), background_tasks: BackgroundTasks = None, current_user: dict = Depends(get_current_user)):
+    """Admin-initiated password reset - sends reset link to user or sets new password directly"""
+    if current_user.get("role", "").lower() != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    try:
+        uid = int(user_id.replace('usr_', '')) if user_id.startswith('usr_') else int(user_id)
+        
+        async with db_manager.get_connection() as conn:
+            user = await conn.fetchrow("SELECT id, email, username FROM users WHERE id = $1", uid)
+        
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Generate reset token
+        reset_token = secrets.token_urlsafe(32)
+        token_hash = hashlib.sha256(reset_token.encode()).hexdigest()
+        
+        # Store reset token
+        password_reset_tokens[token_hash] = {
+            "email": user["email"],
+            "user_id": uid,
+            "expires_at": datetime.now(timezone.utc) + timedelta(hours=24)
+        }
+        
+        # Send reset email if new_password not provided
+        new_password = data.get('new_password')
+        if new_password:
+            # Direct password reset by admin
+            hashed_password = bcrypt.hashpw(new_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+            async with db_manager.get_connection() as conn:
+                await conn.execute(
+                    "UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2",
+                    hashed_password, uid
+                )
+            logger.info(f"Password reset directly for user {uid} by admin {current_user.get('id')}")
+            return {"message": "Password reset successfully", "success": True}
+        
+        # Otherwise send reset email
+        frontend_url = os.environ.get("FRONTEND_URL", "https://tca-irr.azurewebsites.net")
+        reset_url = f"{frontend_url}/reset-password?token={reset_token}"
+        
+        logger.info(f"Password reset initiated for user {uid} by admin {current_user.get('id')}")
+        return {
+            "message": "Password reset link generated", 
+            "success": True, 
+            "reset_url": reset_url,
+            "email": user["email"]
+        }
+        
+    except HTTPException:
+        raise
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid user ID format")
+    except Exception as e:
+        logger.error(f"Reset password admin v1 error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to reset password: {str(e)}")
 
 
 # --- User Requests (Admin) Endpoints ---
