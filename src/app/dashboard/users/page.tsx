@@ -135,6 +135,8 @@ export default function UserManagementPage() {
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [totalUsers, setTotalUsers] = useState(0);
+  const [roleFilter, setRoleFilter] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>('');
   const { toast } = useToast();
   const { currentUser } = useAuth();
 
@@ -156,8 +158,12 @@ export default function UserManagementPage() {
         return;
       }
 
-      const searchParam = searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : '';
-      const response = await fetch(`${backendUrl}/api/v1/users?size=100${searchParam}`, {
+      const params = new URLSearchParams({ size: '100' });
+      if (searchQuery) params.append('search', searchQuery);
+      if (roleFilter) params.append('role', roleFilter);
+      if (statusFilter) params.append('status', statusFilter);
+
+      const response = await fetch(`${backendUrl}/api/v1/users?${params.toString()}`, {
         headers: {
           'Accept': 'application/json',
           'Authorization': `Bearer ${token}`,
@@ -165,10 +171,12 @@ export default function UserManagementPage() {
       });
 
       if (response.ok) {
-        const data: PaginatedResponse = await response.json();
-        const mappedUsers = data.items.map(mapBackendUser);
+        const data = await response.json();
+        // Handle both response formats: { items, total } or { users, pagination }
+        const usersList = data.items || data.users || [];
+        const mappedUsers = Array.isArray(usersList) ? usersList.map(mapBackendUser) : [];
         setUsers(mappedUsers);
-        setTotalUsers(data.total);
+        setTotalUsers(data.total ?? data.pagination?.total ?? mappedUsers.length);
       } else if (response.status === 403) {
         toast({
           variant: 'destructive',
@@ -190,15 +198,15 @@ export default function UserManagementPage() {
     } finally {
       setIsLoadingUsers(false);
     }
-  }, [backendUrl, searchQuery, toast]);
+  }, [backendUrl, searchQuery, roleFilter, statusFilter, toast]);
 
-  // Load users on mount and when search changes
+  // Load users on mount and when search/filters change
   useEffect(() => {
     const debounce = setTimeout(() => {
       loadUsers();
     }, searchQuery ? 300 : 0);
     return () => clearTimeout(debounce);
-  }, [loadUsers, searchQuery]);
+  }, [loadUsers, searchQuery, roleFilter, statusFilter]);
 
   // Use users directly since search is now server-side
   const filteredUsers = users;
@@ -472,10 +480,6 @@ export default function UserManagementPage() {
     }
   };
 
-  // Filter states
-  const [roleFilter, setRoleFilter] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<string>('');
-
   // Get user to delete
   const userToDelete = deleteUserId ? users.find(u => u.id === deleteUserId) : null;
 
@@ -514,7 +518,7 @@ export default function UserManagementPage() {
           <Button variant="outline" onClick={loadUsers} disabled={isLoadingUsers}>
             <RefreshCw className={`mr-2 h-4 w-4 ${isLoadingUsers ? 'animate-spin' : ''}`} /> Refresh
           </Button>
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleExportUsers}>
             <Upload className="mr-2" /> Export Users
           </Button>
           <Dialog open={isInviteDialogOpen} onOpenChange={setInviteDialogOpen}>
@@ -572,22 +576,23 @@ export default function UserManagementPage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <Select>
+            <Select value={roleFilter} onValueChange={(v) => setRoleFilter(v === 'all' ? '' : v)}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="All Roles" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="all">All Roles</SelectItem>
                 <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="Analyst">Analyst</SelectItem>
+                <SelectItem value="analyst">Analyst</SelectItem>
                 <SelectItem value="user">User</SelectItem>
-                <SelectItem value="ai-adopter">AI Adopter</SelectItem>
               </SelectContent>
             </Select>
-            <Select>
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v === 'all' ? '' : v)}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="All Status" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
                 <SelectItem value="inactive">Inactive</SelectItem>
               </SelectContent>
@@ -684,10 +689,10 @@ export default function UserManagementPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem>Edit User</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEditUser(user, {})}>Edit User</DropdownMenuItem>
                             <DropdownMenuItem>View Costs</DropdownMenuItem>
-                            <DropdownMenuItem>Reset Password</DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleResetPassword(user)}>Reset Password</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleToggleUserStatus(user)}>
                               {user.status === 'Active' ? 'Suspend User' : 'Activate User'}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />

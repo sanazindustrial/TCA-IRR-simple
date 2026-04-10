@@ -591,27 +591,29 @@ export default function EvaluationPage() {
 
     // State for AI extraction
     const [isExtracting, setIsExtracting] = useState(false);
+    const [isAiProcessing, setIsAiProcessing] = useState(false); // Track AI API call phase
     const [extractionComplete, setExtractionComplete] = useState(false);
     const [extractionProgress, setExtractionProgress] = useState(0);
     const [extractionTimeLeft, setExtractionTimeLeft] = useState(0);
     const [extractionStep, setExtractionStep] = useState('');
     const extractionStartTime = useRef<number>(0);
-    const ESTIMATED_EXTRACTION_TIME = 8; // 8 seconds estimated
+    const ESTIMATED_EXTRACTION_TIME = 8; // 8 seconds estimated for AI extraction
 
-    // Countdown timer effect for extraction
+    // Countdown timer effect for AI extraction phase only
     useEffect(() => {
         let interval: NodeJS.Timeout;
-        if (isExtracting && extractionStartTime.current > 0) {
+        if (isAiProcessing && extractionStartTime.current > 0) {
             interval = setInterval(() => {
                 const elapsed = (Date.now() - extractionStartTime.current) / 1000;
                 const remaining = Math.max(0, ESTIMATED_EXTRACTION_TIME - elapsed);
-                const progress = Math.min(95, (elapsed / ESTIMATED_EXTRACTION_TIME) * 100);
+                // Progress from 40% to 95% during AI phase
+                const aiProgress = Math.min(55, (elapsed / ESTIMATED_EXTRACTION_TIME) * 55);
                 setExtractionTimeLeft(Math.ceil(remaining));
-                setExtractionProgress(progress);
+                setExtractionProgress(40 + aiProgress);
             }, 100);
         }
         return () => clearInterval(interval);
-    }, [isExtracting]);
+    }, [isAiProcessing]);
 
     // Compute workflow data for step validation
     const workflowData: WorkflowData = {
@@ -773,43 +775,64 @@ export default function EvaluationPage() {
     const handleExtractFromDocuments = async () => {
         setIsExtracting(true);
         setExtractionProgress(0);
-        setExtractionStep('Preparing documents...');
-        extractionStartTime.current = Date.now();
+        setExtractionStep('Reading document content...');
+        // Don't set extractionStartTime here - set it when AI processing starts
 
         try {
-            // Wait a bit for document processing to complete
-            setExtractionStep('Reading document content...');
-            await new Promise(resolve => setTimeout(resolve, 500));
+            // Wait for document processing to complete - poll until content is ready
+            let maxWait = 15; // Max 15 seconds
+            let processedFiles: Array<{ extracted_data?: { text_content?: string } }> = [];
+            let processedUrls: Array<{ extracted_data?: { text_content?: string } }> = [];
+            let processedTexts: Array<{ content?: string }> = [];
+            let allContent = '';
 
-            // Get processed files from localStorage (set by document-submission component)
-            const processedFiles = JSON.parse(localStorage.getItem('processedFiles') || '[]');
-            const processedUrls = JSON.parse(localStorage.getItem('processedUrls') || '[]');
-            const processedTexts = JSON.parse(localStorage.getItem('processedTexts') || '[]');
+            while (maxWait > 0) {
+                setExtractionStep(`Waiting for document processing... (${maxWait}s)`);
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                maxWait--;
 
-            setExtractionStep('Combining text content...');
+                // Get processed files from localStorage (set by document-submission component)
+                processedFiles = JSON.parse(localStorage.getItem('processedFiles') || '[]');
+                processedUrls = JSON.parse(localStorage.getItem('processedUrls') || '[]');
+                processedTexts = JSON.parse(localStorage.getItem('processedTexts') || '[]');
 
-            // Combine all text content for extraction
-            const allContent = [
-                ...processedFiles.map((f: { extracted_data?: { text_content?: string } }) => f.extracted_data?.text_content || ''),
-                ...processedUrls.map((u: { extracted_data?: { text_content?: string } }) => u.extracted_data?.text_content || ''),
-                ...processedTexts.map((t: { content?: string }) => t.content || ''),
-                ...submittedTexts,
-            ].filter(c => c.length > 0).join('\n\n');
+                // Combine all text content for extraction
+                allContent = [
+                    ...processedFiles.map((f) => f.extracted_data?.text_content || ''),
+                    ...processedUrls.map((u) => u.extracted_data?.text_content || ''),
+                    ...processedTexts.map((t) => t.content || ''),
+                    ...submittedTexts,
+                ].filter(c => c.length > 0 && !c.includes('[File extraction pending') && !c.includes('[File extraction failed')).join('\n\n');
 
-            // If no content to extract, show message and exit
+                // Update progress based on wait time
+                setExtractionProgress(Math.min(30, ((15 - maxWait) / 15) * 30));
+
+                // If we have real content, break
+                if (allContent.trim().length >= 50) break;
+            }
+
+            // If still no content, show message and exit
             if (allContent.trim().length < 50) {
                 toast({
                     title: 'Processing Documents',
-                    description: 'Please wait for document processing to complete, then extraction will run automatically.',
+                    description: 'Could not extract text content. Please try uploading a different file format (PDF recommended).',
+                    variant: 'destructive',
                 });
                 setIsExtracting(false);
+                setIsAiProcessing(false);
                 setExtractionProgress(0);
+                setExtractionTimeLeft(0);
                 extractionStartTime.current = 0;
                 autoExtractionTriggered.current = false; // Allow retry
                 return;
             }
 
             setExtractionStep('Analyzing with AI...');
+            setExtractionProgress(40);
+            
+            // Start the AI countdown timer
+            extractionStartTime.current = Date.now();
+            setIsAiProcessing(true);
 
             // Call backend extraction API
             const response = await fetch('https://tcairrapiccontainer.azurewebsites.net/api/v1/analysis/extract-company-info', {
@@ -909,8 +932,10 @@ export default function EvaluationPage() {
             setExtractionComplete(true); // Still mark complete so user can proceed
         } finally {
             setIsExtracting(false);
+            setIsAiProcessing(false);
             setExtractionProgress(100);
             setExtractionStep('Complete!');
+            setExtractionTimeLeft(0);
             extractionStartTime.current = 0;
         }
     };

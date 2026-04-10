@@ -5100,6 +5100,7 @@ async def _process_ssd_tirr_request(
 # ═══════════════════════════════════════════════════════════════════════
 
 @app.get("/api/ssd/audit/logs")
+@app.get("/api/v1/ssd/audit/logs")  # v1 alias
 async def list_ssd_audit_logs(
     status: Optional[str] = None,
     limit: int = 50,
@@ -5216,6 +5217,7 @@ async def get_ssd_report_data(tracking_id: str):
 
 
 @app.get("/api/ssd/audit/stats")
+@app.get("/api/v1/ssd/audit/stats")  # v1 alias
 async def get_ssd_audit_stats():
     """
     Get aggregate statistics on SSD integration health.

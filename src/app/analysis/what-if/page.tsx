@@ -610,14 +610,29 @@ export default function SimulationPage() {
 
           // Initialize module configs for all modules
           const configs: Record<string, ModuleConfig> = {};
+          
+          // Try to load saved configs from localStorage
+          let savedConfigs: Record<string, ModuleConfig> = {};
+          try {
+            const savedConfigStr = localStorage.getItem('moduleConfigs');
+            if (savedConfigStr) {
+              savedConfigs = JSON.parse(savedConfigStr);
+              console.log('Loaded saved module configs:', savedConfigs);
+            }
+          } catch (e) {
+            console.warn('Failed to parse saved module configs:', e);
+          }
+          
           Object.keys(initialScores).forEach((moduleId) => {
             const def = MODULE_DEFINITIONS[moduleId] || { name: moduleId, description: '' };
+            // Use saved config if available, otherwise default values
+            const savedConfig = savedConfigs[moduleId];
             configs[moduleId] = {
               id: moduleId,
               name: def.name,
               description: def.description,
-              enabled: true,
-              simulated: true, // Default to simulating all modules
+              enabled: savedConfig?.enabled ?? true,
+              simulated: savedConfig?.simulated ?? true, // Default to simulating all modules
             };
           });
 
@@ -660,20 +675,30 @@ export default function SimulationPage() {
     }));
   };
 
-  // Toggle module enabled/skipped state (admin only)
+  // Toggle module enabled/skipped state (admin only) - persists to localStorage
   const handleToggleEnabled = (moduleId: string, enabled: boolean) => {
-    setModuleConfigs(prev => ({
-      ...prev,
-      [moduleId]: { ...prev[moduleId], enabled }
-    }));
+    setModuleConfigs(prev => {
+      const updated = {
+        ...prev,
+        [moduleId]: { ...prev[moduleId], enabled }
+      };
+      // Persist module configs to localStorage
+      localStorage.setItem('moduleConfigs', JSON.stringify(updated));
+      return updated;
+    });
   };
 
-  // Toggle module simulated state (admin only)
+  // Toggle module simulated state (admin only) - persists to localStorage
   const handleToggleSimulated = (moduleId: string, simulated: boolean) => {
-    setModuleConfigs(prev => ({
-      ...prev,
-      [moduleId]: { ...prev[moduleId], simulated }
-    }));
+    setModuleConfigs(prev => {
+      const updated = {
+        ...prev,
+        [moduleId]: { ...prev[moduleId], simulated }
+      };
+      // Persist module configs to localStorage
+      localStorage.setItem('moduleConfigs', JSON.stringify(updated));
+      return updated;
+    });
   };
 
   // Handle module tab selection
