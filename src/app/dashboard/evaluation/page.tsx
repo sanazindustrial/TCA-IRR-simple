@@ -108,8 +108,8 @@ const DEFAULT_COMPANY_INFO: CompanyInformationData = {
 const WORKFLOW_STEPS: WorkflowStep[] = [
     {
         id: 1,
-        name: 'Upload Documents',
-        description: 'Upload pitch deck, financials, and other materials',
+        name: 'Upload Pitch Deck',
+        description: 'Upload your company pitch deck (PPT, PDF) to extract company details',
         icon: <Upload className="h-5 w-5" />,
         isLocked: () => false,
         isComplete: (data) => data.hasDocuments,
@@ -231,6 +231,9 @@ function AnalysisSetup({
     onExtractFromDocuments,
     isExtracting,
     extractionComplete,
+    extractionProgress,
+    extractionTimeLeft,
+    extractionStep,
     currentStep,
     setCurrentStep,
     evaluationId,
@@ -241,6 +244,9 @@ function AnalysisSetup({
     onExtractFromDocuments: () => void;
     isExtracting: boolean;
     extractionComplete: boolean;
+    extractionProgress: number;
+    extractionTimeLeft: number;
+    extractionStep: string;
     currentStep: number;
     setCurrentStep: (step: number) => void;
     evaluationId: string;
@@ -330,14 +336,18 @@ function AnalysisSetup({
 
             {/* Step Content */}
             <div className="min-h-[400px]">
-                {/* Step 1: Upload Documents */}
+                {/* Step 1: Upload Pitch Deck */}
                 {currentStep === 1 && (
                     <div className="space-y-4">
                         <div className="border rounded-lg p-6">
-                            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                            <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
                                 <Upload className="h-5 w-5" />
-                                Upload Documents
+                                Upload Pitch Deck
                             </h3>
+                            <p className="text-sm text-muted-foreground mb-4">
+                                Upload your company pitch deck (PowerPoint or PDF) to automatically extract company information.
+                                You can upload additional documents after the initial analysis.
+                            </p>
                             <DocumentSubmission
                                 uploadedFiles={uploadedFiles}
                                 setUploadedFiles={setUploadedFilesAction || (() => { })}
@@ -345,12 +355,16 @@ function AnalysisSetup({
                                 setImportedUrls={setImportedUrlsAction || (() => { })}
                                 submittedTexts={submittedTexts}
                                 setSubmittedTexts={setSubmittedTextsAction || (() => { })}
+                                showUrlInput={false}
+                                showTextInput={false}
+                                title="Upload Pitch Deck"
+                                description="Drag and drop your pitch deck file (PDF, PPT, PPTX) or click to browse"
                             />
                         </div>
                         {hasDocuments && (
                             <div className="p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
                                 <p className="text-blue-700 dark:text-blue-300 text-sm">
-                                    ✨ Documents uploaded! Click <strong>Next</strong> to extract company information automatically.
+                                    ✨ Pitch deck uploaded! Click <strong>Next</strong> to extract company information automatically.
                                 </p>
                             </div>
                         )}
@@ -361,10 +375,43 @@ function AnalysisSetup({
                 {currentStep === 2 && (
                     <div className="space-y-4">
                         {isExtracting && (
-                            <div className="flex items-center justify-center p-8 bg-muted/50 rounded-lg">
+                            <div className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                                 <div className="text-center">
-                                    <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent mb-4" />
-                                    <p className="text-muted-foreground">Extracting company information from documents...</p>
+                                    <div className="inline-block h-10 w-10 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent mb-4" />
+                                    <h4 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-2">
+                                        Extracting Company Information
+                                    </h4>
+                                    <p className="text-blue-700 dark:text-blue-300 text-sm mb-4">
+                                        {extractionStep || 'Processing documents...'}
+                                    </p>
+
+                                    {/* Progress Bar */}
+                                    <div className="w-full max-w-md mx-auto mb-3">
+                                        <div className="h-3 bg-blue-100 dark:bg-blue-800 rounded-full overflow-hidden">
+                                            <div
+                                                className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-200 ease-out"
+                                                style={{ width: `${Math.min(extractionProgress, 100)}%` }}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Time Remaining */}
+                                    <div className="flex items-center justify-center gap-2 text-sm">
+                                        <span className="text-blue-600 dark:text-blue-400 font-medium">
+                                            {extractionTimeLeft > 0 ? (
+                                                <>⏱️ ~{extractionTimeLeft}s remaining</>
+                                            ) : (
+                                                <>✨ Almost ready...</>
+                                            )}
+                                        </span>
+                                        <span className="text-blue-500/70 dark:text-blue-400/70">
+                                            ({Math.round(extractionProgress)}%)
+                                        </span>
+                                    </div>
+
+                                    <p className="text-xs text-blue-500/80 dark:text-blue-400/80 mt-3">
+                                        AI is analyzing your documents to extract company details
+                                    </p>
                                 </div>
                             </div>
                         )}
@@ -381,11 +428,34 @@ function AnalysisSetup({
                                 <FileText className="h-5 w-5" />
                                 Company Information
                             </h3>
-                            <CompanyInformation
-                                framework={framework}
+                            <CompanyInformation framework={framework}
                                 onFrameworkChange={onFrameworkChangeAction}
                             />
                         </div>
+
+                        {/* Additional Documents Section */}
+                        {extractionComplete && (
+                            <div className="border rounded-lg p-6 bg-muted/30">
+                                <h4 className="text-md font-semibold mb-2 flex items-center gap-2">
+                                    <Upload className="h-4 w-4" />
+                                    Upload Additional Documents (Optional)
+                                </h4>
+                                <p className="text-sm text-muted-foreground mb-4">
+                                    Add financial statements, market research, or other supporting documents. You can upload files, import from URLs, or paste text directly.
+                                </p>
+                                <DocumentSubmission
+                                    uploadedFiles={uploadedFiles}
+                                    setUploadedFiles={setUploadedFilesAction || (() => { })}
+                                    importedUrls={importedUrls}
+                                    setImportedUrls={setImportedUrlsAction || (() => { })}
+                                    submittedTexts={submittedTexts}
+                                    setSubmittedTexts={setSubmittedTextsAction || (() => { })}
+                                    showUrlInput={true}
+                                    showTextInput={true}
+                                    title="Additional Documents"
+                                />
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -521,7 +591,29 @@ export default function EvaluationPage() {
 
     // State for AI extraction
     const [isExtracting, setIsExtracting] = useState(false);
+    const [isAiProcessing, setIsAiProcessing] = useState(false); // Track AI API call phase
     const [extractionComplete, setExtractionComplete] = useState(false);
+    const [extractionProgress, setExtractionProgress] = useState(0);
+    const [extractionTimeLeft, setExtractionTimeLeft] = useState(0);
+    const [extractionStep, setExtractionStep] = useState('');
+    const extractionStartTime = useRef<number>(0);
+    const ESTIMATED_EXTRACTION_TIME = 8; // 8 seconds estimated for AI extraction
+
+    // Countdown timer effect for AI extraction phase only
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+        if (isAiProcessing && extractionStartTime.current > 0) {
+            interval = setInterval(() => {
+                const elapsed = (Date.now() - extractionStartTime.current) / 1000;
+                const remaining = Math.max(0, ESTIMATED_EXTRACTION_TIME - elapsed);
+                // Progress from 40% to 95% during AI phase
+                const aiProgress = Math.min(55, (elapsed / ESTIMATED_EXTRACTION_TIME) * 55);
+                setExtractionTimeLeft(Math.ceil(remaining));
+                setExtractionProgress(40 + aiProgress);
+            }, 100);
+        }
+        return () => clearInterval(interval);
+    }, [isAiProcessing]);
 
     // Compute workflow data for step validation
     const workflowData: WorkflowData = {
@@ -529,6 +621,7 @@ export default function EvaluationPage() {
         extractionComplete,
         hasCompanyInfo: (companyInfo?.companyName?.length ?? 0) > 0 || (companyInfo?.companyDescription?.length ?? 0) > 0,
         hasExternalData: false, // Track external data separately if needed
+        analysisComplete: false, // Tracked by analysis state
         hasModuleConfig: true, // Modules have default config
     };
 
@@ -599,6 +692,10 @@ export default function EvaluationPage() {
         setCompanyInfo(DEFAULT_COMPANY_INFO);
         setExtractionComplete(false);
         setIsExtracting(false);
+        setExtractionProgress(0);
+        setExtractionTimeLeft(0);
+        setExtractionStep('');
+        extractionStartTime.current = 0;
         setCurrentStep(1);
         setFramework('general');
         setReportType('triage');
@@ -636,8 +733,8 @@ export default function EvaluationPage() {
         setShowClearConfirm(false);
 
         toast({
-            title: 'New Evaluation Started',
-            description: `Fresh evaluation ${newEvaluationId} created.`,
+            title: 'New Company Analysis Started',
+            description: `Fresh analysis ${newEvaluationId} created.`,
         });
     }, [framework, toast]);
 
@@ -677,33 +774,65 @@ export default function EvaluationPage() {
     // Extract company info from uploaded documents
     const handleExtractFromDocuments = async () => {
         setIsExtracting(true);
+        setExtractionProgress(0);
+        setExtractionStep('Reading document content...');
+        // Don't set extractionStartTime here - set it when AI processing starts
+
         try {
-            // Wait a bit for document processing to complete
-            await new Promise(resolve => setTimeout(resolve, 500));
+            // Wait for document processing to complete - poll until content is ready
+            let maxWait = 15; // Max 15 seconds
+            let processedFiles: Array<{ extracted_data?: { text_content?: string } }> = [];
+            let processedUrls: Array<{ extracted_data?: { text_content?: string } }> = [];
+            let processedTexts: Array<{ content?: string }> = [];
+            let allContent = '';
 
-            // Get processed files from localStorage (set by document-submission component)
-            const processedFiles = JSON.parse(localStorage.getItem('processedFiles') || '[]');
-            const processedUrls = JSON.parse(localStorage.getItem('processedUrls') || '[]');
-            const processedTexts = JSON.parse(localStorage.getItem('processedTexts') || '[]');
+            while (maxWait > 0) {
+                setExtractionStep(`Waiting for document processing... (${maxWait}s)`);
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                maxWait--;
 
-            // Combine all text content for extraction
-            const allContent = [
-                ...processedFiles.map((f: { extracted_data?: { text_content?: string } }) => f.extracted_data?.text_content || ''),
-                ...processedUrls.map((u: { extracted_data?: { text_content?: string } }) => u.extracted_data?.text_content || ''),
-                ...processedTexts.map((t: { content?: string }) => t.content || ''),
-                ...submittedTexts,
-            ].filter(c => c.length > 0).join('\n\n');
+                // Get processed files from localStorage (set by document-submission component)
+                processedFiles = JSON.parse(localStorage.getItem('processedFiles') || '[]');
+                processedUrls = JSON.parse(localStorage.getItem('processedUrls') || '[]');
+                processedTexts = JSON.parse(localStorage.getItem('processedTexts') || '[]');
 
-            // If no content to extract, show message and exit
+                // Combine all text content for extraction
+                allContent = [
+                    ...processedFiles.map((f) => f.extracted_data?.text_content || ''),
+                    ...processedUrls.map((u) => u.extracted_data?.text_content || ''),
+                    ...processedTexts.map((t) => t.content || ''),
+                    ...submittedTexts,
+                ].filter(c => c.length > 0 && !c.includes('[File extraction pending') && !c.includes('[File extraction failed')).join('\n\n');
+
+                // Update progress based on wait time
+                setExtractionProgress(Math.min(30, ((15 - maxWait) / 15) * 30));
+
+                // If we have real content, break
+                if (allContent.trim().length >= 50) break;
+            }
+
+            // If still no content, show message and exit
             if (allContent.trim().length < 50) {
                 toast({
                     title: 'Processing Documents',
-                    description: 'Please wait for document processing to complete, then extraction will run automatically.',
+                    description: 'Could not extract text content. Please try uploading a different file format (PDF recommended).',
+                    variant: 'destructive',
                 });
                 setIsExtracting(false);
+                setIsAiProcessing(false);
+                setExtractionProgress(0);
+                setExtractionTimeLeft(0);
+                extractionStartTime.current = 0;
                 autoExtractionTriggered.current = false; // Allow retry
                 return;
             }
+
+            setExtractionStep('Analyzing with AI...');
+            setExtractionProgress(40);
+            
+            // Start the AI countdown timer
+            extractionStartTime.current = Date.now();
+            setIsAiProcessing(true);
 
             // Call backend extraction API
             const response = await fetch('https://tcairrapiccontainer.azurewebsites.net/api/v1/analysis/extract-company-info', {
@@ -714,6 +843,8 @@ export default function EvaluationPage() {
                     framework,
                 }),
             });
+
+            setExtractionStep('Processing extracted data...');
 
             if (response.ok) {
                 const extractedData = await response.json();
@@ -801,6 +932,11 @@ export default function EvaluationPage() {
             setExtractionComplete(true); // Still mark complete so user can proceed
         } finally {
             setIsExtracting(false);
+            setIsAiProcessing(false);
+            setExtractionProgress(100);
+            setExtractionStep('Complete!');
+            setExtractionTimeLeft(0);
+            extractionStartTime.current = 0;
         }
     };
 
@@ -1201,13 +1337,13 @@ export default function EvaluationPage() {
                         )}
                         <div className='relative'>
                             <h1 className="text-4xl md:text-5xl font-bold font-headline text-primary tracking-tight">
-                                Analysis Setup
+                                Company Analysis Setup
                             </h1>
                         </div>
                         <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-                            Configure the inputs for the startup evaluation.
+                            Configure the inputs for the company analysis.
                         </p>
-                        {/* New Evaluation Button */}
+                        {/* New Company Analysis Button */}
                         <div className="mt-4">
                             <Button
                                 variant="outline"
@@ -1215,7 +1351,7 @@ export default function EvaluationPage() {
                                 className="gap-2"
                             >
                                 <RefreshCw className="h-4 w-4" />
-                                Start New Evaluation
+                                Start New Company Analysis
                             </Button>
                         </div>
                     </header>
@@ -1233,6 +1369,9 @@ export default function EvaluationPage() {
                         onExtractFromDocuments={handleExtractFromDocuments}
                         isExtracting={isExtracting}
                         extractionComplete={extractionComplete}
+                        extractionProgress={extractionProgress}
+                        extractionTimeLeft={extractionTimeLeft}
+                        extractionStep={extractionStep}
                         currentStep={currentStep}
                         setCurrentStep={setCurrentStep}
                         evaluationId={evaluationId}

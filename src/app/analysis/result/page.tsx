@@ -18,6 +18,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { saveAnalysisReport, reportStorage } from '@/lib/report-storage';
 import { unifiedRecordTracking, generateReportId } from '@/lib/unified-record-tracking';
+import { clearEvaluationState } from '@/lib/auto-extraction-service';
 
 // Evaluation Components
 import { BenchmarkComparison } from '@/components/evaluation/benchmark-comparison';
@@ -783,6 +784,10 @@ export default function AnalysisResultPage({
             } catch (e) {
                 console.warn('Pending report sync failed:', e);
             }
+
+            // Clear all evaluation/analysis state for fresh start
+            clearEvaluationState();
+            console.log('Cleared evaluation state after successful save');
 
             // Redirect to reports page after a short delay
             setTimeout(() => {
