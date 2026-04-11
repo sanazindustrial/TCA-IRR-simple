@@ -224,6 +224,23 @@ function AnalysisSetup(_a) {
             setCurrentStep(prevSteps[prevSteps.length - 1].id);
         }
     };
+    // Handle step click with navigation for external steps
+    var handleStepClick = function (stepId) {
+        var step = WORKFLOW_STEPS.find(function (s) { return s.id === stepId; });
+        if (!step || step.isLocked(workflowData))
+            return;
+        // Navigate to external pages for steps 6 and 7
+        if (stepId === 6) {
+            window.location.href = '/analysis/what-if';
+            return;
+        }
+        if (stepId === 7) {
+            window.location.href = '/analysis/result';
+            return;
+        }
+        // For other steps, just update the current step
+        setCurrentStep(stepId);
+    };
     return (React.createElement("div", { className: "space-y-6 mb-12" },
         React.createElement("div", { className: "flex items-center justify-between bg-muted/50 rounded-lg p-4" },
             React.createElement("div", { className: "flex items-center gap-3" },
@@ -233,7 +250,7 @@ function AnalysisSetup(_a) {
             hasData && (React.createElement("span", { className: "flex items-center gap-2 text-sm text-muted-foreground" },
                 React.createElement("span", { className: "w-2 h-2 bg-green-500 rounded-full animate-pulse" }),
                 "Auto-saving"))),
-        React.createElement(WorkflowProgress, { currentStep: currentStep, steps: visibleSteps, workflowData: workflowData, onStepClick: setCurrentStep }),
+        React.createElement(WorkflowProgress, { currentStep: currentStep, steps: visibleSteps, workflowData: workflowData, onStepClick: handleStepClick }),
         React.createElement("div", { className: "min-h-[400px]" },
             currentStep === 1 && (React.createElement("div", { className: "space-y-4" },
                 React.createElement("div", { className: "border rounded-lg p-6" },
