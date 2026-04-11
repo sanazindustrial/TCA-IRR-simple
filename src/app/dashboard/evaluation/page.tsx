@@ -308,6 +308,25 @@ function AnalysisSetup({
         }
     };
 
+    // Handle step click with navigation for external steps
+    const handleStepClick = (stepId: number) => {
+        const step = WORKFLOW_STEPS.find(s => s.id === stepId);
+        if (!step || step.isLocked(workflowData)) return;
+        
+        // Navigate to external pages for steps 6 and 7
+        if (stepId === 6) {
+            window.location.href = '/analysis/what-if';
+            return;
+        }
+        if (stepId === 7) {
+            window.location.href = '/analysis/result';
+            return;
+        }
+        
+        // For other steps, just update the current step
+        setCurrentStep(stepId);
+    };
+
     return (
         <div className="space-y-6 mb-12">
             {/* Evaluation ID Badge */}
@@ -331,7 +350,7 @@ function AnalysisSetup({
                 currentStep={currentStep}
                 steps={visibleSteps}
                 workflowData={workflowData}
-                onStepClick={setCurrentStep}
+                onStepClick={handleStepClick}
             />
 
             {/* Step Content */}
