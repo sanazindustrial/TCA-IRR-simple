@@ -358,7 +358,8 @@ function AnalysisSetup({
                                 showUrlInput={false}
                                 showTextInput={false}
                                 title="Upload Pitch Deck"
-                                description="Drag and drop your pitch deck file (PDF, PPT, PPTX) or click to browse"
+                                description="Upload only 1 pitch deck file (PDF, DOCX, or PPTX)"
+                                pitchDeckOnly={true}
                             />
                         </div>
                         {hasDocuments && (

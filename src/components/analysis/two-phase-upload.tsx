@@ -98,15 +98,27 @@ export function TwoPhaseUpload({
         }
     }, [uploadedFiles]);
 
-    // Handle pitch deck upload (Phase 1)
+    // Handle pitch deck upload (Phase 1) - Only 1 file: PDF, DOCX, or PPTX
     const handlePitchDeckUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
         if (event.target.files && event.target.files.length > 0) {
             const file = event.target.files[0];
+            
+            // Validate file type - only pdf, docx, pptx allowed
+            const ext = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+            const validTypes = ['.pdf', '.docx', '.pptx'];
+            if (!validTypes.includes(ext)) {
+                alert('Only PDF, DOCX, or PPTX files are allowed for the pitch deck.');
+                return;
+            }
+            
             setIsProcessing(true);
 
+            // Replace any existing pitch deck file
+            setUploadedFiles([]);
+            
             // Add file to uploaded files
             const newFile = { name: file.name, size: file.size };
-            setUploadedFiles(prev => [...prev, newFile]);
+            setUploadedFiles([newFile]);
 
             // Process the pitch deck
             let textContent = '';
@@ -329,7 +341,7 @@ export function TwoPhaseUpload({
                                                 Upload Pitch Deck
                                             </h3>
                                             <p className="mt-1 text-sm text-muted-foreground">
-                                                PDF, PowerPoint, or Word document (Max 30MB)
+                                                PDF, PowerPoint (PPTX), or Word document (DOCX) - Max 30MB
                                             </p>
                                             <p className="mt-2 text-xs text-primary">
                                                 Company name, description, and key metrics will be auto-extracted
@@ -340,7 +352,7 @@ export function TwoPhaseUpload({
                                         type="file"
                                         ref={pitchDeckInputRef}
                                         className="hidden"
-                                        accept=".pdf,.ppt,.pptx,.doc,.docx"
+                                        accept=".pdf,.pptx,.docx"
                                         onChange={handlePitchDeckUpload}
                                     />
                                 </div>
