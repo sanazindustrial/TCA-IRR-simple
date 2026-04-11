@@ -70,5 +70,8 @@ api_router.include_router(api_routes.requests_router,
 api_router.include_router(api_routes.evaluations_router,
                           prefix="/evaluations",
                           tags=["Evaluations"])
+api_router.include_router(api_routes.records_router,
+                          prefix="/records",
+                          tags=["Records"])
 api_router.include_router(api_routes.api_health_router,
                           tags=["API Health"])

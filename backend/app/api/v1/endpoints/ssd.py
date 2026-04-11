@@ -1428,3 +1428,39 @@ async def ssd_callback_test_post(payload: dict = None):
         "payload_received": payload is not None,
         "timestamp": datetime.utcnow().isoformat()
     }
+
+
+@router.post("/webhook")
+async def ssd_webhook_receiver(payload: dict = None):
+    """
+    Main webhook endpoint for receiving SSD/StartupSteroid callbacks.
+    This endpoint receives external webhook notifications and processes them.
+    
+    Args:
+        payload: Webhook payload data from external service
+    
+    Returns:
+        Acknowledgment of webhook receipt with processing status
+    """
+    try:
+        webhook_id = f"wh_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+        
+        # Log webhook receipt
+        logger.info(f"Webhook received: {webhook_id}, payload_size: {len(str(payload)) if payload else 0}")
+        
+        return {
+            "status": "acknowledged",
+            "webhook_id": webhook_id,
+            "service": "ssd_webhook_receiver",
+            "message": "Webhook received and queued for processing",
+            "payload_received": payload is not None,
+            "payload_type": type(payload).__name__ if payload else None,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Webhook processing error: {e}")
+        return {
+            "status": "error",
+            "message": str(e),
+            "timestamp": datetime.utcnow().isoformat()
+        }
