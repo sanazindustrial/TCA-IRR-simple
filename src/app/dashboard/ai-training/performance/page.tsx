@@ -5,11 +5,11 @@ import { ConfusionMatrix } from './confusion-matrix';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, Target, CheckCircle, AlertTriangle } from 'lucide-react';
 
-const kpiData = [
-  { name: 'Accuracy', value: '94.5%', change: '+1.2%', status: 'success' },
-  { name: 'Precision (Macro)', value: '0.89', change: '+0.03', status: 'success' },
-  { name: 'Recall (Macro)', value: '0.87', change: '-0.01', status: 'destructive' },
-  { name: 'F1-Score (Macro)', value: '0.88', change: '+0.01', status: 'success' },
+const kpiData: { title: string; value: string; change: string; status: 'success' | 'destructive' }[] = [
+  { title: 'Accuracy', value: '94.5%', change: '+1.2%', status: 'success' },
+  { title: 'Precision (Macro)', value: '0.89', change: '+0.03', status: 'success' },
+  { title: 'Recall (Macro)', value: '0.87', change: '-0.01', status: 'destructive' },
+  { title: 'F1-Score (Macro)', value: '0.88', change: '+0.01', status: 'success' },
 ];
 
 const rocData = [
@@ -46,7 +46,7 @@ export default function PerformancePage() {
   return (
     <div className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {kpiData.map(kpi => <KpiCard key={kpi.name} {...kpi} />)}
+            {kpiData.map(kpi => <KpiCard key={kpi.title} {...kpi} />)}
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
             <Card className="lg:col-span-3">

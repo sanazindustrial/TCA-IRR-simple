@@ -63,7 +63,7 @@ const initialFactorScores = {
 const calculateWeights = (factorScores: typeof initialFactorScores) => {
     const rawMeans: Record<string, number> = {};
     for (const modelId in factorScores) {
-        const scores = Object.values((factorScores as any)[modelId]);
+        const scores = Object.values((factorScores as any)[modelId]) as number[];
         rawMeans[modelId] = scores.reduce((a, b) => a + b, 0) / scores.length;
     }
 

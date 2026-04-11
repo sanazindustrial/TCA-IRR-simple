@@ -469,7 +469,7 @@ class WorkflowAutomation {
                 this.state.framework,
                 this.state.userId,
                 this.state.companyName,
-                { version: 1, status: 'completed' },
+                { status: 'completed' },
                 {
                     evaluationId: this.state.evaluationId,
                     companyId: this.state.companyId
