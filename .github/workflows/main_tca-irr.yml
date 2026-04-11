@@ -61,6 +61,10 @@ jobs:
             cp -r public deploy-package/public
           fi
 
+          echo "=== Copying env files ==="
+          cp .env.production deploy-package/.env.production 2>/dev/null || true
+          cp .env deploy-package/.env 2>/dev/null || true
+
           echo "=== Creating package.json ==="
           cat > deploy-package/package.json << 'EOF'
           {"name":"tca-irr","version":"1.0.0","scripts":{"start":"node server.js"}}
@@ -82,7 +86,7 @@ jobs:
     needs: build
     environment:
       name: "Production"
-      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
+      url: https://tca-irr.azurewebsites.net
 
     steps:
       - name: Download artifact from build job
@@ -90,13 +94,34 @@ jobs:
         with:
           name: node-app
 
-      - name: "Deploy to Azure Web App"
-        id: deploy-to-webapp
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: "TCA-IRR"
-          slot-name: "Production"
-          package: .
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_8EEB615CA3AE4C7894E3645EF2B2C0A7 }}
+      - name: Create deployment zip
+        run: |
+          echo "=== Creating deployment zip ==="
+          ls -la
+          zip -r deploy.zip . -x "*.git*"
+          ls -la deploy.zip
+
+      - name: Deploy to Azure via Kudu
+        env:
+          KUDU_USER: ${{ secrets.KUDU_USER }}
+          KUDU_PASS: ${{ secrets.KUDU_PASS }}
+        run: |
+          echo "=== Deploying to Azure ==="
+          curl -X POST \
+            --user "${KUDU_USER}:${KUDU_PASS}" \
+            --data-binary @deploy.zip \
+            -H "Content-Type: application/zip" \
+            "https://tca-irr.scm.azurewebsites.net/api/zipdeploy?isAsync=false" \
+            --fail --show-error --verbose
+          echo "=== Deployment complete ==="
+
+      - name: Verify deployment
+        run: |
+          sleep 30
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://tca-irr.azurewebsites.net)
+          echo "App status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "Warning: App returned $STATUS instead of 200"
+          fi
 
 # Last deployed: 2026-04-11 05:54:25
