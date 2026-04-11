@@ -148,7 +148,6 @@ stages:
               
               echo "Checking application health..."
               HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://$(appServiceName).azurewebsites.net" || echo "000")
-              
               if [ "$HTTP_STATUS" = "200" ] || [ "$HTTP_STATUS" = "302" ]; then
                 echo "##[section]Frontend healthy (HTTP $HTTP_STATUS)"
                 echo "##################################################"
