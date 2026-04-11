@@ -32,7 +32,7 @@ type Module = ModuleConfig;
 
 const generalModules: Module[] = [
   { id: 'tca', name: 'TCA Scorecard', description: 'Central evaluation across fundamental categories.', status: 'active' },
-  { id: 'risk', name: 'Risk Flags', description: 'Risk analysis across 14 domains.', status: 'active' },
+  { id: 'risk', name: 'Risk Assessment', description: 'Risk analysis across 14 domains.', status: 'active' },
   { id: 'benchmark', name: 'Benchmark Comparison', description: 'Performance vs. sector averages.', status: 'active' },
 ];
 

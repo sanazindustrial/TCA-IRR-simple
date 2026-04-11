@@ -194,19 +194,19 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
                                     <SidebarMenuSubItem>
                                         <SidebarMenuSubButton href="/analysis/modules/macro" isActive={pathname === '/analysis/modules/macro'}>
                                             <TrendingUp className="size-4" />
-                                            <span>Macro Trends</span>
+                                            <span>Macro Trend Analysis</span>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
                                     <SidebarMenuSubItem>
                                         <SidebarMenuSubButton href="/analysis/modules/team" isActive={pathname === '/analysis/modules/team'}>
                                             <Users2 className="size-4" />
-                                            <span>Team Analysis</span>
+                                            <span>Team Assessment</span>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
                                     <SidebarMenuSubItem>
                                         <SidebarMenuSubButton href="/analysis/modules/benchmark" isActive={pathname === '/analysis/modules/benchmark'}>
                                             <Gauge className="size-4" />
-                                            <span>Benchmark</span>
+                                            <span>Benchmark Comparison</span>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
                                     <SidebarMenuSubItem>
@@ -222,15 +222,15 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
                                     <SidebarMenuSubItem>
-                                        <SidebarMenuSubButton href="/analysis/modules/funder" isActive={pathname === '/analysis/modules/funder'}>
+                                        <SidebarMenuSubButton href="/analysis/modules/founderFit" isActive={pathname === '/analysis/modules/founderFit'}>
                                             <UserIcon className="size-4" />
-                                            <span>Founder Fit</span>
+                                            <span>Founder Fit Analysis</span>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
                                     <SidebarMenuSubItem>
-                                        <SidebarMenuSubButton href="/analysis/modules/strategic" isActive={pathname === '/analysis/modules/strategic'}>
+                                        <SidebarMenuSubButton href="/analysis/modules/strategicFit" isActive={pathname === '/analysis/modules/strategicFit'}>
                                             <Target className="size-4" />
-                                            <span>Strategic Fit</span>
+                                            <span>Strategic Fit Matrix</span>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
                                     <SidebarMenuSubItem>
