@@ -2885,12 +2885,12 @@ async def get_module_weights():
 # Analysis Modules - Matching production UI exactly
 NINE_MODULES = [
     {"id": "tca",          "name": "TCA Scorecard",           "version": "v2.1", "weight": 20.0, "description": "Central evaluation across fundamental categories."},
-    {"id": "risk",         "name": "Risk Flags",              "version": "v1.8", "weight": 15.0, "description": "Risk analysis across 14 domains."},
+    {"id": "risk",         "name": "Risk Assessment",         "version": "v1.8", "weight": 15.0, "description": "Risk analysis across 14 domains."},
     {"id": "benchmark",    "name": "Benchmark Comparison",    "version": "v1.5", "weight": 10.0, "description": "Performance vs. sector averages."},
     {"id": "macro",        "name": "Macro Trend Alignment",   "version": "v1.2", "weight": 10.0, "description": "PESTEL analysis and trend scores."},
     {"id": "gap",          "name": "Gap Analysis",            "version": "v2.0", "weight": 10.0, "description": "Identify performance gaps."},
     {"id": "growth",       "name": "Growth Classifier",       "version": "v3.1", "weight": 10.0, "description": "Predict growth potential."},
-    {"id": "founderFit",   "name": "Funder Fit Analysis",     "version": "v1.0", "weight": 10.0, "description": "Investor matching & readiness."},
+    {"id": "founderFit",   "name": "Founder Fit Analysis",    "version": "v1.0", "weight": 10.0, "description": "Investor matching & readiness."},
     {"id": "team",         "name": "Team Assessment",         "version": "v1.4", "weight": 10.0, "description": "Analyze founder and team strength."},
     {"id": "strategicFit", "name": "Strategic Fit Matrix",    "version": "v1.1", "weight": 5.0,  "description": "Align with strategic pathways."},
 ]
@@ -7947,6 +7947,135 @@ async def update_request_status(request_id: int, data: dict = Body(...)):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  ADDITIONAL API ALIASES - Frontend Compatibility
+# ═══════════════════════════════════════════════════════════════════════
+
+# --- Auth API v1 Aliases ---
+@app.post("/api/v1/auth/login")
+async def login_user_v1(user_data: UserLogin):
+    """Login user - v1 alias"""
+    return await login_user(user_data)
+
+@app.get("/api/v1/auth/me", response_model=UserResponse)
+async def get_current_user_info_v1(current_user: dict = Depends(get_current_user)):
+    """Get current user - v1 alias"""
+    return UserResponse.from_db_row(current_user)
+
+@app.post("/api/v1/auth/register", response_model=UserResponse)
+async def register_user_v1(user_data: UserCreate, background_tasks: BackgroundTasks):
+    """Register user - v1 alias"""
+    return await register_user(user_data, background_tasks)
+
+@app.post("/api/v1/auth/logout")
+async def logout_user_v1(current_user: dict = Depends(get_current_user)):
+    """Logout user - v1 alias"""
+    return await logout_user(current_user)
+
+@app.post("/api/v1/auth/forgot-password")
+async def forgot_password_v1(data: dict = Body(...), background_tasks: BackgroundTasks = None):
+    """Forgot password - v1 alias"""
+    return await forgot_password(data, background_tasks)
+
+
+# --- Settings Versions Aliases (without /api/v1 prefix) ---
+@app.get("/settings/versions")
+async def get_settings_versions_alias(include_archived: bool = False):
+    """Get all settings versions - alias without api prefix"""
+    return await get_all_settings_versions_v1(include_archived)
+
+@app.get("/settings/versions/active")
+async def get_active_settings_version_alias():
+    """Get active settings version - alias without api prefix"""
+    return await get_active_settings_version_v1()
+
+
+# --- Settings Simulations Endpoint ---
+@app.get("/settings/simulations")
+@app.get("/api/v1/settings/simulations")
+async def get_simulation_runs(limit: int = 50):
+    """Get simulation runs"""
+    try:
+        async with db_manager.get_connection() as conn:
+            # Check if simulations table exists
+            table_exists = await conn.fetchval("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = 'simulations'
+                )
+            """)
+            
+            if not table_exists:
+                return []
+            
+            rows = await conn.fetch("""
+                SELECT * FROM simulations
+                ORDER BY created_at DESC
+                LIMIT $1
+            """, limit)
+            return [dict(row) for row in rows]
+    except Exception as e:
+        logger.warning(f"Simulations fetch: {e}")
+        return []
+
+
+# --- Analysis Reviews Endpoint ---
+@app.get("/api/analysis/reviews")
+@app.get("/api/v1/analysis/reviews")
+async def get_analysis_reviews():
+    """Get analysis reviews for reviewer workflow"""
+    try:
+        async with db_manager.get_connection() as conn:
+            rows = await conn.fetch("""
+                SELECT e.*, 
+                       c.name as company_name,
+                       c.industry as company_industry
+                FROM evaluations e
+                LEFT JOIN companies c ON e.company_id = c.company_id
+                WHERE e.status IN ('pending_review', 'in_review', 'completed')
+                ORDER BY e.created_at DESC
+                LIMIT 100
+            """)
+            return {"success": True, "data": [dict(row) for row in rows], "total": len(rows)}
+    except Exception as e:
+        logger.warning(f"Analysis reviews fetch: {e}")
+        return {"success": True, "data": [], "total": 0}
+
+
+# --- SSD Connection Test Endpoint ---
+@app.get("/api/ssd/connection-test")
+@app.get("/api/v1/ssd/connection-test")
+async def ssd_connection_test():
+    """Test SSD audit connection"""
+    try:
+        async with db_manager.get_connection() as conn:
+            # Test database connection
+            db_status = await conn.fetchval("SELECT 1")
+            
+            # Check if audit logs table exists
+            audit_table = await conn.fetchval("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = 'ssd_audit_logs'
+                )
+            """)
+            
+            return {
+                "status": "connected",
+                "database": "connected" if db_status == 1 else "disconnected",
+                "audit_table": "exists" if audit_table else "missing",
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+    except Exception as e:
+        logger.error(f"SSD connection test error: {e}")
+        return {
+            "status": "error",
+            "database": "disconnected",
+            "error": str(e),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
 
 
 # Wrap app with ASGI JSON validation middleware (must be after all route definitions)

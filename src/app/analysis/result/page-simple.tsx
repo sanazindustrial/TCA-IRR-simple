@@ -263,7 +263,7 @@ function ResultContent() {
                             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
                                 <div className="text-sm text-muted-foreground">
                                     Full DD reports include competitive landscape, exit strategy roadmap,
-                                    detailed risk mitigation, and comprehensive funder fit analysis.
+                                    detailed risk mitigation, and comprehensive founder fit analysis.
                                 </div>
                                 <Button
                                     onClick={() => router.push(`/analysis/result?type=dd`)}

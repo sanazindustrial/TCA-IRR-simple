@@ -232,7 +232,7 @@ export default function WhatIfAnalysisPage() {
                 {editableScores.benchmark && <EditableScoreTable title="Benchmark Comparison" data={editableScores.benchmark} onScoreChange={(id, score) => handleScoreChange('benchmark', id, score)} />}
                 {editableScores.growth && <EditableScoreTable title="Growth Classifier" data={editableScores.growth} onScoreChange={(id, score) => handleScoreChange('growth', id, score)} />}
                 {editableScores.gap && <EditableScoreTable title="Gap Analysis" data={editableScores.gap} onScoreChange={(id, score) => handleScoreChange('gap', id, score)} />}
-                {editableScores.founderFit && <EditableScoreTable title="Funder Fit Analysis" data={editableScores.founderFit} onScoreChange={(id, score) => handleScoreChange('founderFit', id, score)} />}
+                {editableScores.founderFit && <EditableScoreTable title="Founder Fit Analysis" data={editableScores.founderFit} onScoreChange={(id, score) => handleScoreChange('founderFit', id, score)} />}
                 {editableScores.team && <EditableScoreTable title="Team Assessment" data={editableScores.team} onScoreChange={(id, score) => handleScoreChange('team', id, score)} />}
                 {editableScores.strategicFit && <EditableScoreTable title="Strategic Fit Matrix" data={editableScores.strategicFit} onScoreChange={(id, score) => handleScoreChange('strategicFit', id, score)} />}
             </div>
