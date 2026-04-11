@@ -33,30 +33,28 @@ jobs:
 
       - name: Prepare standalone deployment
         run: |
-          mkdir -p deploy-package
+          # Debug: show what's in .next/standalone
+          echo "=== .next/standalone contents ==="
+          ls -la .next/standalone/ || echo "No standalone folder!"
           
-          # Copy standalone server
-          cp .next/standalone/server.js deploy-package/
+          # Copy entire standalone output
+          cp -r .next/standalone deploy-package
           
-          # Copy .next folder
-          cp -r .next/standalone/.next deploy-package/.next
-          
-          # Copy static assets
+          # Copy static assets into .next/static (required for Next.js)
           mkdir -p deploy-package/.next/static
           cp -r .next/static/* deploy-package/.next/static/
-          
-          # Copy node_modules from standalone build
-          cp -r .next/standalone/node_modules deploy-package/node_modules
           
           # Copy public folder
           cp -r public deploy-package/public
           
-          # Create package.json
+          # Create simple package.json for Azure
           echo '{"name":"tca-irr","version":"1.0.0","scripts":{"start":"node server.js"}}' > deploy-package/package.json
           
-          # Debug: show structure
-          echo "=== Package Structure ==="
+          # Debug: show final structure
+          echo "=== Deploy Package Structure ==="
           ls -la deploy-package/
+          echo "=== .next folder ==="
+          ls -la deploy-package/.next/ || echo "No .next"
           echo "=== node_modules count ==="
           ls deploy-package/node_modules | wc -l
 
