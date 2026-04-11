@@ -5011,7 +5011,10 @@ async def _process_ssd_tirr_request(
 # ═══════════════════════════════════════════════════════════════════════
 
 @app.get("/api/ssd/audit/logs")
+<<<<<<< HEAD
 @app.get("/api/v1/ssd/audit/logs")  # v1 alias
+=======
+>>>>>>> azure-devops/main
 async def list_ssd_audit_logs(
     status: Optional[str] = None,
     limit: int = 50,
@@ -5128,7 +5131,10 @@ async def get_ssd_report_data(tracking_id: str):
 
 
 @app.get("/api/ssd/audit/stats")
+<<<<<<< HEAD
 @app.get("/api/v1/ssd/audit/stats")  # v1 alias
+=======
+>>>>>>> azure-devops/main
 async def get_ssd_audit_stats():
     """
     Get aggregate statistics on SSD integration health.
@@ -7843,6 +7849,7 @@ async def create_admin_user(data: dict = Body(...)):
         raise HTTPException(status_code=500, detail=f"Failed to create user: {str(e)}")
 
 
+<<<<<<< HEAD
 @app.post("/api/v1/users/{user_id}/reset-password")
 async def reset_password_admin_v1(user_id: str, data: dict = Body(default={}), background_tasks: BackgroundTasks = None, current_user: dict = Depends(get_current_user)):
     """Admin-initiated password reset - sends reset link to user or sets new password directly"""
@@ -7903,6 +7910,8 @@ async def reset_password_admin_v1(user_id: str, data: dict = Body(default={}), b
         raise HTTPException(status_code=500, detail=f"Failed to reset password: {str(e)}")
 
 
+=======
+>>>>>>> azure-devops/main
 # --- User Requests (Admin) Endpoints ---
 @app.get("/api/v1/admin/requests")
 async def get_admin_requests():
