@@ -62,3 +62,7 @@ __pycache__/
 
 # Docker context (keep tracked)
 !docker-context/
+
+# Large files
+ui.zip
+*.zip
