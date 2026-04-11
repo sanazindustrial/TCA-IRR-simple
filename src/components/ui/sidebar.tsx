@@ -567,7 +567,7 @@ const SidebarMenuButton = React.forwardRef<
 
     const button = (
       <Comp
-        ref={ref as React.Ref<HTMLAnchorElement & HTMLButtonElement>}
+        ref={ref as any}
         {...buttonProps}
         data-sidebar="menu-button"
         data-size={size}
@@ -577,7 +577,7 @@ const SidebarMenuButton = React.forwardRef<
           'cursor-pointer',
           className
         )}
-        {...props}
+        {...(props as any)}
       >
         {children}
       </Comp>

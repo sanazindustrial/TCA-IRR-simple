@@ -40,7 +40,7 @@ const initialHealthData = {
 };
 
 const initialAlerts = [
-    { id: 'alert-1', variant: 'warning' as const, title: 'High Memory Usage', description: 'Memory usage is at 67% - consider scaling.', timestamp: '10/24/2025, 6:34:42 AM' },
+    { id: 'alert-1', variant: 'destructive' as const, title: 'High Memory Usage', description: 'Memory usage is at 67% - consider scaling.', timestamp: '10/24/2025, 6:34:42 AM' },
     { id: 'alert-2', variant: 'default' as const, title: 'Backup Completed', description: 'Daily backup completed successfully.', timestamp: '10/24/2025, 5:14:42 AM' },
 ];
 
@@ -137,9 +137,9 @@ export default function SystemHealthPage() {
         setAlerts(prev => prev.filter(alert => alert.id !== alertId));
     };
 
-    const getAlertIcon = (variant: 'warning' | 'default') => {
+    const getAlertIcon = (variant: 'destructive' | 'default') => {
         switch(variant) {
-            case 'warning': return <AlertTriangle className="h-4 w-4" />;
+            case 'destructive': return <AlertTriangle className="h-4 w-4" />;
             case 'default': return <CheckCircle className="h-4 w-4" />;
             default: return <AlertTriangle className="h-4 w-4" />;
         }

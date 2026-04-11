@@ -76,10 +76,10 @@ const generateJsonConfig = (state: any) => {
             active: state.benchmarksEnabled,
             overlay_range: { min: -state.overlayWeight/100, max: state.overlayWeight/100 },
             peer_priority: state.peerPriority,
-            universal_metrics: state.universalMetrics.map(m => m.toLowerCase().replace(/\s/g, '_')),
+            universal_metrics: state.universalMetrics.map((m: string) => m.toLowerCase().replace(/\s/g, '_')),
             sector_metrics: {
-                tech: state.techMetrics.map(m => m.metric.toLowerCase().replace(/\s/g, '_')),
-                med_life: state.medMetrics.map(m => m.metric.toLowerCase().replace(/\s/g, '_'))
+                tech: state.techMetrics.map((m: any) => m.metric.toLowerCase().replace(/\s/g, '_')),
+                med_life: state.medMetrics.map((m: any) => m.metric.toLowerCase().replace(/\s/g, '_'))
             }
         }
     }

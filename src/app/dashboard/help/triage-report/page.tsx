@@ -257,10 +257,10 @@ export default function TriageReportPage() {
             role={role}
             reportType="triage"
             framework="general"
-            onFrameworkChange={() => { }}
-            setReportType={() => { }}
+            onFrameworkChangeAction={() => { }}
+            setReportTypeAction={() => { }}
             isLoading={false}
-            handleRunAnalysis={handleRunAnalysis}
+            handleRunAnalysisAction={handleRunAnalysis}
         >
             <main className="bg-background text-foreground">
                 <div className="container mx-auto p-4 md:p-8">

@@ -231,7 +231,7 @@ function ResultContent() {
                             <CompetitiveLandscape />
                             <FunderFitAnalysis />
                         </div>
-                        <RiskFlags initialData={analysisData.riskData} />
+                        {analysisData.riskData && <RiskFlags initialData={analysisData.riskData} />}
                         <ExitStrategyRoadmap />
                         <CEOQuestions />
                         <FinalRecommendation />
