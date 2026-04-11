@@ -33,30 +33,43 @@ jobs:
 
       - name: Prepare standalone deployment
         run: |
-          # Debug: show what's in .next/standalone
-          echo "=== .next/standalone contents ==="
-          ls -la .next/standalone/ || echo "No standalone folder!"
+          set -ex
           
-          # Copy entire standalone output
-          cp -r .next/standalone deploy-package
+          echo "=== Checking .next structure ==="
+          ls -la .next/
+          ls -la .next/standalone/ || true
           
-          # Copy static assets into .next/static (required for Next.js)
-          mkdir -p deploy-package/.next/static
-          cp -r .next/static/* deploy-package/.next/static/
+          echo "=== Creating deploy folder ==="
+          mkdir -p deploy-package
           
-          # Copy public folder
-          cp -r public deploy-package/public
+          echo "=== Copying standalone output ==="
+          if [ -d ".next/standalone" ]; then
+            cp -r .next/standalone/. deploy-package/
+          else
+            echo "ERROR: .next/standalone not found!"
+            exit 1
+          fi
           
-          # Create simple package.json for Azure
-          echo '{"name":"tca-irr","version":"1.0.0","scripts":{"start":"node server.js"}}' > deploy-package/package.json
+          echo "=== Copying static assets ==="
+          if [ -d ".next/static" ]; then
+            mkdir -p deploy-package/.next/static
+            cp -r .next/static/. deploy-package/.next/static/
+          fi
           
-          # Debug: show final structure
-          echo "=== Deploy Package Structure ==="
-          ls -la deploy-package/
-          echo "=== .next folder ==="
-          ls -la deploy-package/.next/ || echo "No .next"
+          echo "=== Copying public folder ==="
+          if [ -d "public" ]; then
+            cp -r public deploy-package/public
+          fi
+          
+          echo "=== Creating package.json ==="
+          cat > deploy-package/package.json << 'EOF'
+          {"name":"tca-irr","version":"1.0.0","scripts":{"start":"node server.js"}}
+          EOF
+          
+          echo "=== Final Structure ==="
+          find deploy-package -maxdepth 2 -type f | head -20
           echo "=== node_modules count ==="
-          ls deploy-package/node_modules | wc -l
+          ls deploy-package/node_modules 2>/dev/null | wc -l || echo "0"
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
