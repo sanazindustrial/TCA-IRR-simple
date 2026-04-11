@@ -13,7 +13,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: read #This is required for actions/checkout
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
@@ -21,17 +21,57 @@ jobs:
       - name: Set up Node.js version
         uses: actions/setup-node@v3
         with:
-          node-version: '24.x'
+          node-version: '20.x'
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Build Next.js (standalone)
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: https://tcairrapiccontainer.azurewebsites.net
+
+      - name: Prepare standalone deployment
+        run: |
+          mkdir -p deploy-package
+          
+          # Copy standalone server
+          cp .next/standalone/server.js deploy-package/
+          
+          # Copy .next folder
+          cp -r .next/standalone/.next deploy-package/.next
+          
+          # Copy static assets
+          mkdir -p deploy-package/.next/static
+          cp -r .next/static/* deploy-package/.next/static/
+          
+          # Copy node_modules from standalone build
+          cp -r .next/standalone/node_modules deploy-package/node_modules
+          
+          # Copy public folder
+          cp -r public deploy-package/public
+          
+          # Create package.json
+          echo '{"name":"tca-irr","version":"1.0.0","scripts":{"start":"node server.js"}}' > deploy-package/package.json
+          
+          # Debug: show structure
+          echo "=== Package Structure ==="
+          ls -la deploy-package/
+          echo "=== node_modules count ==="
+          ls deploy-package/node_modules | wc -l
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
           name: node-app
-          path: .
+          path: deploy-package/
 
   deploy:
     runs-on: ubuntu-latest
     needs: build
+    environment:
+      name: 'Production'
+      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
     
     steps:
       - name: Download artifact from build job
