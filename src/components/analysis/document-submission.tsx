@@ -37,6 +37,8 @@ type DocumentSubmissionProps = {
   showTextInput?: boolean;
   title?: string;
   description?: string;
+  /** For pitch deck: only allow 1 file with pdf/docx/pptx */
+  pitchDeckOnly?: boolean;
 }
 
 // Helper function to convert file to base64
@@ -65,6 +67,7 @@ export function DocumentSubmission({
   showTextInput = true,
   title = "Document Submission",
   description,
+  pitchDeckOnly = false,
 }: DocumentSubmissionProps) {
   const [urlInput, setUrlInput] = useState('');
   const [textInput, setTextInput] = useState('');
@@ -73,7 +76,25 @@ export function DocumentSubmission({
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
-      const files = Array.from(event.target.files);
+      let files = Array.from(event.target.files);
+
+      // For pitch deck, only allow 1 file
+      if (pitchDeckOnly) {
+        if (files.length > 1) {
+          alert('Please upload only 1 pitch deck file.');
+          return;
+        }
+        // Validate file type
+        const validTypes = ['.pdf', '.docx', '.pptx'];
+        const file = files[0];
+        const ext = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+        if (!validTypes.includes(ext)) {
+          alert('Only PDF, DOCX, or PPTX files are allowed for the pitch deck.');
+          return;
+        }
+        // Replace existing pitch deck instead of adding
+        setUploadedFiles([]);
+      }
 
       // Create file objects for immediate UI feedback
       const newFiles = files.map((file) => ({
@@ -248,18 +269,22 @@ export function DocumentSubmission({
             >
               <UploadCloud className="h-12 w-12 text-muted-foreground" />
               <h3 className="mt-4 text-lg font-semibold">
-                Drop your file here or click to browse
+                {pitchDeckOnly ? 'Drop your pitch deck here or click to browse' : 'Drop your file here or click to browse'}
               </h3>
               <p className="mt-1 text-sm text-muted-foreground">
-                Supported: PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, TXT, CSV, JSON, RTF, ODT (Max 30MB)
+                {pitchDeckOnly 
+                  ? 'Only 1 file allowed: PDF, DOCX, or PPTX (Max 30MB)' 
+                  : 'Supported: PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, TXT, CSV, JSON, RTF, ODT (Max 30MB)'}
               </p>
               <Input
                 type="file"
                 ref={fileInputRef}
                 className="hidden"
-                accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.csv,.json,.rtf,.odt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,text/csv,application/json,application/rtf,application/vnd.oasis.opendocument.text"
+                accept={pitchDeckOnly 
+                  ? ".pdf,.docx,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation" 
+                  : ".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.csv,.json,.rtf,.odt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,text/csv,application/json,application/rtf,application/vnd.oasis.opendocument.text"}
                 onChange={handleFileChange}
-                multiple
+                multiple={!pitchDeckOnly}
               />
             </div>
             {uploadedFiles.length > 0 && (

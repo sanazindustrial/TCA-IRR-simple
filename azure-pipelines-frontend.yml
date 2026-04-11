@@ -1,9 +1,12 @@
 # Azure DevOps Pipeline for TCA-IRR Frontend
-# Builds and deploys Next.js frontend to Azure App Service
+# Builds and deploys Next.js standalone frontend to Azure App Service
+#
+# IMPORTANT: Uses Next.js standalone output mode - server.js is pre-built, no npm install needed at runtime
 #
 # SETUP:
 # 1. Create pipeline from this YAML file
 # 2. Set variables WEBAPP_DEPLOY_USER_FRONTEND and WEBAPP_DEPLOY_PASS_FRONTEND
+#    Get from: Azure Portal > TCA-IRR App Service > Deployment Center > FTPS credentials
 
 trigger:
   branches:
@@ -25,10 +28,10 @@ variables:
 
 stages:
   - stage: Build
-    displayName: Build and Package
+    displayName: Build Standalone Package
     jobs:
       - job: BuildApp
-        displayName: Build Next.js App
+        displayName: Build Next.js Standalone
         steps:
           - task: NodeTool@0
             inputs:
@@ -39,78 +42,56 @@ stages:
             displayName: Install Dependencies
 
           - script: npm run build
-            displayName: Build Application
+            env:
+              NEXT_PUBLIC_API_URL: https://tcairrapiccontainer.azurewebsites.net
+            displayName: Build Application (standalone)
 
           - script: |
+              set -ex
+              echo "=== Preparing standalone deployment package ==="
+              
+              # The standalone build creates server.js and node_modules in .next/standalone
+              if [ ! -d ".next/standalone" ]; then
+                echo "ERROR: .next/standalone not found! Check next.config.ts has output: 'standalone'"
+                exit 1
+              fi
+              
               mkdir -p deploy-package
-              cp -r .next deploy-package/
-              cp -r public deploy-package/
-              cp package.json deploy-package/
-              cp package-lock.json deploy-package/ || true
-              cp next.config.ts deploy-package/ || true
-            displayName: Copy Build Output
+              
+              # Copy standalone build (includes server.js and node_modules)
+              cp -r .next/standalone/. deploy-package/
+              
+              # Copy static files to correct location
+              if [ -d ".next/static" ]; then
+                mkdir -p deploy-package/.next/static
+                cp -r .next/static/. deploy-package/.next/static/
+              fi
+              
+              # Copy public folder
+              if [ -d "public" ]; then
+                cp -r public deploy-package/public
+              fi
+              
+              # Copy env files
+              cp .env.production deploy-package/.env.production 2>/dev/null || true
+              cp .env deploy-package/.env 2>/dev/null || true
+              
+              # Create basic package.json for Azure
+              cat > deploy-package/package.json << 'EOF'
+              {"name":"tca-irr","version":"1.0.0","scripts":{"start":"node server.js"}}
+              EOF
+              
+              echo "=== Standalone package structure ==="
+              ls -la deploy-package/
+              echo "=== Verifying server.js exists ==="
+              test -f deploy-package/server.js || { echo "ERROR: server.js missing!"; exit 1; }
+              echo "SUCCESS: server.js found"
+            displayName: Prepare Standalone Deployment
 
           - script: |
               cd deploy-package
-              echo 'const { createServer } = require("http");' > server.js
-              echo 'const { parse } = require("url");' >> server.js
-              echo 'const next = require("next");' >> server.js
-              echo '' >> server.js
-              echo 'const dev = false;' >> server.js
-              echo 'const hostname = "0.0.0.0";' >> server.js
-              echo 'const port = process.env.PORT || 3000;' >> server.js
-              echo '' >> server.js
-              echo 'const app = next({ dev, hostname, port });' >> server.js
-              echo 'const handle = app.getRequestHandler();' >> server.js
-              echo '' >> server.js
-              echo 'app.prepare().then(() => {' >> server.js
-              echo '  createServer(async (req, res) => {' >> server.js
-              echo '    try {' >> server.js
-              echo '      const parsedUrl = parse(req.url, true);' >> server.js
-              echo '      await handle(req, res, parsedUrl);' >> server.js
-              echo '    } catch (err) {' >> server.js
-              echo '      console.error("Error handling request", err);' >> server.js
-              echo '      res.statusCode = 500;' >> server.js
-              echo '      res.end("internal server error");' >> server.js
-              echo '    }' >> server.js
-              echo '  }).listen(port, () => {' >> server.js
-              echo '    console.log("Server ready on port " + port);' >> server.js
-              echo '  });' >> server.js
-              echo '});' >> server.js
-            displayName: Create server.js
-
-          - script: |
-              cd deploy-package
-              printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' > web.config
-              printf '%s\n' '<configuration>' >> web.config
-              printf '%s\n' '  <system.webServer>' >> web.config
-              printf '%s\n' '    <webSocket enabled="false" />' >> web.config
-              printf '%s\n' '    <handlers>' >> web.config
-              printf '%s\n' '      <add name="iisnode" path="server.js" verb="*" modules="iisnode"/>' >> web.config
-              printf '%s\n' '    </handlers>' >> web.config
-              printf '%s\n' '    <rewrite>' >> web.config
-              printf '%s\n' '      <rules>' >> web.config
-              printf '%s\n' '        <rule name="AllToNode">' >> web.config
-              printf '%s\n' '          <match url=".*" />' >> web.config
-              printf '%s\n' '          <action type="Rewrite" url="server.js"/>' >> web.config
-              printf '%s\n' '        </rule>' >> web.config
-              printf '%s\n' '      </rules>' >> web.config
-              printf '%s\n' '    </rewrite>' >> web.config
-              printf '%s\n' '    <httpErrors existingResponse="PassThrough" />' >> web.config
-              printf '%s\n' '    <iisnode watchedFiles="web.config;*.js"/>' >> web.config
-              printf '%s\n' '  </system.webServer>' >> web.config
-              printf '%s\n' '</configuration>' >> web.config
-            displayName: Create web.config
-
-          - script: |
-              cd deploy-package
-              echo "NEXT_PUBLIC_APP_ENV=production" > .env.production
-              echo "NEXT_PUBLIC_API_URL=https://tcairrapiccontainer.azurewebsites.net" >> .env.production
-              npm install --omit=dev --legacy-peer-deps
-            displayName: Install Production Deps
-
-          - script: |
-              zip -r frontend_deploy.zip deploy-package/*
+              zip -r ../frontend_deploy.zip .
+              cd ..
               ls -la frontend_deploy.zip
             displayName: Create ZIP Package
 
@@ -129,17 +110,29 @@ stages:
             artifact: frontend
 
           - script: |
-              if [ -z "$WEBAPP_DEPLOY_USER_FRONTEND" ] || [ -z "$WEBAPP_DEPLOY_PASS_FRONTEND" ]; then
-                echo "##[error]Set WEBAPP_DEPLOY_USER_FRONTEND and WEBAPP_DEPLOY_PASS_FRONTEND variables"
+              DEPLOY_USER="${WEBAPP_DEPLOY_USER_FRONTEND}"
+              DEPLOY_PASS="${WEBAPP_DEPLOY_PASS_FRONTEND}"
+              
+              if [ -z "$DEPLOY_USER" ] || [ -z "$DEPLOY_PASS" ]; then
+                echo "##[error]Deployment credentials not configured!"
+                echo "##[error]Set pipeline variables: WEBAPP_DEPLOY_USER_FRONTEND, WEBAPP_DEPLOY_PASS_FRONTEND"
+                echo "##[error]Get credentials from Azure Portal > TCA-IRR > Deployment Center > FTPS credentials"
                 exit 1
               fi
+              
+              echo "Deploying to Azure App Service..."
               curl -X POST \
-                -u "$WEBAPP_DEPLOY_USER_FRONTEND:$WEBAPP_DEPLOY_PASS_FRONTEND" \
-                -T $(Pipeline.Workspace)/frontend/frontend_deploy.zip \
-                "https://$(appServiceName).scm.azurewebsites.net/api/zipdeploy?isAsync=true" \
-                --fail --show-error
-              echo "Deployment initiated"
-            displayName: ZIP Deploy
+                -u "$DEPLOY_USER:$DEPLOY_PASS" \
+                --data-binary @$(Pipeline.Workspace)/frontend/frontend_deploy.zip \
+                -H "Content-Type: application/zip" \
+                "https://$(appServiceName).scm.azurewebsites.net/api/zipdeploy?isAsync=false" \
+                --fail --show-error --verbose
+              echo ""
+              echo "Deployment complete!"
+            displayName: ZIP Deploy via Kudu
+            env:
+              WEBAPP_DEPLOY_USER_FRONTEND: $(WEBAPP_DEPLOY_USER_FRONTEND)
+              WEBAPP_DEPLOY_PASS_FRONTEND: $(WEBAPP_DEPLOY_PASS_FRONTEND)
 
   - stage: Verify
     displayName: Verify Deployment
@@ -150,12 +143,20 @@ stages:
         displayName: Health Check
         steps:
           - script: |
+              echo "Waiting 30 seconds for app restart..."
               sleep 30
+              
+              echo "Checking application health..."
               HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://$(appServiceName).azurewebsites.net" || echo "000")
+              
               if [ "$HTTP_STATUS" = "200" ] || [ "$HTTP_STATUS" = "302" ]; then
-                echo "Frontend healthy (HTTP $HTTP_STATUS)"
+                echo "##[section]Frontend healthy (HTTP $HTTP_STATUS)"
+                echo "##################################################"
+                echo "#      DEPLOYMENT SUCCESSFUL!                   #"
+                echo "#      URL: https://$(appServiceName).azurewebsites.net"
+                echo "##################################################"
               else
                 echo "##[warning]Frontend returned HTTP $HTTP_STATUS"
+                echo "App may still be starting up - check URL manually"
               fi
-              echo "Frontend URL https://$(appServiceName).azurewebsites.net"
             displayName: Check Health
