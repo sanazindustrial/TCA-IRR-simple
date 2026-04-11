@@ -66,3 +66,21 @@ __pycache__/
 # Large files
 ui.zip
 *.zip
+
+# Log directories
+logs/
+**/logs/
+container_logs/
+container_logs2/
+app_logs/
+**/app_logs/
+
+# Backup files
+*.bak
+*.backup
+
+# Reports output (not source)
+backend/reports/
+
+# Deploy check artifacts
+deploy-check/
