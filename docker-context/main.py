@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 ﻿#!/usr/bin/env python3
+=======
+#!/usr/bin/env python3
+>>>>>>> azure-devops/main
 """
 TCA IRR App Backend
 FastAPI backend server for the TCA Investment Risk Rating application
@@ -14,7 +18,11 @@ import os
 import logging
 import uvicorn
 from typing import Optional, List, Dict, Any
+<<<<<<< HEAD
 from datetime import datetime, timedelta, timezone
+=======
+from datetime import datetime, timedelta
+>>>>>>> azure-devops/main
 import jwt
 import bcrypt
 import uuid
@@ -1323,6 +1331,7 @@ async def register_user(user_data: UserCreate):
         raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)[:100]}")
 
 
+<<<<<<< HEAD
 @app.get("/auth/validate-invite")
 async def validate_invite_token(token: str):
     """Validate an invite token and return the email and role"""
@@ -1403,6 +1412,8 @@ async def complete_invite_registration(request: CompleteInviteRequest):
         raise HTTPException(status_code=500, detail="Failed to complete registration")
 
 
+=======
+>>>>>>> azure-devops/main
 @app.post("/auth/login")
 async def login_user(user_data: UserLogin):
     """Login user and return JWT token"""
@@ -1707,23 +1718,34 @@ class InviteUserRequest(BaseModel):
 
 
 @app.get("/users")
+<<<<<<< HEAD
 @app.get("/api/v1/users")
+=======
+>>>>>>> azure-devops/main
 async def list_users(
     current_user: dict = Depends(get_current_user),
     page: int = 1,
     limit: int = 20,
+<<<<<<< HEAD
     size: Optional[int] = None,
+=======
+>>>>>>> azure-devops/main
     search: Optional[str] = None
 ):
     """List all users (admin only)"""
     if current_user.get("role", "").lower() != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     
+<<<<<<< HEAD
     # Support both 'limit' and 'size' params
     actual_limit = size if size else limit
     
     try:
         offset = (page - 1) * actual_limit
+=======
+    try:
+        offset = (page - 1) * limit
+>>>>>>> azure-devops/main
         
         async with db_manager.get_connection() as conn:
             if search:
@@ -1736,7 +1758,11 @@ async def list_users(
                     ORDER BY created_at DESC
                     LIMIT $2 OFFSET $3
                     """,
+<<<<<<< HEAD
                     search_pattern, actual_limit, offset
+=======
+                    search_pattern, limit, offset
+>>>>>>> azure-devops/main
                 )
                 total_result = await conn.fetchrow(
                     "SELECT COUNT(*) as count FROM users WHERE email ILIKE $1 OR username ILIKE $1",
@@ -1750,7 +1776,11 @@ async def list_users(
                     ORDER BY created_at DESC
                     LIMIT $1 OFFSET $2
                     """,
+<<<<<<< HEAD
                     actual_limit, offset
+=======
+                    limit, offset
+>>>>>>> azure-devops/main
                 )
                 total_result = await conn.fetchrow("SELECT COUNT(*) as count FROM users")
         
@@ -1771,9 +1801,15 @@ async def list_users(
             ],
             "pagination": {
                 "page": page,
+<<<<<<< HEAD
                 "limit": actual_limit,
                 "total": total,
                 "pages": (total + actual_limit - 1) // actual_limit
+=======
+                "limit": limit,
+                "total": total,
+                "pages": (total + limit - 1) // limit
+>>>>>>> azure-devops/main
             }
         }
         
@@ -1783,7 +1819,10 @@ async def list_users(
 
 
 @app.get("/users/{user_id}")
+<<<<<<< HEAD
 @app.get("/api/v1/users/{user_id}")
+=======
+>>>>>>> azure-devops/main
 async def get_user(user_id: int, current_user: dict = Depends(get_current_user)):
     """Get user by ID (admin only)"""
     if current_user.get("role", "").lower() != "admin":
@@ -1817,7 +1856,10 @@ async def get_user(user_id: int, current_user: dict = Depends(get_current_user))
 
 
 @app.put("/users/{user_id}")
+<<<<<<< HEAD
 @app.put("/api/v1/users/{user_id}")
+=======
+>>>>>>> azure-devops/main
 async def update_user(user_id: int, request: UserUpdateRequest, current_user: dict = Depends(get_current_user)):
     """Update user (admin only)"""
     if current_user.get("role", "").lower() != "admin":
@@ -1870,7 +1912,10 @@ async def update_user(user_id: int, request: UserUpdateRequest, current_user: di
 
 
 @app.delete("/users/{user_id}")
+<<<<<<< HEAD
 @app.delete("/api/v1/users/{user_id}")
+=======
+>>>>>>> azure-devops/main
 async def delete_user(user_id: int, current_user: dict = Depends(get_current_user)):
     """Delete user (admin only)"""
     if current_user.get("role", "").lower() != "admin":
@@ -1898,7 +1943,10 @@ async def delete_user(user_id: int, current_user: dict = Depends(get_current_use
 
 
 @app.post("/users/invite")
+<<<<<<< HEAD
 @app.post("/api/v1/users/invite")
+=======
+>>>>>>> azure-devops/main
 async def invite_user(request: InviteUserRequest, background_tasks: BackgroundTasks, current_user: dict = Depends(get_current_user)):
     """Invite a new user via email (admin only)"""
     if current_user.get("role", "").lower() != "admin":
@@ -5100,7 +5148,10 @@ async def _process_ssd_tirr_request(
 # ═══════════════════════════════════════════════════════════════════════
 
 @app.get("/api/ssd/audit/logs")
+<<<<<<< HEAD
 @app.get("/api/v1/ssd/audit/logs")  # v1 alias
+=======
+>>>>>>> azure-devops/main
 async def list_ssd_audit_logs(
     status: Optional[str] = None,
     limit: int = 50,
@@ -5217,7 +5268,10 @@ async def get_ssd_report_data(tracking_id: str):
 
 
 @app.get("/api/ssd/audit/stats")
+<<<<<<< HEAD
 @app.get("/api/v1/ssd/audit/stats")  # v1 alias
+=======
+>>>>>>> azure-devops/main
 async def get_ssd_audit_stats():
     """
     Get aggregate statistics on SSD integration health.
@@ -5575,7 +5629,10 @@ async def get_reports_v1(
             
             reports = []
             for row in rows:
+<<<<<<< HEAD
                 # Use metadata JSONB column for extra data
+=======
+>>>>>>> azure-devops/main
                 metadata = row.get('metadata') or {}
                 if isinstance(metadata, str):
                     try:
@@ -5618,24 +5675,36 @@ async def create_report_v1(data: dict = Body(...)):
     """Create a new report entry"""
     try:
         async with db_manager.get_connection() as conn:
+<<<<<<< HEAD
             # Build metadata JSONB - store all extra fields here as DB doesn't have dedicated columns
             metadata = {
                 "company_name": data.get('company_name'),
                 "user_name": data.get('user_name'),
                 "user_email": data.get('user_email'),
+=======
+            # Build metadata
+            metadata = {
+                "company_name": data.get('company_name'),
+>>>>>>> azure-devops/main
                 "overall_score": data.get('overall_score'),
                 "tca_score": data.get('tca_score'),
                 "confidence": data.get('confidence'),
                 "recommendation": data.get('recommendation'),
+<<<<<<< HEAD
                 "module_scores": data.get('module_scores') or {},
                 "settings_version_id": data.get('settings_version_id'),
                 "evaluation_id": data.get('evaluation_id'),
                 "analysis_id": data.get('analysis_id'),
+=======
+                "module_scores": data.get('module_scores'),
+                "settings_version_id": data.get('settings_version_id'),
+>>>>>>> azure-devops/main
                 "approval_status": "Pending"
             }
             
             row = await conn.fetchrow("""
                 INSERT INTO reports (
+<<<<<<< HEAD
                     title, report_type, status, generated_by, company_id, metadata, generated_at
                 ) VALUES ($1, $2, $3, $4, $5, $6, NOW())
                 RETURNING id, title, report_type, status, generated_at
@@ -5644,13 +5713,28 @@ async def create_report_v1(data: dict = Body(...)):
                 data.get('report_type', 'Triage'),
                 data.get('status', 'Completed'),
                 data.get('user_id'),  # This maps to generated_by
+=======
+                    title, report_type, status, user_id, company_id, 
+                    metadata, generated_at
+                ) VALUES ($1, $2, $3, $4, $5, $6, NOW())
+                RETURNING id, title, report_type, status, generated_at
+            """, 
+                data.get('company_name', 'Untitled Report'),
+                data.get('report_type', 'Triage'),
+                data.get('status', 'Completed'),
+                data.get('user_id'),
+>>>>>>> azure-devops/main
                 data.get('company_id'),
                 json.dumps(metadata)
             )
             
             return {
                 "id": row['id'],
+<<<<<<< HEAD
                 "company_name": row['title'],
+=======
+                "title": row['title'],
+>>>>>>> azure-devops/main
                 "report_type": row['report_type'],
                 "status": row['status'],
                 "created_at": row['generated_at'].isoformat() if row['generated_at'] else None
@@ -5678,26 +5762,46 @@ async def update_report_v1(report_id: int, data: dict = Body(...)):
                 except:
                     existing_metadata = {}
             
+<<<<<<< HEAD
             # Update metadata fields (store scores in metadata since DB lacks columns)
+=======
+            # Update metadata fields
+>>>>>>> azure-devops/main
             if 'approval_status' in data:
                 existing_metadata['approval_status'] = data['approval_status']
             if 'analyst_notes' in data:
                 existing_metadata['analyst_notes'] = data['analyst_notes']
+<<<<<<< HEAD
             if 'reviewer_id' in data:
                 existing_metadata['reviewer_id'] = data['reviewer_id']
             if 'review_date' in data:
                 existing_metadata['review_date'] = data['review_date']
+=======
+>>>>>>> azure-devops/main
             if 'overall_score' in data:
                 existing_metadata['overall_score'] = data['overall_score']
             if 'recommendation' in data:
                 existing_metadata['recommendation'] = data['recommendation']
+<<<<<<< HEAD
             
             # Update status column and metadata
+=======
+            if 'reviewer_id' in data:
+                existing_metadata['reviewer_id'] = data['reviewer_id']
+            if 'review_date' in data:
+                existing_metadata['review_date'] = data['review_date']
+            
+            # Update status if provided
+>>>>>>> azure-devops/main
             new_status = data.get('status', existing.get('status'))
             
             await conn.execute("""
                 UPDATE reports 
+<<<<<<< HEAD
                 SET metadata = $1, status = $2
+=======
+                SET metadata = $1, status = $2, updated_at = NOW()
+>>>>>>> azure-devops/main
                 WHERE id = $3
             """, json.dumps(existing_metadata), new_status, report_id)
             
@@ -5741,7 +5845,11 @@ async def update_report_approval(report_id: int, data: dict = Body(...)):
             metadata['review_date'] = datetime.utcnow().isoformat()
             
             await conn.execute("""
+<<<<<<< HEAD
                 UPDATE reports SET metadata = $1 WHERE id = $2
+=======
+                UPDATE reports SET metadata = $1, updated_at = NOW() WHERE id = $2
+>>>>>>> azure-devops/main
             """, json.dumps(metadata), report_id)
             
             return {
@@ -5823,7 +5931,11 @@ async def get_report_by_id_v1(report_id: int):
             
             return {
                 "id": row['id'],
+<<<<<<< HEAD
                 "company_name": metadata.get('company_name') or row.get('title') or "Unknown",
+=======
+                "company_name": metadata.get('company_name') or row.get('title'),
+>>>>>>> azure-devops/main
                 "type": row.get('report_type') or "Triage",
                 "status": row.get('status') or "Pending",
                 "approval": metadata.get('approval_status') or "Pending",
@@ -5832,7 +5944,11 @@ async def get_report_by_id_v1(report_id: int):
                 "confidence": float(metadata.get('confidence')) if metadata.get('confidence') else None,
                 "recommendation": metadata.get('recommendation'),
                 "module_scores": metadata.get('module_scores'),
+<<<<<<< HEAD
                 "analysis_data": metadata,
+=======
+                "analysis_data": metadata.get('analysis_data'),
+>>>>>>> azure-devops/main
                 "user": {
                     "name": metadata.get('user_name') or "Unknown",
                     "email": metadata.get('user_email') or "unknown@tca.com"
@@ -6254,7 +6370,10 @@ async def extract_company_info(data: dict = Body(...)):
 
 
 @app.post("/api/v1/analysis/ai-deviation-comparison")
+<<<<<<< HEAD
 @app.post("/api/analysis/ai-deviation-comparison")
+=======
+>>>>>>> azure-devops/main
 async def ai_deviation_comparison(data: dict = Body(...)):
     """
     Compare AI scores with human/analyst scores and calculate deviation metrics.
@@ -7937,6 +8056,7 @@ async def create_admin_user(data: dict = Body(...)):
         raise HTTPException(status_code=500, detail=f"Failed to create user: {str(e)}")
 
 
+<<<<<<< HEAD
 @app.post("/api/v1/users/{user_id}/reset-password")
 async def reset_password_admin_v1(user_id: str, data: dict = Body(default={}), background_tasks: BackgroundTasks = None, current_user: dict = Depends(get_current_user)):
     """Admin-initiated password reset - sends reset link to user or sets new password directly"""
@@ -7997,6 +8117,8 @@ async def reset_password_admin_v1(user_id: str, data: dict = Body(default={}), b
         raise HTTPException(status_code=500, detail=f"Failed to reset password: {str(e)}")
 
 
+=======
+>>>>>>> azure-devops/main
 # --- User Requests (Admin) Endpoints ---
 @app.get("/api/v1/admin/requests")
 async def get_admin_requests():
