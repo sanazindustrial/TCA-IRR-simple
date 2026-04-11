@@ -1,6 +1,6 @@
 
 'use client';
-import type { GenerateRiskFlagsAndMitigationOutput } from '@/ai/flows/schemas';
+import type { RiskFlagsAndMitigationOutput } from '@/ai/flows/schemas';
 import { DashboardCard } from '@/components/shared/dashboard-card';
 import { Badge, type BadgeProps } from '@/components/ui/badge';
 import { ShieldAlert, ChevronDown, ChevronRight } from 'lucide-react';
@@ -28,7 +28,7 @@ const flagVariantMap: Record<string, BadgeProps['variant']> = {
 };
 
 type RiskFlagsProps = {
-  initialData: GenerateRiskFlagsAndMitigationOutput;
+  initialData: RiskFlagsAndMitigationOutput;
 };
 
 const RiskRow = ({ risk, isEditable, onFieldChange }: { risk: any, isEditable: boolean, onFieldChange: (field: any, value: string) => void}) => {
@@ -99,11 +99,11 @@ export function RiskFlags({ initialData }: RiskFlagsProps) {
   ) => {
     const newRiskFlags = [...data.riskFlags];
     (newRiskFlags[index] as any)[field] = value;
-    setData((prev) => (prev ? { ...prev, riskFlags: newRiskFlags } : null));
+    setData((prev) => ({ ...prev, riskFlags: newRiskFlags }));
   };
 
   const handleSummaryChange = (value: string) => {
-    setData((prev) => (prev ? { ...prev, riskSummary: value } : null));
+    setData((prev) => ({ ...prev, riskSummary: value }));
   };
 
   return (
@@ -141,7 +141,7 @@ export function RiskFlags({ initialData }: RiskFlagsProps) {
             </TableRow>
         </TableHeader>
         <TableBody>
-            {data.riskFlags.map((risk, index) => (
+            {data.riskFlags.map((risk: any, index: number) => (
                 <RiskRow 
                     key={risk.domain}
                     risk={risk} 
