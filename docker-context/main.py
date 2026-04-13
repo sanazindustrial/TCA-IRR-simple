@@ -1953,6 +1953,118 @@ async def invite_user(request: InviteUserRequest, background_tasks: BackgroundTa
         raise HTTPException(status_code=500, detail="Failed to send invitation")
 
 
+@app.get("/auth/validate-invite")
+@app.get("/api/v1/auth/validate-invite")
+async def validate_invite_token(token: str = Query(..., description="The invitation token to validate")):
+    """
+    Validate an invitation token and return the email/role for pre-filling signup form.
+    This endpoint is called by the frontend signup page when a token is present.
+    """
+    try:
+        # The invite was created with the raw token, stored with hashed key
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        token_data = password_reset_tokens.get(f"invite_{token_hash}")
+        
+        if not token_data:
+            raise HTTPException(status_code=400, detail="Invalid invitation token")
+        
+        if datetime.utcnow() > token_data.get('expires_at', datetime.utcnow()):
+            # Remove expired token
+            del password_reset_tokens[f"invite_{token_hash}"]
+            raise HTTPException(status_code=400, detail="Invitation token has expired")
+        
+        return {
+            "valid": True,
+            "email": token_data['email'],
+            "role": token_data['role'],
+            "invited_by": token_data.get('invited_by', 'Admin')
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Validate invite error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to validate invitation")
+
+
+class CompleteInviteRequest(BaseModel):
+    token: str
+    password: str
+    full_name: Optional[str] = None
+
+
+@app.post("/auth/complete-invite")
+@app.post("/api/v1/auth/complete-invite")
+async def complete_invite(request: CompleteInviteRequest):
+    """
+    Complete an invitation and create a user account with the invited role.
+    Called by the frontend signup page when completing an invite registration.
+    """
+    try:
+        # Validate the invite token
+        token_hash = hashlib.sha256(request.token.encode()).hexdigest()
+        token_data = password_reset_tokens.get(f"invite_{token_hash}")
+        
+        if not token_data:
+            raise HTTPException(status_code=400, detail="Invalid or expired invitation token")
+        
+        if datetime.utcnow() > token_data.get('expires_at', datetime.utcnow()):
+            del password_reset_tokens[f"invite_{token_hash}"]
+            raise HTTPException(status_code=400, detail="Invitation token has expired")
+        
+        email = token_data['email']
+        role = token_data['role']  # This is the invited role (admin/analyst)
+        
+        # Generate username from email
+        username = email.split('@')[0].replace('.', '_').replace('-', '_')[:50]
+        
+        # Validate password
+        if len(request.password) < 8:
+            raise HTTPException(status_code=422, detail="Password must be at least 8 characters")
+        
+        async with db_manager.get_connection() as conn:
+            # Check if user already exists
+            existing = await conn.fetchrow("SELECT id FROM users WHERE email = $1 OR username = $2", email, username)
+            if existing:
+                raise HTTPException(status_code=400, detail="Account already exists for this email")
+            
+            # Hash password and create user with the INVITED ROLE
+            hashed_password = hash_password(request.password)
+            
+            user_id = await conn.fetchval(
+                """
+                INSERT INTO users (username, email, password_hash, role, full_name, is_active, created_at)
+                VALUES ($1, $2, $3, $4, $5, true, NOW())
+                RETURNING id
+                """,
+                username, email, hashed_password, role, request.full_name or username
+            )
+            
+            # Remove used token
+            del password_reset_tokens[f"invite_{token_hash}"]
+            
+            # Generate access token
+            access_token = create_access_token(data={"sub": username, "user_id": user_id, "email": email, "role": role})
+            
+            logger.info(f"User {email} created via invite with role {role}")
+            
+            return {
+                "id": user_id,
+                "username": username,
+                "email": email,
+                "role": role,
+                "full_name": request.full_name or username,
+                "is_active": True,
+                "access_token": access_token,
+                "token_type": "bearer"
+            }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Complete invite error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create account")
+
+
 # ── Role Configuration Endpoints ────────────────────────────────────────
 
 @app.get("/api/v1/roles/configurations")
