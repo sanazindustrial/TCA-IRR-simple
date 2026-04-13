@@ -1,6 +1,14 @@
 """Models module initialization"""
 
 from .schemas import *
+from .role_permissions import (
+    RolePermission,
+    RoleLimits,
+    RoleConfig,
+    RoleConfigUpdate,
+    RoleConfigResponse,
+    RoleConfigCreateRequest,
+)
 
 __all__ = [
     # Enums
@@ -54,5 +62,13 @@ __all__ = [
     # Utility Models
     "HealthCheck",
     "PaginationParams",
-    "PaginatedResponse"
+    "PaginatedResponse",
+
+    # Role Permission Models
+    "RolePermission",
+    "RoleLimits",
+    "RoleConfig",
+    "RoleConfigUpdate",
+    "RoleConfigResponse",
+    "RoleConfigCreateRequest",
 ]

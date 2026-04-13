@@ -57,12 +57,13 @@ if (Test-Path $zipPath) {
 
 # Create startup.sh if it doesn't exist
 if (-not (Test-Path "startup.sh")) {
-    @"
+    $startupContent = @'
 #!/bin/bash
 pip install --upgrade pip
 pip install -r requirements.txt
 python main.py
-"@ | Out-File -FilePath "startup.sh" -Encoding utf8
+'@
+    $startupContent | Out-File -FilePath "startup.sh" -Encoding utf8 -NoNewline
 }
 
 Compress-Archive -Path $deployFiles -DestinationPath $zipPath -Force
@@ -93,7 +94,8 @@ try {
     if ($healthResponse.StatusCode -eq 200) {
         Write-Host "✅ Backend health check passed!" -ForegroundColor Green
     }
-} catch {
+}
+catch {
     Write-Host "⚠️ Health check failed - backend may still be starting..." -ForegroundColor Yellow
 }
 
@@ -103,7 +105,8 @@ try {
     if ($ssdResponse.StatusCode -eq 200) {
         Write-Host "✅ SSD endpoint is available!" -ForegroundColor Green
     }
-} catch {
+}
+catch {
     Write-Host "⚠️ SSD endpoint not yet available - restart may be needed" -ForegroundColor Yellow
 }
 
