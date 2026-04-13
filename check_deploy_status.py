@@ -8,11 +8,12 @@ kudu_url = "https://tca-irr.scm.azurewebsites.net"
 
 # Check wwwroot contents
 print("=== Checking wwwroot contents ===")
-resp = requests.post(
-    f"{kudu_url}/api/command",
-    auth=(username, password),
-    json={"command": "ls -la /home/site/wwwroot", "dir": "/"}
-)
+resp = requests.post(f"{kudu_url}/api/command",
+                     auth=(username, password),
+                     json={
+                         "command": "ls -la /home/site/wwwroot",
+                         "dir": "/"
+                     })
 if resp.ok:
     data = resp.json()
     print(data.get("Output", "No output"))
@@ -26,8 +27,11 @@ print("\n=== Checking node_modules ===")
 resp = requests.post(
     f"{kudu_url}/api/command",
     auth=(username, password),
-    json={"command": "ls /home/site/wwwroot/node_modules 2>/dev/null | head -5 || echo 'node_modules not found'", "dir": "/"}
-)
+    json={
+        "command":
+        "ls /home/site/wwwroot/node_modules 2>/dev/null | head -5 || echo 'node_modules not found'",
+        "dir": "/"
+    })
 if resp.ok:
     data = resp.json()
     print(data.get("Output", "No output"))
@@ -42,10 +46,7 @@ except Exception as e:
 
 # Get latest deployment
 print("\n=== Latest deployment ===")
-resp = requests.get(
-    f"{kudu_url}/api/deployments",
-    auth=(username, password)
-)
+resp = requests.get(f"{kudu_url}/api/deployments", auth=(username, password))
 if resp.ok:
     deps = resp.json()
     if deps:
