@@ -50,6 +50,9 @@ import {
   AlertTriangle,
   Eye,
   Edit,
+  DollarSign,
+  Settings,
+  Save,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -68,9 +71,32 @@ import { useAuth } from '@/hooks/use-auth';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Separator } from '@/components/ui/separator';
+import { Progress } from '@/components/ui/progress';
+import { costApi, UserCost } from '@/lib/cost-api';
+import { RolesApi, RoleConfig, RolePermission, DEFAULT_ROLE_CONFIGS } from '@/lib/roles-api';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 
-// Permission definitions for each role
-const ROLE_PERMISSIONS = {
+// Default role limits (can be overridden)
+const DEFAULT_ROLE_LIMITS: {
+  admin: { triageReports: string | number; ddReports: string | number };
+  analyst: { triageReports: string | number; ddReports: string | number };
+  user: { triageReports: string | number; ddReports: string | number };
+} = {
+  admin: { triageReports: 'Unlimited', ddReports: 'Unlimited' },
+  analyst: { triageReports: 25, ddReports: 5 },
+  user: { triageReports: 10, ddReports: 2 },
+};
+
+// Icon mapping for roles (icons can't be stored in DB)
+const ROLE_ICONS = {
+  admin: { icon: Crown, borderColor: 'border-red-500/20', badgeVariant: 'destructive' as const },
+  analyst: { icon: Briefcase, borderColor: 'border-blue-500/20', badgeVariant: 'default' as const },
+  user: { icon: UserIcon, borderColor: 'border-gray-500/20', badgeVariant: 'secondary' as const },
+};
+
+// Initial role permissions (used before API loads)
+const INITIAL_ROLE_PERMISSIONS = {
   admin: {
     label: 'Administrator',
     icon: Crown,
@@ -86,7 +112,7 @@ const ROLE_PERMISSIONS = {
       { name: 'API Access', description: 'Full API access', enabled: true },
       { name: 'Audit Logs', description: 'View system audit logs', enabled: true },
     ],
-    limits: { triageReports: 'Unlimited', ddReports: 'Unlimited' },
+    limits: { triageReports: 'Unlimited' as string | number, ddReports: 'Unlimited' as string | number },
   },
   analyst: {
     label: 'Analyst',
@@ -103,7 +129,7 @@ const ROLE_PERMISSIONS = {
       { name: 'API Access', description: 'Limited API access', enabled: true },
       { name: 'Audit Logs', description: 'View system audit logs', enabled: false },
     ],
-    limits: { triageReports: 25, ddReports: 5 },
+    limits: { triageReports: 25 as string | number, ddReports: 5 as string | number },
   },
   user: {
     label: 'User',
@@ -120,8 +146,23 @@ const ROLE_PERMISSIONS = {
       { name: 'API Access', description: 'No API access', enabled: false },
       { name: 'Audit Logs', description: 'View system audit logs', enabled: false },
     ],
-    limits: { triageReports: 10, ddReports: 2 },
+    limits: { triageReports: 10 as string | number, ddReports: 2 as string | number },
   },
+};
+
+// Type for role permission config
+type RolePermissionConfig = typeof INITIAL_ROLE_PERMISSIONS;
+
+// Generic role config type for editing (allows any badgeVariant)
+type EditableRoleConfig = {
+  label: string;
+  icon: typeof Crown | typeof Briefcase | typeof UserIcon;
+  color: string;
+  bgColor: string;
+  borderColor: string;
+  badgeVariant: 'destructive' | 'default' | 'secondary';
+  permissions: { name: string; description: string; enabled: boolean }[];
+  limits: { triageReports: string | number; ddReports: string | number };
 };
 
 // User interface matching backend API response
@@ -205,6 +246,17 @@ export default function UserManagementPage() {
   const [isEditDialogOpen, setEditDialogOpen] = useState(false);
   const [editRole, setEditRole] = useState<string>('');
   const [isAccessDenied, setIsAccessDenied] = useState(false);
+  const [userCosts, setUserCosts] = useState<Map<string, UserCost>>(new Map());
+  const [isLoadingCosts, setIsLoadingCosts] = useState(false);
+  const [roleLimits, setRoleLimits] = useState(DEFAULT_ROLE_LIMITS);
+  const [isEditLimitsOpen, setEditLimitsOpen] = useState(false);
+  const [editingLimits, setEditingLimits] = useState(DEFAULT_ROLE_LIMITS);
+  const [rolePermissions, setRolePermissions] = useState<RolePermissionConfig>(INITIAL_ROLE_PERMISSIONS);
+  const [isEditRoleConfigOpen, setEditRoleConfigOpen] = useState(false);
+  const [editingRoleKey, setEditingRoleKey] = useState<'admin' | 'analyst' | 'user'>('admin');
+  const [editingRoleConfig, setEditingRoleConfig] = useState<EditableRoleConfig | null>(null);
+  const [isSavingRoleConfig, setIsSavingRoleConfig] = useState(false);
+  const [isLoadingRoles, setIsLoadingRoles] = useState(false);
   const { toast } = useToast();
   const { currentUser } = useAuth();
 
@@ -293,6 +345,210 @@ export default function UserManagementPage() {
   // Auto-refresh users list every 30 seconds to show new signups immediately
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [autoRefresh, setAutoRefresh] = useState(true);
+
+  // Load user costs from cost API
+  const loadUserCosts = useCallback(async () => {
+    setIsLoadingCosts(true);
+    try {
+      const data = await costApi.getSummary();
+      const costMap = new Map<string, UserCost>();
+      data.aiBreakdown.costByUser.forEach(uc => {
+        costMap.set(uc.name.toLowerCase(), uc);
+      });
+      setUserCosts(costMap);
+    } catch (error) {
+      console.error('Error loading user costs:', error);
+    } finally {
+      setIsLoadingCosts(false);
+    }
+  }, []);
+
+  // Load costs on mount
+  useEffect(() => {
+    loadUserCosts();
+  }, [loadUserCosts]);
+
+  // Load role configurations from backend
+  const loadRoleConfigurations = useCallback(async () => {
+    setIsLoadingRoles(true);
+    try {
+      const data = await RolesApi.getConfigurations();
+      if (data.roles) {
+        // Helper to convert API permissions to local format
+        const convertPermissions = (perms: { name: string; description?: string; enabled: boolean }[]) =>
+          perms.map(p => ({ name: p.name, description: p.description || '', enabled: p.enabled }));
+
+        // Helper to convert limits
+        const convertLimits = (limits: { triageReports: number | 'Unlimited'; ddReports: number | 'Unlimited' }) => ({
+          triageReports: limits.triageReports as string | number,
+          ddReports: limits.ddReports as string | number,
+        });
+
+        // Merge API data with local icon configuration
+        const mergedConfig: RolePermissionConfig = {
+          admin: {
+            label: data.roles.admin.label,
+            icon: ROLE_ICONS.admin.icon,
+            color: data.roles.admin.color,
+            bgColor: data.roles.admin.bgColor,
+            borderColor: ROLE_ICONS.admin.borderColor,
+            badgeVariant: ROLE_ICONS.admin.badgeVariant,
+            permissions: convertPermissions(data.roles.admin.permissions),
+            limits: convertLimits(data.roles.admin.limits),
+          },
+          analyst: {
+            label: data.roles.analyst.label,
+            icon: ROLE_ICONS.analyst.icon,
+            color: data.roles.analyst.color,
+            bgColor: data.roles.analyst.bgColor,
+            borderColor: ROLE_ICONS.analyst.borderColor,
+            badgeVariant: ROLE_ICONS.analyst.badgeVariant,
+            permissions: convertPermissions(data.roles.analyst.permissions),
+            limits: convertLimits(data.roles.analyst.limits),
+          },
+          user: {
+            label: data.roles.user.label,
+            icon: ROLE_ICONS.user.icon,
+            color: data.roles.user.color,
+            bgColor: data.roles.user.bgColor,
+            borderColor: ROLE_ICONS.user.borderColor,
+            badgeVariant: ROLE_ICONS.user.badgeVariant,
+            permissions: convertPermissions(data.roles.user.permissions),
+            limits: convertLimits(data.roles.user.limits),
+          },
+        };
+        setRolePermissions(mergedConfig);
+        // Also update roleLimits
+        setRoleLimits({
+          admin: convertLimits(data.roles.admin.limits),
+          analyst: convertLimits(data.roles.analyst.limits),
+          user: convertLimits(data.roles.user.limits),
+        });
+      }
+    } catch (error) {
+      console.error('Error loading role configurations:', error);
+    } finally {
+      setIsLoadingRoles(false);
+    }
+  }, []);
+
+  // Load role configurations on mount
+  useEffect(() => {
+    loadRoleConfigurations();
+  }, [loadRoleConfigurations]);
+
+  // Open role config editor
+  const openRoleConfigEditor = (roleKey: 'admin' | 'analyst' | 'user') => {
+    setEditingRoleKey(roleKey);
+    const config = rolePermissions[roleKey];
+    setEditingRoleConfig({
+      label: config.label,
+      icon: config.icon,
+      color: config.color,
+      bgColor: config.bgColor,
+      borderColor: config.borderColor,
+      badgeVariant: config.badgeVariant,
+      permissions: [...config.permissions],
+      limits: { ...config.limits },
+    });
+    setEditRoleConfigOpen(true);
+  };
+
+  // Save role configuration to backend
+  const handleSaveRoleConfig = async () => {
+    if (!editingRoleConfig) return;
+
+    setIsSavingRoleConfig(true);
+    try {
+      // Convert limits to API format
+      const convertLimitForApi = (val: string | number): number | 'Unlimited' => {
+        if (val === 'Unlimited' || (typeof val === 'string' && val.toLowerCase() === 'unlimited')) {
+          return 'Unlimited';
+        }
+        return typeof val === 'number' ? val : parseInt(val) || 0;
+      };
+
+      await RolesApi.updateConfiguration(editingRoleKey, {
+        label: editingRoleConfig.label,
+        color: editingRoleConfig.color,
+        bgColor: editingRoleConfig.bgColor,
+        permissions: editingRoleConfig.permissions.map(p => ({
+          name: p.name,
+          description: p.description,
+          enabled: p.enabled,
+        })),
+        limits: {
+          triageReports: convertLimitForApi(editingRoleConfig.limits.triageReports),
+          ddReports: convertLimitForApi(editingRoleConfig.limits.ddReports),
+        },
+      });
+
+      // Update local state
+      setRolePermissions(prev => ({
+        ...prev,
+        [editingRoleKey]: editingRoleConfig,
+      }));
+      setRoleLimits(prev => ({
+        ...prev,
+        [editingRoleKey]: editingRoleConfig.limits,
+      }));
+
+      setEditRoleConfigOpen(false);
+      toast({
+        title: '✅ Role Updated',
+        description: `${editingRoleConfig.label} configuration saved successfully.`,
+      });
+    } catch (error) {
+      console.error('Error saving role configuration:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error Saving Role',
+        description: error instanceof Error ? error.message : 'Failed to save role configuration.',
+      });
+    } finally {
+      setIsSavingRoleConfig(false);
+    }
+  };
+
+  // Toggle permission in editing state
+  const toggleEditingPermission = (permIndex: number) => {
+    if (!editingRoleConfig) return;
+    const newPerms = [...editingRoleConfig.permissions];
+    newPerms[permIndex] = { ...newPerms[permIndex], enabled: !newPerms[permIndex].enabled };
+    setEditingRoleConfig({ ...editingRoleConfig, permissions: newPerms });
+  };
+
+  // Update editing limit
+  const updateEditingLimit = (field: 'triageReports' | 'ddReports', value: string) => {
+    if (!editingRoleConfig) return;
+    const parsed = value.toLowerCase() === 'unlimited' ? 'Unlimited' : (parseInt(value) || 0);
+    setEditingRoleConfig({
+      ...editingRoleConfig,
+      limits: { ...editingRoleConfig.limits, [field]: parsed },
+    });
+  };
+
+  // Get cost for a user
+  const getUserCost = (userName: string): UserCost | undefined => {
+    // Try exact match first, then partial match
+    const lowerName = userName.toLowerCase();
+    if (userCosts.has(lowerName)) return userCosts.get(lowerName);
+    // Try to find partial match
+    for (const [key, value] of userCosts.entries()) {
+      if (lowerName.includes(key) || key.includes(lowerName)) return value;
+    }
+    return undefined;
+  };
+
+  // Handle saving role limits
+  const handleSaveLimits = () => {
+    setRoleLimits(editingLimits);
+    setEditLimitsOpen(false);
+    toast({
+      title: '✅ Limits Updated',
+      description: 'Report limits have been updated for all roles.',
+    });
+  };
 
   useEffect(() => {
     if (!autoRefresh) return;
@@ -623,7 +879,7 @@ export default function UserManagementPage() {
               <div className="space-y-6 py-4">
                 <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
                   <Avatar className="h-10 w-10">
-                    <AvatarFallback className={ROLE_PERMISSIONS[selectedUser.role].bgColor}>
+                    <AvatarFallback className={rolePermissions[selectedUser.role].bgColor}>
                       {selectedUser.name.charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
@@ -636,15 +892,15 @@ export default function UserManagementPage() {
                 <div className="space-y-3">
                   <Label>Select New Role</Label>
                   <div className="grid gap-3">
-                    {Object.entries(ROLE_PERMISSIONS).map(([role, config]) => {
+                    {Object.entries(rolePermissions).map(([role, config]) => {
                       const Icon = config.icon;
                       return (
                         <div
                           key={role}
                           onClick={() => setEditRole(role)}
                           className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${editRole === role
-                              ? `${config.borderColor} ${config.bgColor}`
-                              : 'border-border hover:border-muted-foreground/50'
+                            ? `${config.borderColor} ${config.bgColor}`
+                            : 'border-border hover:border-muted-foreground/50'
                             }`}
                         >
                           <div className="flex items-center gap-3">
@@ -749,15 +1005,15 @@ export default function UserManagementPage() {
                     <Label>Role</Label>
                     <div className="grid grid-cols-2 gap-3">
                       {(['admin', 'analyst'] as const).map((role) => {
-                        const config = ROLE_PERMISSIONS[role];
+                        const config = rolePermissions[role];
                         const Icon = config.icon;
                         return (
                           <div
                             key={role}
                             onClick={() => setInviteRole(role)}
                             className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${inviteRole === role
-                                ? `${config.borderColor} ${config.bgColor}`
-                                : 'border-border hover:border-muted-foreground/50'
+                              ? `${config.borderColor} ${config.bgColor}`
+                              : 'border-border hover:border-muted-foreground/50'
                               }`}
                           >
                             <div className="flex items-center gap-2">
@@ -918,6 +1174,7 @@ export default function UserManagementPage() {
                     <TableHead className="font-semibold">Role</TableHead>
                     <TableHead className="font-semibold">Permissions</TableHead>
                     <TableHead className="font-semibold">Report Limits</TableHead>
+                    <TableHead className="font-semibold">AI Cost</TableHead>
                     <TableHead className="font-semibold">Status</TableHead>
                     <TableHead className="font-semibold">Last Active</TableHead>
                     <TableHead className="font-semibold text-right">Actions</TableHead>
@@ -926,15 +1183,17 @@ export default function UserManagementPage() {
                 <TableBody>
                   {isLoadingUsers ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="h-48 text-center">
+                      <TableCell colSpan={8} className="h-48 text-center">
                         <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
                         <p className="mt-2 text-muted-foreground">Loading users...</p>
                       </TableCell>
                     </TableRow>
                   ) : users.length > 0 ? (
                     users.map(user => {
-                      const roleConfig = ROLE_PERMISSIONS[user.role];
+                      const roleConfig = rolePermissions[user.role];
                       const RoleIcon = roleConfig.icon;
+                      const userCost = getUserCost(user.name);
+                      const userLimits = roleLimits[user.role];
                       return (
                         <TableRow key={user.id} className="hover:bg-muted/50">
                           <TableCell>
@@ -981,11 +1240,33 @@ export default function UserManagementPage() {
                           <TableCell>
                             <div className="text-sm">
                               <span className="text-muted-foreground">Triage:</span>{' '}
-                              <span className="font-medium">{roleConfig.limits.triageReports}</span>
+                              <span className="font-medium">{userLimits.triageReports}</span>
                               <br />
                               <span className="text-muted-foreground">DD:</span>{' '}
-                              <span className="font-medium">{roleConfig.limits.ddReports}</span>
+                              <span className="font-medium">{userLimits.ddReports}</span>
                             </div>
+                          </TableCell>
+                          <TableCell>
+                            {isLoadingCosts ? (
+                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                            ) : userCost ? (
+                              <Tooltip>
+                                <TooltipTrigger>
+                                  <div className="space-y-1">
+                                    <div className="flex items-center gap-1">
+                                      <DollarSign className="h-3 w-3 text-green-600" />
+                                      <span className="font-medium text-green-600">${userCost.cost.toFixed(2)}</span>
+                                    </div>
+                                    <Progress value={userCost.percentage} className="h-1.5 w-16" />
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p className="font-medium">{userCost.percentage.toFixed(1)}% of total AI cost</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">No data</span>
+                            )}
                           </TableCell>
                           <TableCell>
                             <Badge variant={user.status === 'Active' ? 'default' : 'secondary'} className={user.status === 'Active' ? 'bg-green-500/10 text-green-600 hover:bg-green-500/20' : ''}>
@@ -1054,7 +1335,7 @@ export default function UserManagementPage() {
                     })
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={7} className="h-48 text-center">
+                      <TableCell colSpan={8} className="h-48 text-center">
                         <Users className="mx-auto h-12 w-12 text-muted-foreground/50" />
                         <h3 className="mt-4 text-lg font-semibold">No users found</h3>
                         <p className="text-muted-foreground">Try adjusting your search or filter criteria</p>
@@ -1067,23 +1348,113 @@ export default function UserManagementPage() {
           </CardContent>
         </Card>
 
-        {/* Permissions Reference */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5" />
-              Role Permissions Reference
-            </CardTitle>
-            <CardDescription>
-              Overview of permissions granted to each role
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid md:grid-cols-3 gap-6">
-              {Object.entries(ROLE_PERMISSIONS).map(([role, config]) => {
+        {/* Edit Limits Dialog */}
+        <Dialog open={isEditLimitsOpen} onOpenChange={setEditLimitsOpen}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Settings className="h-5 w-5" />
+                Edit Report Limits
+              </DialogTitle>
+              <DialogDescription>
+                Configure the maximum number of reports each role can generate per month.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-6 py-4">
+              {(['analyst', 'user'] as const).map((role) => {
+                const config = rolePermissions[role];
                 const Icon = config.icon;
                 return (
                   <div key={role} className={`p-4 rounded-lg border ${config.borderColor} ${config.bgColor}`}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Icon className={`h-4 w-4 ${config.color}`} />
+                      <span className="font-medium">{config.label}</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Triage Reports</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={editingLimits[role].triageReports}
+                          onChange={(e) => setEditingLimits(prev => ({
+                            ...prev,
+                            [role]: { ...prev[role], triageReports: parseInt(e.target.value) || 0 }
+                          }))}
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">DD Reports</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={editingLimits[role].ddReports}
+                          onChange={(e) => setEditingLimits(prev => ({
+                            ...prev,
+                            [role]: { ...prev[role], ddReports: parseInt(e.target.value) || 0 }
+                          }))}
+                          className="mt-1"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              <p className="text-xs text-muted-foreground">
+                Note: Admin role always has unlimited reports.
+              </p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditLimitsOpen(false)}>Cancel</Button>
+              <Button onClick={handleSaveLimits}>
+                <Save className="mr-2 h-4 w-4" />
+                Save Limits
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Permissions Reference */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5" />
+                Role Permissions Reference
+                {isLoadingRoles && <Loader2 className="h-4 w-4 animate-spin" />}
+              </CardTitle>
+              <CardDescription>
+                Overview of permissions granted to each role
+              </CardDescription>
+            </div>
+            {isAdmin && (
+              <Button variant="outline" size="sm" onClick={() => {
+                setEditingLimits(roleLimits);
+                setEditLimitsOpen(true);
+              }}>
+                <Settings className="h-4 w-4 mr-2" />
+                Edit Limits
+              </Button>
+            )}
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-3 gap-6">
+              {Object.entries(rolePermissions).map(([role, config]) => {
+                const Icon = config.icon;
+                const limits = roleLimits[role as keyof typeof roleLimits];
+                return (
+                  <div key={role} className={`p-4 rounded-lg border ${config.borderColor} ${config.bgColor} relative`}>
+                    {isAdmin && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute top-2 right-2 h-8 w-8"
+                        onClick={() => openRoleConfigEditor(role as 'admin' | 'analyst' | 'user')}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    )}
                     <div className="flex items-center gap-2 mb-4">
                       <Icon className={`h-5 w-5 ${config.color}`} />
                       <h3 className="font-semibold">{config.label}</h3>
@@ -1102,8 +1473,8 @@ export default function UserManagementPage() {
                     </div>
                     <Separator className="my-3" />
                     <div className="text-sm">
-                      <p><span className="text-muted-foreground">Triage Reports:</span> <strong>{config.limits.triageReports}</strong></p>
-                      <p><span className="text-muted-foreground">DD Reports:</span> <strong>{config.limits.ddReports}</strong></p>
+                      <p><span className="text-muted-foreground">Triage Reports:</span> <strong>{limits.triageReports}</strong></p>
+                      <p><span className="text-muted-foreground">DD Reports:</span> <strong>{limits.ddReports}</strong></p>
                     </div>
                   </div>
                 );
@@ -1111,6 +1482,96 @@ export default function UserManagementPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Role Configuration Edit Dialog */}
+        <Dialog open={isEditRoleConfigOpen} onOpenChange={setEditRoleConfigOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Settings className="h-5 w-5" />
+                Edit {editingRoleConfig?.label || 'Role'} Configuration
+              </DialogTitle>
+              <DialogDescription>
+                Modify permissions and limits for this role
+              </DialogDescription>
+            </DialogHeader>
+            {editingRoleConfig && (
+              <div className="space-y-6 py-4 max-h-[60vh] overflow-y-auto">
+                {/* Role Label */}
+                <div className="space-y-2">
+                  <Label>Role Label</Label>
+                  <Input
+                    value={editingRoleConfig.label}
+                    onChange={(e) => setEditingRoleConfig({ ...editingRoleConfig, label: e.target.value })}
+                  />
+                </div>
+
+                {/* Permissions */}
+                <div className="space-y-3">
+                  <Label>Permissions</Label>
+                  <div className="space-y-2 border rounded-lg p-3">
+                    {editingRoleConfig.permissions.map((perm, i) => (
+                      <div key={i} className="flex items-center justify-between py-2 border-b last:border-b-0">
+                        <div>
+                          <p className="font-medium text-sm">{perm.name}</p>
+                          <p className="text-xs text-muted-foreground">{perm.description}</p>
+                        </div>
+                        <Switch
+                          checked={perm.enabled}
+                          onCheckedChange={() => toggleEditingPermission(i)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Limits */}
+                <div className="space-y-3">
+                  <Label>Report Limits</Label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">Triage Reports</Label>
+                      <Input
+                        value={editingRoleConfig.limits.triageReports}
+                        onChange={(e) => updateEditingLimit('triageReports', e.target.value)}
+                        placeholder="Number or 'Unlimited'"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">DD Reports</Label>
+                      <Input
+                        value={editingRoleConfig.limits.ddReports}
+                        onChange={(e) => updateEditingLimit('ddReports', e.target.value)}
+                        placeholder="Number or 'Unlimited'"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Enter a number or type &quot;Unlimited&quot; for no limit
+                  </p>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditRoleConfigOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSaveRoleConfig} disabled={isSavingRoleConfig}>
+                {isSavingRoleConfig ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Changes
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </TooltipProvider>
   );

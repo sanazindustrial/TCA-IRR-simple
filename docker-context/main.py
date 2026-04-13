@@ -1051,6 +1051,94 @@ class EvaluationCreate(BaseModel):
     request_id: Optional[str] = None
 
 
+# ── Role Permission Models ──────────────────────────────────────────
+
+class RolePermission(BaseModel):
+    id: Optional[int] = None
+    name: str
+    description: Optional[str] = None
+    enabled: bool = True
+
+
+class RoleLimits(BaseModel):
+    triageReports: Optional[int] = None  # None = Unlimited
+    ddReports: Optional[int] = None  # None = Unlimited
+
+
+class RoleConfig(BaseModel):
+    label: str
+    icon: str
+    color: str
+    bgColor: str
+    permissions: List[RolePermission]
+    limits: RoleLimits
+
+
+class RoleConfigUpdate(BaseModel):
+    label: Optional[str] = None
+    icon: Optional[str] = None
+    color: Optional[str] = None
+    bgColor: Optional[str] = None
+    permissions: Optional[List[RolePermission]] = None
+    limits: Optional[RoleLimits] = None
+
+
+class RoleConfigurationsResponse(BaseModel):
+    roles: Dict[str, RoleConfig]
+    updatedAt: Optional[str] = None
+    fromDefaults: bool = False
+
+
+# Default role configurations
+DEFAULT_ROLE_CONFIGS = {
+    "admin": {
+        "label": "Administrator",
+        "icon": "Shield",
+        "color": "text-red-600",
+        "bgColor": "bg-red-50",
+        "permissions": [
+            {"name": "Full System Access", "description": "Complete access to all features", "enabled": True},
+            {"name": "User Management", "description": "Can create, edit, and delete users", "enabled": True},
+            {"name": "Module Configuration", "description": "Can modify analysis modules", "enabled": True},
+            {"name": "Export Data", "description": "Can export reports and data", "enabled": True},
+            {"name": "View Reports", "description": "Can view all reports", "enabled": True},
+            {"name": "Run Analysis", "description": "Can execute triage and DD analysis", "enabled": True},
+        ],
+        "limits": {"triageReports": None, "ddReports": None}  # Unlimited
+    },
+    "analyst": {
+        "label": "Analyst",
+        "icon": "LineChart",
+        "color": "text-blue-600",
+        "bgColor": "bg-blue-50",
+        "permissions": [
+            {"name": "Run DD Analysis", "description": "Can execute deep dive analysis", "enabled": True},
+            {"name": "Run Triage Analysis", "description": "Can execute triage analysis", "enabled": True},
+            {"name": "View Reports", "description": "Can view assigned reports", "enabled": True},
+            {"name": "Export Data", "description": "Can export own reports", "enabled": True},
+            {"name": "User Management", "description": "Can manage users", "enabled": False},
+            {"name": "Module Configuration", "description": "Can modify analysis modules", "enabled": False},
+        ],
+        "limits": {"triageReports": 50, "ddReports": 10}
+    },
+    "user": {
+        "label": "Standard User",
+        "icon": "User",
+        "color": "text-gray-600",
+        "bgColor": "bg-gray-50",
+        "permissions": [
+            {"name": "Run Triage Analysis", "description": "Can execute triage analysis", "enabled": True},
+            {"name": "View Reports", "description": "Can view own reports only", "enabled": True},
+            {"name": "Run DD Analysis", "description": "Can execute deep dive analysis", "enabled": False},
+            {"name": "Export Data", "description": "Can export data", "enabled": False},
+            {"name": "User Management", "description": "Can manage users", "enabled": False},
+            {"name": "Module Configuration", "description": "Can modify analysis modules", "enabled": False},
+        ],
+        "limits": {"triageReports": 10, "ddReports": 0}
+    }
+}
+
+
 # ── SSD → TCA TIRR Payload Models (sections 4.1.1 – 4.1.8) ──────────
 
 class SSDContactInformation(BaseModel):
@@ -1863,6 +1951,340 @@ async def invite_user(request: InviteUserRequest, background_tasks: BackgroundTa
     except Exception as e:
         logger.error(f"Invite user error: {e}")
         raise HTTPException(status_code=500, detail="Failed to send invitation")
+
+
+# ── Role Configuration Endpoints ────────────────────────────────────────
+
+@app.get("/api/v1/roles/configurations")
+@app.get("/roles/configurations")
+async def get_role_configurations():
+    """Get all role configurations from database or defaults"""
+    try:
+        async with db_manager.get_connection() as conn:
+            # Check if tables exist
+            table_exists = await conn.fetchval("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = 'role_configurations'
+                )
+            """)
+            
+            if not table_exists:
+                # Return defaults if tables don't exist yet
+                # Convert None to 'Unlimited' for frontend
+                roles = {}
+                for key, config in DEFAULT_ROLE_CONFIGS.items():
+                    roles[key] = {
+                        **config,
+                        "limits": {
+                            "triageReports": "Unlimited" if config["limits"]["triageReports"] is None else config["limits"]["triageReports"],
+                            "ddReports": "Unlimited" if config["limits"]["ddReports"] is None else config["limits"]["ddReports"]
+                        }
+                    }
+                return {
+                    "roles": roles,
+                    "updatedAt": datetime.utcnow().isoformat(),
+                    "fromDefaults": True
+                }
+            
+            # Fetch role configurations
+            configs = await conn.fetch("""
+                SELECT role_key, label, icon, color, bg_color, updated_at
+                FROM role_configurations
+                ORDER BY role_key
+            """)
+            
+            if not configs:
+                # Return defaults if no data
+                roles = {}
+                for key, config in DEFAULT_ROLE_CONFIGS.items():
+                    roles[key] = {
+                        **config,
+                        "limits": {
+                            "triageReports": "Unlimited" if config["limits"]["triageReports"] is None else config["limits"]["triageReports"],
+                            "ddReports": "Unlimited" if config["limits"]["ddReports"] is None else config["limits"]["ddReports"]
+                        }
+                    }
+                return {
+                    "roles": roles,
+                    "updatedAt": datetime.utcnow().isoformat(),
+                    "fromDefaults": True
+                }
+            
+            roles = {}
+            latest_update = None
+            
+            for config in configs:
+                role_key = config['role_key']
+                
+                # Fetch permissions for this role
+                permissions = await conn.fetch("""
+                    SELECT id, permission_name, description, is_enabled
+                    FROM role_permissions
+                    WHERE role_key = $1
+                    ORDER BY id
+                """, role_key)
+                
+                # Fetch limits for this role
+                limits = await conn.fetchrow("""
+                    SELECT triage_reports, dd_reports
+                    FROM role_limits
+                    WHERE role_key = $1
+                """, role_key)
+                
+                roles[role_key] = {
+                    "label": config['label'],
+                    "icon": config['icon'],
+                    "color": config['color'],
+                    "bgColor": config['bg_color'],
+                    "permissions": [
+                        {
+                            "id": p['id'],
+                            "name": p['permission_name'],
+                            "description": p['description'],
+                            "enabled": p['is_enabled']
+                        } for p in permissions
+                    ],
+                    "limits": {
+                        "triageReports": limits['triage_reports'] if limits and limits['triage_reports'] is not None else "Unlimited",
+                        "ddReports": limits['dd_reports'] if limits and limits['dd_reports'] is not None else "Unlimited"
+                    } if limits else {"triageReports": "Unlimited", "ddReports": "Unlimited"}
+                }
+                
+                if config['updated_at'] and (latest_update is None or config['updated_at'] > latest_update):
+                    latest_update = config['updated_at']
+            
+            return {
+                "roles": roles,
+                "updatedAt": latest_update.isoformat() if latest_update else datetime.utcnow().isoformat(),
+                "fromDefaults": False
+            }
+            
+    except Exception as e:
+        logger.error(f"Get role configurations error: {e}")
+        # Return defaults on error
+        roles = {}
+        for key, config in DEFAULT_ROLE_CONFIGS.items():
+            roles[key] = {
+                **config,
+                "limits": {
+                    "triageReports": "Unlimited" if config["limits"]["triageReports"] is None else config["limits"]["triageReports"],
+                    "ddReports": "Unlimited" if config["limits"]["ddReports"] is None else config["limits"]["ddReports"]
+                }
+            }
+        return {
+            "roles": roles,
+            "updatedAt": datetime.utcnow().isoformat(),
+            "fromDefaults": True
+        }
+
+
+@app.put("/api/v1/roles/configurations/{role_key}")
+@app.put("/roles/configurations/{role_key}")
+async def update_role_configuration(role_key: str, update_data: RoleConfigUpdate, current_user: dict = Depends(get_current_user)):
+    """Update a specific role configuration (admin only)"""
+    if current_user.get("role", "").lower() != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    if role_key not in ["admin", "analyst", "user"]:
+        raise HTTPException(status_code=400, detail="Invalid role key")
+    
+    try:
+        async with db_manager.get_connection() as conn:
+            # Check if tables exist
+            table_exists = await conn.fetchval("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = 'role_configurations'
+                )
+            """)
+            
+            if not table_exists:
+                raise HTTPException(status_code=400, detail="Role tables not initialized. Call POST /roles/configurations/initialize first.")
+            
+            # Update role configuration
+            if update_data.label or update_data.icon or update_data.color or update_data.bgColor:
+                await conn.execute("""
+                    UPDATE role_configurations 
+                    SET label = COALESCE($2, label),
+                        icon = COALESCE($3, icon),
+                        color = COALESCE($4, color),
+                        bg_color = COALESCE($5, bg_color),
+                        updated_at = NOW()
+                    WHERE role_key = $1
+                """, role_key, update_data.label, update_data.icon, update_data.color, update_data.bgColor)
+            
+            # Update permissions
+            if update_data.permissions:
+                # Delete existing permissions
+                await conn.execute("DELETE FROM role_permissions WHERE role_key = $1", role_key)
+                
+                # Insert new permissions
+                for perm in update_data.permissions:
+                    await conn.execute("""
+                        INSERT INTO role_permissions (role_key, permission_name, description, is_enabled)
+                        VALUES ($1, $2, $3, $4)
+                    """, role_key, perm.name, perm.description, perm.enabled)
+            
+            # Update limits
+            if update_data.limits:
+                triage = update_data.limits.triageReports if update_data.limits.triageReports != 'Unlimited' else None
+                dd = update_data.limits.ddReports if update_data.limits.ddReports != 'Unlimited' else None
+                
+                # Convert string 'Unlimited' to None
+                if isinstance(triage, str) and triage.lower() == 'unlimited':
+                    triage = None
+                if isinstance(dd, str) and dd.lower() == 'unlimited':
+                    dd = None
+                
+                await conn.execute("""
+                    UPDATE role_limits 
+                    SET triage_reports = $2, dd_reports = $3, updated_at = NOW()
+                    WHERE role_key = $1
+                """, role_key, triage, dd)
+            
+            logger.info(f"Role {role_key} updated by admin {current_user['id']}")
+            return {"success": True, "message": f"Role {role_key} configuration updated"}
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Update role configuration error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update role configuration: {str(e)}")
+
+
+@app.post("/api/v1/roles/configurations/reset")
+@app.post("/roles/configurations/reset")
+async def reset_role_configurations(current_user: dict = Depends(get_current_user)):
+    """Reset all role configurations to defaults (admin only)"""
+    if current_user.get("role", "").lower() != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    try:
+        async with db_manager.get_connection() as conn:
+            # Check if tables exist
+            table_exists = await conn.fetchval("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = 'role_configurations'
+                )
+            """)
+            
+            if not table_exists:
+                raise HTTPException(status_code=400, detail="Role tables not initialized")
+            
+            # Clear existing data
+            await conn.execute("DELETE FROM role_permissions")
+            await conn.execute("DELETE FROM role_limits")
+            await conn.execute("DELETE FROM role_configurations")
+            
+            # Insert defaults
+            for role_key, config in DEFAULT_ROLE_CONFIGS.items():
+                # Insert config
+                await conn.execute("""
+                    INSERT INTO role_configurations (role_key, label, icon, color, bg_color)
+                    VALUES ($1, $2, $3, $4, $5)
+                """, role_key, config['label'], config['icon'], config['color'], config['bgColor'])
+                
+                # Insert permissions
+                for perm in config['permissions']:
+                    await conn.execute("""
+                        INSERT INTO role_permissions (role_key, permission_name, description, is_enabled)
+                        VALUES ($1, $2, $3, $4)
+                    """, role_key, perm['name'], perm['description'], perm['enabled'])
+                
+                # Insert limits
+                await conn.execute("""
+                    INSERT INTO role_limits (role_key, triage_reports, dd_reports)
+                    VALUES ($1, $2, $3)
+                """, role_key, config['limits']['triageReports'], config['limits']['ddReports'])
+            
+            logger.info(f"Role configurations reset to defaults by admin {current_user['id']}")
+            return {"success": True, "message": "Role configurations reset to defaults"}
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Reset role configurations error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to reset: {str(e)}")
+
+
+@app.post("/api/v1/roles/configurations/initialize")
+@app.post("/roles/configurations/initialize")
+async def initialize_role_tables(current_user: dict = Depends(get_current_user)):
+    """Initialize role configuration tables (admin only)"""
+    if current_user.get("role", "").lower() != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    try:
+        async with db_manager.get_connection() as conn:
+            # Create tables
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS role_configurations (
+                    id SERIAL PRIMARY KEY,
+                    role_key VARCHAR(50) UNIQUE NOT NULL,
+                    label VARCHAR(100) NOT NULL,
+                    icon VARCHAR(50) NOT NULL,
+                    color VARCHAR(50) NOT NULL,
+                    bg_color VARCHAR(50) NOT NULL,
+                    created_at TIMESTAMPTZ DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+            
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS role_permissions (
+                    id SERIAL PRIMARY KEY,
+                    role_key VARCHAR(50) NOT NULL REFERENCES role_configurations(role_key) ON DELETE CASCADE,
+                    permission_name VARCHAR(100) NOT NULL,
+                    description TEXT,
+                    is_enabled BOOLEAN DEFAULT TRUE,
+                    created_at TIMESTAMPTZ DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+            
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS role_limits (
+                    id SERIAL PRIMARY KEY,
+                    role_key VARCHAR(50) UNIQUE NOT NULL REFERENCES role_configurations(role_key) ON DELETE CASCADE,
+                    triage_reports INTEGER,
+                    dd_reports INTEGER,
+                    created_at TIMESTAMPTZ DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+            
+            # Check if data exists
+            count = await conn.fetchval("SELECT COUNT(*) FROM role_configurations")
+            
+            if count == 0:
+                # Insert default data
+                for role_key, config in DEFAULT_ROLE_CONFIGS.items():
+                    await conn.execute("""
+                        INSERT INTO role_configurations (role_key, label, icon, color, bg_color)
+                        VALUES ($1, $2, $3, $4, $5)
+                    """, role_key, config['label'], config['icon'], config['color'], config['bgColor'])
+                    
+                    for perm in config['permissions']:
+                        await conn.execute("""
+                            INSERT INTO role_permissions (role_key, permission_name, description, is_enabled)
+                            VALUES ($1, $2, $3, $4)
+                        """, role_key, perm['name'], perm['description'], perm['enabled'])
+                    
+                    await conn.execute("""
+                        INSERT INTO role_limits (role_key, triage_reports, dd_reports)
+                        VALUES ($1, $2, $3)
+                    """, role_key, config['limits']['triageReports'], config['limits']['ddReports'])
+                
+                logger.info(f"Role tables initialized with defaults by admin {current_user['id']}")
+                return {"success": True, "message": "Role tables created and initialized with defaults"}
+            else:
+                return {"success": True, "message": "Role tables already exist with data"}
+            
+    except Exception as e:
+        logger.error(f"Initialize role tables error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to initialize: {str(e)}")
 
 
 # App Requests endpoints

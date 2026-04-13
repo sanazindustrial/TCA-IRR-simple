@@ -2,14 +2,15 @@
 
 from fastapi import APIRouter
 from .endpoints import (auth, users, companies, analysis, investments, admin,
-                        tca, dashboard, ssd, settings, reports, cost, 
-                        external_sources, api_routes)
+                        tca, dashboard, ssd, settings, reports, cost,
+                        external_sources, api_routes, roles)
 
 api_router = APIRouter()
 
 # Include all endpoint routers
 api_router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 api_router.include_router(users.router, prefix="/users", tags=["Users"])
+api_router.include_router(roles.router, tags=["Role Configuration"])
 api_router.include_router(settings.router, tags=["Settings"])
 api_router.include_router(reports.router, tags=["Reports"])
 api_router.include_router(companies.router,
@@ -28,9 +29,7 @@ api_router.include_router(dashboard.router,
 api_router.include_router(admin.router,
                           prefix="/admin",
                           tags=["Administration"])
-api_router.include_router(ssd.router,
-                          prefix="/ssd",
-                          tags=["SSD Integration"])
+api_router.include_router(ssd.router, prefix="/ssd", tags=["SSD Integration"])
 
 # Alias for /startup-steroid/* → /ssd/* (backwards compatibility)
 api_router.include_router(ssd.router,
@@ -73,5 +72,4 @@ api_router.include_router(api_routes.evaluations_router,
 api_router.include_router(api_routes.records_router,
                           prefix="/records",
                           tags=["Records"])
-api_router.include_router(api_routes.api_health_router,
-                          tags=["API Health"])
+api_router.include_router(api_routes.api_health_router, tags=["API Health"])
