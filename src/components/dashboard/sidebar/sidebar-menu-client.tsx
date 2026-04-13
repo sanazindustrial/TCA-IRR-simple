@@ -92,6 +92,7 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
 
     const userRole = user?.role.toLowerCase() || 'user';
     const isPrivilegedUser = userRole === 'admin' || userRole === 'analyst';
+    const isAdmin = userRole === 'admin';
 
     if (isFooter) {
         return (
@@ -287,18 +288,22 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
                     <SidebarGroup>
                         <SidebarGroupLabel>Administration</SidebarGroupLabel>
                         <SidebarMenu>
-                            <SidebarMenuItem>
-                                <SidebarMenuButton href="/dashboard/users" isActive={pathname === '/dashboard/users'} tooltip="User Management">
-                                    <Users />
-                                    <span>User Management</span>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
-                            <SidebarMenuItem>
-                                <SidebarMenuButton href="/dashboard/user-requests" isActive={pathname === '/dashboard/user-requests'} tooltip="User Requests">
-                                    <MessageSquare />
-                                    <span>User Requests</span>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
+                            {isAdmin && (
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton href="/dashboard/users" isActive={pathname === '/dashboard/users'} tooltip="User Management">
+                                        <Users />
+                                        <span>User Management</span>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            )}
+                            {isAdmin && (
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton href="/dashboard/user-requests" isActive={pathname === '/dashboard/user-requests'} tooltip="User Requests">
+                                        <MessageSquare />
+                                        <span>User Requests</span>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            )}
                             <SidebarMenuItem>
                                 <SidebarMenuButton href="/dashboard/system-health" isActive={pathname === '/dashboard/system-health'} tooltip="System Health">
                                     <Activity />
@@ -323,66 +328,82 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
                                     <span>External Links</span>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
-                            <SidebarMenuItem>
-                                <SidebarMenuButton href="/dashboard/cost" isActive={pathname === '/dashboard/cost'} tooltip="Cost Management">
-                                    <DollarSign />
-                                    <span>Cost Management</span>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
+                            {isAdmin && (
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton href="/dashboard/cost" isActive={pathname === '/dashboard/cost'} tooltip="Cost Management">
+                                        <DollarSign />
+                                        <span>Cost Management</span>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            )}
                             <SidebarMenuItem>
                                 <SidebarMenuButton href="/dashboard/database" isActive={pathname === '/dashboard/database'} tooltip="Database Mining">
                                     <Database />
                                     <span>Database Mining</span>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
-                            <SidebarMenuItem>
-                                <SidebarMenuButton href="/dashboard/database-integration" isActive={pathname === '/dashboard/database-integration'} tooltip="Database Integration">
-                                    <GitBranch />
-                                    <span>Database Integration</span>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
-                            <SidebarMenuItem>
-                                <SidebarMenuButton href="/dashboard/remote" isActive={pathname === '/dashboard/remote'} tooltip="Remote Integration">
-                                    <GitBranch />
-                                    <span>Remote Integration</span>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
-                            <SidebarMenuItem>
-                                <SidebarMenuButton href="/dashboard/system-config" isActive={pathname === '/dashboard/system-config'} tooltip="System Config">
-                                    <Settings />
-                                    <span>System Config</span>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
-                            <SidebarMenuItem>
-                                <SidebarMenuButton href="/dashboard/module-settings" isActive={pathname === '/dashboard/module-settings'} tooltip="Module Settings">
-                                    <Layers />
-                                    <span>Module Settings</span>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
-                            <SidebarMenuItem>
-                                <SidebarMenuButton href="/dashboard/schema" isActive={pathname === '/dashboard/schema'} tooltip="Schema & Models">
-                                    <FileCode />
-                                    <span>Schema & Models</span>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
-                            <SidebarMenuItem>
-                                <SidebarMenuButton href="/dashboard/reports/configure" isActive={pathname === '/dashboard/reports/configure'} tooltip="Report Configuration">
-                                    <FileText />
-                                    <span>Report Configuration</span>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
+                            {isAdmin && (
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton href="/dashboard/database-integration" isActive={pathname === '/dashboard/database-integration'} tooltip="Database Integration">
+                                        <GitBranch />
+                                        <span>Database Integration</span>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            )}
+                            {isAdmin && (
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton href="/dashboard/remote" isActive={pathname === '/dashboard/remote'} tooltip="Remote Integration">
+                                        <GitBranch />
+                                        <span>Remote Integration</span>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            )}
+                            {isAdmin && (
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton href="/dashboard/system-config" isActive={pathname === '/dashboard/system-config'} tooltip="System Config">
+                                        <Settings />
+                                        <span>System Config</span>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            )}
+                            {isAdmin && (
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton href="/dashboard/module-settings" isActive={pathname === '/dashboard/module-settings'} tooltip="Module Settings">
+                                        <Layers />
+                                        <span>Module Settings</span>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            )}
+                            {isAdmin && (
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton href="/dashboard/schema" isActive={pathname === '/dashboard/schema'} tooltip="Schema & Models">
+                                        <FileCode />
+                                        <span>Schema & Models</span>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            )}
+                            {isAdmin && (
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton href="/dashboard/reports/configure" isActive={pathname === '/dashboard/reports/configure'} tooltip="Report Configuration">
+                                        <FileText />
+                                        <span>Report Configuration</span>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            )}
                             <SidebarMenuItem>
                                 <SidebarMenuButton href="/dashboard/ssd-audit" isActive={pathname === '/dashboard/ssd-audit'} tooltip="Startup Steroid Audit">
                                     <Activity />
                                     <span>Startup Steroid Audit</span>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
-                            <SidebarMenuItem>
-                                <SidebarMenuButton href="/dashboard/evaluation/modules" isActive={pathname.startsWith('/analysis/modules')} tooltip="Complete Admin Config">
-                                    <Settings />
-                                    <span>Module Control Deck</span>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
+                            {isAdmin && (
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton href="/dashboard/evaluation/modules" isActive={pathname.startsWith('/analysis/modules')} tooltip="Complete Admin Config">
+                                        <Settings />
+                                        <span>Module Control Deck</span>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            )}
                         </SidebarMenu>
                     </SidebarGroup>
                 </>

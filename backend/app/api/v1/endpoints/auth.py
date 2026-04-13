@@ -757,6 +757,13 @@ class AcceptInviteRequest(BaseModel):
         return v
 
 
+class CompleteInviteRequest(BaseModel):
+    """Request model for completing an invitation (simplified frontend version)"""
+    token: str
+    password: str = Field(..., min_length=8)
+    full_name: Optional[str] = None
+
+
 @router.post("/invite", response_model=InviteResponse)
 async def invite_user(
     request: Request,
@@ -984,6 +991,19 @@ async def accept_invite(
         
         logger.info(f"User {accept_data.username} accepted invite as {token_data['role']}")
         
+        # Send welcome email to the new user
+        try:
+            email_sent = await send_welcome_email(
+                to_email=token_data['email'],
+                username=accept_data.username
+            )
+            if email_sent:
+                logger.info(f"Welcome email sent to {token_data['email']}")
+            else:
+                logger.warning(f"Failed to send welcome email to {token_data['email']} - email service may not be configured")
+        except Exception as email_error:
+            logger.error(f"Error sending welcome email: {email_error}")
+        
         return UserResponse(**created_user)
         
     except HTTPException:
@@ -994,6 +1014,172 @@ async def accept_invite(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error creating account"
         )
+
+
+@router.post("/complete-invite", response_model=UserResponse)
+async def complete_invite(
+    request: Request,
+    complete_data: CompleteInviteRequest,
+    db: asyncpg.Connection = Depends(get_db)
+):
+    """
+    Complete an invitation and create an admin/analyst account (simplified version)
+    
+    This endpoint is compatible with the frontend signup form for invites.
+    Username is auto-generated from the invitation email.
+    
+    - **token**: The invitation token received
+    - **password**: Password (minimum 8 characters with complexity requirements)
+    - **full_name**: Optional full name
+    """
+    # Get client info for logging
+    client_ip = request.client.host if request.client else "unknown"
+    user_agent = request.headers.get("user-agent", "unknown")
+    
+    try:
+        # Validate the invite token
+        token_data = invite_tokens.get(complete_data.token)
+        
+        if not token_data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired invitation token"
+            )
+        
+        # Check if token has expired
+        if datetime.utcnow() > token_data['expires_at']:
+            del invite_tokens[complete_data.token]
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invitation token has expired"
+            )
+        
+        # Generate username from email
+        email = token_data['email']
+        username = email.split('@')[0].replace('.', '_').replace('-', '_')[:50]
+        
+        # Validate password strength
+        is_valid, errors = PasswordPolicy.validate(
+            complete_data.password,
+            username=username,
+            email=email
+        )
+        if not is_valid:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={"password_errors": errors}
+            )
+        
+        # Check if username already exists
+        existing_user = await db.fetchrow(
+            "SELECT id FROM users WHERE username = $1 OR email = $2",
+            username, email
+        )
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Account already exists for this email"
+            )
+        
+        # Hash password and create user
+        hashed_password = get_password_hash(complete_data.password)
+        
+        # Insert new user with role from invite
+        user_id = await db.fetchval(
+            """
+            INSERT INTO users (username, email, password_hash, role, is_active, created_at)
+            VALUES ($1, $2, $3, $4, true, NOW())
+            RETURNING id
+            """,
+            username, email, hashed_password, token_data['role']
+        )
+        
+        # Remove used token
+        del invite_tokens[complete_data.token]
+        
+        # Fetch created user
+        created_user_row = await db.fetchrow(
+            """
+            SELECT id, username, email, role, is_active, created_at, updated_at
+            FROM users WHERE id = $1
+            """, user_id
+        )
+        created_user = dict(created_user_row)
+        created_user['full_name'] = complete_data.full_name
+        
+        # Log successful account creation
+        await audit_logger.log(
+            AuditEventType.USER_CREATED,
+            user_id=user_id,
+            username=username,
+            ip_address=client_ip,
+            user_agent=user_agent,
+            action_details={
+                "email": email,
+                "role": token_data['role'],
+                "method": "invitation"
+            },
+            success=True,
+            db=db
+        )
+        
+        logger.info(f"User {username} completed invite as {token_data['role']}")
+        
+        # Send welcome email
+        try:
+            email_sent = await send_welcome_email(
+                to_email=email,
+                username=username
+            )
+            if email_sent:
+                logger.info(f"Welcome email sent to {email}")
+        except Exception as email_error:
+            logger.error(f"Error sending welcome email: {email_error}")
+        
+        return UserResponse(**created_user)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error completing invite: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error creating account"
+        )
+
+
+@router.get("/validate-invite")
+async def validate_invite_query(token: str = Query(..., description="The invitation token to validate")):
+    """
+    Validate an invitation token using query parameter (frontend compatibility)
+    
+    - **token**: The invitation token to validate (as query param)
+    
+    Returns the email and role for the invitation.
+    """
+    token_data = invite_tokens.get(token)
+    
+    if not token_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid invitation token"
+        )
+    
+    if datetime.utcnow() > token_data['expires_at']:
+        # Remove expired token
+        del invite_tokens[token]
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invitation token has expired"
+        )
+    
+    # Return full email for the signup form (frontend needs it to pre-fill)
+    return {
+        "valid": True,
+        "email": token_data['email'],
+        "role": token_data['role'],
+        "invited_by": token_data['invited_by_username']
+    }
 
 
 @router.get("/invite/validate/{token}")
