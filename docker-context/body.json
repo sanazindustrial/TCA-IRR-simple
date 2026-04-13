@@ -1,0 +1,9 @@
+﻿{
+    "properties":  {
+                       "isMain":  true,
+                       "userName":  "tcairrresgistry",
+                       "authType":  "UserCredentials",
+                       "inheritAppSettingsAndConnectionStrings":  true,
+                       "image":  "tcairrresgistry-a4bahwbpegfve2gq.azurecr.io/tca-irr-api:latest"
+                   }
+}

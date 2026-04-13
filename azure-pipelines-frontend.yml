@@ -1,0 +1,161 @@
+# Azure DevOps Pipeline for TCA-IRR Frontend
+# Builds and deploys Next.js standalone frontend to Azure App Service
+#
+# IMPORTANT: Uses Next.js standalone output mode - server.js is pre-built, no npm install needed at runtime
+#
+# SETUP:
+# 1. Create pipeline from this YAML file
+# 2. Set variables WEBAPP_DEPLOY_USER_FRONTEND and WEBAPP_DEPLOY_PASS_FRONTEND
+#    Get from: Azure Portal > TCA-IRR App Service > Deployment Center > FTPS credentials
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - src/**
+      - public/**
+      - package.json
+      - next.config.ts
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  appServiceName: tca-irr
+  nodeVersion: 20.x
+
+stages:
+  - stage: Build
+    displayName: Build Standalone Package
+    jobs:
+      - job: BuildApp
+        displayName: Build Next.js Standalone
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: $(nodeVersion)
+            displayName: Use Node.js
+
+          - script: npm ci --legacy-peer-deps
+            displayName: Install Dependencies
+
+          - script: npm run build
+            env:
+              NEXT_PUBLIC_API_URL: https://tcairrapiccontainer.azurewebsites.net
+            displayName: Build Application (standalone)
+
+          - script: |
+              set -ex
+              echo "=== Preparing standalone deployment package ==="
+              
+              # The standalone build creates server.js and node_modules in .next/standalone
+              if [ ! -d ".next/standalone" ]; then
+                echo "ERROR: .next/standalone not found! Check next.config.ts has output: 'standalone'"
+                exit 1
+              fi
+              
+              mkdir -p deploy-package
+              
+              # Copy standalone build (includes server.js and node_modules)
+              cp -r .next/standalone/. deploy-package/
+              
+              # Copy static files to correct location
+              if [ -d ".next/static" ]; then
+                mkdir -p deploy-package/.next/static
+                cp -r .next/static/. deploy-package/.next/static/
+              fi
+              
+              # Copy public folder
+              if [ -d "public" ]; then
+                cp -r public deploy-package/public
+              fi
+              
+              # Copy env files
+              cp .env.production deploy-package/.env.production 2>/dev/null || true
+              cp .env deploy-package/.env 2>/dev/null || true
+              
+              # Create basic package.json for Azure
+              cat > deploy-package/package.json << 'EOF'
+              {"name":"tca-irr","version":"1.0.0","scripts":{"start":"node server.js"}}
+              EOF
+              
+              echo "=== Standalone package structure ==="
+              ls -la deploy-package/
+              echo "=== Verifying server.js exists ==="
+              test -f deploy-package/server.js || { echo "ERROR: server.js missing!"; exit 1; }
+              echo "SUCCESS: server.js found"
+            displayName: Prepare Standalone Deployment
+
+          - script: |
+              cd deploy-package
+              zip -r ../frontend_deploy.zip .
+              cd ..
+              ls -la frontend_deploy.zip
+            displayName: Create ZIP Package
+
+          - publish: frontend_deploy.zip
+            artifact: frontend
+
+  - stage: Deploy
+    displayName: Deploy to Azure
+    dependsOn: Build
+    condition: succeeded()
+    jobs:
+      - job: DeployApp
+        displayName: Deploy to App Service
+        steps:
+          - download: current
+            artifact: frontend
+
+          - script: |
+              DEPLOY_USER="${WEBAPP_DEPLOY_USER_FRONTEND}"
+              DEPLOY_PASS="${WEBAPP_DEPLOY_PASS_FRONTEND}"
+              
+              if [ -z "$DEPLOY_USER" ] || [ -z "$DEPLOY_PASS" ]; then
+                echo "##[error]Deployment credentials not configured!"
+                echo "##[error]Set pipeline variables: WEBAPP_DEPLOY_USER_FRONTEND, WEBAPP_DEPLOY_PASS_FRONTEND"
+                echo "##[error]Get credentials from Azure Portal > TCA-IRR > Deployment Center > FTPS credentials"
+                exit 1
+              fi
+              
+              echo "Deploying to Azure App Service..."
+              curl -X POST \
+                -u "$DEPLOY_USER:$DEPLOY_PASS" \
+                --data-binary @$(Pipeline.Workspace)/frontend/frontend_deploy.zip \
+                -H "Content-Type: application/zip" \
+                "https://$(appServiceName).scm.azurewebsites.net/api/zipdeploy?isAsync=false" \
+                --fail --show-error --verbose
+              echo ""
+              echo "Deployment complete!"
+            displayName: ZIP Deploy via Kudu
+            env:
+              WEBAPP_DEPLOY_USER_FRONTEND: $(WEBAPP_DEPLOY_USER_FRONTEND)
+              WEBAPP_DEPLOY_PASS_FRONTEND: $(WEBAPP_DEPLOY_PASS_FRONTEND)
+
+  - stage: Verify
+    displayName: Verify Deployment
+    dependsOn: Deploy
+    condition: succeeded()
+    jobs:
+      - job: HealthCheck
+        displayName: Health Check
+        steps:
+          - script: |
+              echo "Waiting 30 seconds for app restart..."
+              sleep 30
+              
+              echo "Checking application health..."
+              HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://$(appServiceName).azurewebsites.net" || echo "000")
+              if [ "$HTTP_STATUS" = "200" ] || [ "$HTTP_STATUS" = "302" ]; then
+                echo "##[section]Frontend healthy (HTTP $HTTP_STATUS)"
+                echo "##################################################"
+                echo "#      DEPLOYMENT SUCCESSFUL!                   #"
+                echo "#      URL: https://$(appServiceName).azurewebsites.net"
+                echo "##################################################"
+              else
+                echo "##[warning]Frontend returned HTTP $HTTP_STATUS"
+                echo "App may still be starting up - check URL manually"
+              fi
+            displayName: Check Health

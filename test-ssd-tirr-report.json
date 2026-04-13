@@ -1,0 +1,28 @@
+{
+  "suite": "SSD-TIRR Integration",
+  "timestamp": "2026-03-18T19:57:57.578Z",
+  "passed": 56,
+  "failed": 0,
+  "warnings": 0,
+  "total": 56,
+  "success_rate": "100.0%",
+  "results": {
+    "health": 200,
+    "submit": {
+      "status": 202,
+      "tracking_id": "e2964646-8b8d-46d0-a840-c892b16744f0",
+      "elapsed": 410
+    },
+    "poll": {
+      "status": "completed",
+      "trackingId": "e2964646-8b8d-46d0-a840-c892b16744f0"
+    },
+    "report": {
+      "score": 8.5,
+      "recommendation": "INVEST",
+      "pages": 10
+    },
+    "validation": "tested",
+    "persistence": "verified"
+  }
+}
