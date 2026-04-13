@@ -6,7 +6,7 @@ base_url = 'https://tca-irr.azurewebsites.net'
 pages = [
     '/dashboard',
     '/dashboard/users',
-    '/dashboard/user-requests', 
+    '/dashboard/user-requests',
     '/dashboard/my-requests',
     '/dashboard/analyst',
     '/dashboard/evaluation',
@@ -31,6 +31,7 @@ print(f"Testing {len(pages)} pages...\n")
 print("=== Checking CSS ===")
 r = requests.get(base_url, timeout=30)
 import re
+
 css_match = re.search(r'href="(/_next/static/css/[^"]+\.css)"', r.text)
 if css_match:
     css_url = base_url + css_match.group(1)
@@ -44,7 +45,9 @@ else:
 print("=== Testing Pages ===")
 for page in pages:
     try:
-        resp = requests.get(f'{base_url}{page}', timeout=15, allow_redirects=True)
+        resp = requests.get(f'{base_url}{page}',
+                            timeout=15,
+                            allow_redirects=True)
         status = "OK" if resp.status_code == 200 else f"ERROR {resp.status_code}"
         print(f"{page}: {status}")
     except Exception as e:
