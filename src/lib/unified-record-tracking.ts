@@ -81,7 +81,7 @@ export interface UnifiedRecord {
   // Report data
   report?: {
     reportId: string;
-    reportType: 'triage' | 'dd';
+    reportType: 'triage' | 'dd' | 'ssd';
     version: number;
     generatedAt: string;
     status: 'generating' | 'completed' | 'failed';
@@ -172,8 +172,8 @@ export function generateCompanyId(companyName?: string): string {
   return `${prefix}-${timestamp}-${random}`;
 }
 
-export function generateReportId(reportType: 'triage' | 'dd'): string {
-  const prefix = reportType === 'dd' ? 'DD' : 'TR';
+export function generateReportId(reportType: 'triage' | 'dd' | 'ssd'): string {
+  const prefix = reportType === 'dd' ? 'DD' : reportType === 'ssd' ? 'SSD' : 'TR';
   const timestamp = Date.now().toString(36).toUpperCase();
   const random = Math.random().toString(36).substring(2, 6).toUpperCase();
   return `RPT-${prefix}-${timestamp}-${random}`;

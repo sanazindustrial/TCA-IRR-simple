@@ -116,15 +116,15 @@ export interface VersionComparison {
 
 // Default module definitions for reference
 export const MODULE_DEFINITIONS = {
-    tca: { name: 'TCA Scorecard', description: 'Core technology capability assessment', weight: 20 },
-    risk: { name: 'Risk Assessment', description: 'Risk factors and mitigation analysis', weight: 15 },
-    macro: { name: 'Macro Trend Analysis', description: 'PESTEL framework analysis', weight: 10 },
-    benchmark: { name: 'Benchmark Comparison', description: 'Industry benchmark overlay', weight: 10 },
-    growth: { name: 'Growth Classification', description: 'Growth trajectory analysis', weight: 10 },
-    gap: { name: 'Gap Analysis', description: 'Capability gap heatmap', weight: 10 },
-    founderFit: { name: 'Founder Fit Analysis', description: 'Funding readiness assessment', weight: 10 },
-    team: { name: 'Team Assessment', description: 'Team effectiveness evaluation', weight: 10 },
-    strategicFit: { name: 'Strategic Fit Matrix', description: 'Strategic alignment scoring', weight: 5 },
+    tca: { name: 'TCA Scorecard', description: 'Core technology capability assessment', weight: 20, version: '2.1' },
+    risk: { name: 'Risk Flags', description: 'Risk analysis across 14 domains', weight: 15, version: '1.8' },
+    macro: { name: 'Macro Trend Alignment', description: 'PESTEL analysis and trend scores', weight: 10, version: '1.2' },
+    benchmark: { name: 'Benchmark Comparison', description: 'Performance vs. sector averages', weight: 10, version: '1.5' },
+    growth: { name: 'Growth Classifier', description: 'Predict growth potential', weight: 10, version: '3.1' },
+    gap: { name: 'Gap Analysis', description: 'Identify performance gaps', weight: 10, version: '2.0' },
+    funderFit: { name: 'Funder Fit Analysis', description: 'Investor matching & readiness', weight: 10, version: '1.0' },
+    team: { name: 'Team Assessment', description: 'Analyze founder and team strength', weight: 10, version: '1.4' },
+    strategicFit: { name: 'Strategic Fit Matrix', description: 'Align with strategic pathways', weight: 5, version: '1.1' },
 };
 
 // Default 12 TCA categories

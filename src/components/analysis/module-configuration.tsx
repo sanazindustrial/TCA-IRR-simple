@@ -18,28 +18,41 @@ export type ModuleConfig = {
   name: string;
   description: string;
   status: 'active' | 'inactive';
+  version?: string;
   category?: 'core' | 'analysis' | 'specialized' | 'review' | 'medtech' | 'strategic' | 'compliance';
   requiredRole?: ('user' | 'admin' | 'analyst')[];
   reportTypes?: ('triage' | 'dd')[];
   frameworks?: ('general' | 'medtech')[];
 };
 
-export type ReportType = 'triage' | 'dd' | 'comprehensive';
+export type ReportType = 'triage' | 'dd' | 'ssd' | 'comprehensive';
 export type ModuleReportType = 'triage' | 'dd';
 export type Framework = 'general' | 'medtech';
 
 type Module = ModuleConfig;
 
 const generalModules: Module[] = [
-  { id: 'tca', name: 'TCA Scorecard', description: 'Central evaluation across fundamental categories.', status: 'active' },
-  { id: 'risk', name: 'Risk Assessment', description: 'Risk analysis across 14 domains.', status: 'active' },
-  { id: 'benchmark', name: 'Benchmark Comparison', description: 'Performance vs. sector averages.', status: 'active' },
+  { id: 'tca', name: 'TCA Scorecard', description: 'Central evaluation across fundamental categories.', status: 'active', version: '2.1' },
+  { id: 'risk', name: 'Risk Flags', description: 'Risk analysis across 14 domains.', status: 'active', version: '1.8' },
+  { id: 'benchmark', name: 'Benchmark Comparison', description: 'Performance vs. sector averages.', status: 'active', version: '1.5' },
+  { id: 'macro', name: 'Macro Trend Alignment', description: 'PESTEL analysis and trend scores.', status: 'active', version: '1.2' },
+  { id: 'gap', name: 'Gap Analysis', description: 'Identify performance gaps.', status: 'active', version: '2.0' },
+  { id: 'growth', name: 'Growth Classifier', description: 'Predict growth potential.', status: 'active', version: '3.1' },
+  { id: 'funderFit', name: 'Funder Fit Analysis', description: 'Investor matching & readiness.', status: 'active', version: '1.0' },
+  { id: 'team', name: 'Team Assessment', description: 'Analyze founder and team strength.', status: 'active', version: '1.4' },
+  { id: 'strategicFit', name: 'Strategic Fit Matrix', description: 'Align with strategic pathways.', status: 'active', version: '1.1' },
 ];
 
 const medtechModules: Module[] = [
-  { id: 'tca', name: 'TCA Scorecard (MedTech)', description: 'MedTech-focused category evaluation.', status: 'active' },
-  { id: 'risk', name: 'Risk Flags (Regulatory Focus)', description: 'Regulatory and compliance risk.', status: 'active' },
-  { id: 'benchmark', name: 'Clinical Trial Benchmark', description: 'Compare against clinical trial data.', status: 'active' },
+  { id: 'tca', name: 'TCA Scorecard (MedTech)', description: 'MedTech-focused category evaluation.', status: 'active', version: '2.1' },
+  { id: 'risk', name: 'Risk Flags (Regulatory)', description: 'Regulatory and compliance risk analysis.', status: 'active', version: '1.8' },
+  { id: 'benchmark', name: 'Clinical Benchmark', description: 'Compare against clinical trial data.', status: 'active', version: '1.5' },
+  { id: 'macro', name: 'Macro Trend Alignment', description: 'PESTEL analysis and FDA trends.', status: 'active', version: '1.2' },
+  { id: 'gap', name: 'Gap Analysis', description: 'Clinical/Regulatory performance gaps.', status: 'active', version: '2.0' },
+  { id: 'growth', name: 'Growth Classifier', description: 'MedTech growth potential prediction.', status: 'active', version: '3.1' },
+  { id: 'funderFit', name: 'Funder Fit Analysis', description: 'HealthTech investor matching.', status: 'active', version: '1.0' },
+  { id: 'team', name: 'Team Assessment', description: 'Medical/Technical team evaluation.', status: 'active', version: '1.4' },
+  { id: 'strategicFit', name: 'Strategic Fit Matrix', description: 'MedTech strategic pathways.', status: 'active', version: '1.1' },
 ];
 
 type ModuleConfigurationProps = {

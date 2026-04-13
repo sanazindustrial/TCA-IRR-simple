@@ -36,12 +36,12 @@ import {
 
 const allModules = [
     { id: 'tca', name: 'TCA Scorecard', description: 'Central evaluation across fundamental categories.', status: 'active', version: '2.1', link: '/dashboard/evaluation/modules/tca' },
-    { id: 'risk', name: 'Risk Assessment', description: 'Risk analysis across 14 domains.', status: 'active', version: '1.8', link: '/dashboard/evaluation/modules/risk' },
+    { id: 'risk', name: 'Risk Flags', description: 'Risk analysis across 14 domains.', status: 'active', version: '1.8', link: '/dashboard/evaluation/modules/risk' },
     { id: 'benchmark', name: 'Benchmark Comparison', description: 'Performance vs. sector averages.', status: 'active', version: '1.5', link: '/dashboard/evaluation/modules/benchmark' },
-    { id: 'macro', name: 'Macro Trend Analysis', description: 'PESTEL analysis and trend scores.', status: 'active', version: '1.2', link: '/dashboard/evaluation/modules/macro' },
+    { id: 'macro', name: 'Macro Trend Alignment', description: 'PESTEL analysis and trend scores.', status: 'active', version: '1.2', link: '/dashboard/evaluation/modules/macro' },
     { id: 'gap', name: 'Gap Analysis', description: 'Identify performance gaps.', status: 'active', version: '2.0', link: '/dashboard/evaluation/modules/gap' },
-    { id: 'growth', name: 'Growth Classification', description: 'Predict growth potential.', status: 'active', version: '3.1', link: '/dashboard/evaluation/modules/growth' },
-    { id: 'founderFit', name: 'Founder Fit Analysis', description: 'Investor matching & readiness.', status: 'active', version: '1.0', link: '/dashboard/evaluation/modules/founderFit' },
+    { id: 'growth', name: 'Growth Classifier', description: 'Predict growth potential.', status: 'active', version: '3.1', link: '/dashboard/evaluation/modules/growth' },
+    { id: 'funderFit', name: 'Funder Fit Analysis', description: 'Investor matching & readiness.', status: 'active', version: '1.0', link: '/dashboard/evaluation/modules/funderFit' },
     { id: 'team', name: 'Team Assessment', description: 'Analyze founder and team strength.', status: 'active', version: '1.4', link: '/dashboard/evaluation/modules/team' },
     { id: 'strategicFit', name: 'Strategic Fit Matrix', description: 'Align with strategic pathways.', status: 'active', version: '1.1', link: '/dashboard/evaluation/modules/strategicFit' },
 ];

@@ -188,13 +188,13 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
                                     <SidebarMenuSubItem>
                                         <SidebarMenuSubButton href="/analysis/modules/risk" isActive={pathname === '/analysis/modules/risk'}>
                                             <Shield className="size-4" />
-                                            <span>Risk Assessment</span>
+                                            <span>Risk Flags</span>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
                                     <SidebarMenuSubItem>
                                         <SidebarMenuSubButton href="/analysis/modules/macro" isActive={pathname === '/analysis/modules/macro'}>
                                             <TrendingUp className="size-4" />
-                                            <span>Macro Trend Analysis</span>
+                                            <span>Macro Trend Alignment</span>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
                                     <SidebarMenuSubItem>
@@ -222,9 +222,9 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
                                     <SidebarMenuSubItem>
-                                        <SidebarMenuSubButton href="/analysis/modules/founderFit" isActive={pathname === '/analysis/modules/founderFit'}>
+                                        <SidebarMenuSubButton href="/analysis/modules/funderFit" isActive={pathname === '/analysis/modules/funderFit'}>
                                             <UserIcon className="size-4" />
-                                            <span>Founder Fit Analysis</span>
+                                            <span>Funder Fit Analysis</span>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
                                     <SidebarMenuSubItem>

@@ -68,7 +68,7 @@ interface LocalStoredReport {
   companyId?: string;        // Company ID
   userId: string;
   companyName: string;
-  reportType: 'triage' | 'dd';
+  reportType: 'triage' | 'dd' | 'ssd';
   framework: 'general' | 'medtech';
   data: any;
   createdAt: string;
@@ -106,7 +106,7 @@ function getLocalStorageReports(): Report[] {
         evaluationId: r.evaluationId,
         companyId: r.companyId,
         company: r.companyName || 'Unnamed Company',
-        type: r.reportType === 'dd' ? 'Due Diligence' : 'Triage',
+        type: r.reportType === 'dd' ? 'Due Diligence' : r.reportType === 'ssd' ? 'SSD Report' : 'Triage',
         status: r.metadata?.status === 'completed' ? 'Completed' : 'Draft',
         approval: 'Pending',
         score: score,
@@ -205,6 +205,7 @@ const approvalStatusColors: { [key: string]: string } = {
   'Approved': 'bg-sky-500/20 text-sky-500',
   'Pending': 'bg-yellow-500/20 text-yellow-500',
   'Due Diligence': 'bg-blue-500/20 text-blue-500',
+  'SSD Report': 'bg-purple-500/20 text-purple-500',
   'Rejected': 'bg-red-500/20 text-red-500',
   'Invested': 'bg-green-500/20 text-green-500',
 };
@@ -330,7 +331,7 @@ export default function ReportsPage() {
                 const report: Report = {
                   id: record.id?.evaluationId || record.evaluationId || `pending-${Date.now()}-${Math.random().toString(36).substring(7)}`,
                   company: record.company?.name || record.companyName || record.company_name || 'Unknown',
-                  type: record.report?.reportType === 'dd' ? 'Due Diligence' : 'Triage',
+                  type: record.report?.reportType === 'dd' ? 'Due Diligence' : record.report?.reportType === 'ssd' ? 'SSD Report' : 'Triage',
                   status: 'Pending Sync',
                   approval: 'Pending',
                   score: record.analysis?.overallScore || record.score || 0,
@@ -366,7 +367,7 @@ export default function ReportsPage() {
                 const report: Report = {
                   id: record.id?.evaluationId || `unified-${Date.now()}`,
                   company: record.company?.name || 'Unknown',
-                  type: record.report?.reportType === 'dd' ? 'Due Diligence' : 'Triage',
+                  type: record.report?.reportType === 'dd' ? 'Due Diligence' : record.report?.reportType === 'ssd' ? 'SSD Report' : 'Triage',
                   status: 'Pending Sync',
                   approval: record.workflow?.reviewerApproval?.status || 'Pending',
                   score: record.analysis?.overallScore || 0,
@@ -898,6 +899,7 @@ export default function ReportsPage() {
                 <>
                   <TabsTrigger value="all">All Reports ({reportsForUser.length})</TabsTrigger>
                   <TabsTrigger value="due-diligence">Due Diligence ({allReports.filter(r => r.type === 'Due Diligence').length})</TabsTrigger>
+                  <TabsTrigger value="ssd">SSD ({allReports.filter(r => r.type === 'SSD Report').length})</TabsTrigger>
                   <TabsTrigger value="pending">Pending Approval ({pendingReports.length})</TabsTrigger>
                   {pendingSyncCount > 0 && (
                     <TabsTrigger value="pending-sync" className="text-yellow-600">
@@ -948,6 +950,7 @@ export default function ReportsPage() {
                       <SelectItem value="all">All Types</SelectItem>
                       <SelectItem value="triage">Triage</SelectItem>
                       <SelectItem value="dd">Due Diligence</SelectItem>
+                      <SelectItem value="ssd">SSD Report</SelectItem>
                     </SelectContent>
                   </Select>
                 </>
@@ -1001,6 +1004,33 @@ export default function ReportsPage() {
                         <Button asChild className="bg-blue-600 hover:bg-blue-700">
                           <Link href="/dashboard/reports/due-diligence">
                             <FileUp className="mr-2 size-4" /> Start Due Diligence Analysis
+                          </Link>
+                        </Button>
+                      </div>
+                    </Card>
+                  )}
+              </TabsContent>
+              <TabsContent value="ssd" className="space-y-4">
+                {allReports.filter(r => r.type === 'SSD Report').length > 0
+                  ? allReports.filter(r => r.type === 'SSD Report').map(report => (
+                    <ReportCard
+                      key={report.id}
+                      report={report}
+                      isPrivileged={isPrivilegedUser}
+                      onViewVersions={typeof report.id === 'number' ? () => viewReportVersions(report.id as number, report.company) : undefined}
+                    />
+                  ))
+                  : (
+                    <Card className="p-8 text-center">
+                      <div className="flex flex-col items-center gap-4">
+                        <FileText className="size-12 text-muted-foreground" />
+                        <div>
+                          <h3 className="text-lg font-semibold">No SSD Reports</h3>
+                          <p className="text-muted-foreground mb-4">Start an SSD analysis for specialized startup screening and diagnostics.</p>
+                        </div>
+                        <Button asChild className="bg-purple-600 hover:bg-purple-700">
+                          <Link href="/dashboard/reports/ssd">
+                            <FileUp className="mr-2 size-4" /> Start SSD Analysis
                           </Link>
                         </Button>
                       </div>
