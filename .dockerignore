@@ -1,0 +1,40 @@
+# Ignore everything by default
+*
+
+# Only include what's needed for the backend
+!main.py
+!launch.py
+!ai_integration.py
+!database_config.py
+!init_db.py
+!ssd_tirr_report_config.py
+!requirements.txt
+!dockerfile
+
+# Include backend folder if needed
+!backend/
+backend/**/__pycache__/
+backend/**/*.pyc
+
+# Explicitly exclude large directories
+node_modules/
+.venv/
+venv/
+.git/
+.next/
+frontend/
+src/
+*.zip
+*.tar.gz
+*.log
+*.db
+*.sqlite3
+reports/
+uploads/
+.pytest_cache/
+.mypy_cache/
+htmlcov/
+coverage/
+build/
+dist/
+__pycache__/

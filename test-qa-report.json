@@ -1,0 +1,225 @@
+{
+  "meta": {
+    "date": "2026-02-18T04:48:12.371Z",
+    "target": "http://localhost:8000",
+    "elapsed": "18.0s",
+    "nodeVersion": "v22.17.0"
+  },
+  "summary": {
+    "passed": 123,
+    "failed": 0,
+    "skipped": 0,
+    "warnings": 2,
+    "bugsFound": 3,
+    "total": 123
+  },
+  "results": {
+    "environment": {
+      "root": 200,
+      "health": 200,
+      "db": "tca_platform",
+      "tables": 22,
+      "avgMs": "203"
+    },
+    "auth": {
+      "register": 200,
+      "login": 200,
+      "hasToken": true,
+      "meStatus": 200
+    },
+    "upload": {
+      "uploadId": "7ca03864-0f74-4271-aaa4-4a1588df23b0",
+      "status": 200,
+      "precision": "tested"
+    },
+    "analysis": {
+      "score": 8.9,
+      "recommendation": "STRONG BUY â€” High confidence investment opportunity",
+      "modules": 9,
+      "elapsed": 1522
+    },
+    "reports": {
+      "triage": 200,
+      "dd": 200
+    },
+    "requests": {
+      "create": 200,
+      "list": 200
+    },
+    "edgeCases": {
+      "malformedJson": "tested",
+      "longName": "tested",
+      "negative": "tested",
+      "zero": "tested",
+      "concurrent": true
+    },
+    "security": {
+      "sqlInjection": "tested",
+      "authBypass": "tested",
+      "pathTraversal": "tested"
+    },
+    "comparative": {
+      "strongScore": 8.9,
+      "weakScore": 4.8
+    }
+  },
+  "bugs": [
+    {
+      "id": "DATA-002",
+      "severity": "MEDIUM",
+      "area": "Upload",
+      "title": "Empty text upload accepted without validation",
+      "detail": "Status 200",
+      "steps": "POST /api/text/submit with empty company_name and text",
+      "timestamp": "2026-02-18T04:47:59.437Z"
+    },
+    {
+      "id": "SEC-001",
+      "severity": "HIGH",
+      "area": "Upload",
+      "title": "XSS payload stored without sanitization",
+      "detail": "Script tags in company_name stored as-is",
+      "steps": "Upload company_name with <script> tag",
+      "timestamp": "2026-02-18T04:47:59.653Z"
+    },
+    {
+      "id": "EDGE-002",
+      "severity": "LOW",
+      "area": "EdgeCases",
+      "title": "No max length on company_name",
+      "detail": "Accepted 10000 chars",
+      "steps": "POST /api/text/submit with 10000-char name",
+      "timestamp": "2026-02-18T04:48:02.748Z"
+    }
+  ],
+  "testMatrix": {
+    "areas": [
+      {
+        "area": "Environment & Infrastructure",
+        "tests": 8,
+        "coverage": [
+          "health",
+          "DB connection",
+          "CORS",
+          "response time",
+          "404 handling"
+        ]
+      },
+      {
+        "area": "Authentication & Authorization",
+        "tests": 10,
+        "coverage": [
+          "register",
+          "duplicate email",
+          "login",
+          "wrong password",
+          "JWT validation",
+          "auth bypass",
+          "empty password"
+        ]
+      },
+      {
+        "area": "Data Upload & Storage",
+        "tests": 15,
+        "coverage": [
+          "text upload",
+          "DB precision (9 fields)",
+          "list uploads",
+          "empty upload",
+          "special chars",
+          "non-existent ID",
+          "invalid UUID"
+        ]
+      },
+      {
+        "area": "9-Module Analysis Engine",
+        "tests": 25,
+        "coverage": [
+          "financial",
+          "market",
+          "team",
+          "technology",
+          "risk",
+          "business model",
+          "growth",
+          "investment readiness",
+          "TCA scorecard",
+          "DB persistence",
+          "weighted average"
+        ]
+      },
+      {
+        "area": "Report Generation",
+        "tests": 5,
+        "coverage": [
+          "triage report",
+          "DD report",
+          "empty uploads",
+          "invalid uploads"
+        ]
+      },
+      {
+        "area": "Request Management",
+        "tests": 3,
+        "coverage": [
+          "create request",
+          "list requests",
+          "auth protection"
+        ]
+      },
+      {
+        "area": "Edge Cases & Error Handling",
+        "tests": 8,
+        "coverage": [
+          "malformed JSON",
+          "long names",
+          "negative values",
+          "zero values",
+          "huge values",
+          "concurrent requests"
+        ]
+      },
+      {
+        "area": "Security Testing",
+        "tests": 8,
+        "coverage": [
+          "SQL injection (name)",
+          "SQL injection (text)",
+          "auth bypass",
+          "path traversal",
+          "method confusion"
+        ]
+      },
+      {
+        "area": "Comparative Analysis",
+        "tests": 7,
+        "coverage": [
+          "strong vs weak scoring",
+          "data precision",
+          "score differentiation"
+        ]
+      },
+      {
+        "area": "Cleanup & Integrity",
+        "tests": 5,
+        "coverage": [
+          "delete uploads",
+          "verify deletions",
+          "final health check"
+        ]
+      }
+    ],
+    "totalTestCases": 94,
+    "dataPoints": "All module scores derived from actual DB data, verified against input"
+  },
+  "moduleScores": {
+    "score": 8.9,
+    "recommendation": "STRONG BUY â€” High confidence investment opportunity",
+    "modules": 9,
+    "elapsed": 1522
+  },
+  "comparative": {
+    "strongScore": 8.9,
+    "weakScore": 4.8
+  }
+}
