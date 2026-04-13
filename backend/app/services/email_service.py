@@ -442,7 +442,8 @@ class EmailService:
         invited_by: str
     ) -> bool:
         """Send invitation email for admin/analyst accounts"""
-        invite_url = f"{self.settings.frontend_url}/accept-invite?token={invite_token}"
+        # Use /signup?token=xxx to match frontend signup page that handles invites
+        invite_url = f"{self.settings.frontend_url}/signup?token={invite_token}"
         role_display = role.capitalize()
         
         content = f"""

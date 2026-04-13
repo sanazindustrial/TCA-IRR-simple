@@ -605,7 +605,7 @@ export default function ReportsPage() {
       if (mergedReports.length === 0) {
         const mappedFallback: Report[] = fallbackReportsData.map((r, idx) => ({
           id: r.id,
-          reportId: `RPT-TR-DEMO${idx+1}`, // Demo report IDs
+          reportId: `RPT-TR-DEMO${idx + 1}`, // Demo report IDs
           company: r.company_name || r.company || '',
           type: r.type,
           status: r.status,
@@ -645,7 +645,7 @@ export default function ReportsPage() {
       // Fallback to local data
       const mappedFallback: Report[] = fallbackReportsData.map((r, idx) => ({
         id: r.id,
-        reportId: `RPT-TR-DEMO${idx+1}`, // Demo report IDs
+        reportId: `RPT-TR-DEMO${idx + 1}`, // Demo report IDs
         company: r.company_name || r.company || '',
         type: r.type,
         status: r.status,
