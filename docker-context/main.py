@@ -4,7 +4,7 @@ TCA IRR App Backend
 FastAPI backend server for the TCA Investment Risk Rating application
 """
 
-from fastapi import FastAPI, Depends, HTTPException, status, Request, BackgroundTasks, Body
+from fastapi import FastAPI, Depends, HTTPException, status, Request, BackgroundTasks, Body, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -14,7 +14,7 @@ import os
 import logging
 import uvicorn
 from typing import Optional, List, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import jwt
 import bcrypt
 import uuid
@@ -25,6 +25,9 @@ import json
 import httpx
 import secrets
 import hashlib
+import io
+import re
+from urllib.parse import urlparse
 
 # Import database configuration
 from database_config import db_manager, db_config
@@ -2962,7 +2965,7 @@ async def get_evaluation(evaluation_id: str,
 # Analysis endpoints
 @app.post("/api/analysis/comprehensive")
 async def run_comprehensive_analysis(request: Request):
-    """Run comprehensive TCA analysis"""
+    """Run comprehensive TCA analysis using real extracted data from allupload table"""
     try:
         # Parse request data
         data = await request.json()
@@ -2971,203 +2974,241 @@ async def run_comprehensive_analysis(request: Request):
         framework = data.get('framework', 'general')
         company_data = data.get('company_data', {})
         tca_input = data.get('tcaInput', {})
+        selected_modules = data.get('selected_modules', None)  # Optional: list of module IDs to run
+        
+        company_name = company_data.get('name', 'Unknown')
+        
+        logger.info(f"Running comprehensive analysis for framework: {framework}")
+        logger.info(f"Company: {company_name}")
 
-        logger.info(
-            f"Running comprehensive analysis for framework: {framework}")
-        logger.info(f"Company: {company_data.get('name', 'Unknown')}")
+        # ─── 1. Read uploads from allupload table ──────────────────────────────
+        merged_text = []
+        merged_data = {}
+        source_ids = []
+        
+        async with db_manager.get_connection() as conn:
+            # First try to get data by company name
+            rows = await conn.fetch(
+                """SELECT upload_id, source_type, file_name, extracted_text,
+                          extracted_data, company_name
+                   FROM allupload
+                   WHERE (company_name = $1 OR $1 = 'Unknown')
+                   ORDER BY created_at DESC LIMIT 20""", company_name)
+            
+            if rows:
+                for r in rows:
+                    source_ids.append(str(r["upload_id"]))
+                    if r["extracted_text"]:
+                        merged_text.append(r["extracted_text"])
+                    ed = r["extracted_data"]
+                    if isinstance(ed, str):
+                        try:
+                            ed = json.loads(ed)
+                        except Exception:
+                            ed = {}
+                    if isinstance(ed, dict):
+                        merged_data = {**merged_data, **ed}
+                    # Use company name from first row if available
+                    if r["company_name"] and company_name == "Unknown":
+                        company_name = r["company_name"]
+        
+        # Overlay any inline data from the request
+        if company_data.get('processed_data'):
+            pd = company_data['processed_data']
+            if pd.get('extracted_financials'):
+                merged_data['financial_data'] = {**merged_data.get('financial_data', {}), **pd['extracted_financials']}
+        
+        if tca_input.get('financials'):
+            merged_text.append(str(tca_input['financials']))
+        if tca_input.get('founderQuestionnaire'):
+            merged_text.append(str(tca_input['founderQuestionnaire']))
+        if tca_input.get('uploadedPitchDecks'):
+            merged_text.append(str(tca_input['uploadedPitchDecks']))
+        
+        company_analysis_data = {
+            "company_name": company_name,
+            "extracted_text": "\n".join(merged_text),
+            **merged_data,
+        }
+        
+        logger.info(f"Retrieved {len(source_ids)} uploads for analysis")
 
-        # Simulate analysis processing
-        await asyncio.sleep(2)  # Simulate processing time
+        # ─── 2. Determine which modules to run ──────────────────────────────────
+        modules_to_run = NINE_MODULES
+        if selected_modules and isinstance(selected_modules, list):
+            modules_to_run = [m for m in NINE_MODULES if m["id"] in selected_modules]
+            logger.info(f"Running {len(modules_to_run)} selected modules: {[m['id'] for m in modules_to_run]}")
 
-        # Generate comprehensive analysis results
-        analysis_result = {
-            "final_tca_score": 78.5,
-            "investment_recommendation": "Proceed with due diligence",
-            "scorecard": {
-                "categories": {
-                    "market_potential": {
-                        "name":
-                        "Market Potential",
-                        "raw_score":
-                        8.2,
-                        "weight":
-                        0.20,
-                        "weighted_score":
-                        16.4,
-                        "notes":
-                        "Strong market opportunity with clear value proposition"
-                    },
-                    "technology_innovation": {
-                        "name":
-                        "Technology Innovation",
-                        "raw_score":
-                        7.8,
-                        "weight":
-                        0.15,
-                        "weighted_score":
-                        11.7,
-                        "notes":
-                        "Solid technology foundation with competitive advantages"
-                    },
-                    "team_capability": {
-                        "name": "Team Capability",
-                        "raw_score": 8.0,
-                        "weight": 0.25,
-                        "weighted_score": 20.0,
-                        "notes":
-                        "Experienced team with relevant domain expertise"
-                    },
-                    "business_model": {
-                        "name": "Business Model",
-                        "raw_score": 7.5,
-                        "weight": 0.20,
-                        "weighted_score": 15.0,
-                        "notes": "Clear revenue model with growth potential"
-                    },
-                    "financial_health": {
-                        "name":
-                        "Financial Health",
-                        "raw_score":
-                        7.0,
-                        "weight":
-                        0.20,
-                        "weighted_score":
-                        14.0,
-                        "notes":
-                        "Adequate funding runway with reasonable burn rate"
-                    }
+        # ─── 3. Run modules and calculate scores ────────────────────────────────
+        await asyncio.sleep(1)  # Brief processing delay
+        
+        module_results = {}
+        total_weight = 0
+        weighted_score = 0
+        
+        for mod in modules_to_run:
+            result = _run_module(mod, company_analysis_data, merged_data)
+            score = result.get("score", 5.0)
+            w = mod["weight"]
+            result["weighted_score"] = round(score * w / 100, 2)
+            module_results[mod["id"]] = result
+            weighted_score += score * w
+            total_weight += w
+        
+        final_score = round(weighted_score / total_weight, 1) if total_weight > 0 else 5.0
+        
+        # ─── 4. Build comprehensive response ────────────────────────────────────
+        # Determine recommendation
+        if final_score >= 8.0:
+            recommendation = "Strong candidate - High confidence investment opportunity"
+        elif final_score >= 7.0:
+            recommendation = "Proceed with due diligence"
+        elif final_score >= 5.5:
+            recommendation = "Conditional - Address key risks before investing"
+        else:
+            recommendation = "Pass - Risk/reward profile not aligned"
+        
+        # Build TCA scorecard categories from module results
+        tca_result = module_results.get("tca", {})
+        scorecard_categories = {}
+        
+        # Use actual extracted categories if available
+        tca_categories = tca_result.get("categories", [])
+        if tca_categories:
+            for cat in tca_categories:
+                cat_id = cat.get("id", cat.get("category", "unknown")).lower().replace(" ", "_")
+                scorecard_categories[cat_id] = {
+                    "name": cat.get("category", cat.get("name", "Unknown")),
+                    "raw_score": cat.get("raw_score", cat.get("score", 7.0)),
+                    "weight": cat.get("weight", 0.1),
+                    "weighted_score": cat.get("weighted_score", cat.get("raw_score", 7.0) * cat.get("weight", 0.1)),
+                    "notes": cat.get("interpretation", cat.get("notes", f"Analysis for {cat.get('category', 'category')}"))
                 }
+        else:
+            # Generate from available module data
+            for mod_id, mod_result in module_results.items():
+                score = mod_result.get("score", 7.0)
+                mod_def = next((m for m in NINE_MODULES if m["id"] == mod_id), None)
+                weight = mod_def["weight"] / 100 if mod_def else 0.1
+                scorecard_categories[mod_id] = {
+                    "name": mod_def["name"] if mod_def else mod_id.title(),
+                    "raw_score": score,
+                    "weight": weight,
+                    "weighted_score": score * weight,
+                    "notes": mod_result.get("interpretation", f"Score based on extracted data analysis")
+                }
+        
+        # Build risk assessment from risk module
+        risk_result = module_results.get("risk", {})
+        risk_flags = {}
+        risk_domains = risk_result.get("risk_domains", risk_result.get("domains", []))
+        if isinstance(risk_domains, list):
+            for domain in risk_domains:
+                domain_name = domain.get("domain", domain.get("name", "unknown"))
+                domain_id = domain_name.lower().replace(" ", "_")
+                flag_value = domain.get("flag", "yellow")
+                risk_flags[domain_id] = {
+                    "level": {"value": flag_value},
+                    "trigger": domain.get("trigger", f"{domain_name} risk identified"),
+                    "impact": domain.get("impact", f"Requires attention in {domain_name}"),
+                    "severity_score": domain.get("severity", 5),
+                    "mitigation": domain.get("mitigation", f"Address {domain_name} concerns"),
+                    "ai_recommendation": domain.get("recommendation", f"Focus on {domain_name} improvements")
+                }
+        
+        # Build PESTEL from macro module
+        macro_result = module_results.get("macro", {})
+        pestel_scores = macro_result.get("pestel", {})
+        pestel_analysis = {
+            "political": pestel_scores.get("political", 7.0),
+            "economic": pestel_scores.get("economic", 7.0),
+            "social": pestel_scores.get("social", 7.0),
+            "technological": pestel_scores.get("technological", 8.0),
+            "environmental": pestel_scores.get("environmental", 6.0),
+            "legal": pestel_scores.get("legal", 7.0),
+            "composite_score": macro_result.get("score", 7.0) * 10,
+            "trend_alignment": macro_result.get("trends", {
+                "digital_transformation": "Analysis based on extracted data",
+                "sustainability": "Based on company profile",
+                "technology_adoption": "Aligned with sector trends"
+            })
+        }
+        
+        # Build benchmark analysis
+        benchmark_result = module_results.get("benchmark", {})
+        benchmark_analysis = {
+            "overall_percentile": int(benchmark_result.get("score", 7.0) * 10),
+            "category_benchmarks": benchmark_result.get("benchmarks", {
+                "growth_metrics": {"percentile_rank": 70, "sector_average": 65, "z_score": 0.5},
+                "financial_metrics": {"percentile_rank": 65, "sector_average": 70, "z_score": -0.3},
+                "operational_metrics": {"percentile_rank": 72, "sector_average": 68, "z_score": 0.4}
+            })
+        }
+        
+        # Build gap analysis
+        gap_result = module_results.get("gap", {})
+        gap_items = gap_result.get("gaps", gap_result.get("heatmap", []))
+        gap_analysis = {
+            "total_gaps": len(gap_items),
+            "priority_areas": [g.get("category", g.get("area", "Area")) for g in gap_items if g.get("priority") == "High"][:3],
+            "quick_wins": [g.get("action", g.get("recommendation", "Improvement")) for g in gap_items if g.get("priority") == "Low"][:2],
+            "gaps": [{
+                "category": g.get("category", g.get("area", "Area")),
+                "gap_size": g.get("gap_size", g.get("gap", 10)),
+                "priority": g.get("priority", "Medium"),
+                "gap_percentage": g.get("gap_percentage", g.get("gap", 15))
+            } for g in gap_items[:5]]
+        }
+        
+        # Build funder analysis
+        founder_result = module_results.get("founderFit", {})
+        funder_analysis = {
+            "funding_readiness_score": int(founder_result.get("readiness_score", founder_result.get("score", 7.0)) * 10),
+            "recommended_round_size": founder_result.get("funding_recommendation", {}).get("ask", "2.5M"),
+            "investor_matches": founder_result.get("investor_fit", [])
+        }
+        
+        # Build team analysis
+        team_result = module_results.get("team", {})
+        team_analysis = {
+            "team_completeness": team_result.get("team_completeness", int(team_result.get("score", 7.0) * 10)),
+            "diversity_score": team_result.get("diversity_score", 70),
+            "founders": team_result.get("founders", team_result.get("members", []))
+        }
+        
+        # Build growth classification
+        growth_result = module_results.get("growth", {})
+        growth_classification = {
+            "tier": growth_result.get("tier", 3),
+            "confidence": growth_result.get("confidence", 0.7),
+            "analysis": growth_result.get("interpretation", "Growth analysis based on extracted metrics"),
+            "scenarios": growth_result.get("scenarios", []),
+            "models": growth_result.get("models", []),
+            "interpretation": growth_result.get("interpretation", "Growth potential assessment")
+        }
+        
+        analysis_result = {
+            "final_tca_score": final_score * 10,  # Scale to 0-100
+            "investment_recommendation": recommendation,
+            "company_name": company_name,
+            "analysis_type": "comprehensive",
+            "modules_run": len(modules_to_run),
+            "source_uploads": source_ids,
+            "scorecard": {
+                "categories": scorecard_categories,
+                "composite_score": final_score
             },
             "risk_assessment": {
-                "overall_risk_score": 6.5,
-                "flags": {
-                    "market_risk": {
-                        "level": {
-                            "value": "yellow"
-                        },
-                        "trigger":
-                        "Market competition intensity",
-                        "impact":
-                        "Medium competitive pressure in target market",
-                        "severity_score":
-                        6,
-                        "mitigation":
-                        "Strengthen differentiation and build market partnerships",
-                        "ai_recommendation":
-                        "Focus on unique value proposition and early customer acquisition"
-                    },
-                    "technology_risk": {
-                        "level": {
-                            "value": "green"
-                        },
-                        "trigger":
-                        "Technology scalability",
-                        "impact":
-                        "Strong technical architecture with good scalability",
-                        "severity_score":
-                        3,
-                        "mitigation":
-                        "Continue investing in technical talent and infrastructure",
-                        "ai_recommendation":
-                        "Maintain current technical roadmap and expand development team"
-                    }
-                }
+                "overall_risk_score": 10 - risk_result.get("score", 7.0),  # Invert: higher module score = lower risk
+                "flags": risk_flags
             },
-            "pestel_analysis": {
-                "political": 7.2,
-                "economic": 7.8,
-                "social": 8.0,
-                "technological": 8.5,
-                "environmental": 6.8,
-                "legal": 7.0,
-                "composite_score": 75.5,
-                "trend_alignment": {
-                    "digital_transformation": "Strong alignment",
-                    "sustainability": "Moderate alignment",
-                    "regulatory_changes": "Good preparation",
-                    "economic_growth": "Positive outlook",
-                    "technology_adoption": "Excellent positioning"
-                }
-            },
-            "benchmark_analysis": {
-                "overall_percentile": 72,
-                "category_benchmarks": {
-                    "growth_metrics": {
-                        "percentile_rank": 75,
-                        "sector_average": 65,
-                        "z_score": 0.8
-                    },
-                    "financial_metrics": {
-                        "percentile_rank": 68,
-                        "sector_average": 70,
-                        "z_score": -0.2
-                    },
-                    "operational_metrics": {
-                        "percentile_rank": 74,
-                        "sector_average": 68,
-                        "z_score": 0.6
-                    }
-                }
-            },
-            "gap_analysis": {
-                "total_gaps":
-                5,
-                "priority_areas": [
-                    "Sales and Marketing Capability",
-                    "Customer Success Infrastructure"
-                ],
-                "quick_wins":
-                ["Automated onboarding process", "Enhanced product analytics"],
-                "gaps": [{
-                    "category": "Sales Performance",
-                    "gap_size": 15,
-                    "priority": "High",
-                    "gap_percentage": 20
-                }, {
-                    "category": "Marketing Reach",
-                    "gap_size": 12,
-                    "priority": "Medium",
-                    "gap_percentage": 15
-                }]
-            },
-            "funder_analysis": {
-                "funding_readiness_score":
-                76,
-                "recommended_round_size":
-                2.5,
-                "investor_matches": [{
-                    "investor_name": "TechStars Ventures",
-                    "sector_focus": "B2B SaaS and AI",
-                    "fit_score": 85,
-                    "stage_match": "Seed"
-                }, {
-                    "investor_name": "Accel Partners",
-                    "sector_focus": "Technology Infrastructure",
-                    "fit_score": 78,
-                    "stage_match": "Series A"
-                }]
-            },
-            "team_analysis": {
-                "team_completeness":
-                82,
-                "diversity_score":
-                75,
-                "founders": [{
-                    "name":
-                    "CEO/Founder",
-                    "experience_score":
-                    85,
-                    "track_record":
-                    "Previous successful exit, 10+ years domain experience"
-                }, {
-                    "name":
-                    "CTO/Co-founder",
-                    "experience_score":
-                    80,
-                    "track_record":
-                    "Technical leadership at scale-up companies, strong engineering background"
-                }]
-            }
+            "pestel_analysis": pestel_analysis,
+            "benchmark_analysis": benchmark_analysis,
+            "gap_analysis": gap_analysis,
+            "funder_analysis": funder_analysis,
+            "team_analysis": team_analysis,
+            "growth_classification": growth_classification,
+            "module_results": module_results  # Include detailed module results
         }
 
         return analysis_result
@@ -7835,52 +7876,414 @@ async def create_analysis_session_v1(data: dict = Body(...)):
 # ============================================================================
 
 
+def extract_pdf_text(pdf_bytes: bytes) -> str:
+    """Extract text from PDF using PyPDF2"""
+    try:
+        from PyPDF2 import PdfReader
+        pdf_file = io.BytesIO(pdf_bytes)
+        reader = PdfReader(pdf_file)
+        text_parts = []
+        for page in reader.pages:
+            page_text = page.extract_text()
+            if page_text:
+                text_parts.append(page_text)
+        return "\n\n".join(text_parts)
+    except ImportError:
+        logger.warning("PyPDF2 not installed, using fallback")
+        return ""
+    except Exception as e:
+        logger.warning(f"PDF extraction error: {e}")
+        return ""
+
+
+def extract_pptx_text(pptx_bytes: bytes) -> str:
+    """Extract text from PPTX using python-pptx"""
+    try:
+        from pptx import Presentation
+        pptx_file = io.BytesIO(pptx_bytes)
+        prs = Presentation(pptx_file)
+        text_parts = []
+        for slide_num, slide in enumerate(prs.slides, 1):
+            slide_text = [f"--- Slide {slide_num} ---"]
+            for shape in slide.shapes:
+                if hasattr(shape, "text") and shape.text:
+                    slide_text.append(shape.text)
+                if hasattr(shape, "table"):
+                    for row in shape.table.rows:
+                        row_text = [
+                            cell.text for cell in row.cells if cell.text
+                        ]
+                        if row_text:
+                            slide_text.append(" | ".join(row_text))
+            text_parts.append("\n".join(slide_text))
+        return "\n\n".join(text_parts)
+    except ImportError:
+        logger.warning("python-pptx not installed, using fallback")
+        return ""
+    except Exception as e:
+        logger.warning(f"PPTX extraction error: {e}")
+        return ""
+
+
+def extract_docx_text(docx_bytes: bytes) -> str:
+    """Extract text from DOCX using python-docx"""
+    try:
+        from docx import Document
+        docx_file = io.BytesIO(docx_bytes)
+        doc = Document(docx_file)
+        text_parts = []
+        for para in doc.paragraphs:
+            if para.text.strip():
+                text_parts.append(para.text)
+        for table in doc.tables:
+            for row in table.rows:
+                row_text = [
+                    cell.text for cell in row.cells if cell.text.strip()
+                ]
+                if row_text:
+                    text_parts.append(" | ".join(row_text))
+        return "\n".join(text_parts)
+    except ImportError:
+        logger.warning("python-docx not installed, using fallback")
+        return ""
+    except Exception as e:
+        logger.warning(f"DOCX extraction error: {e}")
+        return ""
+
+
+async def scrape_webpage(url: str) -> dict:
+    """Scrape text content from a webpage"""
+    try:
+        async with httpx.AsyncClient(timeout=30.0,
+                                     follow_redirects=True) as client:
+            headers = {
+                'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept':
+                'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+            }
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            html = response.text
+
+            # Try BeautifulSoup for better parsing
+            try:
+                from bs4 import BeautifulSoup
+                soup = BeautifulSoup(html, 'html.parser')
+
+                # Remove unwanted elements
+                for element in soup([
+                        'script', 'style', 'nav', 'footer', 'header', 'aside',
+                        'noscript'
+                ]):
+                    element.decompose()
+
+                # Extract title
+                title = soup.title.string if soup.title else ""
+
+                # Extract meta description
+                meta_desc = ""
+                meta_tag = soup.find('meta', attrs={'name': 'description'})
+                if meta_tag:
+                    meta_desc = meta_tag.get('content', '')
+
+                # Extract main content
+                main_content = soup.find('main') or soup.find(
+                    'article') or soup.find('body')
+                text = main_content.get_text(
+                    separator='\n',
+                    strip=True) if main_content else soup.get_text(
+                        separator='\n', strip=True)
+
+                # Clean up text
+                lines = [
+                    line.strip() for line in text.split('\n')
+                    if line.strip() and len(line.strip()) > 2
+                ]
+                clean_text = '\n'.join(lines[:500])  # Limit to first 500 lines
+
+                # Extract links for further analysis
+                links = []
+                for a in soup.find_all('a', href=True)[:20]:
+                    href = a['href']
+                    if href.startswith('http'):
+                        links.append({
+                            'text': a.get_text(strip=True)[:100],
+                            'url': href
+                        })
+
+                return {
+                    'success': True,
+                    'title': title,
+                    'description': meta_desc,
+                    'content': clean_text,
+                    'links': links,
+                    'char_count': len(clean_text)
+                }
+            except ImportError:
+                # Fallback: basic HTML text extraction
+                import re
+                text = re.sub(r'<script[^>]*>.*?</script>',
+                              '',
+                              html,
+                              flags=re.DOTALL | re.IGNORECASE)
+                text = re.sub(r'<style[^>]*>.*?</style>',
+                              '',
+                              text,
+                              flags=re.DOTALL | re.IGNORECASE)
+                text = re.sub(r'<[^>]+>', ' ', text)
+                text = re.sub(r'\s+', ' ', text).strip()
+                return {
+                    'success': True,
+                    'title': '',
+                    'description': '',
+                    'content': text[:10000],
+                    'links': [],
+                    'char_count': len(text)
+                }
+    except Exception as e:
+        logger.error(f"Webpage scraping error for {url}: {e}")
+        return {
+            'success': False,
+            'error': str(e),
+            'content': '',
+            'char_count': 0
+        }
+
+
 @app.post("/api/v1/analysis/extract-text-from-file")
 async def extract_text_from_file(data: dict = Body(...)):
-    """Extract text content from PDF, Word documents, or other file types"""
+    """Extract text content from PDF, Word documents, PPTX or other file types using proper parsers"""
     try:
-        content = data.get('content', '')
-        filename = data.get('filename', 'unknown')
-
-        # If content is base64 encoded, decode it
         import base64
+        content = data.get('content', '')
+        filename = data.get('filename', 'unknown').lower()
         text_content = ""
+        extraction_method = "unknown"
+
+        if not content:
+            return {
+                "success": False,
+                "text_content": "",
+                "error": "No content provided"
+            }
 
         try:
-            # Try to decode base64 content
-            if content and len(content) > 100:
-                # For demo, extract any readable text patterns from base64
-                decoded = base64.b64decode(content)
-                # Try to find text patterns
-                try:
-                    text_content = decoded.decode('utf-8', errors='ignore')
-                except:
-                    text_content = decoded.decode('latin-1', errors='ignore')
+            # Decode base64 content
+            file_bytes = base64.b64decode(content)
 
-                # Clean up non-printable characters
+            # Determine file type and extract accordingly
+            if filename.endswith('.pdf'):
+                text_content = extract_pdf_text(file_bytes)
+                extraction_method = "PyPDF2"
+
+            elif filename.endswith('.pptx'):
+                text_content = extract_pptx_text(file_bytes)
+                extraction_method = "python-pptx"
+
+            elif filename.endswith('.ppt'):
+                # Old PPT format - try basic extraction
+                text_content = file_bytes.decode('utf-8', errors='ignore')
                 text_content = ''.join(c for c in text_content
                                        if c.isprintable() or c in '\n\r\t ')
+                extraction_method = "binary-text"
 
-                # If still no good content, generate placeholder based on filename
-                if len(text_content.strip()) < 50:
-                    text_content = f"[Document content from {filename}]\n"
-                    text_content += "This document contains company information that has been processed.\n"
-                    text_content += f"File: {filename}\n"
+            elif filename.endswith('.docx'):
+                text_content = extract_docx_text(file_bytes)
+                extraction_method = "python-docx"
+
+            elif filename.endswith('.doc'):
+                # Old DOC format - try basic extraction
+                text_content = file_bytes.decode('utf-8', errors='ignore')
+                text_content = ''.join(c for c in text_content
+                                       if c.isprintable() or c in '\n\r\t ')
+                extraction_method = "binary-text"
+
+            elif filename.endswith(('.txt', '.csv', '.json', '.md')):
+                text_content = file_bytes.decode('utf-8', errors='ignore')
+                extraction_method = "utf-8"
+
+            elif filename.endswith(('.xlsx', '.xls')):
+                # Excel files - try basic extraction
+                try:
+                    import openpyxl
+                    xlsx_file = io.BytesIO(file_bytes)
+                    wb = openpyxl.load_workbook(xlsx_file,
+                                                read_only=True,
+                                                data_only=True)
+                    text_parts = []
+                    for sheet in wb.worksheets:
+                        text_parts.append(f"--- Sheet: {sheet.title} ---")
+                        for row in sheet.iter_rows(max_row=100,
+                                                   values_only=True):
+                            row_text = [
+                                str(cell) for cell in row if cell is not None
+                            ]
+                            if row_text:
+                                text_parts.append(" | ".join(row_text))
+                    text_content = "\n".join(text_parts)
+                    extraction_method = "openpyxl"
+                except ImportError:
+                    text_content = file_bytes.decode('utf-8', errors='ignore')
+                    extraction_method = "binary-fallback"
+            else:
+                # Unknown format - try UTF-8 then Latin-1
+                try:
+                    text_content = file_bytes.decode('utf-8', errors='ignore')
+                except:
+                    text_content = file_bytes.decode('latin-1',
+                                                     errors='ignore')
+                text_content = ''.join(c for c in text_content
+                                       if c.isprintable() or c in '\n\r\t ')
+                extraction_method = "fallback"
+
+            # Clean up extracted text
+            if text_content:
+                # Remove excessive whitespace
+                text_content = re.sub(r'\n{3,}', '\n\n', text_content)
+                text_content = re.sub(r' {2,}', ' ', text_content)
+                text_content = text_content.strip()
+
+            # If still no content, provide meaningful feedback
+            if not text_content or len(text_content) < 20:
+                return {
+                    "success":
+                    False,
+                    "text_content":
+                    f"Could not extract readable text from {filename}",
+                    "filename":
+                    filename,
+                    "char_count":
+                    0,
+                    "extraction_method":
+                    extraction_method,
+                    "error":
+                    "No readable text found - file may be image-based or encrypted"
+                }
+
+            logger.info(
+                f"Extracted {len(text_content)} chars from {filename} using {extraction_method}"
+            )
+
+            return {
+                "success": True,
+                "text_content": text_content,
+                "filename": filename,
+                "char_count": len(text_content),
+                "extraction_method": extraction_method,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+
         except Exception as e:
-            logger.warning(f"Error decoding file content: {e}")
-            text_content = f"[Content extracted from {filename}]"
+            logger.warning(f"Error processing file {filename}: {e}")
+            return {
+                "success": False,
+                "text_content": "",
+                "filename": filename,
+                "error": f"Failed to process file: {str(e)}"
+            }
 
-        return {
-            "success": True,
-            "text_content": text_content
-            if text_content else f"[Processed document: {filename}]",
-            "filename": filename,
-            "char_count": len(text_content),
-            "timestamp": datetime.utcnow().isoformat()
-        }
     except Exception as e:
         logger.error(f"Error extracting text: {e}")
         return {"success": False, "text_content": "", "error": str(e)}
+
+
+@app.post("/api/v1/analysis/extract-from-url")
+async def extract_from_url(data: dict = Body(...)):
+    """Extract content from a URL/webpage for analysis"""
+    try:
+        url = data.get('url', '')
+        if not url:
+            raise HTTPException(status_code=400, detail="URL is required")
+
+        # Validate URL
+        parsed = urlparse(url)
+        if not parsed.scheme or not parsed.netloc:
+            raise HTTPException(status_code=400, detail="Invalid URL format")
+
+        result = await scrape_webpage(url)
+
+        if result.get('success'):
+            return {
+                "success": True,
+                "url": url,
+                "title": result.get('title', ''),
+                "description": result.get('description', ''),
+                "text_content": result.get('content', ''),
+                "related_links": result.get('links', []),
+                "char_count": result.get('char_count', 0),
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        else:
+            raise HTTPException(status_code=400,
+                                detail=result.get('error',
+                                                  'Failed to scrape URL'))
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"URL extraction error: {e}")
+        raise HTTPException(status_code=500,
+                            detail=f"Failed to extract from URL: {str(e)}")
+
+
+@app.post("/api/v1/analysis/batch-extract-urls")
+async def batch_extract_urls(data: dict = Body(...)):
+    """Extract content from multiple URLs in parallel"""
+    try:
+        urls = data.get('urls', [])
+        if not urls:
+            raise HTTPException(status_code=400,
+                                detail="URLs list is required")
+
+        # Limit to 10 URLs max
+        urls = urls[:10]
+
+        # Extract from all URLs in parallel
+        tasks = [scrape_webpage(url) for url in urls]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        extracted = []
+        for url, result in zip(urls, results):
+            if isinstance(result, Exception):
+                extracted.append({
+                    "url": url,
+                    "success": False,
+                    "error": str(result)
+                })
+            elif result.get('success'):
+                extracted.append({
+                    "url": url,
+                    "success": True,
+                    "title": result.get('title', ''),
+                    "content": result.get('content',
+                                          '')[:5000],  # Limit content size
+                    "char_count": result.get('char_count', 0)
+                })
+            else:
+                extracted.append({
+                    "url": url,
+                    "success": False,
+                    "error": result.get('error', 'Unknown error')
+                })
+
+        successful = sum(1 for e in extracted if e.get('success'))
+
+        return {
+            "success": True,
+            "total_urls": len(urls),
+            "successful": successful,
+            "failed": len(urls) - successful,
+            "results": extracted,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Batch URL extraction error: {e}")
+        raise HTTPException(status_code=500,
+                            detail=f"Failed to batch extract URLs: {str(e)}")
 
 
 @app.post("/api/v1/analysis/extract-company-info")
@@ -8571,77 +8974,157 @@ async def get_analysis_run(analysis_id: str):
 
 @app.post("/api/v1/analysis/run")
 async def create_analysis_run(data: dict = Body(...)):
-    """Create and run a new analysis"""
+    """Create and run a new analysis using real extracted data"""
     try:
         analysis_id = str(uuid.uuid4())
         company_id = data.get('company_id') or data.get('companyId')
+        company_name = data.get('company_name', 'Unknown')
         framework = data.get('framework', 'tca_standard')
+        selected_modules = data.get('selected_modules', None)  # Optional: only run specific modules
 
-        # Generate mock analysis results
-        modules = [
-            "TCA Scorecard", "Risk Assessment", "Macro Trends",
-            "Team Analysis", "Benchmark", "Growth Classifier", "Gap Analysis",
-            "Simulation"
-        ]
-
-        import random
-        scores = {
-            module: round(random.uniform(5, 10), 1)
-            for module in modules
+        # ─── Read uploads from allupload table ──────────────────────────────
+        merged_text = []
+        merged_data = {}
+        source_ids = []
+        
+        async with db_manager.get_connection() as conn:
+            rows = await conn.fetch(
+                """SELECT upload_id, source_type, file_name, extracted_text,
+                          extracted_data, company_name
+                   FROM allupload
+                   WHERE (company_name = $1 OR $1 = 'Unknown')
+                   ORDER BY created_at DESC LIMIT 20""", company_name)
+            
+            if rows:
+                for r in rows:
+                    source_ids.append(str(r["upload_id"]))
+                    if r["extracted_text"]:
+                        merged_text.append(r["extracted_text"])
+                    ed = r["extracted_data"]
+                    if isinstance(ed, str):
+                        try:
+                            ed = json.loads(ed)
+                        except Exception:
+                            ed = {}
+                    if isinstance(ed, dict):
+                        merged_data = {**merged_data, **ed}
+                    if r["company_name"] and company_name == "Unknown":
+                        company_name = r["company_name"]
+        
+        company_analysis_data = {
+            "company_name": company_name,
+            "extracted_text": "\n".join(merged_text),
+            **merged_data,
         }
-        overall_score = round(sum(scores.values()) / len(scores), 1)
+
+        # ─── Determine which modules to run ──────────────────────────────────
+        modules_to_run = NINE_MODULES
+        if selected_modules and isinstance(selected_modules, list):
+            modules_to_run = [m for m in NINE_MODULES if m["id"] in selected_modules or m["name"] in selected_modules]
+            logger.info(f"Running {len(modules_to_run)} selected modules")
+        
+        # ─── Run modules and calculate scores ────────────────────────────────
+        module_scores = {}
+        total_weight = 0
+        weighted_score = 0
+        
+        for mod in modules_to_run:
+            result = _run_module(mod, company_analysis_data, merged_data)
+            score = result.get("score", 5.0)
+            w = mod["weight"]
+            module_scores[mod["name"]] = round(score, 1)
+            weighted_score += score * w
+            total_weight += w
+        
+        overall_score = round(weighted_score / total_weight, 1) if total_weight > 0 else 5.0
 
         return {
-            "success":
-            True,
-            "analysis_id":
-            analysis_id,
-            "company_id":
-            company_id,
-            "framework":
-            framework,
-            "status":
-            "completed",
-            "overall_score":
-            overall_score,
-            "module_scores":
-            scores,
-            "risk_level":
-            "Low" if overall_score >= 7 else
-            "Medium" if overall_score >= 5 else "High",
-            "recommendation":
-            "Strong candidate for investment"
-            if overall_score >= 7 else "Requires further due diligence",
-            "created_at":
-            datetime.utcnow().isoformat()
+            "success": True,
+            "analysis_id": analysis_id,
+            "company_id": company_id,
+            "company_name": company_name,
+            "framework": framework,
+            "status": "completed",
+            "overall_score": overall_score,
+            "module_scores": module_scores,
+            "modules_run": len(modules_to_run),
+            "source_uploads": source_ids,
+            "risk_level": "Low" if overall_score >= 7 else "Medium" if overall_score >= 5 else "High",
+            "recommendation": "Strong candidate for investment" if overall_score >= 7.5 else 
+                            "Proceed with due diligence" if overall_score >= 6.5 else
+                            "Conditional - address risks" if overall_score >= 5 else "Pass",
+            "created_at": datetime.utcnow().isoformat()
         }
     except Exception as e:
+        logger.error(f"Analysis run error: {e}")
         return {"success": False, "error": str(e)}
 
 
 @app.post("/api/v1/analysis/what-if")
 async def run_what_if_analysis(data: dict = Body(...)):
-    """Run what-if scenario analysis"""
+    """Run what-if scenario analysis using actual base analysis data"""
     try:
         scenario_id = str(uuid.uuid4())
         base_analysis_id = data.get('analysis_id')
         parameters = data.get('parameters', {})
-
-        import random
-
-        # Generate scenario results
+        company_name = data.get('company_name', 'Unknown')
+        
+        # Try to get base analysis scores from the database or request
+        base_scores = data.get('base_scores', {})
+        
+        if not base_scores:
+            # Try to read from allupload table
+            async with db_manager.get_connection() as conn:
+                row = await conn.fetchrow(
+                    """SELECT analysis_result FROM allupload
+                       WHERE (company_name = $1 OR $1 = 'Unknown') 
+                             AND analysis_result IS NOT NULL
+                       ORDER BY updated_at DESC LIMIT 1""", company_name)
+                if row and row['analysis_result']:
+                    ar = row['analysis_result']
+                    if isinstance(ar, str):
+                        ar = json.loads(ar)
+                    if isinstance(ar, dict):
+                        base_scores = {
+                            "overall": ar.get("final_tca_score", 7.0)
+                        }
+                        module_results = ar.get("module_results", {})
+                        for mod_id, mod_data in module_results.items():
+                            base_scores[mod_id] = mod_data.get("score", 7.0)
+        
+        base_score = base_scores.get("overall", 7.0)
+        
+        # Apply parameter adjustments
+        score_adjustments = 0
+        if parameters.get("revenue_growth"):
+            score_adjustments += float(parameters["revenue_growth"]) * 0.05
+        if parameters.get("market_size"):
+            score_adjustments += float(parameters["market_size"]) * 0.03
+        if parameters.get("team_experience"):
+            score_adjustments += float(parameters["team_experience"]) * 0.04
+        if parameters.get("burn_rate_reduction"):
+            score_adjustments += float(parameters["burn_rate_reduction"]) * 0.03
+        
+        # Calculate scenarios based on actual base score
+        base_case_score = min(10, max(0, base_score + score_adjustments))
+        upside_score = min(10, base_case_score + 1.5)
+        downside_score = max(0, base_case_score - 1.5)
+        
         scenarios = {
             "base_case": {
-                "overall_score": round(random.uniform(6, 8), 1),
-                "probability": 0.60
+                "overall_score": round(base_case_score, 1),
+                "probability": 0.60,
+                "description": "Most likely outcome based on current trajectory"
             },
             "upside_case": {
-                "overall_score": round(random.uniform(8, 10), 1),
-                "probability": 0.25
+                "overall_score": round(upside_score, 1),
+                "probability": 0.25,
+                "description": "Optimistic scenario with strong execution"
             },
             "downside_case": {
-                "overall_score": round(random.uniform(4, 6), 1),
-                "probability": 0.15
+                "overall_score": round(downside_score, 1),
+                "probability": 0.15,
+                "description": "Conservative scenario accounting for risks"
             }
         }
 
@@ -8649,22 +9132,21 @@ async def run_what_if_analysis(data: dict = Body(...)):
             "success": True,
             "scenario_id": scenario_id,
             "base_analysis_id": base_analysis_id,
+            "company_name": company_name,
+            "original_score": base_score,
             "scenarios": scenarios,
             "parameters_applied": parameters,
+            "score_impact": round(score_adjustments, 2),
             "sensitivity_analysis": {
-                "revenue_growth": {
-                    "impact": "+0.5 per 10%"
-                },
-                "market_size": {
-                    "impact": "+0.3 per $1B"
-                },
-                "team_experience": {
-                    "impact": "+0.4 per 5 years"
-                }
+                "revenue_growth": {"impact": "+0.5 per 10%", "current_adjustment": parameters.get("revenue_growth", 0)},
+                "market_size": {"impact": "+0.3 per $1B", "current_adjustment": parameters.get("market_size", 0)},
+                "team_experience": {"impact": "+0.4 per 5 years", "current_adjustment": parameters.get("team_experience", 0)},
+                "burn_rate_reduction": {"impact": "+0.3 per 10%", "current_adjustment": parameters.get("burn_rate_reduction", 0)}
             },
             "created_at": datetime.utcnow().isoformat()
         }
     except Exception as e:
+        logger.error(f"What-if analysis error: {e}")
         return {"success": False, "error": str(e)}
 
 

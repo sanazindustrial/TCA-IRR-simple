@@ -34,6 +34,12 @@ function ResultContent() {
     const [analysisData, setAnalysisData] = useState<ComprehensiveAnalysisOutput | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [analysisDate, setAnalysisDate] = useState<string>('');
+
+    // Set analysis date after mount to prevent hydration mismatch
+    useEffect(() => {
+        setAnalysisDate(new Date().toLocaleDateString());
+    }, []);
 
     // Load analysis data on component mount
     useEffect(() => {
@@ -186,7 +192,7 @@ function ResultContent() {
                         </div>
                         <div>
                             <div className="text-sm text-muted-foreground">Analysis Date</div>
-                            <div className="font-bold text-foreground">{new Date().toLocaleDateString()}</div>
+                            <div className="font-bold text-foreground">{analysisDate || '-'}</div>
                         </div>
                         <div>
                             <div className="text-sm text-muted-foreground">Status</div>
