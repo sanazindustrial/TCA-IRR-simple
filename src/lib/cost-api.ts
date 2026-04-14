@@ -3,9 +3,9 @@
  * Handles all cost-related API calls
  */
 
-// Base URL for API - endpoints add /api prefix (no version)
+// Base URL for API - endpoints use /api/v1 prefix
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
-const API_PREFIX = '/api';
+const API_PREFIX = '/api/v1';
 
 export interface CostBreakdown {
     category: string;
@@ -91,11 +91,17 @@ export interface BudgetStatus {
  */
 function getAuthToken(): string | null {
     if (typeof window !== 'undefined') {
+        // First try the direct authToken (primary storage)
+        const directToken = localStorage.getItem('authToken');
+        if (directToken) {
+            return directToken;
+        }
+        // Fallback to loggedInUser.token if present
         const user = localStorage.getItem('loggedInUser');
         if (user) {
             try {
                 const parsed = JSON.parse(user);
-                return parsed.token || null;
+                return parsed.token || parsed.access_token || null;
             } catch {
                 return null;
             }

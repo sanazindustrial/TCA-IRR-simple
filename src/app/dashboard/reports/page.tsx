@@ -301,6 +301,20 @@ export default function ReportsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [typeFilter, setTypeFilter] = useState<string>('');
   const { toast } = useToast();
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Safe date formatter that returns consistent output
+  const formatDate = useCallback((dateInput: string | Date | undefined, includeTime = false) => {
+    if (!isMounted) return '...';
+    if (!dateInput) return 'N/A';
+    try {
+      const date = new Date(dateInput);
+      if (isNaN(date.getTime())) return 'N/A';
+      return includeTime ? date.toLocaleString() : date.toLocaleDateString();
+    } catch {
+      return 'N/A';
+    }
+  }, [isMounted]);
 
   // Storage status state
   const [localStorageCount, setLocalStorageCount] = useState(0);
@@ -663,6 +677,11 @@ export default function ReportsPage() {
       setLoading(false);
     }
   }, [searchQuery, statusFilter, typeFilter]);
+
+  // Set mounted state to prevent hydration mismatch
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('loggedInUser');
@@ -1121,7 +1140,7 @@ export default function ReportsPage() {
                               </div>
                               <div>
                                 <p className="text-muted-foreground">Created</p>
-                                <p className="font-bold">{new Date(report.createdAt).toLocaleDateString()}</p>
+                                <p className="font-bold">{formatDate(report.createdAt)}</p>
                               </div>
                             </div>
                           </div>
@@ -1197,7 +1216,7 @@ export default function ReportsPage() {
                           {index === 0 && <Badge variant="success">Current</Badge>}
                         </div>
                         <span className="text-sm text-muted-foreground">
-                          {new Date(version.created_at).toLocaleString()}
+                          {formatDate(version.created_at, true)}
                         </span>
                       </div>
                       <div className="grid grid-cols-3 gap-4 text-sm">

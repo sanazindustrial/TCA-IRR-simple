@@ -72,14 +72,19 @@ export function ReportPreview({
     const [activeTab, setActiveTab] = useState('preview');
     const [aiSummary, setAiSummary] = useState<string | null>(null);
     const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+    const [generatedDate, setGeneratedDate] = useState<string>('');
+
+    // Set date on client side to avoid hydration mismatch
+    useEffect(() => {
+        setGeneratedDate(new Date().toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+        }));
+    }, []);
 
     const score = analysisData?.tcaData?.compositeScore || 0;
     const scoreBadge = getScoreBadge(score);
-    const generatedDate = new Date().toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-    });
 
     // Generate AI summary based on analysis data
     const generateAISummary = useCallback(async () => {

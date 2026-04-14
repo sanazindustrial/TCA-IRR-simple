@@ -9187,6 +9187,21 @@ async def get_cost_summary_public():
     return await get_cost_summary()
 
 
+# Non-v1 cost endpoints (for frontend compatibility)
+@app.get("/api/cost/summary")
+async def get_cost_summary_no_v1(start_date: Optional[str] = None,
+                                 end_date: Optional[str] = None):
+    """Get cost summary (non-v1 endpoint for frontend)"""
+    return await get_cost_summary()
+
+
+@app.get("/api/cost/summary/public")
+async def get_cost_summary_public_no_v1(start_date: Optional[str] = None,
+                                        end_date: Optional[str] = None):
+    """Public cost summary (non-v1 endpoint)"""
+    return await get_cost_summary()
+
+
 @app.get("/api/v1/cost/history")
 async def get_cost_history():
     """Get historical cost data"""

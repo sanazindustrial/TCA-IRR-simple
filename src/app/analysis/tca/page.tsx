@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -109,6 +109,17 @@ export default function TCAAnalysisPage() {
     const [selectedAnalysis, setSelectedAnalysis] = useState<string | null>(null);
     const [isRunning, setIsRunning] = useState(false);
     const [companyInput, setCompanyInput] = useState('');
+    const [isMounted, setIsMounted] = useState(false);
+
+    // Hydration-safe date formatter
+    const formatDate = useCallback((dateString: string) => {
+        if (!isMounted) return 'Loading...';
+        return new Date(dateString).toLocaleDateString();
+    }, [isMounted]);
+
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
 
     // Load saved configuration on mount
     useEffect(() => {
@@ -299,7 +310,7 @@ export default function TCAAnalysisPage() {
                                             <div>
                                                 <div className="font-medium">{result.companyName}</div>
                                                 <div className="text-sm text-muted-foreground">
-                                                    {new Date(result.timestamp).toLocaleDateString()}
+                                                    {formatDate(result.timestamp)}
                                                 </div>
                                             </div>
                                         </div>
@@ -446,7 +457,7 @@ export default function TCAAnalysisPage() {
                                                     onChange={() => toggleCategory(category)}
                                                     className="rounded"
                                                 />
-                                                <label 
+                                                <label
                                                     htmlFor={`category-${category.replace(/\s/g, '-').toLowerCase()}`}
                                                     className="text-sm cursor-pointer"
                                                 >
@@ -571,7 +582,7 @@ export default function TCAAnalysisPage() {
                                                 <div>
                                                     <div className="font-medium">{result.companyName}</div>
                                                     <div className="text-sm text-muted-foreground flex items-center gap-2">
-                                                        <span>{new Date(result.timestamp).toLocaleDateString()}</span>
+                                                        <span>{formatDate(result.timestamp)}</span>
                                                         <Badge variant="outline">{result.framework}</Badge>
                                                     </div>
                                                 </div>

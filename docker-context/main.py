@@ -2974,18 +2974,20 @@ async def run_comprehensive_analysis(request: Request):
         framework = data.get('framework', 'general')
         company_data = data.get('company_data', {})
         tca_input = data.get('tcaInput', {})
-        selected_modules = data.get('selected_modules', None)  # Optional: list of module IDs to run
-        
+        selected_modules = data.get(
+            'selected_modules', None)  # Optional: list of module IDs to run
+
         company_name = company_data.get('name', 'Unknown')
-        
-        logger.info(f"Running comprehensive analysis for framework: {framework}")
+
+        logger.info(
+            f"Running comprehensive analysis for framework: {framework}")
         logger.info(f"Company: {company_name}")
 
         # ─── 1. Read uploads from allupload table ──────────────────────────────
         merged_text = []
         merged_data = {}
         source_ids = []
-        
+
         async with db_manager.get_connection() as conn:
             # First try to get data by company name
             rows = await conn.fetch(
@@ -2994,7 +2996,7 @@ async def run_comprehensive_analysis(request: Request):
                    FROM allupload
                    WHERE (company_name = $1 OR $1 = 'Unknown')
                    ORDER BY created_at DESC LIMIT 20""", company_name)
-            
+
             if rows:
                 for r in rows:
                     source_ids.append(str(r["upload_id"]))
@@ -3011,41 +3013,48 @@ async def run_comprehensive_analysis(request: Request):
                     # Use company name from first row if available
                     if r["company_name"] and company_name == "Unknown":
                         company_name = r["company_name"]
-        
+
         # Overlay any inline data from the request
         if company_data.get('processed_data'):
             pd = company_data['processed_data']
             if pd.get('extracted_financials'):
-                merged_data['financial_data'] = {**merged_data.get('financial_data', {}), **pd['extracted_financials']}
-        
+                merged_data['financial_data'] = {
+                    **merged_data.get('financial_data', {}),
+                    **pd['extracted_financials']
+                }
+
         if tca_input.get('financials'):
             merged_text.append(str(tca_input['financials']))
         if tca_input.get('founderQuestionnaire'):
             merged_text.append(str(tca_input['founderQuestionnaire']))
         if tca_input.get('uploadedPitchDecks'):
             merged_text.append(str(tca_input['uploadedPitchDecks']))
-        
+
         company_analysis_data = {
             "company_name": company_name,
             "extracted_text": "\n".join(merged_text),
             **merged_data,
         }
-        
+
         logger.info(f"Retrieved {len(source_ids)} uploads for analysis")
 
         # ─── 2. Determine which modules to run ──────────────────────────────────
         modules_to_run = NINE_MODULES
         if selected_modules and isinstance(selected_modules, list):
-            modules_to_run = [m for m in NINE_MODULES if m["id"] in selected_modules]
-            logger.info(f"Running {len(modules_to_run)} selected modules: {[m['id'] for m in modules_to_run]}")
+            modules_to_run = [
+                m for m in NINE_MODULES if m["id"] in selected_modules
+            ]
+            logger.info(
+                f"Running {len(modules_to_run)} selected modules: {[m['id'] for m in modules_to_run]}"
+            )
 
         # ─── 3. Run modules and calculate scores ────────────────────────────────
         await asyncio.sleep(1)  # Brief processing delay
-        
+
         module_results = {}
         total_weight = 0
         weighted_score = 0
-        
+
         for mod in modules_to_run:
             result = _run_module(mod, company_analysis_data, merged_data)
             score = result.get("score", 5.0)
@@ -3054,9 +3063,10 @@ async def run_comprehensive_analysis(request: Request):
             module_results[mod["id"]] = result
             weighted_score += score * w
             total_weight += w
-        
-        final_score = round(weighted_score / total_weight, 1) if total_weight > 0 else 5.0
-        
+
+        final_score = round(weighted_score /
+                            total_weight, 1) if total_weight > 0 else 5.0
+
         # ─── 4. Build comprehensive response ────────────────────────────────────
         # Determine recommendation
         if final_score >= 8.0:
@@ -3067,126 +3077,211 @@ async def run_comprehensive_analysis(request: Request):
             recommendation = "Conditional - Address key risks before investing"
         else:
             recommendation = "Pass - Risk/reward profile not aligned"
-        
+
         # Build TCA scorecard categories from module results
         tca_result = module_results.get("tca", {})
         scorecard_categories = {}
-        
+
         # Use actual extracted categories if available
         tca_categories = tca_result.get("categories", [])
         if tca_categories:
             for cat in tca_categories:
-                cat_id = cat.get("id", cat.get("category", "unknown")).lower().replace(" ", "_")
+                cat_id = cat.get("id",
+                                 cat.get("category",
+                                         "unknown")).lower().replace(" ", "_")
                 scorecard_categories[cat_id] = {
-                    "name": cat.get("category", cat.get("name", "Unknown")),
-                    "raw_score": cat.get("raw_score", cat.get("score", 7.0)),
-                    "weight": cat.get("weight", 0.1),
-                    "weighted_score": cat.get("weighted_score", cat.get("raw_score", 7.0) * cat.get("weight", 0.1)),
-                    "notes": cat.get("interpretation", cat.get("notes", f"Analysis for {cat.get('category', 'category')}"))
+                    "name":
+                    cat.get("category", cat.get("name", "Unknown")),
+                    "raw_score":
+                    cat.get("raw_score", cat.get("score", 7.0)),
+                    "weight":
+                    cat.get("weight", 0.1),
+                    "weighted_score":
+                    cat.get("weighted_score",
+                            cat.get("raw_score", 7.0) *
+                            cat.get("weight", 0.1)),
+                    "notes":
+                    cat.get(
+                        "interpretation",
+                        cat.get(
+                            "notes",
+                            f"Analysis for {cat.get('category', 'category')}"))
                 }
         else:
             # Generate from available module data
             for mod_id, mod_result in module_results.items():
                 score = mod_result.get("score", 7.0)
-                mod_def = next((m for m in NINE_MODULES if m["id"] == mod_id), None)
+                mod_def = next((m for m in NINE_MODULES if m["id"] == mod_id),
+                               None)
                 weight = mod_def["weight"] / 100 if mod_def else 0.1
                 scorecard_categories[mod_id] = {
-                    "name": mod_def["name"] if mod_def else mod_id.title(),
-                    "raw_score": score,
-                    "weight": weight,
-                    "weighted_score": score * weight,
-                    "notes": mod_result.get("interpretation", f"Score based on extracted data analysis")
+                    "name":
+                    mod_def["name"] if mod_def else mod_id.title(),
+                    "raw_score":
+                    score,
+                    "weight":
+                    weight,
+                    "weighted_score":
+                    score * weight,
+                    "notes":
+                    mod_result.get("interpretation",
+                                   f"Score based on extracted data analysis")
                 }
-        
+
         # Build risk assessment from risk module
         risk_result = module_results.get("risk", {})
         risk_flags = {}
-        risk_domains = risk_result.get("risk_domains", risk_result.get("domains", []))
+        risk_domains = risk_result.get("risk_domains",
+                                       risk_result.get("domains", []))
         if isinstance(risk_domains, list):
             for domain in risk_domains:
-                domain_name = domain.get("domain", domain.get("name", "unknown"))
+                domain_name = domain.get("domain",
+                                         domain.get("name", "unknown"))
                 domain_id = domain_name.lower().replace(" ", "_")
                 flag_value = domain.get("flag", "yellow")
                 risk_flags[domain_id] = {
-                    "level": {"value": flag_value},
-                    "trigger": domain.get("trigger", f"{domain_name} risk identified"),
-                    "impact": domain.get("impact", f"Requires attention in {domain_name}"),
-                    "severity_score": domain.get("severity", 5),
-                    "mitigation": domain.get("mitigation", f"Address {domain_name} concerns"),
-                    "ai_recommendation": domain.get("recommendation", f"Focus on {domain_name} improvements")
+                    "level": {
+                        "value": flag_value
+                    },
+                    "trigger":
+                    domain.get("trigger", f"{domain_name} risk identified"),
+                    "impact":
+                    domain.get("impact",
+                               f"Requires attention in {domain_name}"),
+                    "severity_score":
+                    domain.get("severity", 5),
+                    "mitigation":
+                    domain.get("mitigation",
+                               f"Address {domain_name} concerns"),
+                    "ai_recommendation":
+                    domain.get("recommendation",
+                               f"Focus on {domain_name} improvements")
                 }
-        
+
         # Build PESTEL from macro module
         macro_result = module_results.get("macro", {})
         pestel_scores = macro_result.get("pestel", {})
         pestel_analysis = {
-            "political": pestel_scores.get("political", 7.0),
-            "economic": pestel_scores.get("economic", 7.0),
-            "social": pestel_scores.get("social", 7.0),
-            "technological": pestel_scores.get("technological", 8.0),
-            "environmental": pestel_scores.get("environmental", 6.0),
-            "legal": pestel_scores.get("legal", 7.0),
-            "composite_score": macro_result.get("score", 7.0) * 10,
-            "trend_alignment": macro_result.get("trends", {
-                "digital_transformation": "Analysis based on extracted data",
-                "sustainability": "Based on company profile",
-                "technology_adoption": "Aligned with sector trends"
-            })
+            "political":
+            pestel_scores.get("political", 7.0),
+            "economic":
+            pestel_scores.get("economic", 7.0),
+            "social":
+            pestel_scores.get("social", 7.0),
+            "technological":
+            pestel_scores.get("technological", 8.0),
+            "environmental":
+            pestel_scores.get("environmental", 6.0),
+            "legal":
+            pestel_scores.get("legal", 7.0),
+            "composite_score":
+            macro_result.get("score", 7.0) * 10,
+            "trend_alignment":
+            macro_result.get(
+                "trends", {
+                    "digital_transformation":
+                    "Analysis based on extracted data",
+                    "sustainability": "Based on company profile",
+                    "technology_adoption": "Aligned with sector trends"
+                })
         }
-        
+
         # Build benchmark analysis
         benchmark_result = module_results.get("benchmark", {})
         benchmark_analysis = {
-            "overall_percentile": int(benchmark_result.get("score", 7.0) * 10),
-            "category_benchmarks": benchmark_result.get("benchmarks", {
-                "growth_metrics": {"percentile_rank": 70, "sector_average": 65, "z_score": 0.5},
-                "financial_metrics": {"percentile_rank": 65, "sector_average": 70, "z_score": -0.3},
-                "operational_metrics": {"percentile_rank": 72, "sector_average": 68, "z_score": 0.4}
-            })
+            "overall_percentile":
+            int(benchmark_result.get("score", 7.0) * 10),
+            "category_benchmarks":
+            benchmark_result.get(
+                "benchmarks", {
+                    "growth_metrics": {
+                        "percentile_rank": 70,
+                        "sector_average": 65,
+                        "z_score": 0.5
+                    },
+                    "financial_metrics": {
+                        "percentile_rank": 65,
+                        "sector_average": 70,
+                        "z_score": -0.3
+                    },
+                    "operational_metrics": {
+                        "percentile_rank": 72,
+                        "sector_average": 68,
+                        "z_score": 0.4
+                    }
+                })
         }
-        
+
         # Build gap analysis
         gap_result = module_results.get("gap", {})
         gap_items = gap_result.get("gaps", gap_result.get("heatmap", []))
         gap_analysis = {
-            "total_gaps": len(gap_items),
-            "priority_areas": [g.get("category", g.get("area", "Area")) for g in gap_items if g.get("priority") == "High"][:3],
-            "quick_wins": [g.get("action", g.get("recommendation", "Improvement")) for g in gap_items if g.get("priority") == "Low"][:2],
+            "total_gaps":
+            len(gap_items),
+            "priority_areas": [
+                g.get("category", g.get("area", "Area")) for g in gap_items
+                if g.get("priority") == "High"
+            ][:3],
+            "quick_wins": [
+                g.get("action", g.get("recommendation", "Improvement"))
+                for g in gap_items if g.get("priority") == "Low"
+            ][:2],
             "gaps": [{
-                "category": g.get("category", g.get("area", "Area")),
-                "gap_size": g.get("gap_size", g.get("gap", 10)),
-                "priority": g.get("priority", "Medium"),
-                "gap_percentage": g.get("gap_percentage", g.get("gap", 15))
+                "category":
+                g.get("category", g.get("area", "Area")),
+                "gap_size":
+                g.get("gap_size", g.get("gap", 10)),
+                "priority":
+                g.get("priority", "Medium"),
+                "gap_percentage":
+                g.get("gap_percentage", g.get("gap", 15))
             } for g in gap_items[:5]]
         }
-        
+
         # Build funder analysis
         founder_result = module_results.get("founderFit", {})
         funder_analysis = {
-            "funding_readiness_score": int(founder_result.get("readiness_score", founder_result.get("score", 7.0)) * 10),
-            "recommended_round_size": founder_result.get("funding_recommendation", {}).get("ask", "2.5M"),
-            "investor_matches": founder_result.get("investor_fit", [])
+            "funding_readiness_score":
+            int(
+                founder_result.get("readiness_score",
+                                   founder_result.get("score", 7.0)) * 10),
+            "recommended_round_size":
+            founder_result.get("funding_recommendation",
+                               {}).get("ask", "2.5M"),
+            "investor_matches":
+            founder_result.get("investor_fit", [])
         }
-        
+
         # Build team analysis
         team_result = module_results.get("team", {})
         team_analysis = {
-            "team_completeness": team_result.get("team_completeness", int(team_result.get("score", 7.0) * 10)),
-            "diversity_score": team_result.get("diversity_score", 70),
-            "founders": team_result.get("founders", team_result.get("members", []))
+            "team_completeness":
+            team_result.get("team_completeness",
+                            int(team_result.get("score", 7.0) * 10)),
+            "diversity_score":
+            team_result.get("diversity_score", 70),
+            "founders":
+            team_result.get("founders", team_result.get("members", []))
         }
-        
+
         # Build growth classification
         growth_result = module_results.get("growth", {})
         growth_classification = {
-            "tier": growth_result.get("tier", 3),
-            "confidence": growth_result.get("confidence", 0.7),
-            "analysis": growth_result.get("interpretation", "Growth analysis based on extracted metrics"),
-            "scenarios": growth_result.get("scenarios", []),
-            "models": growth_result.get("models", []),
-            "interpretation": growth_result.get("interpretation", "Growth potential assessment")
+            "tier":
+            growth_result.get("tier", 3),
+            "confidence":
+            growth_result.get("confidence", 0.7),
+            "analysis":
+            growth_result.get("interpretation",
+                              "Growth analysis based on extracted metrics"),
+            "scenarios":
+            growth_result.get("scenarios", []),
+            "models":
+            growth_result.get("models", []),
+            "interpretation":
+            growth_result.get("interpretation", "Growth potential assessment")
         }
-        
+
         analysis_result = {
             "final_tca_score": final_score * 10,  # Scale to 0-100
             "investment_recommendation": recommendation,
@@ -3199,7 +3294,8 @@ async def run_comprehensive_analysis(request: Request):
                 "composite_score": final_score
             },
             "risk_assessment": {
-                "overall_risk_score": 10 - risk_result.get("score", 7.0),  # Invert: higher module score = lower risk
+                "overall_risk_score": 10 - risk_result.get(
+                    "score", 7.0),  # Invert: higher module score = lower risk
                 "flags": risk_flags
             },
             "pestel_analysis": pestel_analysis,
@@ -8980,13 +9076,14 @@ async def create_analysis_run(data: dict = Body(...)):
         company_id = data.get('company_id') or data.get('companyId')
         company_name = data.get('company_name', 'Unknown')
         framework = data.get('framework', 'tca_standard')
-        selected_modules = data.get('selected_modules', None)  # Optional: only run specific modules
+        selected_modules = data.get(
+            'selected_modules', None)  # Optional: only run specific modules
 
         # ─── Read uploads from allupload table ──────────────────────────────
         merged_text = []
         merged_data = {}
         source_ids = []
-        
+
         async with db_manager.get_connection() as conn:
             rows = await conn.fetch(
                 """SELECT upload_id, source_type, file_name, extracted_text,
@@ -8994,7 +9091,7 @@ async def create_analysis_run(data: dict = Body(...)):
                    FROM allupload
                    WHERE (company_name = $1 OR $1 = 'Unknown')
                    ORDER BY created_at DESC LIMIT 20""", company_name)
-            
+
             if rows:
                 for r in rows:
                     source_ids.append(str(r["upload_id"]))
@@ -9010,7 +9107,7 @@ async def create_analysis_run(data: dict = Body(...)):
                         merged_data = {**merged_data, **ed}
                     if r["company_name"] and company_name == "Unknown":
                         company_name = r["company_name"]
-        
+
         company_analysis_data = {
             "company_name": company_name,
             "extracted_text": "\n".join(merged_text),
@@ -9020,14 +9117,17 @@ async def create_analysis_run(data: dict = Body(...)):
         # ─── Determine which modules to run ──────────────────────────────────
         modules_to_run = NINE_MODULES
         if selected_modules and isinstance(selected_modules, list):
-            modules_to_run = [m for m in NINE_MODULES if m["id"] in selected_modules or m["name"] in selected_modules]
+            modules_to_run = [
+                m for m in NINE_MODULES
+                if m["id"] in selected_modules or m["name"] in selected_modules
+            ]
             logger.info(f"Running {len(modules_to_run)} selected modules")
-        
+
         # ─── Run modules and calculate scores ────────────────────────────────
         module_scores = {}
         total_weight = 0
         weighted_score = 0
-        
+
         for mod in modules_to_run:
             result = _run_module(mod, company_analysis_data, merged_data)
             score = result.get("score", 5.0)
@@ -9035,25 +9135,40 @@ async def create_analysis_run(data: dict = Body(...)):
             module_scores[mod["name"]] = round(score, 1)
             weighted_score += score * w
             total_weight += w
-        
-        overall_score = round(weighted_score / total_weight, 1) if total_weight > 0 else 5.0
+
+        overall_score = round(weighted_score /
+                              total_weight, 1) if total_weight > 0 else 5.0
 
         return {
-            "success": True,
-            "analysis_id": analysis_id,
-            "company_id": company_id,
-            "company_name": company_name,
-            "framework": framework,
-            "status": "completed",
-            "overall_score": overall_score,
-            "module_scores": module_scores,
-            "modules_run": len(modules_to_run),
-            "source_uploads": source_ids,
-            "risk_level": "Low" if overall_score >= 7 else "Medium" if overall_score >= 5 else "High",
-            "recommendation": "Strong candidate for investment" if overall_score >= 7.5 else 
-                            "Proceed with due diligence" if overall_score >= 6.5 else
-                            "Conditional - address risks" if overall_score >= 5 else "Pass",
-            "created_at": datetime.utcnow().isoformat()
+            "success":
+            True,
+            "analysis_id":
+            analysis_id,
+            "company_id":
+            company_id,
+            "company_name":
+            company_name,
+            "framework":
+            framework,
+            "status":
+            "completed",
+            "overall_score":
+            overall_score,
+            "module_scores":
+            module_scores,
+            "modules_run":
+            len(modules_to_run),
+            "source_uploads":
+            source_ids,
+            "risk_level":
+            "Low" if overall_score >= 7 else
+            "Medium" if overall_score >= 5 else "High",
+            "recommendation":
+            "Strong candidate for investment" if overall_score >= 7.5 else
+            "Proceed with due diligence" if overall_score >= 6.5 else
+            "Conditional - address risks" if overall_score >= 5 else "Pass",
+            "created_at":
+            datetime.utcnow().isoformat()
         }
     except Exception as e:
         logger.error(f"Analysis run error: {e}")
@@ -9068,10 +9183,10 @@ async def run_what_if_analysis(data: dict = Body(...)):
         base_analysis_id = data.get('analysis_id')
         parameters = data.get('parameters', {})
         company_name = data.get('company_name', 'Unknown')
-        
+
         # Try to get base analysis scores from the database or request
         base_scores = data.get('base_scores', {})
-        
+
         if not base_scores:
             # Try to read from allupload table
             async with db_manager.get_connection() as conn:
@@ -9091,9 +9206,9 @@ async def run_what_if_analysis(data: dict = Body(...)):
                         module_results = ar.get("module_results", {})
                         for mod_id, mod_data in module_results.items():
                             base_scores[mod_id] = mod_data.get("score", 7.0)
-        
+
         base_score = base_scores.get("overall", 7.0)
-        
+
         # Apply parameter adjustments
         score_adjustments = 0
         if parameters.get("revenue_growth"):
@@ -9103,18 +9218,20 @@ async def run_what_if_analysis(data: dict = Body(...)):
         if parameters.get("team_experience"):
             score_adjustments += float(parameters["team_experience"]) * 0.04
         if parameters.get("burn_rate_reduction"):
-            score_adjustments += float(parameters["burn_rate_reduction"]) * 0.03
-        
+            score_adjustments += float(
+                parameters["burn_rate_reduction"]) * 0.03
+
         # Calculate scenarios based on actual base score
         base_case_score = min(10, max(0, base_score + score_adjustments))
         upside_score = min(10, base_case_score + 1.5)
         downside_score = max(0, base_case_score - 1.5)
-        
+
         scenarios = {
             "base_case": {
                 "overall_score": round(base_case_score, 1),
                 "probability": 0.60,
-                "description": "Most likely outcome based on current trajectory"
+                "description":
+                "Most likely outcome based on current trajectory"
             },
             "upside_case": {
                 "overall_score": round(upside_score, 1),
@@ -9138,10 +9255,23 @@ async def run_what_if_analysis(data: dict = Body(...)):
             "parameters_applied": parameters,
             "score_impact": round(score_adjustments, 2),
             "sensitivity_analysis": {
-                "revenue_growth": {"impact": "+0.5 per 10%", "current_adjustment": parameters.get("revenue_growth", 0)},
-                "market_size": {"impact": "+0.3 per $1B", "current_adjustment": parameters.get("market_size", 0)},
-                "team_experience": {"impact": "+0.4 per 5 years", "current_adjustment": parameters.get("team_experience", 0)},
-                "burn_rate_reduction": {"impact": "+0.3 per 10%", "current_adjustment": parameters.get("burn_rate_reduction", 0)}
+                "revenue_growth": {
+                    "impact": "+0.5 per 10%",
+                    "current_adjustment": parameters.get("revenue_growth", 0)
+                },
+                "market_size": {
+                    "impact": "+0.3 per $1B",
+                    "current_adjustment": parameters.get("market_size", 0)
+                },
+                "team_experience": {
+                    "impact": "+0.4 per 5 years",
+                    "current_adjustment": parameters.get("team_experience", 0)
+                },
+                "burn_rate_reduction": {
+                    "impact": "+0.3 per 10%",
+                    "current_adjustment":
+                    parameters.get("burn_rate_reduction", 0)
+                }
             },
             "created_at": datetime.utcnow().isoformat()
         }
@@ -9301,6 +9431,21 @@ async def get_cost_summary():
 @app.get("/api/v1/cost/summary/public")
 async def get_cost_summary_public():
     """Public cost summary endpoint (no auth required)"""
+    return await get_cost_summary()
+
+
+# Non-v1 cost endpoints (for frontend compatibility)
+@app.get("/api/cost/summary")
+async def get_cost_summary_no_v1(start_date: Optional[str] = None,
+                                 end_date: Optional[str] = None):
+    """Get cost summary (non-v1 endpoint for frontend)"""
+    return await get_cost_summary()
+
+
+@app.get("/api/cost/summary/public")
+async def get_cost_summary_public_no_v1(start_date: Optional[str] = None,
+                                        end_date: Optional[str] = None):
+    """Public cost summary (non-v1 endpoint)"""
     return await get_cost_summary()
 
 

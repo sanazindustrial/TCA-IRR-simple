@@ -343,8 +343,13 @@ export default function UserManagementPage() {
   }, [loadUsers, searchQuery, roleFilter, statusFilter]);
 
   // Auto-refresh users list every 30 seconds to show new signups immediately
-  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
+
+  // Initialize lastRefresh on client side only to avoid hydration mismatch
+  useEffect(() => {
+    setLastRefresh(new Date());
+  }, []);
 
   // Load user costs from cost API
   const loadUserCosts = useCallback(async () => {
@@ -572,7 +577,8 @@ export default function UserManagementPage() {
   };
 
   // Format last refresh time
-  const formatLastRefresh = (date: Date) => {
+  const formatLastRefresh = (date: Date | null) => {
+    if (!date) return 'Loading...';
     const now = new Date();
     const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000);
     if (diffSec < 60) return 'Just now';
