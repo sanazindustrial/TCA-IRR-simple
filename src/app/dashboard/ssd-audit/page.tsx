@@ -188,7 +188,12 @@ function formatDuration(ms?: number): string {
 
 function formatDate(isoString?: string): string {
     if (!isoString) return 'N/A';
-    return new Date(isoString).toLocaleString();
+    if (typeof window === 'undefined') return isoString.split('T')[0]; // Safe server-side fallback
+    try {
+        return new Date(isoString).toLocaleString();
+    } catch {
+        return isoString.split('T')[0];
+    }
 }
 
 function formatBytes(bytes?: number): string {
@@ -632,7 +637,7 @@ export default function SsdAuditLogPage() {
                             <CardDescription>Avg TCA Score</CardDescription>
                             <CardTitle className="text-3xl flex items-center gap-2">
                                 <TrendingUp className="size-6 text-purple-500" />
-                                {stats.scores.avg_final_score.toFixed(1)}
+                                {(stats.scores?.avg_final_score ?? 0).toFixed(1)}
                             </CardTitle>
                         </CardHeader>
                     </Card>

@@ -70,7 +70,7 @@ const StatCard = ({
     </CardHeader>
     <CardContent>
       <div className="text-2xl font-bold">
-        {isCurrency ? `$${value.toFixed(2)}` : value}
+        {isCurrency ? `$${(value ?? 0).toFixed(2)}` : (value ?? 0)}
       </div>
       <p className="text-xs text-muted-foreground">{description}</p>
     </CardContent>
@@ -259,7 +259,7 @@ export default function CostManagementPage() {
                 <DollarSign className="size-4 text-success-foreground/70" />
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold">${costData.totalCost.toFixed(2)}</div>
+                <div className="text-3xl font-bold">${(costData.totalCost ?? 0).toFixed(2)}</div>
                 <p className="text-xs text-success-foreground/80">Period: 11/01/2023 - 11/14/2023</p>
               </CardContent>
             </Card>
@@ -295,7 +295,7 @@ export default function CostManagementPage() {
                     <div key={item.category}>
                       <div className="flex justify-between mb-1">
                         <p className="text-sm font-medium">{item.category}</p>
-                        <p className="text-sm font-medium">${item.cost.toFixed(2)} <span className="text-muted-foreground">({item.percentage.toFixed(1)}%)</span></p>
+                        <p className="text-sm font-medium">${(item.cost ?? 0).toFixed(2)} <span className="text-muted-foreground">({(item.percentage ?? 0).toFixed(1)}%)</span></p>
                       </div>
                       <Progress value={item.percentage} />
                       <p className="text-xs text-muted-foreground mt-1">{item.executions.toLocaleString()} Executions</p>
@@ -313,14 +313,14 @@ export default function CostManagementPage() {
                 <div>
                   <div className="flex justify-between items-baseline mb-1">
                     <p className="text-sm font-medium">AI Cost Contribution</p>
-                    <p className="text-lg font-bold">${costData.aiBreakdown.totalAiCost.toFixed(2)}</p>
+                    <p className="text-lg font-bold">${(costData.aiBreakdown?.totalAiCost ?? 0).toFixed(2)}</p>
                   </div>
                   <Progress value={aiCostPercentage} />
-                  <p className="text-xs text-muted-foreground mt-1">{aiCostPercentage.toFixed(1)}% of total cost</p>
+                  <p className="text-xs text-muted-foreground mt-1">{(aiCostPercentage ?? 0).toFixed(1)}% of total cost</p>
                 </div>
                 <div>
                   <p className="text-sm font-medium">Cost per Analysis</p>
-                  <p className="font-bold">${costData.aiBreakdown.costPerAnalysis.toFixed(2)}</p>
+                  <p className="font-bold">${(costData.aiBreakdown?.costPerAnalysis ?? 0).toFixed(2)}</p>
                 </div>
                 <div>
                   <p className="text-sm font-medium">Token Usage</p>
@@ -330,13 +330,13 @@ export default function CostManagementPage() {
                 <div>
                   <p className="text-sm font-medium mb-2">Cost by Model</p>
                   <div className="space-y-2">
-                    {costData.aiBreakdown.models.map(model => (
+                    {(costData.aiBreakdown?.models ?? []).map(model => (
                       <div key={model.name}>
                         <div className="flex justify-between text-xs mb-1">
                           <p>{model.name}</p>
-                          <p>${model.cost.toFixed(2)} ({model.percentage.toFixed(1)}%)</p>
+                          <p>${(model.cost ?? 0).toFixed(2)} ({(model.percentage ?? 0).toFixed(1)}%)</p>
                         </div>
-                        <Progress value={model.percentage} />
+                        <Progress value={model.percentage ?? 0} />
                       </div>
                     ))}
                   </div>
@@ -344,13 +344,13 @@ export default function CostManagementPage() {
                 <div>
                   <p className="text-sm font-medium mb-2">Cost by User</p>
                   <div className="space-y-2">
-                    {costData.aiBreakdown.costByUser.map(user => (
+                    {(costData.aiBreakdown?.costByUser ?? []).map(user => (
                       <div key={user.name}>
                         <div className="flex justify-between text-xs mb-1">
                           <p>{user.name}</p>
-                          <p>${user.cost.toFixed(2)} ({user.percentage.toFixed(1)}%)</p>
+                          <p>${(user.cost ?? 0).toFixed(2)} ({(user.percentage ?? 0).toFixed(1)}%)</p>
                         </div>
-                        <Progress value={user.percentage} />
+                        <Progress value={user.percentage ?? 0} />
                       </div>
                     ))}
                   </div>
@@ -358,13 +358,13 @@ export default function CostManagementPage() {
                 <div>
                   <p className="text-sm font-medium mb-2">Cost by Report Type</p>
                   <div className="space-y-2">
-                    {costData.aiBreakdown.costByReportType.map(report => (
+                    {(costData.aiBreakdown?.costByReportType ?? []).map(report => (
                       <div key={report.name}>
                         <div className="flex justify-between text-xs mb-1">
                           <p>{report.name}</p>
-                          <p>${report.cost.toFixed(2)} ({report.percentage.toFixed(1)}%)</p>
+                          <p>${(report.cost ?? 0).toFixed(2)} ({(report.percentage ?? 0).toFixed(1)}%)</p>
                         </div>
-                        <Progress value={report.percentage} />
+                        <Progress value={report.percentage ?? 0} />
                       </div>
                     ))}
                   </div>

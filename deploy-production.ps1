@@ -1,4 +1,4 @@
-#!/usr/bin/env pwsh
+[]#!/usr/bin/env pwsh
 # Production Deployment Script for TCA-IRR App
 # This script deploys the TCA analysis application to Azure with comprehensive setup
 

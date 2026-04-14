@@ -67,8 +67,27 @@ export default function ModuleSettingsPage() {
     const [copyFromVersion, setCopyFromVersion] = useState<number | null>(null);
     const [editingModule, setEditingModule] = useState<string | null>(null);
     const [editingCategory, setEditingCategory] = useState<number | null>(null);
+    const [isMounted, setIsMounted] = useState(false);
 
     const { toast } = useToast();
+
+    // Safe date formatter to prevent hydration issues
+    const formatDate = useCallback((dateInput: string | Date | undefined, includeTime = false) => {
+        if (!isMounted) return '...';
+        if (!dateInput) return 'N/A';
+        try {
+            const date = new Date(dateInput);
+            if (isNaN(date.getTime())) return 'N/A';
+            return includeTime ? date.toLocaleString() : date.toLocaleDateString();
+        } catch {
+            return 'N/A';
+        }
+    }, [isMounted]);
+
+    // Set mounted state
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
 
     // Load versions on mount
     const loadVersions = useCallback(async () => {
@@ -433,8 +452,8 @@ export default function ModuleSettingsPage() {
                                     key={version.id}
                                     onClick={() => handleSelectVersion(version.id)}
                                     className={`p-3 rounded-lg cursor-pointer transition-colors ${selectedVersion?.id === version.id
-                                            ? 'bg-primary text-primary-foreground'
-                                            : 'hover:bg-muted'
+                                        ? 'bg-primary text-primary-foreground'
+                                        : 'hover:bg-muted'
                                         }`}
                                 >
                                     <div className="flex items-center justify-between">
@@ -447,7 +466,7 @@ export default function ModuleSettingsPage() {
                                     </div>
                                     <p className={`text-xs mt-1 ${selectedVersion?.id === version.id ? 'text-primary-foreground/70' : 'text-muted-foreground'
                                         }`}>
-                                        v{version.version_number} • {new Date(version.created_at).toLocaleDateString()}
+                                        v{version.version_number} • {formatDate(version.created_at)}
                                     </p>
                                 </div>
                             ))}
@@ -681,7 +700,7 @@ export default function ModuleSettingsPage() {
                                                             </TableCell>
                                                             <TableCell>v{run.settings_version_id}</TableCell>
                                                             <TableCell>
-                                                                {new Date(run.run_at).toLocaleString()}
+                                                                {formatDate(run.run_at, true)}
                                                             </TableCell>
                                                             <TableCell>
                                                                 <Badge
