@@ -4,7 +4,7 @@ TCA IRR App Backend
 FastAPI backend server for the TCA Investment Risk Rating application
 """
 
-from fastapi import FastAPI, Depends, HTTPException, status, Request, BackgroundTasks, Body
+from fastapi import FastAPI, Depends, HTTPException, status, Request, BackgroundTasks, Body, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -14,7 +14,7 @@ import os
 import logging
 import uvicorn
 from typing import Optional, List, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import jwt
 import bcrypt
 import uuid
@@ -25,6 +25,9 @@ import json
 import httpx
 import secrets
 import hashlib
+import io
+import re
+from urllib.parse import urlparse
 
 # Import database configuration
 from database_config import db_manager, db_config
@@ -7835,52 +7838,414 @@ async def create_analysis_session_v1(data: dict = Body(...)):
 # ============================================================================
 
 
+def extract_pdf_text(pdf_bytes: bytes) -> str:
+    """Extract text from PDF using PyPDF2"""
+    try:
+        from PyPDF2 import PdfReader
+        pdf_file = io.BytesIO(pdf_bytes)
+        reader = PdfReader(pdf_file)
+        text_parts = []
+        for page in reader.pages:
+            page_text = page.extract_text()
+            if page_text:
+                text_parts.append(page_text)
+        return "\n\n".join(text_parts)
+    except ImportError:
+        logger.warning("PyPDF2 not installed, using fallback")
+        return ""
+    except Exception as e:
+        logger.warning(f"PDF extraction error: {e}")
+        return ""
+
+
+def extract_pptx_text(pptx_bytes: bytes) -> str:
+    """Extract text from PPTX using python-pptx"""
+    try:
+        from pptx import Presentation
+        pptx_file = io.BytesIO(pptx_bytes)
+        prs = Presentation(pptx_file)
+        text_parts = []
+        for slide_num, slide in enumerate(prs.slides, 1):
+            slide_text = [f"--- Slide {slide_num} ---"]
+            for shape in slide.shapes:
+                if hasattr(shape, "text") and shape.text:
+                    slide_text.append(shape.text)
+                if hasattr(shape, "table"):
+                    for row in shape.table.rows:
+                        row_text = [
+                            cell.text for cell in row.cells if cell.text
+                        ]
+                        if row_text:
+                            slide_text.append(" | ".join(row_text))
+            text_parts.append("\n".join(slide_text))
+        return "\n\n".join(text_parts)
+    except ImportError:
+        logger.warning("python-pptx not installed, using fallback")
+        return ""
+    except Exception as e:
+        logger.warning(f"PPTX extraction error: {e}")
+        return ""
+
+
+def extract_docx_text(docx_bytes: bytes) -> str:
+    """Extract text from DOCX using python-docx"""
+    try:
+        from docx import Document
+        docx_file = io.BytesIO(docx_bytes)
+        doc = Document(docx_file)
+        text_parts = []
+        for para in doc.paragraphs:
+            if para.text.strip():
+                text_parts.append(para.text)
+        for table in doc.tables:
+            for row in table.rows:
+                row_text = [
+                    cell.text for cell in row.cells if cell.text.strip()
+                ]
+                if row_text:
+                    text_parts.append(" | ".join(row_text))
+        return "\n".join(text_parts)
+    except ImportError:
+        logger.warning("python-docx not installed, using fallback")
+        return ""
+    except Exception as e:
+        logger.warning(f"DOCX extraction error: {e}")
+        return ""
+
+
+async def scrape_webpage(url: str) -> dict:
+    """Scrape text content from a webpage"""
+    try:
+        async with httpx.AsyncClient(timeout=30.0,
+                                     follow_redirects=True) as client:
+            headers = {
+                'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept':
+                'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+            }
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            html = response.text
+
+            # Try BeautifulSoup for better parsing
+            try:
+                from bs4 import BeautifulSoup
+                soup = BeautifulSoup(html, 'html.parser')
+
+                # Remove unwanted elements
+                for element in soup([
+                        'script', 'style', 'nav', 'footer', 'header', 'aside',
+                        'noscript'
+                ]):
+                    element.decompose()
+
+                # Extract title
+                title = soup.title.string if soup.title else ""
+
+                # Extract meta description
+                meta_desc = ""
+                meta_tag = soup.find('meta', attrs={'name': 'description'})
+                if meta_tag:
+                    meta_desc = meta_tag.get('content', '')
+
+                # Extract main content
+                main_content = soup.find('main') or soup.find(
+                    'article') or soup.find('body')
+                text = main_content.get_text(
+                    separator='\n',
+                    strip=True) if main_content else soup.get_text(
+                        separator='\n', strip=True)
+
+                # Clean up text
+                lines = [
+                    line.strip() for line in text.split('\n')
+                    if line.strip() and len(line.strip()) > 2
+                ]
+                clean_text = '\n'.join(lines[:500])  # Limit to first 500 lines
+
+                # Extract links for further analysis
+                links = []
+                for a in soup.find_all('a', href=True)[:20]:
+                    href = a['href']
+                    if href.startswith('http'):
+                        links.append({
+                            'text': a.get_text(strip=True)[:100],
+                            'url': href
+                        })
+
+                return {
+                    'success': True,
+                    'title': title,
+                    'description': meta_desc,
+                    'content': clean_text,
+                    'links': links,
+                    'char_count': len(clean_text)
+                }
+            except ImportError:
+                # Fallback: basic HTML text extraction
+                import re
+                text = re.sub(r'<script[^>]*>.*?</script>',
+                              '',
+                              html,
+                              flags=re.DOTALL | re.IGNORECASE)
+                text = re.sub(r'<style[^>]*>.*?</style>',
+                              '',
+                              text,
+                              flags=re.DOTALL | re.IGNORECASE)
+                text = re.sub(r'<[^>]+>', ' ', text)
+                text = re.sub(r'\s+', ' ', text).strip()
+                return {
+                    'success': True,
+                    'title': '',
+                    'description': '',
+                    'content': text[:10000],
+                    'links': [],
+                    'char_count': len(text)
+                }
+    except Exception as e:
+        logger.error(f"Webpage scraping error for {url}: {e}")
+        return {
+            'success': False,
+            'error': str(e),
+            'content': '',
+            'char_count': 0
+        }
+
+
 @app.post("/api/v1/analysis/extract-text-from-file")
 async def extract_text_from_file(data: dict = Body(...)):
-    """Extract text content from PDF, Word documents, or other file types"""
+    """Extract text content from PDF, Word documents, PPTX or other file types using proper parsers"""
     try:
-        content = data.get('content', '')
-        filename = data.get('filename', 'unknown')
-
-        # If content is base64 encoded, decode it
         import base64
+        content = data.get('content', '')
+        filename = data.get('filename', 'unknown').lower()
         text_content = ""
+        extraction_method = "unknown"
+
+        if not content:
+            return {
+                "success": False,
+                "text_content": "",
+                "error": "No content provided"
+            }
 
         try:
-            # Try to decode base64 content
-            if content and len(content) > 100:
-                # For demo, extract any readable text patterns from base64
-                decoded = base64.b64decode(content)
-                # Try to find text patterns
-                try:
-                    text_content = decoded.decode('utf-8', errors='ignore')
-                except:
-                    text_content = decoded.decode('latin-1', errors='ignore')
+            # Decode base64 content
+            file_bytes = base64.b64decode(content)
 
-                # Clean up non-printable characters
+            # Determine file type and extract accordingly
+            if filename.endswith('.pdf'):
+                text_content = extract_pdf_text(file_bytes)
+                extraction_method = "PyPDF2"
+
+            elif filename.endswith('.pptx'):
+                text_content = extract_pptx_text(file_bytes)
+                extraction_method = "python-pptx"
+
+            elif filename.endswith('.ppt'):
+                # Old PPT format - try basic extraction
+                text_content = file_bytes.decode('utf-8', errors='ignore')
                 text_content = ''.join(c for c in text_content
                                        if c.isprintable() or c in '\n\r\t ')
+                extraction_method = "binary-text"
 
-                # If still no good content, generate placeholder based on filename
-                if len(text_content.strip()) < 50:
-                    text_content = f"[Document content from {filename}]\n"
-                    text_content += "This document contains company information that has been processed.\n"
-                    text_content += f"File: {filename}\n"
+            elif filename.endswith('.docx'):
+                text_content = extract_docx_text(file_bytes)
+                extraction_method = "python-docx"
+
+            elif filename.endswith('.doc'):
+                # Old DOC format - try basic extraction
+                text_content = file_bytes.decode('utf-8', errors='ignore')
+                text_content = ''.join(c for c in text_content
+                                       if c.isprintable() or c in '\n\r\t ')
+                extraction_method = "binary-text"
+
+            elif filename.endswith(('.txt', '.csv', '.json', '.md')):
+                text_content = file_bytes.decode('utf-8', errors='ignore')
+                extraction_method = "utf-8"
+
+            elif filename.endswith(('.xlsx', '.xls')):
+                # Excel files - try basic extraction
+                try:
+                    import openpyxl
+                    xlsx_file = io.BytesIO(file_bytes)
+                    wb = openpyxl.load_workbook(xlsx_file,
+                                                read_only=True,
+                                                data_only=True)
+                    text_parts = []
+                    for sheet in wb.worksheets:
+                        text_parts.append(f"--- Sheet: {sheet.title} ---")
+                        for row in sheet.iter_rows(max_row=100,
+                                                   values_only=True):
+                            row_text = [
+                                str(cell) for cell in row if cell is not None
+                            ]
+                            if row_text:
+                                text_parts.append(" | ".join(row_text))
+                    text_content = "\n".join(text_parts)
+                    extraction_method = "openpyxl"
+                except ImportError:
+                    text_content = file_bytes.decode('utf-8', errors='ignore')
+                    extraction_method = "binary-fallback"
+            else:
+                # Unknown format - try UTF-8 then Latin-1
+                try:
+                    text_content = file_bytes.decode('utf-8', errors='ignore')
+                except:
+                    text_content = file_bytes.decode('latin-1',
+                                                     errors='ignore')
+                text_content = ''.join(c for c in text_content
+                                       if c.isprintable() or c in '\n\r\t ')
+                extraction_method = "fallback"
+
+            # Clean up extracted text
+            if text_content:
+                # Remove excessive whitespace
+                text_content = re.sub(r'\n{3,}', '\n\n', text_content)
+                text_content = re.sub(r' {2,}', ' ', text_content)
+                text_content = text_content.strip()
+
+            # If still no content, provide meaningful feedback
+            if not text_content or len(text_content) < 20:
+                return {
+                    "success":
+                    False,
+                    "text_content":
+                    f"Could not extract readable text from {filename}",
+                    "filename":
+                    filename,
+                    "char_count":
+                    0,
+                    "extraction_method":
+                    extraction_method,
+                    "error":
+                    "No readable text found - file may be image-based or encrypted"
+                }
+
+            logger.info(
+                f"Extracted {len(text_content)} chars from {filename} using {extraction_method}"
+            )
+
+            return {
+                "success": True,
+                "text_content": text_content,
+                "filename": filename,
+                "char_count": len(text_content),
+                "extraction_method": extraction_method,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+
         except Exception as e:
-            logger.warning(f"Error decoding file content: {e}")
-            text_content = f"[Content extracted from {filename}]"
+            logger.warning(f"Error processing file {filename}: {e}")
+            return {
+                "success": False,
+                "text_content": "",
+                "filename": filename,
+                "error": f"Failed to process file: {str(e)}"
+            }
 
-        return {
-            "success": True,
-            "text_content": text_content
-            if text_content else f"[Processed document: {filename}]",
-            "filename": filename,
-            "char_count": len(text_content),
-            "timestamp": datetime.utcnow().isoformat()
-        }
     except Exception as e:
         logger.error(f"Error extracting text: {e}")
         return {"success": False, "text_content": "", "error": str(e)}
+
+
+@app.post("/api/v1/analysis/extract-from-url")
+async def extract_from_url(data: dict = Body(...)):
+    """Extract content from a URL/webpage for analysis"""
+    try:
+        url = data.get('url', '')
+        if not url:
+            raise HTTPException(status_code=400, detail="URL is required")
+
+        # Validate URL
+        parsed = urlparse(url)
+        if not parsed.scheme or not parsed.netloc:
+            raise HTTPException(status_code=400, detail="Invalid URL format")
+
+        result = await scrape_webpage(url)
+
+        if result.get('success'):
+            return {
+                "success": True,
+                "url": url,
+                "title": result.get('title', ''),
+                "description": result.get('description', ''),
+                "text_content": result.get('content', ''),
+                "related_links": result.get('links', []),
+                "char_count": result.get('char_count', 0),
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        else:
+            raise HTTPException(status_code=400,
+                                detail=result.get('error',
+                                                  'Failed to scrape URL'))
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"URL extraction error: {e}")
+        raise HTTPException(status_code=500,
+                            detail=f"Failed to extract from URL: {str(e)}")
+
+
+@app.post("/api/v1/analysis/batch-extract-urls")
+async def batch_extract_urls(data: dict = Body(...)):
+    """Extract content from multiple URLs in parallel"""
+    try:
+        urls = data.get('urls', [])
+        if not urls:
+            raise HTTPException(status_code=400,
+                                detail="URLs list is required")
+
+        # Limit to 10 URLs max
+        urls = urls[:10]
+
+        # Extract from all URLs in parallel
+        tasks = [scrape_webpage(url) for url in urls]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        extracted = []
+        for url, result in zip(urls, results):
+            if isinstance(result, Exception):
+                extracted.append({
+                    "url": url,
+                    "success": False,
+                    "error": str(result)
+                })
+            elif result.get('success'):
+                extracted.append({
+                    "url": url,
+                    "success": True,
+                    "title": result.get('title', ''),
+                    "content": result.get('content',
+                                          '')[:5000],  # Limit content size
+                    "char_count": result.get('char_count', 0)
+                })
+            else:
+                extracted.append({
+                    "url": url,
+                    "success": False,
+                    "error": result.get('error', 'Unknown error')
+                })
+
+        successful = sum(1 for e in extracted if e.get('success'))
+
+        return {
+            "success": True,
+            "total_urls": len(urls),
+            "successful": successful,
+            "failed": len(urls) - successful,
+            "results": extracted,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Batch URL extraction error: {e}")
+        raise HTTPException(status_code=500,
+                            detail=f"Failed to batch extract URLs: {str(e)}")
 
 
 @app.post("/api/v1/analysis/extract-company-info")

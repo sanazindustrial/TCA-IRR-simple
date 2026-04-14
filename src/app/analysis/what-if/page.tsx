@@ -374,6 +374,14 @@ export default function SimulationPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [simulationHistory, setSimulationHistory] = useState<number[]>([]);
 
+  // Tracking info state for header
+  const [trackingInfo, setTrackingInfo] = useState<{
+    evaluationId: string;
+    companyName: string;
+    userName: string;
+    framework: string;
+  }>({ evaluationId: '', companyName: '', userName: '', framework: '' });
+
   // Settings version state
   const [settingsVersions, setSettingsVersions] = useState<SettingsVersion[]>([]);
   const [selectedVersion, setSelectedVersion] = useState<SettingsVersion | null>(null);
@@ -410,10 +418,40 @@ export default function SimulationPage() {
     }
   }, []);
 
-  // Check if user is admin
+  // Check if user is admin and load tracking info
   useEffect(() => {
     const userRole = localStorage.getItem('userRole') || sessionStorage.getItem('userRole');
     setIsAdmin(userRole === 'admin' || userRole === 'Admin');
+
+    // Load tracking info for header
+    const evalId = localStorage.getItem('currentEvaluationId') || '';
+    const companyName = localStorage.getItem('analysisCompanyName') || '';
+    const framework = localStorage.getItem('analysisFramework') || 'general';
+
+    // Get user name from stored user data
+    let userName = '';
+    try {
+      const storedUser = localStorage.getItem('loggedInUser') || localStorage.getItem('user');
+      if (storedUser) {
+        const user = JSON.parse(storedUser);
+        userName = user.name || user.username || user.email || 'Unknown User';
+      }
+    } catch (e) {
+      userName = 'Unknown User';
+    }
+
+    // Also check URL params
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlEvalId = urlParams.get('evalId');
+    const urlCompany = urlParams.get('company');
+    const urlUser = urlParams.get('user');
+
+    setTrackingInfo({
+      evaluationId: urlEvalId || evalId,
+      companyName: urlCompany || companyName,
+      userName: urlUser || userName,
+      framework: framework
+    });
   }, []);
 
   // Load settings versions on mount
@@ -610,7 +648,7 @@ export default function SimulationPage() {
 
           // Initialize module configs for all modules
           const configs: Record<string, ModuleConfig> = {};
-          
+
           // Try to load saved configs from localStorage
           let savedConfigs: Record<string, ModuleConfig> = {};
           try {
@@ -622,7 +660,7 @@ export default function SimulationPage() {
           } catch (e) {
             console.warn('Failed to parse saved module configs:', e);
           }
-          
+
           Object.keys(initialScores).forEach((moduleId) => {
             const def = MODULE_DEFINITIONS[moduleId] || { name: moduleId, description: '' };
             // Use saved config if available, otherwise default values
@@ -901,7 +939,7 @@ export default function SimulationPage() {
   return (
     <>
       <div className="container mx-auto p-4 md:p-8">
-        <header className="mb-8">
+        <header className="mb-6">
           <Link href="/dashboard/evaluation" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary mb-4">
             <ArrowLeft className="size-4" />
             Back to Analysis Setup
@@ -965,6 +1003,38 @@ export default function SimulationPage() {
             </div>
           </div>
         </header>
+
+        {/* Tracking Info Bar */}
+        {(trackingInfo.evaluationId || trackingInfo.companyName) && (
+          <div className="mb-6 p-4 bg-muted/50 rounded-lg border">
+            <div className="flex flex-wrap items-center gap-6 text-sm">
+              {trackingInfo.evaluationId && (
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">Evaluation ID:</span>
+                  <Badge variant="outline" className="font-mono">{trackingInfo.evaluationId}</Badge>
+                </div>
+              )}
+              {trackingInfo.companyName && (
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">Company:</span>
+                  <span className="font-semibold text-primary">{trackingInfo.companyName}</span>
+                </div>
+              )}
+              {trackingInfo.userName && (
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">Analyst:</span>
+                  <span className="font-medium">{trackingInfo.userName}</span>
+                </div>
+              )}
+              {trackingInfo.framework && (
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">Framework:</span>
+                  <Badge variant="secondary">{trackingInfo.framework === 'general' ? 'General Tech' : 'MedTech'}</Badge>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-12 gap-6">
           {/* Left Sidebar - Module Navigation */}
