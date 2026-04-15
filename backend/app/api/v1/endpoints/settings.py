@@ -3,6 +3,7 @@ Settings Version API Endpoints
 Manage module configurations, TCA categories, and simulation runs with versioning
 """
 
+import json
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, Depends, Query
@@ -25,6 +26,24 @@ from app.models.settings_version import (
 )
 
 router = APIRouter(prefix="/settings", tags=["Settings"])
+
+
+def parse_json_field(value: Any) -> dict:
+    """Safely parse JSON field that may be stored as string in database."""
+    if value is None:
+        return {}
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        value = value.strip()
+        if not value or value == '{}':
+            return {}
+        try:
+            parsed = json.loads(value)
+            return parsed if isinstance(parsed, dict) else {}
+        except (json.JSONDecodeError, TypeError):
+            return {}
+    return {}
 
 
 # ===== Settings Versions =====
@@ -118,8 +137,8 @@ async def get_active_settings_version():
                     weight=float(r['weight']),
                     is_enabled=r['is_enabled'],
                     priority=r['priority'],
-                    settings=r['settings'] or {},
-                    thresholds=r['thresholds'] or {}
+                    settings=parse_json_field(r['settings']),
+                    thresholds=parse_json_field(r['thresholds'])
                 ) for r in module_rows],
                 tca_categories=[TCACategory(
                     id=r['id'],
@@ -187,8 +206,8 @@ async def get_settings_version(version_id: int):
                     weight=float(r['weight']),
                     is_enabled=r['is_enabled'],
                     priority=r['priority'],
-                    settings=r['settings'] or {},
-                    thresholds=r['thresholds'] or {}
+                    settings=parse_json_field(r['settings']),
+                    thresholds=parse_json_field(r['thresholds'])
                 ) for r in module_rows],
                 tca_categories=[TCACategory(
                     id=r['id'],
