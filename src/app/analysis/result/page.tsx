@@ -619,7 +619,7 @@ export default function AnalysisResultPage({
         };
 
         loadUserAndConfig();
-    }, [params.type, isPreview, params]);
+    }, [params?.type, params?.evalId, params?.company, isPreview]); // Fixed: avoid object reference in deps
 
     // Load configuration based on role and report type - Dynamic Configuration
     useEffect(() => {
@@ -656,18 +656,10 @@ export default function AnalysisResultPage({
                 } else {
                     // Force standard users back to triage with notification
                     console.warn('SECURITY: Standard user blocked from DD report access');
-                    setReportType('triage');
+                    // Don't call setReportType here - it causes infinite loop
+                    // Report type is already being set in the previous useEffect
                     configKey = 'report-config-triage-standard';
                     defaultConfig = triageStandardConfig;
-
-                    // Show access denied notification
-                    setTimeout(() => {
-                        toast({
-                            variant: 'destructive',
-                            title: 'Access Denied',
-                            description: 'Due Diligence reports are restricted to admin and analyst accounts only.',
-                        });
-                    }, 500);
                 }
             } else {
                 // Fallback for any other report type
