@@ -6,6 +6,7 @@ OPTIMIZED FOR FAST STARTUP - Heavy initialization is deferred to background task
 import logging
 import json
 import asyncio
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -112,6 +113,10 @@ async def lifespan(app: FastAPI):
 def create_application() -> FastAPI:
     """Create and configure FastAPI application"""
 
+    enable_api_docs = os.getenv("ENABLE_SWAGGER_DOCS", "true").lower() in {
+        "1", "true", "yes", "on"
+    }
+
     app = FastAPI(
         title=settings.app_name,
         description=
@@ -119,9 +124,9 @@ def create_application() -> FastAPI:
         version=settings.version,
         debug=settings.debug,
         lifespan=lifespan,
-        docs_url="/docs" if not settings.is_production else None,
-        redoc_url="/redoc" if not settings.is_production else None,
-        openapi_url="/openapi.json" if not settings.is_production else None,
+        docs_url="/docs" if enable_api_docs else None,
+        redoc_url="/redoc" if enable_api_docs else None,
+        openapi_url="/openapi.json" if enable_api_docs else None,
         default_response_class=CustomJSONResponse,
         redirect_slashes=True)  # Re-enabled with proxy_headers=True in uvicorn for HTTPS redirects
 
