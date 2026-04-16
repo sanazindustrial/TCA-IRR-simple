@@ -728,7 +728,7 @@ class TrackingService {
         return { success: false, error: 'No current evaluation to sync' };
       }
 
-      const response = await fetch(`${this.apiBaseUrl}/evaluations/sync`, {
+      const response = await fetch(`${this.apiBaseUrl}/api/v1/evaluations/sync`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

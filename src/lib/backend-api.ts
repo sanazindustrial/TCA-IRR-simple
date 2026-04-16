@@ -1,10 +1,12 @@
 // API client for backend communication with comprehensive TCA integration
 export class BackendAPIClient {
     private baseURL: string;
+    private apiPrefix: string;
     private authToken: string | null;
 
     constructor() {
-        this.baseURL = process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
+        this.baseURL = (process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net').replace(/\/$/, '');
+        this.apiPrefix = '/api/v1';
         this.authToken = null;
 
         // Try to get auth token from localStorage
@@ -25,8 +27,14 @@ export class BackendAPIClient {
         return headers;
     }
 
+    private buildUrl(path: string): string {
+        if (path.startsWith('http://') || path.startsWith('https://')) return path;
+        if (path === '/health' || path.startsWith('/api/v1/')) return `${this.baseURL}${path}`;
+        return `${this.baseURL}${this.apiPrefix}${path.startsWith('/') ? path : `/${path}`}`;
+    }
+
     async login(email: string, password: string) {
-        const response = await fetch(`${this.baseURL}/auth/login`, {
+        const response = await fetch(this.buildUrl('/auth/login'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -201,7 +209,7 @@ export class BackendAPIClient {
     }
 
     async createUser(userData: { email: string; password: string; name: string; role: string }) {
-        const response = await fetch(`${this.baseURL}/auth/register`, {
+        const response = await fetch(this.buildUrl('/auth/register'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

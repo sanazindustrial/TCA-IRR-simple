@@ -37,7 +37,8 @@ import {
 // AUTO-EXTRACTION SERVICE CONFIGURATION
 // ============================================================================
 
-const API_BASE_URL = 'https://tcairrapiccontainer.azurewebsites.net';
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net').replace(/\/$/, '');
+const API_PREFIX = '/api/v1';
 
 // Storage keys for extraction data (unique per evaluation)
 const EXTRACTION_STORAGE_KEY = 'current_extraction_data';
@@ -182,7 +183,7 @@ async function processUploadedFiles(
 
             // If file has URL (uploaded to storage), fetch content
             if (file.url && !content) {
-                const response = await fetch(`${API_BASE_URL}/files/extract-text`, {
+                const response = await fetch(`${API_BASE_URL}${API_PREFIX}/files/extract-text`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ file_url: file.url }),
@@ -215,7 +216,7 @@ async function processUrls(urls: string[]): Promise<DocumentContent[]> {
 
     for (const url of urls) {
         try {
-            const response = await fetch(`${API_BASE_URL}/scrape/url`, {
+            const response = await fetch(`${API_BASE_URL}${API_PREFIX}/scrape/url`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ url }),
@@ -676,7 +677,7 @@ export async function autoExtractFromDocuments(
         // Call backend API for AI-powered extraction
         let apiExtractedData: Record<string, unknown> | null = null;
         try {
-            const response = await fetch(`${API_BASE_URL}/analysis/extract-company-info`, {
+            const response = await fetch(`${API_BASE_URL}${API_PREFIX}/analysis/extract-company-info`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -907,7 +908,7 @@ export async function saveReportWithIndex(
 
     try {
         // Save to API
-        const response = await fetch(`${API_BASE_URL}/reports`, {
+        const response = await fetch(`${API_BASE_URL}${API_PREFIX}/reports`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(fullReport),

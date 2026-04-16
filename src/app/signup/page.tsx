@@ -12,7 +12,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net').replace(/\/$/, '');
+const API_PREFIX = '/api/v1';
 
 function SignupForm() {
   const [email, setEmail] = useState('');
@@ -41,7 +42,7 @@ function SignupForm() {
   const validateInviteToken = async (token: string) => {
     setIsValidatingToken(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/validate-invite?token=${encodeURIComponent(token)}`);
+      const response = await fetch(`${API_BASE_URL}${API_PREFIX}/auth/validate-invite?token=${encodeURIComponent(token)}`);
       if (response.ok) {
         const data = await response.json();
         setInviteData({ email: data.email, role: data.role });
@@ -112,7 +113,7 @@ function SignupForm() {
 
       if (inviteToken && inviteData) {
         // Complete invite registration - uses role from invite
-        response = await fetch(`${API_BASE_URL}/auth/complete-invite`, {
+        response = await fetch(`${API_BASE_URL}${API_PREFIX}/auth/complete-invite`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -124,7 +125,7 @@ function SignupForm() {
       } else {
         // Regular registration - default User role
         const username = email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '_').substring(0, 50);
-        response = await fetch(`${API_BASE_URL}/auth/register`, {
+        response = await fetch(`${API_BASE_URL}${API_PREFIX}/auth/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

@@ -43,7 +43,7 @@ export function WeightedScoreBreakdown({ data }: WeightedScoreBreakdownProps) {
     const { framework } = useEvaluationContext();
 
     // Normalize categories: recalculate weighted scores if they appear incorrect
-    const rawCategories = data?.categories || sampleData;
+    const rawCategories = data?.categories?.length ? data.categories : [];
     const categories = rawCategories.map(cat => {
         // Correct weighted score calculation: rawScore × (weight / 100)
         const correctWeightedScore = cat.rawScore * (cat.weight / 100);
