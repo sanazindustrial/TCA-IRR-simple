@@ -374,6 +374,16 @@ export default function AnalysisResultPage({
     const [isPreview, setIsPreview] = useState(false);
     const [isUsingSampleData, setIsUsingSampleData] = useState(false);
 
+    const redirectToRunAnalysis = (description: string) => {
+        setIsUsingSampleData(false);
+        toast({
+            variant: 'destructive',
+            title: 'No Analysis Data',
+            description,
+        });
+        router.push('/dashboard/evaluation');
+    };
+
     // Unified Record Tracking State
     const [evaluationId, setEvaluationId] = useState<string | null>(null);
     const [analysisId, setAnalysisId] = useState<string | null>(null);
@@ -467,7 +477,7 @@ export default function AnalysisResultPage({
                     setRole('user');
                 }
 
-                // Load analysis data from localStorage or use sample data
+                // Load real analysis data from localStorage
                 // First, validate that stored analysis belongs to current evaluation
                 const storedEvalIdForValidation = localStorage.getItem('currentEvaluationId');
                 const urlEvalId = params?.evalId;
@@ -478,14 +488,8 @@ export default function AnalysisResultPage({
                     localStorage.removeItem('analysisResult');
                     localStorage.removeItem('analysisTrackingInfo');
                     localStorage.removeItem('reportApprovalStatus');
-                    setAnalysisData(sampleAnalysisData);
-                    setIsUsingSampleData(true);
                     setIsLoading(false);
-                    toast({
-                        variant: 'destructive',
-                        title: 'No Analysis Data',
-                        description: 'No analysis data found for this evaluation. Please run analysis first.',
-                    });
+                    redirectToRunAnalysis('No analysis data found for this evaluation. Please run analysis first.');
                     return;
                 }
 
@@ -539,12 +543,12 @@ export default function AnalysisResultPage({
                         console.log('Loaded analysis data with composite score:', parsedAnalysis.tcaData?.compositeScore);
                     } catch (e) {
                         console.error('Failed to parse analysis data:', e);
-                        setAnalysisData(sampleAnalysisData);
-                        setIsUsingSampleData(true);
+                        redirectToRunAnalysis('Stored analysis data is invalid. Please run the analysis again.');
+                        return;
                     }
-                } else {
-                    setAnalysisData(sampleAnalysisData);
-                    setIsUsingSampleData(true);
+                } else if (!isPreview) {
+                    redirectToRunAnalysis('No real analysis results were found. Please run analysis first.');
+                    return;
                 }
 
                 // Load unified record tracking IDs
@@ -610,9 +614,10 @@ export default function AnalysisResultPage({
                 console.error('Error loading user and config:', error);
                 setRole('user');
                 setReportType('triage');
-                setAnalysisData(sampleAnalysisData);
-                setIsUsingSampleData(true);
-                setAnalysisDuration(45.32);
+                setIsUsingSampleData(false);
+                setAnalysisDuration(null);
+                redirectToRunAnalysis('Unable to load a real analysis result. Please start a new analysis.');
+                return;
             } finally {
                 setIsLoading(false);
             }

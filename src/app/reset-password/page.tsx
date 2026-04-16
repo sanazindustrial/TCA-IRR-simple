@@ -9,7 +9,8 @@ import Link from 'next/link';
 import { KeyRound, Lock, ArrowLeft, Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net').replace(/\/$/, '');
+const API_PREFIX = '/api/v1';
 
 export default function ResetPasswordPage() {
     const [password, setPassword] = useState('');
@@ -33,7 +34,7 @@ export default function ResetPasswordPage() {
             }
 
             try {
-                const response = await fetch(`${API_BASE_URL}/auth/reset-password/validate/${token}`);
+                const response = await fetch(`${API_BASE_URL}${API_PREFIX}/auth/reset-password/validate/${token}`);
                 const data = await response.json();
 
                 if (response.ok && data.valid) {
@@ -84,7 +85,7 @@ export default function ResetPasswordPage() {
 
         setIsLoading(true);
         try {
-            const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+            const response = await fetch(`${API_BASE_URL}${API_PREFIX}/auth/reset-password`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

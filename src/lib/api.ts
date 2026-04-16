@@ -5,7 +5,7 @@
 
 // API Configuration
 export const API_CONFIG = {
-    BASE_URL: process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net',
+    BASE_URL: (process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net').replace(/\/$/, ''),
     API_PREFIX: '/api/v1',
     ENDPOINTS: {
         AUTH: {
@@ -26,8 +26,17 @@ export const API_CONFIG = {
 };
 
 // Helper function to construct full API URLs
+export const normalizeApiPath = (path: string): string => {
+    if (!path) return `${API_CONFIG.API_PREFIX}/health`;
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    if (path === '/api') return `${API_CONFIG.API_PREFIX}/health`;
+    if (path === '/health' || path.startsWith('/api/v1/')) return path;
+    if (path.startsWith('/api/')) return `${API_CONFIG.API_PREFIX}/${path.slice('/api/'.length)}`;
+    return `${API_CONFIG.API_PREFIX}${path.startsWith('/') ? path : `/${path}`}`;
+};
+
 export const getApiUrl = (path: string): string => {
-    return `${API_CONFIG.BASE_URL}${path}`;
+    return `${API_CONFIG.BASE_URL}${normalizeApiPath(path)}`;
 };
 
 // API Response Types
@@ -44,7 +53,7 @@ export class ApiClient {
     private token: string | null = null;
 
     constructor(baseUrl: string = API_CONFIG.BASE_URL) {
-        this.baseUrl = baseUrl;
+        this.baseUrl = baseUrl.replace(/\/$/, '');
 
         // Try to get token from localStorage if available
         if (typeof window !== 'undefined') {
@@ -77,7 +86,7 @@ export class ApiClient {
 
     async get<T = any>(path: string): Promise<ApiResponse<T>> {
         try {
-            const url = `${this.baseUrl}${path}`;
+            const url = getApiUrl(path);
             console.log('API GET Request:', url);
 
             const response = await fetch(url, {
@@ -105,9 +114,11 @@ export class ApiClient {
                 error: error instanceof Error ? error.message : 'Unknown error'
             };
         }
-    } async post<T = any>(path: string, body: any = {}): Promise<ApiResponse<T>> {
+    }
+
+    async post<T = any>(path: string, body: any = {}): Promise<ApiResponse<T>> {
         try {
-            const response = await fetch(`${this.baseUrl}${path}`, {
+            const response = await fetch(getApiUrl(path), {
                 method: 'POST',
                 headers: this.getHeaders(),
                 body: JSON.stringify(body),
@@ -130,7 +141,7 @@ export class ApiClient {
 
     async put<T = any>(path: string, body: any = {}): Promise<ApiResponse<T>> {
         try {
-            const response = await fetch(`${this.baseUrl}${path}`, {
+            const response = await fetch(getApiUrl(path), {
                 method: 'PUT',
                 headers: this.getHeaders(),
                 body: JSON.stringify(body),
@@ -153,7 +164,7 @@ export class ApiClient {
 
     async delete<T = any>(path: string): Promise<ApiResponse<T>> {
         try {
-            const response = await fetch(`${this.baseUrl}${path}`, {
+            const response = await fetch(getApiUrl(path), {
                 method: 'DELETE',
                 headers: this.getHeaders(),
             });
@@ -226,7 +237,7 @@ export const evaluationApi = {
 // Health check function
 export const checkApiHealth = async (): Promise<boolean> => {
     try {
-        const response = await api.get('/api');
+        const response = await api.get('/api/v1/health');
         return response.success === true;
     } catch {
         return false;

@@ -10,7 +10,8 @@ import Link from 'next/link';
 import { KeyRound, Mail, ArrowLeft, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net').replace(/\/$/, '');
+const API_PREFIX = '/api/v1';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -31,7 +32,7 @@ export default function ForgotPasswordPage() {
 
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+      const response = await fetch(`${API_BASE_URL}${API_PREFIX}/auth/forgot-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
