@@ -8,7 +8,7 @@ export async function runAnalysisClient(
   console.log('Client: Running comprehensive analysis for framework:', framework);
 
   try {
-    const response = await fetch('/api/analysis/comprehensive', {
+    const response = await fetch('/api/v1/analysis/comprehensive', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

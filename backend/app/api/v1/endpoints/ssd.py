@@ -12,13 +12,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, status, Header, Security
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, Header, Security
 from fastapi.security import APIKeyHeader
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr, Field
 import httpx
 
-from app.db import db_manager
+from app.db import db_manager, get_db
 from app.core import settings
 
 logger = logging.getLogger(__name__)
@@ -194,6 +194,63 @@ def _ssd_audit_update(tracking_id: str, **kwargs):
     """Update audit log metadata fields."""
     if tracking_id in SSD_AUDIT_LOGS:
         SSD_AUDIT_LOGS[tracking_id].update(kwargs)
+
+
+async def _ssd_audit_persist_to_db(tracking_id: str):
+    """Persist the in-memory audit log entry to the database."""
+    entry = SSD_AUDIT_LOGS.get(tracking_id)
+    if not entry:
+        return
+    try:
+        async with db_manager.get_connection() as conn:
+            await conn.execute(
+                """CREATE TABLE IF NOT EXISTS ssd_audit_logs (
+                    tracking_id TEXT PRIMARY KEY,
+                    company_name TEXT,
+                    founder_email TEXT,
+                    status TEXT,
+                    events JSONB DEFAULT '[]',
+                    created_at TIMESTAMPTZ DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ DEFAULT NOW(),
+                    processing_duration_ms INTEGER,
+                    callback_status TEXT,
+                    report_path TEXT,
+                    extra JSONB DEFAULT '{}'
+                )"""
+            )
+            await conn.execute(
+                """INSERT INTO ssd_audit_logs
+                    (tracking_id, company_name, founder_email, status, events,
+                     created_at, updated_at, processing_duration_ms, callback_status, report_path, extra)
+                   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+                   ON CONFLICT (tracking_id) DO UPDATE SET
+                    company_name = EXCLUDED.company_name,
+                    founder_email = EXCLUDED.founder_email,
+                    status = EXCLUDED.status,
+                    events = EXCLUDED.events,
+                    updated_at = EXCLUDED.updated_at,
+                    processing_duration_ms = EXCLUDED.processing_duration_ms,
+                    callback_status = EXCLUDED.callback_status,
+                    report_path = EXCLUDED.report_path,
+                    extra = EXCLUDED.extra
+                """,
+                tracking_id,
+                entry.get("company_name"),
+                entry.get("founder_email"),
+                entry.get("status", "unknown"),
+                json.dumps(entry.get("events", [])),
+                datetime.fromisoformat(entry["created_at"].rstrip("Z")) if entry.get("created_at") else datetime.utcnow(),
+                datetime.utcnow(),
+                entry.get("processing_duration_ms"),
+                entry.get("callback_status"),
+                entry.get("report_path"),
+                json.dumps({k: v for k, v in entry.items()
+                            if k not in ("tracking_id", "company_name", "founder_email", "status",
+                                         "events", "created_at", "updated_at", "processing_duration_ms",
+                                         "callback_status", "report_path")}),
+            )
+    except Exception as db_err:
+        logger.warning(f"[SSD-AUDIT] Failed to persist audit log for {tracking_id}: {db_err}")
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -1086,11 +1143,44 @@ async def _process_ssd_tirr_request(
         processing_duration_ms = int((time.time() - start_time) * 1000)
         _ssd_audit_log(tracking_id, "completed", {"duration_ms": processing_duration_ms})
         _ssd_audit_update(tracking_id, status="completed", processing_duration_ms=processing_duration_ms)
-        
+        await _ssd_audit_persist_to_db(tracking_id)
+
+        # 8. Save to reports table so it appears on /dashboard/reports
+        try:
+            async with db_manager.get_connection() as conn:
+                await conn.execute(
+                    """
+                    INSERT INTO reports
+                        (title, company_id, generated_by, report_type, status,
+                         generated_at, file_path, metadata)
+                    VALUES ($1, NULL, NULL, $2, $3, NOW(), $4, $5::jsonb)
+                    """,
+                    company_name,
+                    "SSD Triage",
+                    "Completed",
+                    str(report_path),
+                    json.dumps({
+                        "company_name": company_name,
+                        "overall_score": score_data.get("final_score"),
+                        "tca_score": score_data.get("final_score"),
+                        "recommendation": score_data.get("recommendation"),
+                        "confidence": score_data.get("confidence", 0),
+                        "approval_status": "Pending",
+                        "source": "ssd_tirr",
+                        "tracking_id": tracking_id,
+                        "founder_email": founder_email,
+                        "module_scores": score_data.get("module_scores", {}),
+                    }),
+                )
+                logger.info(f"[SSD-TIRR] Report saved to reports table for '{company_name}'")
+        except Exception as rep_err:
+            logger.warning(f"[SSD-TIRR] Failed to save to reports table: {rep_err}")
+
     except Exception as e:
         logger.error(f"[SSD-TIRR] Processing failed: {e}")
         _ssd_audit_log(tracking_id, "error", {"error": str(e)})
         _ssd_audit_update(tracking_id, status="failed")
+        await _ssd_audit_persist_to_db(tracking_id)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -1306,78 +1396,157 @@ async def list_ssd_audit_logs(
     status: Optional[str] = None,
     limit: int = 50,
     offset: int = 0,
+    db=Depends(get_db),
 ):
-    """List all SSD integration audit logs."""
-    logs = list(SSD_AUDIT_LOGS.values())
-    
+    """List all SSD integration audit logs (DB + in-progress from memory)."""
+    db_logs: dict = {}
+    try:
+        await db.execute(
+            """CREATE TABLE IF NOT EXISTS ssd_audit_logs (
+                tracking_id TEXT PRIMARY KEY,
+                company_name TEXT,
+                founder_email TEXT,
+                status TEXT,
+                events JSONB DEFAULT '[]',
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                updated_at TIMESTAMPTZ DEFAULT NOW(),
+                processing_duration_ms INTEGER,
+                callback_status TEXT,
+                report_path TEXT,
+                extra JSONB DEFAULT '{}'
+            )"""
+        )
+        rows = await db.fetch(
+            "SELECT * FROM ssd_audit_logs ORDER BY updated_at DESC LIMIT $1 OFFSET $2",
+            limit, offset
+        )
+        for row in rows:
+            entry = dict(row)
+            entry["events"] = json.loads(entry["events"]) if isinstance(entry["events"], str) else (entry["events"] or [])
+            entry["extra"] = json.loads(entry["extra"]) if isinstance(entry["extra"], str) else (entry["extra"] or {})
+            entry["created_at"] = entry["created_at"].isoformat() + "Z" if entry.get("created_at") else None
+            entry["updated_at"] = entry["updated_at"].isoformat() + "Z" if entry.get("updated_at") else None
+            db_logs[entry["tracking_id"]] = entry
+    except Exception as db_err:
+        logger.warning(f"[SSD-AUDIT] DB read failed: {db_err}")
+
+    # Merge in-memory (in-progress items not yet persisted) with DB results
+    merged: dict = {**db_logs}
+    for tid, entry in SSD_AUDIT_LOGS.items():
+        if tid not in merged:
+            merged[tid] = entry
+
+    logs = list(merged.values())
     if status:
         logs = [log for log in logs if log.get("status") == status]
-    
-    # Sort by created_at descending
+
     logs.sort(key=lambda x: x.get("created_at", ""), reverse=True)
-    
-    # Paginate
     total = len(logs)
     logs = logs[offset:offset + limit]
-    
-    return {
-        "total": total,
-        "limit": limit,
-        "offset": offset,
-        "logs": logs,
-    }
+
+    return {"total": total, "limit": limit, "offset": offset, "logs": logs}
 
 
 @router.get("/audit/logs/{tracking_id}")
-async def get_ssd_audit_log(tracking_id: str):
+async def get_ssd_audit_log(tracking_id: str, db=Depends(get_db)):
     """Get audit log for a specific tracking ID."""
-    if tracking_id not in SSD_AUDIT_LOGS:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No audit log found for tracking_id: {tracking_id}"
-        )
-    return SSD_AUDIT_LOGS[tracking_id]
+    # Check in-memory first (might be in progress)
+    if tracking_id in SSD_AUDIT_LOGS:
+        return SSD_AUDIT_LOGS[tracking_id]
+    # Fall back to DB
+    try:
+        row = await db.fetchrow("SELECT * FROM ssd_audit_logs WHERE tracking_id = $1", tracking_id)
+        if row:
+            entry = dict(row)
+            entry["events"] = json.loads(entry["events"]) if isinstance(entry["events"], str) else (entry["events"] or [])
+            entry["extra"] = json.loads(entry["extra"]) if isinstance(entry["extra"], str) else (entry["extra"] or {})
+            return entry
+    except Exception:
+        pass
+    raise HTTPException(status_code=404, detail=f"No audit log found for tracking_id: {tracking_id}")
+
+
+@router.delete("/audit/logs/{tracking_id}")
+async def delete_ssd_audit_log(tracking_id: str, db=Depends(get_db)):
+    """Delete audit log for a specific tracking ID."""
+    found = False
+    if tracking_id in SSD_AUDIT_LOGS:
+        del SSD_AUDIT_LOGS[tracking_id]
+        found = True
+    try:
+        result = await db.execute("DELETE FROM ssd_audit_logs WHERE tracking_id = $1", tracking_id)
+        if result != "DELETE 0":
+            found = True
+    except Exception:
+        pass
+    if not found:
+        raise HTTPException(status_code=404, detail=f"No audit log found for tracking_id: {tracking_id}")
+    return {"success": True, "tracking_id": tracking_id}
 
 
 @router.get("/audit/stats")
-async def get_ssd_audit_stats():
+async def get_ssd_audit_stats(db=Depends(get_db)):
     """Get aggregated statistics for SSD integration."""
-    logs = list(SSD_AUDIT_LOGS.values())
-    
+    # Read from DB
+    db_logs = []
+    try:
+        await db.execute(
+            """CREATE TABLE IF NOT EXISTS ssd_audit_logs (
+                tracking_id TEXT PRIMARY KEY,
+                company_name TEXT,
+                founder_email TEXT,
+                status TEXT,
+                events JSONB DEFAULT '[]',
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                updated_at TIMESTAMPTZ DEFAULT NOW(),
+                processing_duration_ms INTEGER,
+                callback_status TEXT,
+                report_path TEXT,
+                extra JSONB DEFAULT '{}'
+            )"""
+        )
+        rows = await db.fetch("SELECT status, callback_status, processing_duration_ms, extra FROM ssd_audit_logs")
+        for row in rows:
+            db_logs.append(dict(row))
+    except Exception as db_err:
+        logger.warning(f"[SSD-AUDIT] Stats DB read failed: {db_err}")
+
+    # Merge with in-memory for in-progress
+    mem_logs = [v for k, v in SSD_AUDIT_LOGS.items()
+                if k not in {r.get("tracking_id") for r in db_logs}]
+    logs = db_logs + mem_logs
+
     total = len(logs)
     completed = sum(1 for log in logs if log.get("status") == "completed")
     failed = sum(1 for log in logs if log.get("status") == "failed")
-    processing = sum(1 for log in logs if log.get("status") == "processing")
-    
+    processing = sum(1 for log in logs if log.get("status") in ("processing", "pending"))
+
     callback_sent = sum(1 for log in logs if log.get("callback_status") == "sent")
     callback_failed = sum(1 for log in logs if log.get("callback_status") == "failed")
-    callback_not_configured = sum(1 for log in logs if log.get("callback_status") == "not_configured")
-    
-    processing_times = [log.get("processing_duration_ms", 0) for log in logs if log.get("processing_duration_ms")]
+    callback_not_configured = sum(1 for log in logs if not log.get("callback_status"))
+
+    processing_times = [log.get("processing_duration_ms") for log in logs if log.get("processing_duration_ms")]
     avg_processing_time = sum(processing_times) / len(processing_times) if processing_times else 0
-    
-    scores = [log.get("final_score", 0) for log in logs if log.get("final_score")]
-    avg_score = sum(scores) / len(scores) if scores else 0
-    
+
     return {
         "total_requests": total,
         "status_breakdown": {
             "completed": completed,
             "failed": failed,
-            "processing": processing
+            "processing": processing,
         },
         "callback_stats": {
             "sent": callback_sent,
             "failed": callback_failed,
-            "not_configured": callback_not_configured
+            "not_configured": callback_not_configured,
         },
         "performance": {
-            "avg_processing_time_ms": round(avg_processing_time, 2)
+            "avg_processing_time_ms": round(avg_processing_time, 2),
         },
         "scores": {
-            "avg_final_score": round(avg_score, 2),
-            "total_evaluated": len(scores)
-        }
+            "avg_final_score": 0,
+            "total_evaluated": 0,
+        },
     }
 
 

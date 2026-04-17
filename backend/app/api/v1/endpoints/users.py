@@ -29,11 +29,12 @@ from . import auth
 async def get_users(page: int = 1,
                     size: int = 20,
                     search: Optional[str] = None,
+                    role: Optional[str] = None,
+                    status_filter: Optional[str] = Query(None, alias="status"),
                     db: asyncpg.Connection = Depends(get_db),
                     current_user: dict = Depends(get_current_user)):
     """Get paginated list of users (admin only)"""
     
-    # Check if current user is admin
     if current_user.get('role') != 'admin':
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -41,45 +42,43 @@ async def get_users(page: int = 1,
         )
     
     try:
-        # Calculate offset
         offset = (page - 1) * size
-        
-        # Build query based on search
+
+        conditions = []
+        params = []
+        param_count = 1
+
         if search:
-            # Count total matching users
-            total = await db.fetchval(
-                """
-                SELECT COUNT(*) FROM users 
-                WHERE username ILIKE $1 OR email ILIKE $1
-                """,
-                f"%{search}%"
-            )
-            
-            # Fetch users with search
-            rows = await db.fetch(
-                """
-                SELECT id, username, email, role, is_active, created_at, updated_at
-                FROM users 
-                WHERE username ILIKE $1 OR email ILIKE $1
-                ORDER BY created_at DESC
-                LIMIT $2 OFFSET $3
-                """,
-                f"%{search}%", size, offset
-            )
-        else:
-            # Count total users
-            total = await db.fetchval("SELECT COUNT(*) FROM users")
-            
-            # Fetch users
-            rows = await db.fetch(
-                """
-                SELECT id, username, email, role, is_active, created_at, updated_at
-                FROM users 
-                ORDER BY created_at DESC
-                LIMIT $1 OFFSET $2
-                """,
-                size, offset
-            )
+            conditions.append(f"(username ILIKE ${param_count} OR email ILIKE ${param_count})")
+            params.append(f"%{search}%")
+            param_count += 1
+
+        if role:
+            conditions.append(f"role = ${param_count}")
+            params.append(role.lower())
+            param_count += 1
+
+        if status_filter:
+            normalized_status = status_filter.lower()
+            if normalized_status in ["active", "inactive"]:
+                conditions.append(f"is_active = ${param_count}")
+                params.append(normalized_status == "active")
+                param_count += 1
+
+        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+
+        total_query = f"SELECT COUNT(*) FROM users {where_clause}"
+        total = await db.fetchval(total_query, *params)
+
+        rows_query = f"""
+            SELECT id, username, email, role, is_active, created_at, updated_at,
+                   triage_report_limit, dd_report_limit
+            FROM users
+            {where_clause}
+            ORDER BY created_at DESC
+            LIMIT ${param_count} OFFSET ${param_count + 1}
+        """
+        rows = await db.fetch(rows_query, *params, size, offset)
         
         # Convert rows to user responses
         users = []
@@ -109,6 +108,79 @@ async def get_users(page: int = 1,
         )
 
 
+@router.get("/export")
+async def export_users(
+    format: str = Query("csv", description="Export format (csv or json)"),
+    db: asyncpg.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Export all users to CSV or JSON (admin only)"""
+    
+    if current_user.get('role') != 'admin':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins can export users"
+        )
+    
+    try:
+        rows = await db.fetch(
+            """
+            SELECT id, username, email, role, is_active, created_at, updated_at
+            FROM users ORDER BY created_at DESC
+            """
+        )
+        
+        if format.lower() == "csv":
+            # Create CSV in memory
+            output = io.StringIO()
+            writer = csv.writer(output)
+            
+            # Write header
+            writer.writerow(['ID', 'Username', 'Email', 'Role', 'Status', 'Created At', 'Updated At'])
+            
+            # Write data
+            for row in rows:
+                writer.writerow([
+                    row['id'],
+                    row['username'],
+                    row['email'],
+                    row['role'],
+                    'Active' if row['is_active'] else 'Inactive',
+                    row['created_at'].isoformat() if row['created_at'] else '',
+                    row['updated_at'].isoformat() if row['updated_at'] else ''
+                ])
+            
+            output.seek(0)
+            filename = f"users_export_{datetime.now().strftime('%Y%m%d')}.csv"
+            
+            return StreamingResponse(
+                iter([output.getvalue()]),
+                media_type="text/csv",
+                headers={"Content-Disposition": f"attachment; filename={filename}"}
+            )
+        else:
+            # Return JSON
+            users = []
+            for row in rows:
+                users.append({
+                    "id": row['id'],
+                    "username": row['username'],
+                    "email": row['email'],
+                    "role": row['role'],
+                    "is_active": row['is_active'],
+                    "created_at": row['created_at'].isoformat() if row['created_at'] else None,
+                    "updated_at": row['updated_at'].isoformat() if row['updated_at'] else None
+                })
+            return {"users": users, "total": len(users)}
+            
+    except Exception as e:
+        logger.error(f"Error exporting users: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error exporting users"
+        )
+
+
 @router.get("/{user_id}", response_model=UserResponse)
 async def get_user(user_id: int,
                    db: asyncpg.Connection = Depends(get_db),
@@ -125,7 +197,8 @@ async def get_user(user_id: int,
     try:
         row = await db.fetchrow(
             """
-            SELECT id, username, email, role, is_active, created_at, updated_at
+            SELECT id, username, email, role, is_active, created_at, updated_at,
+                   triage_report_limit, dd_report_limit
             FROM users WHERE id = $1
             """,
             user_id
@@ -218,7 +291,20 @@ async def update_user(user_id: int,
             update_fields.append(f"is_active = ${param_count}")
             values.append(user_update.is_active)
             param_count += 1
-        
+
+        if user_update.triage_report_limit is not None and is_admin:
+            # 0 or negative resets to role default (NULL); positive values set a custom limit
+            triage_val = None if user_update.triage_report_limit <= 0 else user_update.triage_report_limit
+            update_fields.append(f"triage_report_limit = ${param_count}")
+            values.append(triage_val)
+            param_count += 1
+
+        if user_update.dd_report_limit is not None and is_admin:
+            dd_val = None if user_update.dd_report_limit <= 0 else user_update.dd_report_limit
+            update_fields.append(f"dd_report_limit = ${param_count}")
+            values.append(dd_val)
+            param_count += 1
+
         if not update_fields:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -235,7 +321,8 @@ async def update_user(user_id: int,
         query = f"""
             UPDATE users SET {', '.join(update_fields)}
             WHERE id = ${param_count}
-            RETURNING id, username, email, role, is_active, created_at, updated_at
+            RETURNING id, username, email, role, is_active, created_at, updated_at,
+                      triage_report_limit, dd_report_limit
         """
         
         row = await db.fetchrow(query, *values)
@@ -284,6 +371,15 @@ async def delete_user(user_id: int,
                 detail="User not found"
             )
         
+        # Delete all FK-dependent rows before deleting the user
+        await db.execute("DELETE FROM audit_logs WHERE user_id = $1", user_id)
+        await db.execute("DELETE FROM allupload WHERE user_id = $1", user_id)
+        await db.execute("DELETE FROM simulation_runs WHERE user_id = $1", user_id)
+        await db.execute("DELETE FROM evaluations WHERE created_by = $1", user_id)
+        await db.execute("DELETE FROM module_settings_versions WHERE created_by = $1", user_id)
+        await db.execute("UPDATE report_versions SET changed_by = NULL WHERE changed_by = $1", user_id)
+        await db.execute("UPDATE reports SET generated_by = NULL WHERE generated_by = $1", user_id)
+        await db.execute("UPDATE reviewer_feedback SET reviewer_id = NULL WHERE reviewer_id = $1", user_id)
         # Delete user
         await db.execute("DELETE FROM users WHERE id = $1", user_id)
         
@@ -298,79 +394,6 @@ async def delete_user(user_id: int,
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error deleting user"
-        )
-
-
-@router.get("/export")
-async def export_users(
-    format: str = Query("csv", description="Export format (csv or json)"),
-    db: asyncpg.Connection = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
-):
-    """Export all users to CSV or JSON (admin only)"""
-    
-    if current_user.get('role') != 'admin':
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only admins can export users"
-        )
-    
-    try:
-        rows = await db.fetch(
-            """
-            SELECT id, username, email, role, is_active, created_at, updated_at
-            FROM users ORDER BY created_at DESC
-            """
-        )
-        
-        if format.lower() == "csv":
-            # Create CSV in memory
-            output = io.StringIO()
-            writer = csv.writer(output)
-            
-            # Write header
-            writer.writerow(['ID', 'Username', 'Email', 'Role', 'Status', 'Created At', 'Updated At'])
-            
-            # Write data
-            for row in rows:
-                writer.writerow([
-                    row['id'],
-                    row['username'],
-                    row['email'],
-                    row['role'],
-                    'Active' if row['is_active'] else 'Inactive',
-                    row['created_at'].isoformat() if row['created_at'] else '',
-                    row['updated_at'].isoformat() if row['updated_at'] else ''
-                ])
-            
-            output.seek(0)
-            filename = f"users_export_{datetime.now().strftime('%Y%m%d')}.csv"
-            
-            return StreamingResponse(
-                iter([output.getvalue()]),
-                media_type="text/csv",
-                headers={"Content-Disposition": f"attachment; filename={filename}"}
-            )
-        else:
-            # Return JSON
-            users = []
-            for row in rows:
-                users.append({
-                    "id": row['id'],
-                    "username": row['username'],
-                    "email": row['email'],
-                    "role": row['role'],
-                    "is_active": row['is_active'],
-                    "created_at": row['created_at'].isoformat() if row['created_at'] else None,
-                    "updated_at": row['updated_at'].isoformat() if row['updated_at'] else None
-                })
-            return {"users": users, "total": len(users)}
-            
-    except Exception as e:
-        logger.error(f"Error exporting users: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error exporting users"
         )
 
 
@@ -447,7 +470,7 @@ async def invite_user(
                 to_email=email,
                 invite_token=invite_token,
                 role=role,
-                inviter_name=current_user.get('username', 'Admin')
+                invited_by=current_user.get('username', 'Admin')
             )
             email_sent = True
         except Exception as e:

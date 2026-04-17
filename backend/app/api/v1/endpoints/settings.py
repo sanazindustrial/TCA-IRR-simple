@@ -3,6 +3,7 @@ Settings Version API Endpoints
 Manage module configurations, TCA categories, and simulation runs with versioning
 """
 
+import json
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, Depends, Query
@@ -25,6 +26,18 @@ from app.models.settings_version import (
 )
 
 router = APIRouter(prefix="/settings", tags=["Settings"])
+
+
+def _parse_json_field(value, default):
+    """Parse a JSON field from the DB – asyncpg may return JSONB as a string."""
+    if value is None:
+        return default
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except (json.JSONDecodeError, ValueError):
+            return default
+    return value
 
 
 # ===== Settings Versions =====
@@ -118,8 +131,8 @@ async def get_active_settings_version():
                     weight=float(r['weight']),
                     is_enabled=r['is_enabled'],
                     priority=r['priority'],
-                    settings=r['settings'] or {},
-                    thresholds=r['thresholds'] or {}
+                    settings=_parse_json_field(r['settings'], {}),
+                    thresholds=_parse_json_field(r['thresholds'], {})
                 ) for r in module_rows],
                 tca_categories=[TCACategory(
                     id=r['id'],
@@ -131,7 +144,7 @@ async def get_active_settings_version():
                     is_medtech_active=r['is_medtech_active'],
                     normalization_key=r['normalization_key'] or None,
                     description=r['description'],
-                    factors=r['factors'] or []
+                    factors=_parse_json_field(r['factors'], [])
                 ) for r in tca_rows]
             )
     except HTTPException:
@@ -187,8 +200,8 @@ async def get_settings_version(version_id: int):
                     weight=float(r['weight']),
                     is_enabled=r['is_enabled'],
                     priority=r['priority'],
-                    settings=r['settings'] or {},
-                    thresholds=r['thresholds'] or {}
+                    settings=_parse_json_field(r['settings'], {}),
+                    thresholds=_parse_json_field(r['thresholds'], {})
                 ) for r in module_rows],
                 tca_categories=[TCACategory(
                     id=r['id'],
@@ -200,7 +213,7 @@ async def get_settings_version(version_id: int):
                     is_medtech_active=r['is_medtech_active'],
                     normalization_key=r['normalization_key'] or None,
                     description=r['description'],
-                    factors=r['factors'] or []
+                    factors=_parse_json_field(r['factors'], [])
                 ) for r in tca_rows]
             )
     except HTTPException:
@@ -353,8 +366,8 @@ async def update_module_setting(version_id: int, module_id: str, data: ModuleSet
                 weight=float(row['weight']),
                 is_enabled=row['is_enabled'],
                 priority=row['priority'],
-                settings=row['settings'] or {},
-                thresholds=row['thresholds'] or {}
+                settings=_parse_json_field(row['settings'], {}),
+                thresholds=_parse_json_field(row['thresholds'], {})
             )
     except HTTPException:
         raise
@@ -388,7 +401,7 @@ async def get_tca_categories(version_id: int):
                 is_medtech_active=r['is_medtech_active'],
                 normalization_key=r['normalization_key'] or None,
                 description=r['description'],
-                factors=r['factors'] or []
+                factors=_parse_json_field(r['factors'], [])
             ) for r in rows]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

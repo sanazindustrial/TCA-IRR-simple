@@ -73,7 +73,7 @@ class Settings(BaseSettings):
     # Security Settings (overridden from Key Vault in production)
     secret_key: str = "your-secret-key-here"
     algorithm: str = "HS256"
-    access_token_expire_minutes: int = 30
+    access_token_expire_minutes: int = 480  # 8 hours - prevents session expiry during work
     refresh_token_expire_days: int = 7
 
     # AI Integration Settings

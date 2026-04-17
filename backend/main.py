@@ -113,9 +113,10 @@ async def lifespan(app: FastAPI):
 def create_application() -> FastAPI:
     """Create and configure FastAPI application"""
 
-    enable_api_docs = os.getenv("ENABLE_SWAGGER_DOCS", "true").lower() in {
+    raw_enable_api_docs = os.getenv("ENABLE_SWAGGER_DOCS", "true").lower()
+    enable_api_docs = raw_enable_api_docs in {
         "1", "true", "yes", "on"
-    }
+    } or settings.is_production
 
     app = FastAPI(
         title=settings.app_name,
@@ -214,6 +215,12 @@ async def health_check_fast():
 async def healthz():
     """Kubernetes-style health endpoint - INSTANT"""
     return {"status": "ok"}
+
+
+@app.get("/dashboard/system-health", response_model=None)
+async def dashboard_system_health():
+    """Stub for Azure health probe / frontend system-health page requests"""
+    return {"status": "healthy", "version": settings.version, "ready": _app_ready}
 
 
 @app.get("/ready", response_model=None)

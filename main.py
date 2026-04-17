@@ -873,7 +873,10 @@ app = FastAPI(
     title="TCA IRR Backend API",
     description="Backend API for TCA Investment Risk Rating Application",
     version="1.0.0",
-    lifespan=lifespan)
+    lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json")
 
 # CORS middleware
 app.add_middleware(

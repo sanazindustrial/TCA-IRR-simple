@@ -14,7 +14,7 @@ import logging
 import secrets
 from datetime import timedelta, datetime
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field, field_validator
 import asyncpg
@@ -39,8 +39,61 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 security = HTTPBearer()
 
-# In-memory password reset token storage (for production, use Redis or database)
+# In-memory password reset token storage — kept as fallback for compatibility
 password_reset_tokens: dict = {}
+
+
+async def _ensure_reset_tokens_table(db: asyncpg.Connection) -> None:
+    """Create password_reset_tokens table if it does not exist."""
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            token       TEXT PRIMARY KEY,
+            user_id     INTEGER NOT NULL,
+            email       TEXT NOT NULL,
+            username    TEXT NOT NULL,
+            expires_at  TIMESTAMP NOT NULL,
+            created_at  TIMESTAMP DEFAULT NOW()
+        )
+    """)
+
+
+async def _store_reset_token_db(db: asyncpg.Connection, token: str, user_id: int,
+                                 email: str, username: str, expires_at: datetime) -> None:
+    """Persist reset token to database."""
+    try:
+        await _ensure_reset_tokens_table(db)
+        # Remove any existing tokens for this user first
+        await db.execute("DELETE FROM password_reset_tokens WHERE email = $1", email)
+        await db.execute(
+            """INSERT INTO password_reset_tokens (token, user_id, email, username, expires_at)
+               VALUES ($1, $2, $3, $4, $5)""",
+            token, user_id, email, username, expires_at
+        )
+    except Exception as db_err:
+        logger.warning(f"Could not persist reset token to DB: {db_err}")
+
+
+async def _get_reset_token_db(db: asyncpg.Connection, token: str) -> Optional[dict]:
+    """Retrieve reset token data from database, checking expiry."""
+    try:
+        await _ensure_reset_tokens_table(db)
+        row = await db.fetchrow(
+            "SELECT * FROM password_reset_tokens WHERE token = $1 AND expires_at > NOW()",
+            token
+        )
+        if row:
+            return dict(row)
+    except Exception as db_err:
+        logger.warning(f"Could not retrieve reset token from DB: {db_err}")
+    return None
+
+
+async def _delete_reset_token_db(db: asyncpg.Connection, token: str) -> None:
+    """Remove used/expired token from database."""
+    try:
+        await db.execute("DELETE FROM password_reset_tokens WHERE token = $1", token)
+    except Exception:
+        pass
 
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(
@@ -446,6 +499,45 @@ async def get_current_user_info(
     return UserResponse(**current_user)
 
 
+@router.post("/change-password", response_model=BaseResponse)
+async def change_password(
+    request: Request,
+    current_password: str = Body(...),
+    new_password: str = Body(...),
+    current_user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db)
+):
+    """
+    Change the current user's password.
+
+    Requires valid JWT token. Body: {"current_password": "...", "new_password": "..."}
+    """
+    user_id = current_user.get('id')
+
+    # Fetch stored hash
+    row = await db.fetchrow(
+        "SELECT password_hash FROM users WHERE id = $1", user_id
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Verify current password
+    if not verify_password(current_password, row['password_hash']):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+
+    if len(new_password) < 6:
+        raise HTTPException(status_code=400, detail="New password must be at least 6 characters")
+
+    # Hash and save the new password
+    new_hash = get_password_hash(new_password)
+    await db.execute(
+        "UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2",
+        new_hash, user_id
+    )
+    logger.info(f"Password changed for user {current_user['username']} (id={user_id})")
+    return BaseResponse(message="Password changed successfully.")
+
+
 @router.post("/logout", response_model=BaseResponse)
 async def logout(
     request: Request,
@@ -510,8 +602,10 @@ async def forgot_password(
             # Generate password reset token
             reset_token = secrets.token_urlsafe(32)
             expires_at = datetime.utcnow() + timedelta(hours=1)
-            
-            # Store the reset token (in-memory for demo, use database/Redis for production)
+
+            # Store in DB (primary) and in-memory dict (fallback)
+            await _store_reset_token_db(db, reset_token, user['id'],
+                                        user['email'], user['username'], expires_at)
             password_reset_tokens[reset_token] = {
                 "user_id": user['id'],
                 "email": user['email'],
@@ -534,6 +628,8 @@ async def forgot_password(
             logger.info(f"Password reset requested for user: {user['username']}, token: {reset_token[:8]}...")
             
             # Send password reset email
+            reset_url = f"{settings.frontend_url}/reset-password?token={reset_token}"
+            email_sent = False
             try:
                 email_sent = await send_password_reset_email(
                     to_email=user['email'],
@@ -546,6 +642,15 @@ async def forgot_password(
                     logger.warning(f"Failed to send password reset email to {user['email']} - email service may not be configured")
             except Exception as email_error:
                 logger.error(f"Error sending password reset email: {email_error}")
+
+            # When email is not configured, include reset_url in response so admins can share it
+            if not email_sent:
+                logger.info(f"[PASSWORD-RESET] Token for {user['email']}: {reset_url}")
+                return ForgotPasswordResponse(
+                    success=True,
+                    message=f"Email service is not configured. Reset link generated — share with user or use the reset_url field.",
+                    reset_url=reset_url,
+                )
         else:
             # Log the attempt even if user doesn't exist (for security monitoring)
             logger.info(f"Password reset requested for non-existent email: {forgot_request.email}")
@@ -583,8 +688,10 @@ async def reset_password(
     user_agent = request.headers.get("user-agent", "unknown")
     
     try:
-        # Validate the reset token
-        token_data = password_reset_tokens.get(reset_request.token)
+        # Validate the reset token — check DB first, then fall back to in-memory dict
+        token_data = await _get_reset_token_db(db, reset_request.token)
+        if token_data is None:
+            token_data = password_reset_tokens.get(reset_request.token)
         
         if not token_data:
             raise HTTPException(
@@ -592,10 +699,10 @@ async def reset_password(
                 detail="Invalid or expired password reset token"
             )
         
-        # Check if token has expired
-        if datetime.utcnow() > token_data['expires_at']:
-            # Remove expired token
-            del password_reset_tokens[reset_request.token]
+        # Check if token has expired (in-memory path only; DB query already filters by expiry)
+        if isinstance(token_data.get('expires_at'), datetime) and datetime.utcnow() > token_data['expires_at']:
+            password_reset_tokens.pop(reset_request.token, None)
+            await _delete_reset_token_db(db, reset_request.token)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Password reset token has expired"
@@ -623,7 +730,8 @@ async def reset_password(
         )
         
         # Remove the used token
-        del password_reset_tokens[reset_request.token]
+        password_reset_tokens.pop(reset_request.token, None)
+        await _delete_reset_token_db(db, reset_request.token)
         
         # Clear any account lockout for this user
         await account_lockout.clear_failed_attempts(token_data['username'])

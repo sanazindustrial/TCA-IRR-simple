@@ -77,10 +77,10 @@ export async function runAnalysis(
 
       // Company data structure - Use real user data if provided
       company_data: {
-        name: userData?.companyName || 'Sample Company',
+        name: userData?.companyName || '',
         description: userData?.companyDescription ||
           (processedTexts[0] ? (typeof processedTexts[0] === 'string' ? processedTexts[0] : String(processedTexts[0])) : '').slice(0, 200) ||
-          'AI-powered startup using machine learning for optimization',
+          '',
         stage: 'seed',
         sector: backendSectorMap[framework],
         framework: framework,
@@ -142,7 +142,7 @@ export async function runAnalysis(
 
       // Analysis configuration
       stage: 'seed',
-      companyName: 'Sample Company'
+      companyName: userData?.companyName || ''
     };
 
     console.log('Making request to:', `${BACKEND_API_URL}${API_VERSION}/analysis/comprehensive`);

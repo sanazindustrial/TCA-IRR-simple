@@ -156,20 +156,20 @@ class EmailService:
             
             # Send email (synchronous call wrapped in async)
             import asyncio
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             poller = await loop.run_in_executor(
                 None, 
                 lambda: client.begin_send(message)
             )
             
-            # Wait for result
+            # Wait for result (EmailSendResult is a typed object, not a dict)
             result = await loop.run_in_executor(None, poller.result)
             
-            if result.get("status") == "Succeeded":
+            if result.status == "Succeeded":
                 logger.info(f"Email sent successfully via ACS to {to_email}")
                 return True
             else:
-                logger.error(f"ACS email failed with status: {result.get('status')}")
+                logger.error(f"ACS email failed with status: {result.status}")
                 return False
                 
         except Exception as e:

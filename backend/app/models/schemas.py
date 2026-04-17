@@ -96,6 +96,8 @@ class UserUpdate(BaseModel):
     email: Optional[str] = None
     role: Optional[UserRole] = None
     is_active: Optional[bool] = None
+    triage_report_limit: Optional[int] = None
+    dd_report_limit: Optional[int] = None
 
 
 class UserResponse(UserBase):
@@ -103,6 +105,8 @@ class UserResponse(UserBase):
     id: int
     created_at: datetime
     updated_at: Optional[datetime] = None
+    triage_report_limit: Optional[int] = None
+    dd_report_limit: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -131,6 +135,7 @@ class ForgotPasswordRequest(BaseModel):
 class ForgotPasswordResponse(BaseResponse):
     """Forgot password response model"""
     message: str = "If an account exists with that email, a password reset link has been sent."
+    reset_url: Optional[str] = None  # Only populated when email service is not configured
 
 
 class ResetPasswordRequest(BaseModel):

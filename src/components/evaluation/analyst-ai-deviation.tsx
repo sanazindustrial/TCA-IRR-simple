@@ -170,7 +170,7 @@ export function AnalystAIDeviation({
     });
 
     try {
-      const response = await fetch('https://tcairrapiccontainer.azurewebsites.net/api/analysis/ai-deviation-comparison', {
+      const response = await fetch('https://tcairrapiccontainer.azurewebsites.net/api/v1/analysis/ai-deviation-comparison', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -249,7 +249,7 @@ export function AnalystAIDeviation({
         humanScoresObj[item.category] = item.analyst;
       });
 
-      const response = await fetch('https://tcairrapiccontainer.azurewebsites.net/api/analysis/submit-for-training', {
+      const response = await fetch('https://tcairrapiccontainer.azurewebsites.net/api/v1/analysis/submit-for-training', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -287,7 +287,7 @@ export function AnalystAIDeviation({
 
   const handleFlagForReview = async () => {
     try {
-      const response = await fetch('https://tcairrapiccontainer.azurewebsites.net/api/analysis/analyst-reviews', {
+      const response = await fetch('https://tcairrapiccontainer.azurewebsites.net/api/v1/analysis/analyst-reviews', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -314,7 +314,7 @@ export function AnalystAIDeviation({
   const handleAnalyzeSentiment = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('https://tcairrapiccontainer.azurewebsites.net/api/analysis/sentiment-analysis', {
+      const response = await fetch('https://tcairrapiccontainer.azurewebsites.net/api/v1/analysis/sentiment-analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
