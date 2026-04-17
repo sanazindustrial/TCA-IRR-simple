@@ -162,9 +162,13 @@ export default function ReviewerDashboardPage() {
     setIsRefreshing(true);
     try {
       // Attempt real API fetch - use the correct endpoint
-      const response = await fetch(`${API_URL}/api/analysis/analyst-reviews`, {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+      const response = await fetch(`${API_URL}/api/v1/analysis/analyst-reviews`, {
         method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
       });
 
       if (response.ok) {

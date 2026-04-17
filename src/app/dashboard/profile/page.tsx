@@ -6,36 +6,91 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useRef, useEffect } from 'react';
-import type { User } from '@/lib/users';
+
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://tcairrapiccontainer.azurewebsites.net';
+
+interface UserProfile {
+  id: number;
+  username: string;
+  email: string;
+  full_name?: string;
+  role: string;
+  is_active: boolean;
+}
 
 export default function ProfilePage() {
   const { toast } = useToast();
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [name, setName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('loggedInUser');
-    if (storedUser) {
-      const parsedUser: User = JSON.parse(storedUser);
-      setUser(parsedUser);
-      setName(parsedUser.name);
-      setAvatarUrl(parsedUser.avatar || 'https://picsum.photos/seed/10/200/200');
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      setLoading(false);
+      return;
     }
+    fetch(`${BACKEND_URL}/api/v1/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        setUser(data);
+        setName(data.full_name || data.username || '');
+        // Keep avatar from localStorage as backend doesn't store avatars
+        const storedUser = localStorage.getItem('loggedInUser');
+        if (storedUser) {
+          try {
+            const parsed = JSON.parse(storedUser);
+            setAvatarUrl(parsed.avatar || 'https://picsum.photos/seed/10/200/200');
+          } catch {}
+        }
+      })
+      .catch(() => {
+        // Fallback to localStorage if API fails
+        const storedUser = localStorage.getItem('loggedInUser');
+        if (storedUser) {
+          try {
+            const parsed = JSON.parse(storedUser);
+            setUser({ id: parsed.id, username: parsed.name, email: parsed.email, role: parsed.role, is_active: true });
+            setName(parsed.name);
+            setAvatarUrl(parsed.avatar || 'https://picsum.photos/seed/10/200/200');
+          } catch {}
+        }
+      })
+      .finally(() => setLoading(false));
   }, []);
 
-  const handleSaveChanges = () => {
-    if (user) {
-      const updatedUser = { ...user, name, avatar: avatarUrl };
-      localStorage.setItem('loggedInUser', JSON.stringify(updatedUser));
-      setUser(updatedUser);
-      toast({
-        title: 'Profile Updated',
-        description: 'Your changes have been saved successfully.',
+  const handleSaveChanges = async () => {
+    if (!user) return;
+    const token = localStorage.getItem('authToken');
+    if (!token) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/v1/users/${user.id}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ full_name: name }),
       });
-      // Force a re-render of the sidebar by dispatching a custom event
+      if (!res.ok) throw new Error('Failed to save');
+      const updated = await res.json();
+      setUser(updated);
+      // Sync avatar to localStorage for sidebar
+      const storedUser = localStorage.getItem('loggedInUser');
+      const base = storedUser ? JSON.parse(storedUser) : {};
+      localStorage.setItem('loggedInUser', JSON.stringify({ ...base, name, avatar: avatarUrl }));
       window.dispatchEvent(new Event('storage'));
+      toast({ title: 'Profile Updated', description: 'Your changes have been saved successfully.' });
+    } catch {
+      toast({ title: 'Error', description: 'Failed to save profile changes.', variant: 'destructive' });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -44,19 +99,20 @@ export default function ProfilePage() {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setAvatarUrl(reader.result as string);
-        toast({
-          title: 'Profile Picture Updated',
-          description: 'Your new profile picture has been set.',
-        });
+        const url = reader.result as string;
+        setAvatarUrl(url);
+        // Persist avatar locally (backend doesn't store images)
+        const storedUser = localStorage.getItem('loggedInUser');
+        const base = storedUser ? JSON.parse(storedUser) : {};
+        localStorage.setItem('loggedInUser', JSON.stringify({ ...base, avatar: url }));
+        toast({ title: 'Profile Picture Updated', description: 'Your new profile picture has been set.' });
       };
       reader.readAsDataURL(file);
     }
   };
 
-  if (!user) {
-    return <div>Loading...</div>;
-  }
+  if (loading) return <div className="p-8">Loading profile…</div>;
+  if (!user) return <div className="p-8">Please log in to view your profile.</div>;
 
   return (
     <div className="container mx-auto p-4 md:p-8">
@@ -69,7 +125,7 @@ export default function ProfilePage() {
           <div className="flex items-center gap-6">
             <Avatar className="size-24">
               <AvatarImage src={avatarUrl} />
-              <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+              <AvatarFallback>{(name || user.username || '?').charAt(0).toUpperCase()}</AvatarFallback>
             </Avatar>
             <div className="space-y-2">
                 <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
@@ -91,6 +147,10 @@ export default function ProfilePage() {
               <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="username">Username</Label>
+              <Input id="username" value={user.username} disabled />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="email">Email Address</Label>
               <Input id="email" type="email" value={user.email} disabled />
             </div>
@@ -102,7 +162,7 @@ export default function ProfilePage() {
               </p>
             </div>
           </div>
-           <Button onClick={handleSaveChanges}>Save Changes</Button>
+           <Button onClick={handleSaveChanges} disabled={saving}>{saving ? 'Saving…' : 'Save Changes'}</Button>
         </CardContent>
       </Card>
     </div>

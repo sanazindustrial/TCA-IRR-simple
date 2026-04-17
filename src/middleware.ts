@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+.import { NextRequest, NextResponse } from 'next/server';
 import {
     CSP_HEADERS,
     RateLimiter,
@@ -81,6 +81,7 @@ export function middleware(request: NextRequest) {
             '/api/reports',         // Report sync - uses backend auth
             '/api/analysis',        // Analysis endpoints - uses backend auth
             '/api/tracking',        // Tracking endpoints - uses backend auth
+            '/api/ssd',             // SSD integration proxy - uses API key auth on backend
         ];
         const shouldCheckCSRF = !skipCSRFRoutes.some(route => pathname.startsWith(route))
             && !isNextServerAction;
