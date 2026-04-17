@@ -1,4 +1,4 @@
-.import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import {
     CSP_HEADERS,
     RateLimiter,
