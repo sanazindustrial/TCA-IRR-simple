@@ -40,8 +40,8 @@ const initialHealthData = {
 };
 
 const initialAlerts = [
-  { id: 'alert-1', variant: 'destructive' as const, title: 'High Memory Usage', description: 'Memory usage is at 67% - consider scaling.', timestamp: '10/24/2025, 6:34:42 AM' },
-  { id: 'alert-2', variant: 'default' as const, title: 'Backup Completed', description: 'Daily backup completed successfully.', timestamp: '10/24/2025, 5:14:42 AM' },
+    { id: 'alert-1', variant: 'destructive' as const, title: 'High Memory Usage', description: 'Memory usage is at 67% - consider scaling.', timestamp: '10/24/2025, 6:34:42 AM' },
+    { id: 'alert-2', variant: 'default' as const, title: 'Backup Completed', description: 'Daily backup completed successfully.', timestamp: '10/24/2025, 5:14:42 AM' },
 ];
 
 const StatCard = ({
@@ -102,55 +102,73 @@ const SmallStatCard = ({
 );
 
 export default function SystemHealthPage() {
-  const [healthData, setHealthData] = useState(initialHealthData);
-  const [alerts, setAlerts] = useState(initialAlerts);
-  const [currentTime, setCurrentTime] = useState<Date | null>(null);
-  const [isMounted, setIsMounted] = useState(false);
+    const [healthData, setHealthData] = useState(initialHealthData);
+    const [alerts, setAlerts] = useState(initialAlerts);
+    const [currentTime, setCurrentTime] = useState(new Date());
 
-  // Set mounted state to prevent hydration mismatch
-  useEffect(() => {
-    setIsMounted(true);
-    setCurrentTime(new Date());
-  }, []);
+    const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
 
-  const updateHealthData = () => {
-    setHealthData(prev => ({
-      ...prev,
-      cpu: Math.random() * 80 + 10, // Keep it in a reasonable range
-      memory: Math.random() * 70 + 20,
-      disk: prev.disk + Math.random() * 0.01,
-      network: Math.random() * 100,
-      responseTime: Math.random() * 150 + 50,
-      activeUsers: Math.floor(Math.random() * 50) + 120,
-      apiCalls: prev.apiCalls + Math.floor(Math.random() * 100),
-    }));
-  };
-
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    const healthTimer = setInterval(updateHealthData, 3000); // Update health data every 3 seconds
-
-    return () => {
-      clearInterval(timer);
-      clearInterval(healthTimer);
+    const fetchHealthData = async () => {
+        try {
+            const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+            const res = await fetch(`${API_BASE}/api/v1/dashboard/health`, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            setHealthData(prev => ({
+                ...prev,
+                cpu: data.cpu?.percent ?? prev.cpu,
+                memory: data.memory?.percent ?? prev.memory,
+                disk: data.disk?.percent ?? prev.disk,
+                activeUsers: data.database?.user_count ?? prev.activeUsers,
+                apiCalls: data.database?.analysis_count ?? prev.apiCalls,
+            }));
+        } catch {
+            // Fallback to random on failure
+            setHealthData(prev => ({
+                ...prev,
+                cpu: Math.random() * 80 + 10,
+                memory: Math.random() * 70 + 20,
+                disk: prev.disk + Math.random() * 0.01,
+                network: Math.random() * 100,
+                responseTime: Math.random() * 150 + 50,
+                activeUsers: Math.floor(Math.random() * 50) + 120,
+                apiCalls: prev.apiCalls + Math.floor(Math.random() * 100),
+            }));
+        }
     };
-  }, []);
 
-  const handleRefresh = () => {
-    updateHealthData();
-  };
+    useEffect(() => {
+        fetchHealthData();
+        const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+        const healthTimer = setInterval(fetchHealthData, 10000); // Refresh every 10s
 
-  const handleResolve = (alertId: string) => {
-    setAlerts(prev => prev.filter(alert => alert.id !== alertId));
-  };
+        return () => {
+            clearInterval(timer);
+            clearInterval(healthTimer);
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
-  const getAlertIcon = (variant: 'destructive' | 'default') => {
-    switch (variant) {
-      case 'destructive': return <AlertTriangle className="h-4 w-4" />;
-      case 'default': return <CheckCircle className="h-4 w-4" />;
-      default: return <AlertTriangle className="h-4 w-4" />;
+    const handleRefresh = () => {
+        fetchHealthData();
+    };
+
+    const handleResolve = (alertId: string) => {
+        setAlerts(prev => prev.filter(alert => alert.id !== alertId));
+    };
+
+    const getAlertIcon = (variant: 'destructive' | 'default') => {
+        switch(variant) {
+            case 'destructive': return <AlertTriangle className="h-4 w-4" />;
+            case 'default': return <CheckCircle className="h-4 w-4" />;
+            default: return <AlertTriangle className="h-4 w-4" />;
+        }
     }
-  }
 
 
   return (
@@ -183,28 +201,28 @@ export default function SystemHealthPage() {
 
       <div className="grid gap-6 md:grid-cols-3 mb-6">
         <SmallStatCard
-          title="Response Time"
-          value={`${healthData.responseTime.toFixed(2)}ms`}
-          change={healthData.responseTimeChange}
-          changeType="increase"
-          unit="ms"
-          icon={Timer}
+            title="Response Time"
+            value={`${healthData.responseTime.toFixed(2)}ms`}
+            change={healthData.responseTimeChange}
+            changeType="increase"
+            unit="ms"
+            icon={Timer}
         />
         <SmallStatCard
-          title="Active Users"
-          value={healthData.activeUsers.toString()}
-          change={healthData.activeUsersChange}
-          changeType="increase"
-          unit=""
-          icon={Users}
+            title="Active Users"
+            value={healthData.activeUsers.toString()}
+            change={healthData.activeUsersChange}
+            changeType="increase"
+            unit=""
+            icon={Users}
         />
         <SmallStatCard
-          title="API Calls"
-          value={healthData.apiCalls.toLocaleString()}
-          change={healthData.apiCallsChange}
-          changeType="increase"
-          unit="%"
-          icon={BarChart}
+            title="API Calls"
+            value={healthData.apiCalls.toLocaleString()}
+            change={healthData.apiCallsChange}
+            changeType="increase"
+            unit="%"
+            icon={BarChart}
         />
       </div>
 
@@ -215,26 +233,26 @@ export default function SystemHealthPage() {
         <CardContent className="space-y-4">
           {alerts.length > 0 ? alerts.map(alert => (
             <Alert key={alert.id} variant={alert.variant}>
-              {getAlertIcon(alert.variant)}
-              <AlertTitle>{alert.title}</AlertTitle>
-              <AlertDescription className='flex justify-between items-center'>
+                {getAlertIcon(alert.variant)}
+                <AlertTitle>{alert.title}</AlertTitle>
+                <AlertDescription className='flex justify-between items-center'>
                 <div>
-                  {alert.description}
-                  <p className="text-xs text-muted-foreground mt-1">{alert.timestamp}</p>
+                    {alert.description}
+                    <p className="text-xs text-muted-foreground mt-1">{alert.timestamp}</p>
                 </div>
                 <Button variant="outline" size="sm" onClick={() => handleResolve(alert.id)}>Resolve</Button>
-              </AlertDescription>
+                </AlertDescription>
             </Alert>
           )) : (
             <div className="text-center py-8 text-muted-foreground">
-              <CheckCircle className="mx-auto size-8 text-success" />
-              <p className="mt-2">No active alerts.</p>
+                <CheckCircle className="mx-auto size-8 text-success"/>
+                <p className="mt-2">No active alerts.</p>
             </div>
           )}
         </CardContent>
       </Card>
-
-      <Card>
+      
+       <Card>
         <CardHeader>
           <CardTitle>System Status Overview</CardTitle>
         </CardHeader>
@@ -242,16 +260,16 @@ export default function SystemHealthPage() {
           <div className="p-4 bg-muted/50 rounded-lg">
             <h3 className="text-sm font-medium text-muted-foreground">Uptime</h3>
             <p className="text-2xl font-bold text-success flex items-center gap-2">
-              <span className="h-3 w-3 rounded-full bg-success"></span>
-              {healthData.uptime}%
+                <span className="h-3 w-3 rounded-full bg-success"></span>
+                {healthData.uptime}%
             </p>
             <p className="text-xs text-muted-foreground">Last 30 days</p>
           </div>
-          <div className="p-4 bg-muted/50 rounded-lg">
+           <div className="p-4 bg-muted/50 rounded-lg">
             <h3 className="text-sm font-medium text-muted-foreground">Error Rate</h3>
             <p className="text-2xl font-bold text-success flex items-center gap-2">
-              <span className="h-3 w-3 rounded-full bg-success"></span>
-              {healthData.errorRate}%
+                 <span className="h-3 w-3 rounded-full bg-success"></span>
+                 {healthData.errorRate}%
             </p>
             <p className="text-xs text-muted-foreground">Last 24 hours</p>
           </div>

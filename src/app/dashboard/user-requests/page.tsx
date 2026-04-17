@@ -61,15 +61,20 @@ const StatCard = ({ title, value, icon: Icon, color }: { title: string, value: n
   </Card>
 );
 
-const initialRequests = [
-  { id: 'req-1', title: 'Need access to DD reports for Project Alpha', type: 'Due Diligence Access', user: 'Standard User', status: 'Pending', priority: 'High', date: '10/24/2025', description: 'User: Standard User\nCompany: Project Alpha\nRole: User\nReason for Access: Need to conduct deep-dive analysis for investment committee.', resolutionNotes: '' },
-  { id: 'req-2', title: 'Bug: Report export to PDF fails', type: 'Bug Report', user: 'Analyst User', status: 'In Review', priority: 'Critical', date: '10/23/2025', description: 'Page/Feature: "Report Export"\nExpected Behavior: PDF download should start.\nActual Behavior: The button is unresponsive and a console error appears.\nSteps to Reproduce:\n1. Open any completed report.\n2. Click "Export & Share".\n3. Select "PDF".', resolutionNotes: 'Confirmed the bug. The issue seems to be with the PDF generation library on Firefox. A fix is being deployed in v1.2.1.' },
-  { id: 'req-3', title: 'Feature: Add custom scoring weights', type: 'Feature Request', user: 'Admin User', status: 'Approved', priority: 'Medium', date: '10/22/2025', description: 'Feature Idea: Allow admins to create and save custom weight profiles for TCA scorecard categories.\nProblem it Solves: Different sectors require different weighting. This would allow us to have a "Tech" profile and a "MedTech" profile.\nPotential Benefit: Increases analysis accuracy and flexibility.', resolutionNotes: 'Excellent idea. This has been approved and added to the Q4 roadmap. ETA for release is end of November.' },
-  { id: 'req-4', title: 'Request for 5 more triage reports', type: 'Additional Triage Reports', user: 'Standard User', status: 'Completed', priority: 'Low', date: '10/21/2025', description: 'User: Standard User\nCurrent Limit: 10/month\nReports Needed: 5\nJustification: Have a new batch of startups to screen this month.', resolutionNotes: 'Approved. The report limit for the user has been increased by 5 for the current billing cycle.' },
-  { id: 'req-5', title: 'Resubmit analysis for Innovate Inc.', type: 'Resubmission Request', user: 'Standard User', status: 'Rejected', priority: 'Medium', date: '10/20/2025', description: 'Report ID: rep-1\nCompany: Innovate Inc.\nReason for Resubmission: The company provided an updated pitch deck with new financial projections.\nFiles to Update: Innovate_Pitch_Deck_Q4.pdf', resolutionNotes: 'Rejected. Please create a new analysis for updated documents. Resubmissions are only for correcting system errors.' },
-];
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://tcairrapiccontainer.azurewebsites.net';
 
-type Request = typeof initialRequests[0];
+type Request = {
+  id: string;
+  request_type: string;
+  description: string;
+  priority: string;
+  status: string;
+  resolution_notes?: string;
+  username?: string;
+  user_id?: number;
+  created_at?: string;
+  updated_at?: string;
+};
 
 const requestCategories = [
   { id: 'additional_reports', title: 'Additional Triage Reports', icon: FileText },
@@ -103,6 +108,12 @@ const typeIcons: { [key: string]: React.ElementType } = {
 }
 
 const statusColors: { [key: string]: string } = {
+  'pending': 'bg-yellow-500/20 text-yellow-500',
+  'in_review': 'bg-blue-500/20 text-blue-500',
+  'approved': 'bg-green-500/20 text-green-500',
+  'completed': 'bg-green-500/20 text-green-500',
+  'rejected': 'bg-red-500/20 text-red-500',
+  // legacy capitalised values (fallback)
   'Pending': 'bg-yellow-500/20 text-yellow-500',
   'In Review': 'bg-blue-500/20 text-blue-500',
   'Approved': 'bg-green-500/20 text-green-500',
@@ -128,74 +139,80 @@ export default function UserRequestManagerPage() {
   const [resolutionNotes, setResolutionNotes] = useState('');
   const { toast } = useToast();
 
+  const fetchRequests = () => {
+    const token = localStorage.getItem('authToken');
+    if (!token) return;
+    fetch(`${BACKEND_URL}/api/v1/requests`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((data) => setRequests(data.items || []))
+      .catch(() => setRequests([]));
+  };
+
   useEffect(() => {
-    try {
-      const storedRequests = localStorage.getItem('userRequests');
-      if (storedRequests) {
-        setRequests(JSON.parse(storedRequests));
-      } else {
-        localStorage.setItem('userRequests', JSON.stringify(initialRequests));
-        setRequests(initialRequests);
-      }
-    } catch (error) {
-      console.error("Could not parse user requests from localStorage", error);
-      setRequests(initialRequests);
-    }
+    fetchRequests();
   }, []);
 
   const handleViewDetails = (request: Request) => {
     setSelectedRequest(request);
-    setResolutionNotes(request.resolutionNotes || '');
+    setResolutionNotes(request.resolution_notes || '');
     setDialogOpen(true);
   };
 
-  const updateRequest = (updatedRequest: Request) => {
-    const updatedRequests = requests.map(req =>
-      req.id === updatedRequest.id ? updatedRequest : req
-    );
-    setRequests(updatedRequests);
-    localStorage.setItem('userRequests', JSON.stringify(updatedRequests));
+  const patchRequest = async (requestId: string, body: object) => {
+    const token = localStorage.getItem('authToken');
+    const res = await fetch(`${BACKEND_URL}/api/v1/requests/${requestId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
   };
 
-  const changeStatus = (requestId: string, newStatus: string) => {
-    const request = requests.find(req => req.id === requestId);
-    if (request) {
-      updateRequest({ ...request, status: newStatus });
-      toast({
-        title: 'Status Updated',
-        description: `Request has been marked as ${newStatus}.`
-      });
+  const changeStatus = async (requestId: string, newStatus: string) => {
+    try {
+      const updated = await patchRequest(requestId, { status: newStatus });
+      setRequests(prev => prev.map(r => r.id === requestId ? { ...r, ...updated } : r));
+      toast({ title: 'Status Updated', description: `Request marked as ${newStatus}.` });
+    } catch {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to update status.' });
     }
-  }
+  };
 
-  const deleteRequest = (requestId: string) => {
-    const updatedRequests = requests.filter(req => req.id !== requestId);
-    setRequests(updatedRequests);
-    localStorage.setItem('userRequests', JSON.stringify(updatedRequests));
-    toast({
-      variant: 'destructive',
-      title: 'Request Deleted',
-      description: 'The user request has been permanently deleted.',
-    });
-  }
-
-  const handleSaveNotes = () => {
-    if (selectedRequest) {
-      updateRequest({ ...selectedRequest, resolutionNotes });
-      setDialogOpen(false);
-      toast({
-        title: 'Response Saved',
-        description: `Resolution notes updated and a notification email has been sent to the user.`,
+  const deleteRequest = async (requestId: string) => {
+    const token = localStorage.getItem('authToken');
+    try {
+      await fetch(`${BACKEND_URL}/api/v1/requests/${requestId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
       });
+      setRequests(prev => prev.filter(r => r.id !== requestId));
+      toast({ variant: 'destructive', title: 'Request Deleted', description: 'The request has been deleted.' });
+    } catch {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete request.' });
+    }
+  };
+
+  const handleSaveNotes = async () => {
+    if (!selectedRequest) return;
+    try {
+      const updated = await patchRequest(selectedRequest.id, { resolution_notes: resolutionNotes });
+      setRequests(prev => prev.map(r => r.id === selectedRequest.id ? { ...r, ...updated } : r));
+      setDialogOpen(false);
+      toast({ title: 'Response Saved', description: 'Resolution notes updated.' });
+    } catch {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to save notes.' });
     }
   };
 
 
   const filteredRequests = requests.filter(req => {
-    const searchMatch = req.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      req.user.toLowerCase().includes(searchQuery.toLowerCase());
+    const searchMatch = req.request_type.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (req.username || '').toLowerCase().includes(searchQuery.toLowerCase());
     const statusMatch = statusFilter === 'all' || req.status === statusFilter;
-    const typeMatch = typeFilter === 'all' || req.type === typeFilter;
+    const typeMatch = typeFilter === 'all' || req.request_type === typeFilter;
     return searchMatch && statusMatch && typeMatch;
   });
 
@@ -210,17 +227,17 @@ export default function UserRequestManagerPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="outline">{requests.filter(r => r.status === 'Pending').length} Pending</Badge>
-          <Badge variant="outline">{requests.filter(r => r.status === 'In Review').length} In Review</Badge>
+          <Badge variant="outline">{requests.filter(r => r.status === 'pending').length} Pending</Badge>
+          <Badge variant="outline">{requests.filter(r => r.status === 'in_review').length} In Review</Badge>
         </div>
       </header>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
         <StatCard title="Total Requests" value={requests.length} icon={FileText} color="text-primary" />
-        <StatCard title="Pending" value={requests.filter(r => r.status === 'Pending').length} icon={Clock} color="text-warning" />
-        <StatCard title="In Review" value={requests.filter(r => r.status === 'In Review').length} icon={Eye} color="text-blue-500" />
-        <StatCard title="Approved" value={requests.filter(r => r.status === 'Approved' || r.status === 'Completed').length} icon={CheckCircle} color="text-success" />
-        <StatCard title="Rejected" value={requests.filter(r => r.status === 'Rejected').length} icon={XCircle} color="text-destructive" />
+        <StatCard title="Pending" value={requests.filter(r => r.status === 'pending').length} icon={Clock} color="text-warning" />
+        <StatCard title="In Review" value={requests.filter(r => r.status === 'in_review').length} icon={Eye} color="text-blue-500" />
+        <StatCard title="Approved" value={requests.filter(r => r.status === 'approved' || r.status === 'completed').length} icon={CheckCircle} color="text-success" />
+        <StatCard title="Rejected" value={requests.filter(r => r.status === 'rejected').length} icon={XCircle} color="text-destructive" />
       </div>
 
       <Card>
@@ -277,26 +294,25 @@ export default function UserRequestManagerPage() {
             <TableBody>
               {filteredRequests.length > 0 ? (
                 filteredRequests.map(req => {
-                  const Icon = typeIcons[req.type] || typeIcons.default;
+                  const Icon = typeIcons[req.request_type] || typeIcons.default;
                   return (
                     <TableRow key={req.id}>
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <Icon className="size-5 text-muted-foreground" />
                           <div>
-                            <p className="font-medium">{req.title}</p>
-                            <p className="text-xs text-muted-foreground">{req.type}</p>
+                            <p className="font-medium">{req.request_type}</p>
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>{req.user}</TableCell>
+                      <TableCell>{req.username || '—'}</TableCell>
                       <TableCell>
                         <Badge className={cn('font-semibold', statusColors[req.status] || 'bg-gray-500/20 text-gray-500')}>{req.status}</Badge>
                       </TableCell>
                       <TableCell>
                         <p className={cn('font-semibold', priorityColors[req.priority] || 'text-muted-foreground')}>{req.priority}</p>
                       </TableCell>
-                      <TableCell>{req.date}</TableCell>
+                      <TableCell>{req.created_at ? new Date(req.created_at).toLocaleDateString() : '—'}</TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -339,9 +355,9 @@ export default function UserRequestManagerPage() {
       <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{selectedRequest?.title}</DialogTitle>
+            <DialogTitle>{selectedRequest?.request_type}</DialogTitle>
             <DialogDescription>
-              Submitted by {selectedRequest?.user} on {selectedRequest?.date}
+              Submitted by {selectedRequest?.username} on {selectedRequest?.created_at ? new Date(selectedRequest.created_at).toLocaleDateString() : '—'}
             </DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto pr-4">

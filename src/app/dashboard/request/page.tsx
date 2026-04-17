@@ -31,7 +31,6 @@ import {
     Bug,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { User } from '@/lib/users';
 
 const requestCategories = [
     { id: 'additional_reports', title: 'Additional Triage Reports', icon: FileText, template: 'User: [Your Name]\nCompany: [Company Name]\nCurrent Limit: [Current Report Limit]\nReports Needed: [Number]\nJustification: [Briefly explain why you need more reports]' },
@@ -53,7 +52,6 @@ export default function SubmitRequestPage() {
     const [requestTitle, setRequestTitle] = useState('general_question');
     const [description, setDescription] = useState('');
     const [priority, setPriority] = useState('Medium');
-    const [user, setUser] = useState<User | null>(null);
 
     const { toast } = useToast();
 
@@ -66,18 +64,11 @@ export default function SubmitRequestPage() {
         }
     }, [requestTitle]);
 
-    useEffect(() => {
-        const storedUser = localStorage.getItem('loggedInUser');
-        if (storedUser) {
-            setUser(JSON.parse(storedUser));
-        }
-    }, []);
-
     const handleRequestTitleChange = (newTitle: string) => {
         setRequestTitle(newTitle);
     };
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         const selectedCategory = requestCategories.find(c => c.id === requestTitle);
         if (!selectedCategory || !description.trim() || !priority.trim()) {
             toast({
@@ -88,21 +79,23 @@ export default function SubmitRequestPage() {
             return;
         }
 
-        try {
-            const existingRequests = JSON.parse(localStorage.getItem('userRequests') || '[]');
-            const newRequest = {
-                id: `req-${Date.now()}`,
-                title: selectedCategory.title,
-                type: selectedCategory.title, // For consistency with log page
-                user: user?.name || 'Unknown User',
-                status: 'Pending',
-                priority: priority,
-                date: new Date().toLocaleDateString(),
-                description: description, // Save the full description
-            };
+        const token = localStorage.getItem('authToken');
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://tcairrapiccontainer.azurewebsites.net';
 
-            const updatedRequests = [newRequest, ...existingRequests];
-            localStorage.setItem('userRequests', JSON.stringify(updatedRequests));
+        try {
+            const res = await fetch(`${backendUrl}/api/v1/requests`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+                body: JSON.stringify({
+                    request_type: selectedCategory.title,
+                    description,
+                    priority: priority.toLowerCase(),
+                }),
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
             toast({
                 title: 'Request Submitted',
@@ -113,11 +106,11 @@ export default function SubmitRequestPage() {
             setRequestTitle('general_question');
             setPriority('Medium');
         } catch (error) {
-            console.error('Failed to save request to localStorage:', error);
+            console.error('Failed to submit request:', error);
             toast({
                 variant: 'destructive',
                 title: 'Submission Failed',
-                description: 'There was an error saving your request. Please try again.',
+                description: 'There was an error submitting your request. Please try again.',
             });
         }
     };
