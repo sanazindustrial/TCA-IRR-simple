@@ -60,6 +60,8 @@ interface BackendUser {
   created_at: string;
   updated_at: string | null;
   full_name: string | null;
+  triage_report_limit: number | null;
+  dd_report_limit: number | null;
 }
 
 // User interface for UI display
@@ -70,6 +72,8 @@ interface User {
   role: string;
   triageReports: number | 'Unlimited';
   ddReports: number | 'Unlimited';
+  triageLimitCustom: number | null;
+  ddLimitCustom: number | null;
   permissions: string;
   status: string;
   lastActivity: string;
@@ -78,22 +82,58 @@ interface User {
   backendId?: number; // Store backend ID for API calls
 }
 
+function getRoleConfig(role: string) {
+  const normalizedRole = (role || 'user').toLowerCase();
+
+  switch (normalizedRole) {
+    case 'admin':
+      return {
+        display: 'Admin',
+        triageReports: 'Unlimited' as const,
+        ddReports: 'Unlimited' as const,
+        permissions: 'Full system administration',
+        avatarId: 'avatar1',
+      };
+    case 'analyst':
+      return {
+        display: 'Analyst',
+        triageReports: 25,
+        ddReports: 5,
+        permissions: 'Review and analysis functions',
+        avatarId: 'avatar2',
+      };
+    default:
+      return {
+        display: 'User',
+        triageReports: 10,
+        ddReports: 2,
+        permissions: 'Basic user functionality',
+        avatarId: 'avatar3',
+      };
+  }
+}
+
 // Convert backend user to UI user format
 function mapBackendUser(bu: BackendUser): User {
-  const roleDisplay = bu.role.charAt(0).toUpperCase() + bu.role.slice(1);
+  const roleConfig = getRoleConfig(bu.role);
+  // Use per-user custom limit when set, otherwise fall back to role default
+  const triageReports = bu.triage_report_limit != null ? bu.triage_report_limit : roleConfig.triageReports;
+  const ddReports = bu.dd_report_limit != null ? bu.dd_report_limit : roleConfig.ddReports;
   return {
     id: `usr_${bu.id}`,
     backendId: bu.id,
     name: bu.full_name || bu.username,
     email: bu.email,
-    role: roleDisplay,
-    triageReports: bu.role === 'admin' ? 'Unlimited' : bu.role === 'analyst' ? 25 : 10,
-    ddReports: bu.role === 'admin' ? 'Unlimited' : bu.role === 'analyst' ? 5 : 2,
-    permissions: bu.role === 'admin' ? 'Full system administration' : bu.role === 'analyst' ? 'Review and analysis functions' : 'Basic user functionality',
+    role: roleConfig.display,
+    triageReports,
+    ddReports,
+    triageLimitCustom: bu.triage_report_limit ?? null,
+    ddLimitCustom: bu.dd_report_limit ?? null,
+    permissions: roleConfig.permissions,
     status: bu.is_active ? 'Active' : 'Inactive',
     lastActivity: bu.updated_at ? formatTimeAgo(new Date(bu.updated_at)) : formatTimeAgo(new Date(bu.created_at)),
     cost: { ytd: 0, mtd: 0 },
-    avatarId: bu.role === 'admin' ? 'avatar1' : bu.role === 'analyst' ? 'avatar2' : 'avatar3',
+    avatarId: roleConfig.avatarId,
   };
 }
 
@@ -137,6 +177,14 @@ export default function UserManagementPage() {
   const [totalUsers, setTotalUsers] = useState(0);
   const [roleFilter, setRoleFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isCostDialogOpen, setIsCostDialogOpen] = useState(false);
+  const [editRole, setEditRole] = useState('user');
+  const [editStatus, setEditStatus] = useState('active');
+  const [editTriageLimit, setEditTriageLimit] = useState<string>('');
+  const [editDdLimit, setEditDdLimit] = useState<string>('');
+  const [isSavingUser, setIsSavingUser] = useState(false);
   const { toast } = useToast();
   const { currentUser } = useAuth();
 
@@ -163,7 +211,7 @@ export default function UserManagementPage() {
       if (roleFilter) params.append('role', roleFilter);
       if (statusFilter) params.append('status', statusFilter);
 
-      const response = await fetch(`${backendUrl}/api/v1/users?${params.toString()}`, {
+      const response = await fetch(`${backendUrl}/api/v1/users/?${params.toString()}`, {
         headers: {
           'Accept': 'application/json',
           'Authorization': `Bearer ${token}`,
@@ -172,11 +220,52 @@ export default function UserManagementPage() {
 
       if (response.ok) {
         const data = await response.json();
-        // Handle both response formats: { items, total } or { users, pagination }
         const usersList = data.items || data.users || [];
         const mappedUsers = Array.isArray(usersList) ? usersList.map(mapBackendUser) : [];
-        setUsers(mappedUsers);
-        setTotalUsers(data.total ?? data.pagination?.total ?? mappedUsers.length);
+
+        let enrichedUsers = mappedUsers;
+        try {
+          const costResponse = await fetch(`${backendUrl}/api/v1/cost/summary`, {
+            headers: {
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+          });
+
+          if (costResponse.ok) {
+            const costData = await costResponse.json();
+            const costEntries = Array.isArray(costData?.aiBreakdown?.costByUser) ? costData.aiBreakdown.costByUser : [];
+            const costMap = new Map<string, number>(
+              costEntries.map((entry: any) => [String(entry.name).toLowerCase(), Number(entry.cost || 0)])
+            );
+
+            enrichedUsers = mappedUsers.map((user): User => {
+              const nameKey = user.name.toLowerCase();
+              const emailKey = user.email.split('@')[0].toLowerCase();
+              const matchedCost = Number(costMap.get(nameKey) ?? costMap.get(emailKey) ?? 0);
+              const safeCost = Number.isFinite(matchedCost) ? matchedCost : 0;
+
+              return {
+                ...user,
+                cost: {
+                  mtd: safeCost,
+                  ytd: safeCost,
+                },
+              };
+            });
+          }
+        } catch (costError) {
+          console.warn('Unable to load dynamic cost data:', costError);
+        }
+
+        setUsers(enrichedUsers);
+        setTotalUsers(data.total ?? data.pagination?.total ?? enrichedUsers.length);
+      } else if (response.status === 401) {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('loggedInUser');
+        localStorage.removeItem('currentUser');
+        window.location.href = '/login';
+        return;
       } else if (response.status === 403) {
         toast({
           variant: 'destructive',
@@ -211,33 +300,18 @@ export default function UserManagementPage() {
   // Use users directly since search is now server-side
   const filteredUsers = users;
 
-  const handlePermissionChange = (userId: string, newPermissions: string) => {
-    setUsers(currentUsers =>
-      currentUsers.map(user =>
-        user.id === userId ? { ...user, permissions: newPermissions } : user
-      )
-    );
+  const openEditDialog = (user: User) => {
+    setSelectedUser(user);
+    setEditRole(user.role.toLowerCase());
+    setEditStatus(user.status === 'Active' ? 'active' : 'inactive');
+    setEditTriageLimit(user.triageLimitCustom != null ? String(user.triageLimitCustom) : '');
+    setEditDdLimit(user.ddLimitCustom != null ? String(user.ddLimitCustom) : '');
+    setIsEditDialogOpen(true);
   };
 
-  const handleReportChange = (userId: string, type: 'triage' | 'dd', value: string | number) => {
-    setUsers(currentUsers =>
-      currentUsers.map(user => {
-        if (user.id === userId) {
-          const strValue = String(value).trim();
-          const isUnlimited = strValue.toLowerCase() === 'unlimited';
-          const numericValue = parseInt(strValue, 10);
-          const newValue: number | 'Unlimited' = isUnlimited ? 'Unlimited' : (isNaN(numericValue) ? (typeof user.triageReports === 'number' ? user.triageReports : 0) : numericValue);
-
-          if (type === 'triage') {
-            return { ...user, triageReports: newValue };
-          } else {
-            const ddValue: number | 'Unlimited' = isUnlimited ? 'Unlimited' : (isNaN(numericValue) ? (typeof user.ddReports === 'number' ? user.ddReports : 0) : numericValue);
-            return { ...user, ddReports: ddValue };
-          }
-        }
-        return user;
-      })
-    );
+  const openCostDialog = (user: User) => {
+    setSelectedUser(user);
+    setIsCostDialogOpen(true);
   };
 
   const handleSendInvite = async () => {
@@ -292,10 +366,22 @@ export default function UserManagementPage() {
         throw new Error(data.detail || 'Failed to invite user');
       }
 
-      toast({
-        title: 'Invitation Sent',
-        description: `An invitation email has been sent to ${inviteEmail}. They will receive a link to create their account.`,
-      });
+      if (data.email_sent === false && data.invite_token) {
+        // Email failed — show copyable invite link
+        const inviteUrl = `${window.location.origin}/accept-invite?token=${data.invite_token}`;
+        toast({
+          title: 'Invite Created (Email Failed)',
+          description: `Email could not be sent. Share this link manually: ${inviteUrl}`,
+          duration: 15000,
+        });
+        // Also copy to clipboard silently
+        try { await navigator.clipboard.writeText(inviteUrl); } catch {}
+      } else {
+        toast({
+          title: 'Invitation Sent',
+          description: `An invitation email has been sent to ${inviteEmail}. They will receive a link to create their account.`,
+        });
+      }
       setInviteDialogOpen(false);
       setInviteEmail('');
       setInviteRole('analyst');
@@ -378,29 +464,32 @@ export default function UserManagementPage() {
       return;
     }
 
-    const action = user.status === 'Active' ? 'suspend' : 'activate';
+    const nextIsActive = user.status !== 'Active';
     try {
-      const response = await fetch(`${backendUrl}/api/v1/users/${user.backendId}/${action}`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
+      const response = await fetch(`${backendUrl}/api/v1/users/${user.backendId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ is_active: nextIsActive }),
       });
 
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        throw new Error(data.detail || `Failed to ${action} user`);
+        throw new Error(data.detail || `Failed to update user status`);
       }
 
-      toast({ title: 'Success', description: `User ${action}d successfully.` });
+      toast({ title: 'User Updated', description: `${user.email} has been ${nextIsActive ? 'activated' : 'suspended'}.` });
       loadUsers();
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Error', description: error instanceof Error ? error.message : `Failed to ${action} user.` });
+      toast({ variant: 'destructive', title: 'Error', description: error instanceof Error ? error.message : 'Failed to update user status.' });
     }
   };
 
   // Reset password handler
   const handleResetPassword = async (user: User) => {
-    if (!user.backendId) return;
-
     const token = getAuthToken();
     if (!token) {
       toast({ variant: 'destructive', title: 'Not Authenticated', description: 'Please log in.' });
@@ -408,19 +497,22 @@ export default function UserManagementPage() {
     }
 
     try {
-      const response = await fetch(`${backendUrl}/api/v1/users/${user.backendId}/reset-password`, {
+      const response = await fetch(`${backendUrl}/api/v1/auth/forgot-password`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email: user.email }),
       });
 
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.detail || 'Failed to reset password');
+        throw new Error(data.detail || 'Failed to send reset password email');
       }
 
-      const data = await response.json();
-      toast({ title: 'Password Reset Link Generated', description: `Reset link sent to ${data.email || user.email}.` });
+      toast({ title: 'Reset Email Sent', description: data.message || `Password reset instructions sent to ${user.email}.` });
     } catch (error) {
       toast({ variant: 'destructive', title: 'Error', description: error instanceof Error ? error.message : 'Failed to reset password.' });
     }
@@ -458,7 +550,7 @@ export default function UserManagementPage() {
   };
 
   // Edit user handler (update role/status)
-  const handleEditUser = async (user: User, updates: { role?: string; is_active?: boolean }) => {
+  const handleEditUser = async (user: User, updates: { role?: string; is_active?: boolean; triage_report_limit?: number; dd_report_limit?: number }) => {
     if (!user.backendId) return;
 
     const token = getAuthToken();
@@ -471,12 +563,31 @@ export default function UserManagementPage() {
         body: JSON.stringify(updates),
       });
 
-      if (!response.ok) throw new Error('Failed to update user');
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || 'Failed to update user');
 
-      toast({ title: 'User Updated', description: 'User details updated successfully.' });
+      toast({ title: 'User Updated', description: 'Role and permission settings updated successfully.' });
       loadUsers();
     } catch (error) {
       toast({ variant: 'destructive', title: 'Error', description: error instanceof Error ? error.message : 'Failed to update user.' });
+    }
+  };
+
+  const handleSaveUserEdits = async () => {
+    if (!selectedUser) return;
+
+    setIsSavingUser(true);
+    try {
+      await handleEditUser(selectedUser, {
+        role: editRole,
+        is_active: editStatus === 'active',
+        triage_report_limit: editTriageLimit !== '' ? (parseInt(editTriageLimit) || 0) : 0,
+        dd_report_limit: editDdLimit !== '' ? (parseInt(editDdLimit) || 0) : 0,
+      });
+      setIsEditDialogOpen(false);
+      setSelectedUser(null);
+    } finally {
+      setIsSavingUser(false);
     }
   };
 
@@ -507,6 +618,102 @@ export default function UserManagementPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit User</DialogTitle>
+            <DialogDescription>
+              Update the selected user's role and access status. Permissions and report limits update automatically.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedUser && (
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <Label>User</Label>
+                <Input value={`${selectedUser.name} (${selectedUser.email})`} readOnly />
+              </div>
+              <div className="space-y-2">
+                <Label>Role</Label>
+                <Select value={editRole} onValueChange={setEditRole}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="analyst">Analyst</SelectItem>
+                    <SelectItem value="user">User</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select value={editStatus} onValueChange={setEditStatus}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Triage Report Limit</Label>
+                <Input
+                  type="number"
+                  placeholder={`Leave empty for role default (${getRoleConfig(editRole).triageReports})`}
+                  value={editTriageLimit}
+                  onChange={(e) => setEditTriageLimit(e.target.value)}
+                  min={0}
+                />
+                <p className="text-xs text-muted-foreground">Role default: {getRoleConfig(editRole).triageReports}. Leave empty or set 0 to use the role default.</p>
+              </div>
+              <div className="space-y-2">
+                <Label>DD Report Limit</Label>
+                <Input
+                  type="number"
+                  placeholder={`Leave empty for role default (${getRoleConfig(editRole).ddReports})`}
+                  value={editDdLimit}
+                  onChange={(e) => setEditDdLimit(e.target.value)}
+                  min={0}
+                />
+                <p className="text-xs text-muted-foreground">Role default: {getRoleConfig(editRole).ddReports}. Leave empty or set 0 to use the role default.</p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} disabled={isSavingUser}>Cancel</Button>
+            <Button onClick={handleSaveUserEdits} disabled={isSavingUser}>
+              {isSavingUser ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCostDialogOpen} onOpenChange={setIsCostDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>User Cost Summary</DialogTitle>
+            <DialogDescription>
+              Current dynamic cost usage for the selected user.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedUser && (
+            <div className="space-y-3 py-2 text-sm">
+              <p><strong>User:</strong> {selectedUser.name}</p>
+              <p><strong>Email:</strong> {selectedUser.email}</p>
+              <p><strong>Role:</strong> {selectedUser.role}</p>
+              <p><strong>Month to Date:</strong> ${selectedUser.cost.mtd.toFixed(2)}</p>
+              <p><strong>Year to Date:</strong> ${selectedUser.cost.ytd.toFixed(2)}</p>
+              <p><strong>Permissions:</strong> {selectedUser.permissions}</p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setIsCostDialogOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <header className="flex justify-between items-center mb-8">
         <div className="flex items-center gap-2">
@@ -652,25 +859,13 @@ export default function UserManagementPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Input
-                          value={user.triageReports}
-                          onChange={(e) => handleReportChange(user.id, 'triage', e.target.value)}
-                          className="h-8 w-24"
-                        />
+                        <span className="text-sm font-medium">{user.triageReports}</span>
                       </TableCell>
                       <TableCell>
-                        <Input
-                          value={user.ddReports}
-                          onChange={(e) => handleReportChange(user.id, 'dd', e.target.value)}
-                          className="h-8 w-24"
-                        />
+                        <span className="text-sm font-medium">{user.ddReports}</span>
                       </TableCell>
                       <TableCell>
-                        <Input
-                          value={user.permissions}
-                          onChange={(e) => handlePermissionChange(user.id, e.target.value)}
-                          className="h-8"
-                        />
+                        <span className="text-sm">{user.permissions}</span>
                       </TableCell>
                       <TableCell>
                         <p>${user.cost.mtd.toFixed(2)} / ${user.cost.ytd.toFixed(2)}</p>
@@ -689,16 +884,17 @@ export default function UserManagementPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem onClick={() => handleEditUser(user, {})}>Edit User</DropdownMenuItem>
-                            <DropdownMenuItem>View Costs</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleResetPassword(user)}>Reset Password</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleToggleUserStatus(user)}>
+                            <DropdownMenuItem onSelect={(e) => { e.preventDefault(); openEditDialog(user); }}>Edit User</DropdownMenuItem>
+                            <DropdownMenuItem onSelect={(e) => { e.preventDefault(); openCostDialog(user); }}>View Costs</DropdownMenuItem>
+                            <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleResetPassword(user); }}>Reset Password</DropdownMenuItem>
+                            <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleToggleUserStatus(user); }}>
                               {user.status === 'Active' ? 'Suspend User' : 'Activate User'}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive"
-                              onClick={() => setDeleteUserId(user.id)}
+                              disabled={currentUser?.email === user.email}
+                              onSelect={(e) => { e.preventDefault(); setDeleteUserId(user.id); }}
                             >
                               <Trash2 className="mr-2 h-4 w-4" />
                               Delete User

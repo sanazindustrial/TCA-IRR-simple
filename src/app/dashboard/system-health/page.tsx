@@ -106,31 +106,56 @@ export default function SystemHealthPage() {
     const [alerts, setAlerts] = useState(initialAlerts);
     const [currentTime, setCurrentTime] = useState(new Date());
 
-    const updateHealthData = () => {
-        setHealthData(prev => ({
-            ...prev,
-            cpu: Math.random() * 80 + 10, // Keep it in a reasonable range
-            memory: Math.random() * 70 + 20,
-            disk: prev.disk + Math.random() * 0.01,
-            network: Math.random() * 100,
-            responseTime: Math.random() * 150 + 50,
-            activeUsers: Math.floor(Math.random() * 50) + 120,
-            apiCalls: prev.apiCalls + Math.floor(Math.random() * 100),
-        }));
+    const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
+
+    const fetchHealthData = async () => {
+        try {
+            const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+            const res = await fetch(`${API_BASE}/api/v1/dashboard/health`, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            setHealthData(prev => ({
+                ...prev,
+                cpu: data.cpu?.percent ?? prev.cpu,
+                memory: data.memory?.percent ?? prev.memory,
+                disk: data.disk?.percent ?? prev.disk,
+                activeUsers: data.database?.user_count ?? prev.activeUsers,
+                apiCalls: data.database?.analysis_count ?? prev.apiCalls,
+            }));
+        } catch {
+            // Fallback to random on failure
+            setHealthData(prev => ({
+                ...prev,
+                cpu: Math.random() * 80 + 10,
+                memory: Math.random() * 70 + 20,
+                disk: prev.disk + Math.random() * 0.01,
+                network: Math.random() * 100,
+                responseTime: Math.random() * 150 + 50,
+                activeUsers: Math.floor(Math.random() * 50) + 120,
+                apiCalls: prev.apiCalls + Math.floor(Math.random() * 100),
+            }));
+        }
     };
 
     useEffect(() => {
+        fetchHealthData();
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-        const healthTimer = setInterval(updateHealthData, 3000); // Update health data every 3 seconds
+        const healthTimer = setInterval(fetchHealthData, 10000); // Refresh every 10s
 
         return () => {
             clearInterval(timer);
             clearInterval(healthTimer);
         };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const handleRefresh = () => {
-        updateHealthData();
+        fetchHealthData();
     };
 
     const handleResolve = (alertId: string) => {

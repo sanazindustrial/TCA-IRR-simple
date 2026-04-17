@@ -10,7 +10,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import Link from 'next/link';
 import { LogIn, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { users } from '@/lib/users';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -37,6 +36,7 @@ export default function LoginPage() {
           role: response.user.role || 'User'
         };
         localStorage.setItem('loggedInUser', JSON.stringify(userData));
+        localStorage.setItem('currentUser', JSON.stringify(userData));
         localStorage.setItem('authToken', response.access_token);
         if (response.refresh_token) {
           localStorage.setItem('refreshToken', response.refresh_token);
