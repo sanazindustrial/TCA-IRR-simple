@@ -895,6 +895,47 @@ async def extract_company_info(request_data: Dict[str, Any]):
 
 # ============ Analyst Review Workflow Endpoints ============
 
+@router.get("/analyst-reviews", response_model=Dict[str, Any])
+async def list_analyst_reviews(
+    db: asyncpg.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """List all analyses as analyst review queue."""
+    try:
+        rows = await db.fetch(
+            """SELECT a.id, a.company_name, a.analysis_type, a.status,
+                      a.created_at, a.updated_at, a.created_by,
+                      u.username as analyst_name
+               FROM analyses a
+               LEFT JOIN users u ON a.created_by = u.id
+               ORDER BY a.updated_at DESC
+               LIMIT 100"""
+        )
+        reviews = []
+        for row in rows:
+            r = dict(row)
+            # Map DB status to review status
+            status_map = {
+                "completed": "completed",
+                "processing": "in_progress",
+                "pending": "pending",
+                "failed": "failed",
+            }
+            reviews.append({
+                "id": str(r["id"]),
+                "company": r.get("company_name") or "Unknown",
+                "reportType": r.get("analysis_type") or "TCA Analysis",
+                "status": status_map.get(r.get("status", "pending"), "pending"),
+                "assigned": r.get("analyst_name") or current_user.get("username", "Unassigned"),
+                "progress": 100 if r.get("status") == "completed" else (50 if r.get("status") == "processing" else 0),
+                "lastActivity": r["updated_at"].isoformat() + "Z" if r.get("updated_at") else None,
+            })
+        return {"success": True, "reviews": reviews}
+    except Exception as e:
+        logger.error(f"Failed to list analyst reviews: {e}")
+        return {"success": True, "reviews": []}
+
+
 @router.post("/analyst-reviews", response_model=Dict[str, Any])
 async def create_analyst_review(review_data: Dict[str, Any]):
     """

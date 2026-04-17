@@ -34,7 +34,7 @@ export default function MaintenancePage() {
         setIsRetrying(true);
         try {
             // Try to access the API to check if maintenance is over
-            const response = await fetch('/api/health', { method: 'HEAD' });
+            const response = await fetch('/health', { method: 'HEAD' });
             if (response.ok) {
                 router.push('/dashboard');
             } else {

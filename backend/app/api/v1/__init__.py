@@ -2,8 +2,8 @@
 
 from fastapi import APIRouter
 from .endpoints import (auth, users, companies, analysis, investments, admin,
-                        tca, dashboard, ssd, settings, reports, cost, 
-                        external_sources, api_routes)
+                        tca, dashboard, ssd, settings, reports, cost,
+                        external_sources, api_routes, storage)
 
 api_router = APIRouter()
 
@@ -75,3 +75,7 @@ api_router.include_router(api_routes.records_router,
                           tags=["Records"])
 api_router.include_router(api_routes.api_health_router,
                           tags=["API Health"])
+
+api_router.include_router(storage.router,
+                          prefix="/storage",
+                          tags=["Storage"])

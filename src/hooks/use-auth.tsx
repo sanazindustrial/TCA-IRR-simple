@@ -11,30 +11,8 @@ import {
 } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 
-// Mock users for demonstration
-const mockUsers: User[] = [
-    {
-        id: '1',
-        name: 'Admin User',
-        email: 'admin@example.com',
-        role: 'Admin',
-        avatarUrl: 'https://picsum.photos/seed/admin/100/100'
-    },
-    {
-        id: '2',
-        name: 'Analyst User',
-        email: 'analyst@example.com',
-        role: 'Analyst',
-        avatarUrl: 'https://picsum.photos/seed/analyst/100/100'
-    },
-    {
-        id: '3',
-        name: 'Standard User',
-        email: 'user@example.com',
-        role: 'User',
-        avatarUrl: 'https://picsum.photos/seed/user/100/100'
-    }
-];
+// Do not expose demo users in production auth flow
+const authUsers: User[] = [];
 
 type AuthContextType = {
     users: User[];
@@ -66,7 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     id: String(rawUser.id),
                     name: rawUser.name || rawUser.full_name || rawUser.username || 'Unknown',
                     email: rawUser.email,
-                    role: rawUser.role || 'User',
+                    role: (rawUser.role ? rawUser.role.charAt(0).toUpperCase() + rawUser.role.slice(1) : 'User') as Role,
                     avatarUrl: rawUser.avatarUrl || rawUser.avatar_url || `https://picsum.photos/seed/${rawUser.email}/100/100`
                 };
                 setCurrentUser(user);
@@ -84,44 +62,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const login = async (email: string, password?: string) => {
         try {
-            // Try backend API first
-            const useBackendAPI = typeof window !== 'undefined' && process.env.NEXT_PUBLIC_USE_MOCK_DATA !== 'true';
-            
-            if (useBackendAPI && password) {
-                try {
-                    const { backendAPI } = await import('@/lib/backend-api');
-                    const response = await backendAPI.login(email, password);
-                    
-                    if (response.success && response.user) {
-                        const user: User = {
-                            id: String(response.user.id),
-                            name: response.user.name || response.user.full_name || response.user.username || 'Unknown',
-                            email: response.user.email,
-                            role: response.user.role || 'User',
-                            avatarUrl: response.user.avatarUrl || response.user.avatar_url || `https://picsum.photos/seed/${response.user.email}/100/100`
-                        };
-                        setCurrentUser(user);
-                        setIsAuthenticated(true);
-                        localStorage.setItem('loggedInUser', JSON.stringify(response.user));
-                        localStorage.setItem('authToken', response.access_token);
-                        return;
-                    }
-                } catch (backendError) {
-                    console.warn('Backend login failed, trying local auth:', backendError);
-                }
+            if (!password) {
+                throw new Error('Password is required');
             }
-            
-            // Fallback to mock users
-            const localUser = mockUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
-            if (localUser) {
-                setCurrentUser(localUser);
+
+            const { backendAPI } = await import('@/lib/backend-api');
+            const response = await backendAPI.login(email, password);
+
+            if (response.success && response.user) {
+                const normalizedUser = {
+                    ...response.user,
+                    id: response.user.id || response.user.user_id,
+                    name: response.user.name || response.user.full_name || response.user.username || 'Unknown',
+                    role: response.user.role
+                        ? response.user.role.charAt(0).toUpperCase() + response.user.role.slice(1)
+                        : 'User',
+                };
+
+                const user: User = {
+                    id: String(normalizedUser.id),
+                    name: normalizedUser.name,
+                    email: normalizedUser.email,
+                    role: normalizedUser.role as Role,
+                    avatarUrl: normalizedUser.avatarUrl || normalizedUser.avatar_url || `https://picsum.photos/seed/${normalizedUser.email}/100/100`
+                };
+
+                setCurrentUser(user);
                 setIsAuthenticated(true);
-                localStorage.setItem('loggedInUser', JSON.stringify(localUser));
-            } else {
-                throw new Error('User not found');
+                localStorage.setItem('loggedInUser', JSON.stringify(normalizedUser));
+                localStorage.setItem('currentUser', JSON.stringify(normalizedUser));
+                localStorage.setItem('authToken', response.access_token);
+                return;
             }
+
+            throw new Error(response.error || 'Invalid email or password');
         } catch (error) {
             console.error("Login error:", error);
+            setCurrentUser(null);
+            setIsAuthenticated(false);
             throw error;
         }
     };
@@ -135,18 +113,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         router.push('/login');
     };
 
-    const switchRole = (role: Role) => {
-        const user = mockUsers.find((u) => u.role === role);
-        if (user) {
-            setCurrentUser(user);
-            setIsAuthenticated(true);
-            localStorage.setItem('loggedInUser', JSON.stringify(user));
-        }
+    const switchRole = (_role: Role) => {
+        console.warn('Role switching is disabled in the real production auth flow.');
     };
 
     const value = useMemo(
         () => ({
-            users: mockUsers,
+            users: currentUser ? [currentUser] : authUsers,
             currentUser,
             isAuthenticated,
             login,
@@ -164,8 +137,8 @@ export function useAuth() {
     if (!context) {
         // Return default values when not wrapped in provider (for build-time rendering)
         return {
-            users: mockUsers,
-            currentUser: null, // Do not default to Admin
+            users: authUsers,
+            currentUser: null,
             isAuthenticated: false,
             login: async () => { },
             logout: () => { },

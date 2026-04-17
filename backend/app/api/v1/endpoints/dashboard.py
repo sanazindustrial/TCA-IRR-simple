@@ -3,9 +3,17 @@ Dashboard endpoints for analytics and statistics
 """
 
 import logging
+import time
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import Dict, Any
 import asyncpg
+
+try:
+    import psutil
+    _HAS_PSUTIL = True
+except ImportError:
+    _HAS_PSUTIL = False
 
 from app.db import get_db
 from .auth import get_current_user
@@ -94,3 +102,78 @@ async def get_dashboard_charts(timeframe: str = "30d",
         logger.error(f"Dashboard charts error: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail="Failed to retrieve chart data")
+
+
+@router.get("/health", response_model=Dict[str, Any])
+async def get_dashboard_health(
+    db: asyncpg.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Get real-time system health metrics."""
+    # System metrics via psutil
+    cpu_percent = psutil.cpu_percent(interval=0.1) if _HAS_PSUTIL else 0.0
+    memory = psutil.virtual_memory() if _HAS_PSUTIL else None
+    disk = psutil.disk_usage("/") if _HAS_PSUTIL else None
+    net_io = psutil.net_io_counters() if _HAS_PSUTIL else None
+    boot_time = psutil.boot_time() if _HAS_PSUTIL else time.time()
+    uptime_seconds = int(time.time() - boot_time)
+
+    # DB counts
+    try:
+        user_count = await db.fetchval("SELECT COUNT(*) FROM users") or 0
+    except Exception:
+        user_count = 0
+    try:
+        analysis_count = await db.fetchval("SELECT COUNT(*) FROM analyses") or 0
+    except Exception:
+        analysis_count = 0
+    try:
+        company_count = await db.fetchval("SELECT COUNT(*) FROM companies") or 0
+    except Exception:
+        company_count = 0
+    try:
+        pending_analyses = await db.fetchval(
+            "SELECT COUNT(*) FROM analyses WHERE status IN ('pending','processing')"
+        ) or 0
+    except Exception:
+        pending_analyses = 0
+
+    # Determine overall status
+    mem_pct = memory.percent if memory else 0.0
+    disk_pct = (disk.used / disk.total * 100) if disk else 0.0
+    if cpu_percent > 90 or mem_pct > 90:
+        health_status = "degraded"
+    else:
+        health_status = "healthy"
+
+    return {
+        "status": health_status,
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "uptime_seconds": uptime_seconds,
+        "cpu": {
+            "percent": round(cpu_percent, 1),
+        },
+        "memory": {
+            "percent": round(mem_pct, 1),
+            "total_mb": round(memory.total / 1024 / 1024, 1) if memory else 0,
+            "used_mb": round(memory.used / 1024 / 1024, 1) if memory else 0,
+            "available_mb": round(memory.available / 1024 / 1024, 1) if memory else 0,
+        },
+        "disk": {
+            "percent": round(disk_pct, 1),
+            "total_gb": round(disk.total / 1024 / 1024 / 1024, 1) if disk else 0,
+            "used_gb": round(disk.used / 1024 / 1024 / 1024, 1) if disk else 0,
+            "free_gb": round(disk.free / 1024 / 1024 / 1024, 1) if disk else 0,
+        },
+        "network": {
+            "bytes_sent": net_io.bytes_sent if net_io else 0,
+            "bytes_recv": net_io.bytes_recv if net_io else 0,
+        },
+        "database": {
+            "status": "connected",
+            "user_count": user_count,
+            "analysis_count": analysis_count,
+            "company_count": company_count,
+            "pending_analyses": pending_analyses,
+        },
+    }

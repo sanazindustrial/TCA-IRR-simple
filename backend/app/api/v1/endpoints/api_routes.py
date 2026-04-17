@@ -1,4 +1,4 @@
-s"""
+"""
 Additional API Routes for file uploads, extractions, modules, requests, and evaluations
 These routes are mounted at /api/* (without /v1 prefix) for backwards compatibility
 """
@@ -300,11 +300,47 @@ async def submit_text(
 @requests_router.post("", response_model=AppRequestResponse)
 async def create_app_request(
     request_data: AppRequestCreate,
+    db: asyncpg.Connection = Depends(get_db),
     current_user: dict = Depends(get_optional_current_user)
 ):
-    """Create a new app request"""
+    """Create a new app request (persisted to DB)"""
+    import json as _json
     request_id = str(uuid.uuid4())
-    
+    user_id = current_user.get('id') if current_user else None
+    username = current_user.get('username', 'anonymous') if current_user else 'anonymous'
+
+    await db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS app_requests (
+            id          TEXT PRIMARY KEY,
+            user_id     INTEGER,
+            username    TEXT,
+            request_type TEXT NOT NULL,
+            description TEXT NOT NULL,
+            priority    TEXT DEFAULT 'normal',
+            status      TEXT DEFAULT 'pending',
+            resolution_notes TEXT,
+            metadata    JSONB,
+            created_at  TIMESTAMPTZ DEFAULT NOW(),
+            updated_at  TIMESTAMPTZ DEFAULT NOW()
+        )
+        """
+    )
+
+    await db.execute(
+        """
+        INSERT INTO app_requests (id, user_id, username, request_type, description, priority, status, metadata)
+        VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7::jsonb)
+        """,
+        request_id,
+        user_id,
+        username,
+        request_data.request_type,
+        request_data.description,
+        request_data.priority,
+        _json.dumps(request_data.metadata or {}),
+    )
+
     return AppRequestResponse(
         id=request_id,
         request_type=request_data.request_type,
@@ -318,18 +354,126 @@ async def create_app_request(
 @requests_router.get("")
 async def get_app_requests(
     page: int = 1,
-    size: int = 20,
+    size: int = 50,
     status: Optional[str] = None,
+    db: asyncpg.Connection = Depends(get_db),
     current_user: dict = Depends(get_optional_current_user)
 ):
-    """Get all app requests"""
-    return {
-        "items": [],
-        "total": 0,
-        "page": page,
-        "size": size,
-        "pages": 0
-    }
+    """Get app requests from DB (admin gets all; others get own)"""
+    try:
+        await db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS app_requests (
+                id          TEXT PRIMARY KEY,
+                user_id     INTEGER,
+                username    TEXT,
+                request_type TEXT NOT NULL,
+                description TEXT NOT NULL,
+                priority    TEXT DEFAULT 'normal',
+                status      TEXT DEFAULT 'pending',
+                resolution_notes TEXT,
+                metadata    JSONB,
+                created_at  TIMESTAMPTZ DEFAULT NOW(),
+                updated_at  TIMESTAMPTZ DEFAULT NOW()
+            )
+            """
+        )
+
+        conditions = []
+        params: list = []
+        idx = 1
+
+        # Non-admins see only their own requests
+        is_admin = current_user.get('role') == 'admin' if current_user else False
+        if not is_admin and current_user:
+            conditions.append(f"user_id = ${idx}")
+            params.append(current_user['id'])
+            idx += 1
+
+        if status and status != 'all':
+            conditions.append(f"status = ${idx}")
+            params.append(status)
+            idx += 1
+
+        where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+        offset = (page - 1) * size
+
+        rows = await db.fetch(
+            f"SELECT * FROM app_requests {where} ORDER BY created_at DESC LIMIT {size} OFFSET {offset}",
+            *params
+        )
+        total = await db.fetchval(f"SELECT COUNT(*) FROM app_requests {where}", *params)
+
+        items = [dict(r) for r in rows]
+        for item in items:
+            for k, v in item.items():
+                if hasattr(v, 'isoformat'):
+                    item[k] = v.isoformat()
+
+        return {
+            "items": items,
+            "total": total or 0,
+            "page": page,
+            "size": size,
+            "pages": max(1, (total or 0 + size - 1) // size) if total else 1
+        }
+    except Exception as e:
+        logger.error(f"get_app_requests error: {e}")
+        return {"items": [], "total": 0, "page": page, "size": size, "pages": 0}
+
+
+@requests_router.patch("/{request_id}")
+async def update_app_request(
+    request_id: str,
+    update_data: Dict[str, Any],
+    db: asyncpg.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Update request status and/or resolution_notes (admin only)"""
+    if current_user.get('role') != 'admin':
+        raise HTTPException(status_code=403, detail="Admin only")
+
+    fields = []
+    params = []
+    idx = 1
+    for field in ('status', 'resolution_notes'):
+        if field in update_data:
+            fields.append(f"{field} = ${idx}")
+            params.append(update_data[field])
+            idx += 1
+
+    if not fields:
+        raise HTTPException(status_code=400, detail="Nothing to update")
+
+    fields.append(f"updated_at = NOW()")
+    params.append(request_id)
+    await db.execute(
+        f"UPDATE app_requests SET {', '.join(fields)} WHERE id = ${idx}",
+        *params
+    )
+    row = await db.fetchrow("SELECT * FROM app_requests WHERE id = $1", request_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Request not found")
+    result = dict(row)
+    for k, v in result.items():
+        if hasattr(v, 'isoformat'):
+            result[k] = v.isoformat()
+    return result
+
+
+@requests_router.delete("/{request_id}")
+async def delete_app_request(
+    request_id: str,
+    db: asyncpg.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete a request (admin only)"""
+    if current_user.get('role') != 'admin':
+        raise HTTPException(status_code=403, detail="Admin only")
+    result = await db.execute("DELETE FROM app_requests WHERE id = $1", request_id)
+    if result == "DELETE 0":
+        raise HTTPException(status_code=404, detail="Request not found")
+    return {"message": "Deleted"}
 
 
 # ═══════════════════════════════════════════════════════════════════════

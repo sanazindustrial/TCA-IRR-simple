@@ -15,13 +15,14 @@ export class BackendAPIClient {
         }
     }
 
-    private getHeaders(): HeadersInit {
+    private getHeaders(tokenOverride?: string): HeadersInit {
         const headers: HeadersInit = {
             'Content-Type': 'application/json',
         };
 
-        if (this.authToken) {
-            headers['Authorization'] = `Bearer ${this.authToken}`;
+        const activeToken = tokenOverride || this.authToken;
+        if (activeToken) {
+            headers['Authorization'] = `Bearer ${activeToken}`;
         }
 
         return headers;
@@ -33,6 +34,19 @@ export class BackendAPIClient {
         return `${this.baseURL}${this.apiPrefix}${path.startsWith('/') ? path : `/${path}`}`;
     }
 
+    async getCurrentUser(tokenOverride?: string) {
+        const response = await fetch(this.buildUrl('/auth/me'), {
+            method: 'GET',
+            headers: this.getHeaders(tokenOverride),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch current user: ${response.statusText}`);
+        }
+
+        return response.json();
+    }
+
     async login(email: string, password: string) {
         const response = await fetch(this.buildUrl('/auth/login'), {
             method: 'POST',
@@ -42,48 +56,74 @@ export class BackendAPIClient {
             body: JSON.stringify({ email, password }),
         });
 
-        if (!response.ok) {
-            throw new Error(`Login failed: ${response.statusText}`);
+        const rawText = await response.text();
+        let result: any = {};
+
+        try {
+            result = rawText ? JSON.parse(rawText) : {};
+        } catch {
+            result = {};
         }
 
-        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(result?.detail || result?.message || `Login failed: ${response.statusText}`);
+        }
 
-        // Backend returns { access_token, refresh_token, user, ... } directly
         if (result.access_token) {
             this.authToken = result.access_token;
+
             if (typeof window !== 'undefined') {
                 localStorage.setItem('authToken', result.access_token);
                 if (result.refresh_token) {
                     localStorage.setItem('refreshToken', result.refresh_token);
                 }
             }
-            // Normalize response for frontend consumption
+
+            let user = result.user || null;
+            if (!user) {
+                try {
+                    user = await this.getCurrentUser(result.access_token);
+                } catch (profileError) {
+                    console.warn('Could not load user profile after login:', profileError);
+                    user = {
+                        id: result.user_id || email,
+                        email,
+                        full_name: email,
+                        role: result.role || 'User',
+                    };
+                }
+            }
+
             return {
                 success: true,
                 access_token: result.access_token,
-                refresh_token: result.refresh_token,
-                user: result.user,
-                expires_in: result.expires_in
+                refresh_token: result.refresh_token ?? null,
+                user,
+                expires_in: result.expires_in,
+                token_type: result.token_type
             };
         }
 
-        return { success: false, error: 'Invalid response from server' };
+        return { success: false, error: result?.detail || 'Invalid response from server' };
     }
 
     async runComprehensiveAnalysis(framework: 'general' | 'medtech', additionalData?: any) {
+        const companyName = additionalData?.companyName || additionalData?.name || '';
+        const companyDescription = additionalData?.description || additionalData?.companyDescription || '';
+
         // Enhanced payload structure matching backend expectations
         const payload = {
             framework,
             sector: framework === 'medtech' ? 'life_sciences_medical' : 'technology_others',
             company_data: {
-                name: additionalData?.companyName || 'Sample Company',
-                description: additionalData?.description || 'AI-powered startup analysis',
-                stage: additionalData?.stage || 'seed',
+                name: companyName,
+                description: companyDescription,
+                stage: additionalData?.stage || '',
                 sector: framework === 'medtech' ? 'life_sciences_medical' : 'technology_others',
                 framework: framework
             },
-            stage: additionalData?.stage || 'seed',
-            companyName: additionalData?.companyName || 'Sample Company',
+            stage: additionalData?.stage || '',
+            companyName,
             ...additionalData
         };
 
@@ -107,7 +147,7 @@ export class BackendAPIClient {
             headers: this.getHeaders(),
             body: JSON.stringify({
                 framework,
-                company_data: companyData || { name: 'Sample Company', framework },
+                company_data: companyData || { framework },
                 ...companyData
             }),
         });
@@ -126,7 +166,7 @@ export class BackendAPIClient {
             body: JSON.stringify({
                 framework,
                 sector: framework === 'medtech' ? 'life_sciences_medical' : 'technology_others',
-                company_data: companyData || { name: 'Sample Company', framework },
+                company_data: companyData || { framework },
                 ...companyData
             }),
         });

@@ -4,7 +4,7 @@ import type { ComprehensiveAnalysisOutput } from '@/ai/flows/schemas';
 
 // Use the correct production API URL - check multiple env vars for compatibility
 const BACKEND_API_URL = process.env.API_URL || process.env.BACKEND_URL || process.env.BACKEND_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
-const API_VERSION = '/api';
+const API_VERSION = '/api/v1';
 
 // GET - Return API information and status
 export async function GET() {
@@ -29,7 +29,8 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
     try {
-        const { framework } = await request.json();
+        const requestBody = await request.json();
+        const { framework } = requestBody;
 
         // Validate framework
         if (!['general', 'medtech'].includes(framework)) {
@@ -48,9 +49,9 @@ export async function POST(request: NextRequest) {
             legacySector: framework === 'medtech' ? 'med_life' : 'tech',
 
             company_data: {
-                name: 'Sample Company',
-                description: 'AI-powered startup using machine learning for optimization',
-                stage: 'seed',
+                name: requestBody?.companyName || requestBody?.company_data?.name || '',
+                description: requestBody?.companyDescription || requestBody?.company_data?.description || '',
+                stage: requestBody?.stage || 'seed',
                 sector: framework === 'medtech' ? 'life_sciences_medical' : 'technology_others',
                 framework: framework
             },
@@ -104,8 +105,8 @@ export async function POST(request: NextRequest) {
                 keyHires: 'VP Sales, VP Marketing, Senior Engineers'
             },
 
-            stage: 'seed',
-            companyName: 'Sample Company'
+            stage: requestBody?.stage || 'seed',
+            companyName: requestBody?.companyName || requestBody?.company_data?.name || ''
         };
 
         console.log('API Route: Making request to backend...');

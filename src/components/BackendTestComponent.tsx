@@ -22,7 +22,7 @@ function BackendTestComponent() {
         setHealth(null);
 
         try {
-            const res = await timeoutFetch(`${base}/api/health`, {}, 4000);
+            const res = await timeoutFetch(`${base}/health`, {}, 4000);
             if (!res.ok) throw new Error(`Status ${res.status}`);
             const data = await res.json();
             setHealth(JSON.stringify(data, null, 2));
@@ -43,7 +43,7 @@ function BackendTestComponent() {
                 role_mode: 'user'
             };
 
-            const res = await timeoutFetch(`${base}/api/analysis/comprehensive`, {
+            const res = await timeoutFetch(`${base}/api/v1/analysis/comprehensive`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)

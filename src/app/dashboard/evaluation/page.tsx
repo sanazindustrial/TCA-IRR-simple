@@ -35,6 +35,7 @@ interface UserSession {
 
 // Autosave storage key
 const AUTOSAVE_KEY = 'evaluation_autosave';
+const BACKEND_API_URL = (process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net').replace(/\/$/, '');
 
 // Evaluation ID generator for unique indexing - using tracking service format
 const generateEvaluationId = (): string => {
@@ -854,10 +855,14 @@ export default function EvaluationPage() {
             extractionStartTime.current = Date.now();
             setIsAiProcessing(true);
 
-            // Call backend extraction API
-            const response = await fetch('https://tcairrapiccontainer.azurewebsites.net/api/v1/analysis/extract-company-info', {
+            // Call backend extraction API with the active auth token from the session
+            const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+            const response = await fetch(`${BACKEND_API_URL}/api/v1/analysis/extract-company-info`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+                },
                 body: JSON.stringify({
                     content: allContent,
                     framework,
