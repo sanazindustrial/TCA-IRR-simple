@@ -71,7 +71,7 @@ async def get_users(page: int = 1,
         total = await db.fetchval(total_query, *params)
 
         rows_query = f"""
-            SELECT id, username, email, role, is_active, created_at, updated_at,
+            SELECT id, username, email, full_name, role, is_active, created_at, updated_at,
                    triage_report_limit, dd_report_limit
             FROM users
             {where_clause}
@@ -84,7 +84,6 @@ async def get_users(page: int = 1,
         users = []
         for row in rows:
             user_dict = dict(row)
-            user_dict['full_name'] = None  # Column doesn't exist in DB
             users.append(UserResponse(**user_dict))
         
         # Calculate pagination
@@ -197,7 +196,7 @@ async def get_user(user_id: int,
     try:
         row = await db.fetchrow(
             """
-            SELECT id, username, email, role, is_active, created_at, updated_at,
+            SELECT id, username, email, full_name, role, is_active, created_at, updated_at,
                    triage_report_limit, dd_report_limit
             FROM users WHERE id = $1
             """,
@@ -210,9 +209,7 @@ async def get_user(user_id: int,
                 detail="User not found"
             )
         
-        user_dict = dict(row)
-        user_dict['full_name'] = None
-        return UserResponse(**user_dict)
+        return UserResponse(**dict(row))
         
     except HTTPException:
         raise
@@ -292,6 +289,11 @@ async def update_user(user_id: int,
             values.append(user_update.is_active)
             param_count += 1
 
+        if user_update.full_name is not None:
+            update_fields.append(f"full_name = ${param_count}")
+            values.append(user_update.full_name.strip() or None)
+            param_count += 1
+
         if user_update.triage_report_limit is not None and is_admin:
             # 0 or negative resets to role default (NULL); positive values set a custom limit
             triage_val = None if user_update.triage_report_limit <= 0 else user_update.triage_report_limit
@@ -321,17 +323,14 @@ async def update_user(user_id: int,
         query = f"""
             UPDATE users SET {', '.join(update_fields)}
             WHERE id = ${param_count}
-            RETURNING id, username, email, role, is_active, created_at, updated_at,
+            RETURNING id, username, email, full_name, role, is_active, created_at, updated_at,
                       triage_report_limit, dd_report_limit
         """
         
         row = await db.fetchrow(query, *values)
         
-        user_dict = dict(row)
-        user_dict['full_name'] = None
-        
         logger.info(f"User {user_id} updated by {current_user['username']}")
-        return UserResponse(**user_dict)
+        return UserResponse(**dict(row))
         
     except HTTPException:
         raise
