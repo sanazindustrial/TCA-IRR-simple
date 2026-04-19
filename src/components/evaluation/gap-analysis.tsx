@@ -65,7 +65,10 @@ const TrendIcon = ({ direction }: { direction: string }) => {
   return <Minus className="size-3 text-muted-foreground" />;
 }
 
-export function GapAnalysis() {
+interface WizardGap { category: string; status: 'covered' | 'gap' | 'partial'; detail: string; }
+interface GapAnalysisProps { wizardGaps?: WizardGap[]; }
+
+export function GapAnalysis({ wizardGaps }: GapAnalysisProps = {}) {
   const { isEditable } = useEvaluationContext();
   const [gapData, setGapData] = useState(initialGapData);
   
@@ -143,6 +146,31 @@ export function GapAnalysis() {
                 <p className="text-sm text-muted-foreground">{gapData.interpretation}</p>
             )}
         </div>
+      {wizardGaps && wizardGaps.length > 0 && (
+        <>
+          <Separator className="my-6" />
+          <div>
+            <h4 className="text-sm font-semibold mb-3 text-muted-foreground">Analyst Coverage Assessment (from Wizard)</h4>
+            <div className="space-y-2">
+              {wizardGaps.map((g) => (
+                <div key={g.category} className="flex items-start gap-3 p-3 bg-muted/40 rounded-lg border">
+                  <CoverageStatusBadge status={g.status} />
+                  <div>
+                    <p className="text-sm font-medium">{g.category}</p>
+                    <p className="text-xs text-muted-foreground">{g.detail}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
     </DashboardCard>
   );
+}
+
+function CoverageStatusBadge({ status }: { status: WizardGap['status'] }) {
+  if (status === 'covered') return <span className="inline-flex items-center rounded-md bg-success/20 px-2 py-0.5 text-xs font-medium text-success">Covered</span>;
+  if (status === 'partial') return <span className="inline-flex items-center rounded-md bg-warning/20 px-2 py-0.5 text-xs font-medium text-warning">Partial</span>;
+  return <span className="inline-flex items-center rounded-md bg-destructive/20 px-2 py-0.5 text-xs font-medium text-destructive">Gap</span>;
 }
