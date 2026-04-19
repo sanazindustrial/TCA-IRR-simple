@@ -106,10 +106,15 @@ export default function ProfilePage() {
         const url = reader.result as string;
         setAvatarUrl(url);
         // Persist avatar locally (backend doesn't store images)
-        const storedUser = localStorage.getItem('loggedInUser');
-        const base = storedUser ? JSON.parse(storedUser) : {};
-        localStorage.setItem('loggedInUser', JSON.stringify({ ...base, avatar: url }));
-        toast({ title: 'Profile Picture Updated', description: 'Your new profile picture has been set.' });
+        try {
+          const storedUser = localStorage.getItem('loggedInUser');
+          const base = storedUser ? JSON.parse(storedUser) : {};
+          localStorage.setItem('loggedInUser', JSON.stringify({ ...base, avatar: url }));
+          window.dispatchEvent(new Event('storage'));
+          toast({ title: 'Profile Picture Updated', description: 'Your new profile picture has been set.' });
+        } catch {
+          toast({ title: 'Image Too Large', description: 'Could not save picture locally. Try a smaller image (under 1 MB).', variant: 'destructive' });
+        }
       };
       reader.readAsDataURL(file);
     }

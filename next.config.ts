@@ -96,6 +96,20 @@ const nextConfig: NextConfig = {
     ],
   },
 
+  // Redirects for case-insensitive module URLs (Azure Linux is case-sensitive)
+  async redirects() {
+    return [
+      { source: '/analysis/modules/Analyst', destination: '/analysis/modules/analyst', permanent: true },
+      { source: '/analysis/modules/Benchmark', destination: '/analysis/modules/benchmark', permanent: true },
+      { source: '/analysis/modules/Risk', destination: '/analysis/modules/risk', permanent: true },
+      { source: '/analysis/modules/Tca', destination: '/analysis/modules/tca', permanent: true },
+      { source: '/analysis/modules/Macro', destination: '/analysis/modules/macro', permanent: true },
+      { source: '/analysis/modules/Gap', destination: '/analysis/modules/gap', permanent: true },
+      { source: '/analysis/modules/Growth', destination: '/analysis/modules/growth', permanent: true },
+      { source: '/analysis/modules/Team', destination: '/analysis/modules/team', permanent: true },
+    ];
+  },
+
   // Performance optimizations
   compress: true,
   poweredByHeader: false,
