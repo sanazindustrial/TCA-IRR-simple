@@ -225,7 +225,7 @@ export default function ModuleControlDeck() {
                     </CardHeader>
                     <CardContent>
                         <Button asChild className="w-full justify-start">
-                            <Link href="/analysis/modules/Analyst"><MessageSquareQuote /> Analyst Analysis & Manual Input</Link>
+                            <Link href="/analysis/modules/analyst"><MessageSquareQuote /> Analyst Analysis & Manual Input</Link>
                         </Button>
                     </CardContent>
                 </Card>

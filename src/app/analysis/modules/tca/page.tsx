@@ -1,6 +1,6 @@
 
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -19,11 +19,22 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { ArrowLeft, Plus, RotateCcw, Trash2, Calculator } from 'lucide-react';
+import { ArrowLeft, Plus, RotateCcw, Trash2, Calculator, Save, History, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
+import {
+    saveConfigVersion,
+    getLatestConfig,
+    getVersionHistory,
+    clearConfigVersions,
+    DEFAULT_TCA_CONFIG,
+    type TcaConfig,
+    type ConfigVersion,
+} from '@/lib/module-config-service';
 
 type Category = {
     id: string;
@@ -34,31 +45,10 @@ type Category = {
     medtechNA: boolean;
 };
 
-const initialCategories: Category[] = [
-    { id: 'leadership', name: 'Leadership', general: 20, medtech: 15, generalNA: false, medtechNA: false },
-    { id: 'pmf', name: 'Product-Market Fit / Product Quality', general: 20, medtech: 15, generalNA: false, medtechNA: false },
-    { id: 'team', name: 'Team Strength', general: 10, medtech: 10, generalNA: false, medtechNA: false },
-    { id: 'tech', name: 'Technology & IP', general: 10, medtech: 10, generalNA: false, medtechNA: false },
-    { id: 'financials', name: 'Business Model & Financials', general: 10, medtech: 10, generalNA: false, medtechNA: false },
-    { id: 'gtm', name: 'Go-to-Market Strategy', general: 10, medtech: 5, generalNA: false, medtechNA: false },
-    { id: 'competition', name: 'Competition & Moat', general: 5, medtech: 5, generalNA: false, medtechNA: false },
-    { id: 'market', name: 'Market Potential', general: 5, medtech: 5, generalNA: false, medtechNA: false },
-    { id: 'traction', name: 'Traction', general: 5, medtech: 5, generalNA: false, medtechNA: false },
-    { id: 'scalability', name: 'Scalability', general: 2.5, medtech: 0, generalNA: false, medtechNA: true },
-    { id: 'risk', name: 'Risk Assessment', general: 2.5, medtech: 0, generalNA: false, medtechNA: true },
-    { id: 'exit', name: 'Exit Potential', general: 0, medtech: 0, generalNA: true, medtechNA: true },
-    { id: 'regulatory', name: 'Regulatory', general: 0, medtech: 15, generalNA: true, medtechNA: false },
-];
-
-
-const initialScoringLogic = [
-    { id: 'green', color: '🟩', tier: 'Strong & Investable', range: '8.0 – 10.0', risk: 'Low/Medium' },
-    { id: 'yellow', color: '🟨', tier: 'Moderate; needs traction', range: '6.5 – 7.9', risk: 'Medium' },
-    { id: 'red', color: '🟥', tier: 'High risk / weak readiness', range: '< 6.5', risk: 'High' },
-];
-
-const initialFormula = '∑ (Category Weight * Category Score)';
-const initialExample = '(20% * 8.0) + (20% * 7.0) + ... = 7.5';
+const initialCategories = DEFAULT_TCA_CONFIG.categories as Category[];
+const initialScoringLogic = DEFAULT_TCA_CONFIG.scoringLogic;
+const initialFormula = DEFAULT_TCA_CONFIG.formula;
+const initialExample = DEFAULT_TCA_CONFIG.example;
 
 const toSnakeCase = (str: string) => str.toLowerCase().replace(/[\s/&]+/g, '_').replace(/[^a-z0-9_]/g, '');
 
@@ -89,6 +79,55 @@ export default function TcaConfigPage() {
     const [newCategoryName, setNewCategoryName] = useState('');
     const [formula, setFormula] = useState(initialFormula);
     const [example, setExample] = useState(initialExample);
+    const [versionHistory, setVersionHistory] = useState<ConfigVersion<TcaConfig>[]>([]);
+    const [currentVersion, setCurrentVersion] = useState<number | null>(null);
+    const { toast } = useToast();
+
+    // Load saved config on mount
+    useEffect(() => {
+        const saved = getLatestConfig<TcaConfig>('tca');
+        if (saved) {
+            setCategories(saved.categories as Category[]);
+            setScoringLogic(saved.scoringLogic);
+            setFormula(saved.formula);
+            setExample(saved.example);
+        }
+        setVersionHistory(getVersionHistory<TcaConfig>('tca'));
+        const history = getVersionHistory<TcaConfig>('tca');
+        if (history.length > 0) setCurrentVersion(history[0].version);
+    }, []);
+
+    const handleSaveConfig = () => {
+        const user = (() => { try { return JSON.parse(localStorage.getItem('loggedInUser') || '{}'); } catch { return {}; } })();
+        const config: TcaConfig = { categories: categories as TcaConfig['categories'], scoringLogic, formula, example };
+        const v = saveConfigVersion<TcaConfig>('tca', config, {
+            label: `Saved by ${user.email ?? 'user'} — ${new Date().toLocaleString()}`,
+            savedBy: user.email,
+        });
+        setCurrentVersion(v);
+        setVersionHistory(getVersionHistory<TcaConfig>('tca'));
+        toast({ title: 'Configuration Saved', description: `Version ${v} saved permanently.` });
+    };
+
+    const handleRestoreDefault = () => {
+        clearConfigVersions('tca');
+        setCategories(DEFAULT_TCA_CONFIG.categories as Category[]);
+        setScoringLogic(DEFAULT_TCA_CONFIG.scoringLogic);
+        setFormula(DEFAULT_TCA_CONFIG.formula);
+        setExample(DEFAULT_TCA_CONFIG.example);
+        setVersionHistory([]);
+        setCurrentVersion(null);
+        toast({ title: 'Default Restored', description: 'TCA config reset to system defaults.' });
+    };
+
+    const handleLoadVersion = (v: ConfigVersion<TcaConfig>) => {
+        setCategories(v.config.categories as Category[]);
+        setScoringLogic(v.config.scoringLogic);
+        setFormula(v.config.formula);
+        setExample(v.config.example);
+        setCurrentVersion(v.version);
+        toast({ title: `Version ${v.version} loaded`, description: v.label });
+    };
 
     const handleWeightChange = (id: string, value: string, type: 'general' | 'medtech') => {
         const numValue = parseFloat(value) || 0;
@@ -217,8 +256,7 @@ export default function TcaConfigPage() {
                                 <CardTitle>Category Weight Matrix</CardTitle>
                                 <CardDescription>Adjust weights for General and MedTech frameworks. Columns should sum to 100%.</CardDescription>
                             </div>
-                            <Button variant="ghost" onClick={handleReset}><RotateCcw className="mr-2" /> Reset</Button>
-                        </CardHeader>
+                            <Button variant="ghost" onClick={handleReset}><RotateCcw className="mr-2" /> Reset</Button>                        </CardHeader>
                         <CardContent>
                             <Table>
                                 <TableHeader>
@@ -345,10 +383,44 @@ export default function TcaConfigPage() {
                 </div>
             </div>
             <Card className="mt-8">
-                <CardFooter className="p-4 flex justify-end">
-                    <Button>Save Configuration</Button>
+                <CardFooter className="p-4 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        {currentVersion !== null && <Badge variant="outline">Active: v{currentVersion}</Badge>}
+                    </div>
+                    <div className="flex gap-2">
+                        <Button variant="outline" onClick={handleRestoreDefault}>
+                            <RefreshCw className="mr-2 size-4" /> Restore Defaults
+                        </Button>
+                        <Button onClick={handleSaveConfig}>
+                            <Save className="mr-2 size-4" /> Save Configuration
+                        </Button>
+                    </div>
                 </CardFooter>
             </Card>
+
+            {versionHistory.length > 0 && (
+                <Card className="mt-4">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="flex items-center gap-2 text-base">
+                            <History className="size-4" /> Version History
+                        </CardTitle>
+                        <CardDescription>Click a version to restore it.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {versionHistory.map(v => (
+                                <div key={v.version} className="flex items-center justify-between p-2 rounded-md border hover:bg-muted/50 cursor-pointer" onClick={() => handleLoadVersion(v)}>
+                                    <div>
+                                        <span className="font-semibold text-sm mr-2">v{v.version}</span>
+                                        <span className="text-xs text-muted-foreground">{v.label}</span>
+                                    </div>
+                                    <span className="text-xs text-muted-foreground">{new Date(v.timestamp).toLocaleString()}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
         </div>
     )
 }

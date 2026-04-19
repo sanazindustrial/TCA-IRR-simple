@@ -95,7 +95,12 @@ export default function CostManagementPage() {
     try {
       const startDate = format(dateRange.from, 'yyyy-MM-dd');
       const endDate = format(dateRange.to, 'yyyy-MM-dd');
-      const data = await costApi.getSummary(startDate, endDate);
+      const data = await costApi.getSummary(
+        startDate,
+        endDate,
+        userFilter !== 'all' ? userFilter : undefined,
+        activityFilter !== 'all' ? activityFilter : undefined,
+      );
       setCostData(data);
     } catch (error) {
       console.error('Failed to fetch cost data:', error);
@@ -107,7 +112,7 @@ export default function CostManagementPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [dateRange, toast]);
+  }, [dateRange, userFilter, activityFilter, toast]);
 
   // Initial fetch
   useEffect(() => {
@@ -127,8 +132,8 @@ export default function CostManagementPage() {
     if (type === 'user') setUserFilter(value);
     if (type === 'date' && value) setDateRange(value);
 
-    if (liveUpdate && type === 'date') {
-      // Re-fetch with new date range
+    if (liveUpdate) {
+      // Re-fetch with updated filters
       setTimeout(() => {
         fetchCostData();
         toast({

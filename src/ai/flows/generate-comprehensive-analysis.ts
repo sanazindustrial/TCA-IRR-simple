@@ -20,6 +20,13 @@ import { generateGapAnalysis } from './generate-gap-analysis';
 import { generateFounderFitAnalysis } from './generate-founder-fit-analysis';
 import { generateTeamAssessment } from './generate-team-assessment';
 import { generateStrategicFitMatrix } from './generate-strategic-fit-matrix';
+import { generateFinancialAnalysis } from './generate-financial-analysis';
+import { generateEconomicAnalysis } from './generate-economic-analysis';
+import { generateSocialAnalysis } from './generate-social-analysis';
+import { generateMarketingAnalysis } from './generate-marketing-analysis';
+import { generateEnvironmentalAnalysis } from './generate-environmental-analysis';
+import { generateFunderAnalysis } from './generate-funder-analysis';
+import { generateStrategicAnalysis } from './generate-strategic-analysis';
 
 // ------------------------------
 // Model Registry & Discovery
@@ -189,7 +196,14 @@ type TaskKey =
   | 'gap'
   | 'founderFit'
   | 'team'
-  | 'strategicFit';
+  | 'strategicFit'
+  | 'financial'
+  | 'economic'
+  | 'social'
+  | 'marketing'
+  | 'environmental'
+  | 'funder'
+  | 'strategic';
 
 type TaskDiag = {
   task: TaskKey;
@@ -233,7 +247,7 @@ async function executeTask<T>(
 }
 
 // ------------------------------
-// Public API (9 modules + diagnostics)
+// Public API (16 modules + diagnostics)
 // ------------------------------
 
 export async function generateComprehensiveAnalysis(
@@ -254,7 +268,7 @@ export async function generateComprehensiveAnalysis(
     modelPool: modelCandidates.map(m => m.name),
   };
 
-  // 9 modules in parallel; each with fallback + retry + timeout
+  // 16 modules in parallel; each with fallback + retry + timeout
   const [
     tcaRes,
     riskRes,
@@ -265,6 +279,13 @@ export async function generateComprehensiveAnalysis(
     founderRes,
     teamRes,
     stratRes,
+    financialRes,
+    economicRes,
+    socialRes,
+    marketingRes,
+    environmentalRes,
+    funderRes,
+    strategicRes,
   ] = await Promise.all([
     executeTask('tca', modelCandidates, (m) => generateTcaScorecard(input.tcaInput, m)),
     executeTask('risk', modelCandidates, (m) => generateRiskFlagsAndMitigation(input.riskInput, m)),
@@ -275,6 +296,13 @@ export async function generateComprehensiveAnalysis(
     executeTask('founderFit', modelCandidates, (m) => generateFounderFitAnalysis(input.founderFitInput!, m)),
     executeTask('team', modelCandidates, (m) => generateTeamAssessment(input.teamInput!, m)),
     executeTask('strategicFit', modelCandidates, (m) => generateStrategicFitMatrix(input.strategicFitInput!, m)),
+    executeTask('financial', modelCandidates, (m) => generateFinancialAnalysis(input.financialInput ?? { companyData: input.tcaInput.companyData }, m)),
+    executeTask('economic', modelCandidates, (m) => generateEconomicAnalysis(input.economicInput ?? { companyData: input.tcaInput.companyData }, m)),
+    executeTask('social', modelCandidates, (m) => generateSocialAnalysis(input.socialInput ?? { companyData: input.tcaInput.companyData }, m)),
+    executeTask('marketing', modelCandidates, (m) => generateMarketingAnalysis(input.marketingInput ?? { companyData: input.tcaInput.companyData }, m)),
+    executeTask('environmental', modelCandidates, (m) => generateEnvironmentalAnalysis(input.environmentalInput ?? { companyData: input.tcaInput.companyData }, m)),
+    executeTask('funder', modelCandidates, (m) => generateFunderAnalysis(input.funderInput ?? { companyData: input.tcaInput.companyData }, m)),
+    executeTask('strategic', modelCandidates, (m) => generateStrategicAnalysis(input.strategicInput ?? { companyData: input.tcaInput.companyData }, m)),
   ]);
 
   diag.tasks.push(
@@ -286,7 +314,14 @@ export async function generateComprehensiveAnalysis(
     gapRes.diag,
     founderRes.diag,
     teamRes.diag,
-    stratRes.diag
+    stratRes.diag,
+    financialRes.diag,
+    economicRes.diag,
+    socialRes.diag,
+    marketingRes.diag,
+    environmentalRes.diag,
+    funderRes.diag,
+    strategicRes.diag
   );
   diag.finishedAt = new Date().toISOString();
 
@@ -301,6 +336,13 @@ export async function generateComprehensiveAnalysis(
     founderFitData: founderRes.data ?? null,
     teamData: teamRes.data ?? null,
     strategicFitData: stratRes.data ?? null,
+    financialData: financialRes.data ?? null,
+    economicData: economicRes.data ?? null,
+    socialData: socialRes.data ?? null,
+    marketingData: marketingRes.data ?? null,
+    environmentalData: environmentalRes.data ?? null,
+    funderData: funderRes.data ?? null,
+    strategicData: strategicRes.data ?? null,
     __diagnostics: diag,
   };
 
@@ -315,7 +357,7 @@ const generateComprehensiveAnalysisFlow = ai.defineFlow(
   {
     name: 'generateComprehensiveAnalysisFlow',
     inputSchema: ComprehensiveAnalysisInputSchema,
-    outputSchema: ComprehensiveAnalysisOutputSchema, // ensure this schema includes all 9 outputs
+    outputSchema: ComprehensiveAnalysisOutputSchema, // includes all 16 module outputs
   },
   generateComprehensiveAnalysis
 );

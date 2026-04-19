@@ -302,6 +302,160 @@ export const GenerateStrategicFitMatrixOutputSchema = z.object({}).optional();
 export type GenerateStrategicFitMatrixOutput = z.infer<typeof GenerateStrategicFitMatrixOutputSchema>;
 
 
+// Funder Fit Analysis Schemas (dedicated — investor matching & funding readiness)
+export const FunderAnalysisInputSchema = z.object({
+  companyData: z.string().describe('Company profile, traction, and funding history.'),
+  framework: z.string().optional().describe('Analysis framework (general or medtech).'),
+});
+export type FunderAnalysisInput = z.infer<typeof FunderAnalysisInputSchema>;
+export const FunderAnalysisOutputSchema = z.object({
+  score: z.number().describe('Funder fit score 0-10.'),
+  signal: z.enum(['green', 'yellow', 'red']).describe('Signal colour based on thresholds.'),
+  readinessScore: z.number().describe('Funding readiness score 0–100.'),
+  subscores: z.object({
+    investor_alignment: z.number(),
+    stage_readiness: z.number(),
+    deck_quality: z.number(),
+    network_strength: z.number(),
+  }),
+  investorList: z.array(z.object({
+    name: z.string(),
+    thesis: z.string(),
+    match: z.number(),
+    stage: z.string(),
+  })).describe('Top matched investors with fit score.'),
+  summary: z.string().describe('Narrative on funding readiness and investor fit.'),
+  risks: z.array(z.string()),
+  recommendations: z.array(z.string()),
+}).describe('Output for Funder Fit Analysis module.');
+export type FunderAnalysisOutput = z.infer<typeof FunderAnalysisOutputSchema>;
+
+// Strategic Analysis Schemas (high-level strategic overview)
+export const StrategicAnalysisInputSchema = z.object({
+  companyData: z.string().describe('Company strategy, competitive positioning, and roadmap data.'),
+  framework: z.string().optional().describe('Analysis framework (general or medtech).'),
+});
+export type StrategicAnalysisInput = z.infer<typeof StrategicAnalysisInputSchema>;
+export const StrategicAnalysisOutputSchema = z.object({
+  score: z.number().describe('Strategic analysis score 0-10.'),
+  signal: z.enum(['green', 'yellow', 'red']).describe('Signal colour based on thresholds.'),
+  subscores: z.object({
+    competitive_positioning: z.number(),
+    moat_strength: z.number(),
+    roadmap_clarity: z.number(),
+    partnership_potential: z.number(),
+  }),
+  summary: z.string().describe('Narrative of strategic position and competitive dynamics.'),
+  risks: z.array(z.string()),
+  recommendations: z.array(z.string()),
+}).describe('Output for Strategic Analysis module.');
+export type StrategicAnalysisOutput = z.infer<typeof StrategicAnalysisOutputSchema>;
+
+// Financial Analysis Schemas
+export const FinancialAnalysisInputSchema = z.object({
+  companyData: z.string().describe('Company financial information and context.'),
+  framework: z.string().optional().describe('Analysis framework (e.g. general, medtech).'),
+});
+export type FinancialAnalysisInput = z.infer<typeof FinancialAnalysisInputSchema>;
+export const FinancialAnalysisOutputSchema = z.object({
+  score: z.number().describe('Financial analysis score 0-10.'),
+  signal: z.enum(['green', 'yellow', 'red']).describe('Signal colour based on thresholds.'),
+  subscores: z.object({
+    revenue_model: z.number(),
+    unit_economics: z.number(),
+    projections: z.number(),
+    funding_requirements: z.number(),
+  }),
+  summary: z.string().describe('Brief narrative of financial health.'),
+  risks: z.array(z.string()).describe('Key financial risks identified.'),
+  recommendations: z.array(z.string()).describe('Actionable financial recommendations.'),
+}).describe('Output for Financial Analysis module.');
+export type FinancialAnalysisOutput = z.infer<typeof FinancialAnalysisOutputSchema>;
+
+// Economic Analysis Schemas
+export const EconomicAnalysisInputSchema = z.object({
+  companyData: z.string().describe('Company context and sector information.'),
+  framework: z.string().optional().describe('Analysis framework.'),
+});
+export type EconomicAnalysisInput = z.infer<typeof EconomicAnalysisInputSchema>;
+export const EconomicAnalysisOutputSchema = z.object({
+  score: z.number().describe('Economic analysis score 0-10.'),
+  signal: z.enum(['green', 'yellow', 'red']).describe('Signal colour based on thresholds.'),
+  subscores: z.object({
+    industry_structure: z.number(),
+    pricing_power: z.number(),
+    macro_indicators: z.number(),
+    cycle_resilience: z.number(),
+  }),
+  summary: z.string().describe('Brief narrative of economic context.'),
+  risks: z.array(z.string()),
+  recommendations: z.array(z.string()),
+}).describe('Output for Economic Analysis module.');
+export type EconomicAnalysisOutput = z.infer<typeof EconomicAnalysisOutputSchema>;
+
+// Social Analysis Schemas
+export const SocialAnalysisInputSchema = z.object({
+  companyData: z.string().describe('Company social impact and stakeholder information.'),
+  framework: z.string().optional().describe('Analysis framework.'),
+});
+export type SocialAnalysisInput = z.infer<typeof SocialAnalysisInputSchema>;
+export const SocialAnalysisOutputSchema = z.object({
+  score: z.number().describe('Social analysis score 0-10.'),
+  signal: z.enum(['green', 'yellow', 'red']).describe('Signal colour based on thresholds.'),
+  subscores: z.object({
+    social_impact: z.number(),
+    demographic_fit: z.number(),
+    cultural_adoption: z.number(),
+    stakeholder_trust: z.number(),
+  }),
+  summary: z.string().describe('Brief narrative of social positioning.'),
+  risks: z.array(z.string()),
+  recommendations: z.array(z.string()),
+}).describe('Output for Social Analysis module.');
+export type SocialAnalysisOutput = z.infer<typeof SocialAnalysisOutputSchema>;
+
+// Marketing Analysis Schemas
+export const MarketingAnalysisInputSchema = z.object({
+  companyData: z.string().describe('Company marketing, GTM, and brand information.'),
+  framework: z.string().optional().describe('Analysis framework.'),
+});
+export type MarketingAnalysisInput = z.infer<typeof MarketingAnalysisInputSchema>;
+export const MarketingAnalysisOutputSchema = z.object({
+  score: z.number().describe('Marketing analysis score 0-10.'),
+  signal: z.enum(['green', 'yellow', 'red']).describe('Signal colour based on thresholds.'),
+  subscores: z.object({
+    positioning: z.number(),
+    digital_presence: z.number(),
+    spend_efficiency: z.number(),
+    gtm_execution: z.number(),
+  }),
+  summary: z.string().describe('Brief narrative of marketing effectiveness.'),
+  risks: z.array(z.string()),
+  recommendations: z.array(z.string()),
+}).describe('Output for Marketing Analysis module.');
+export type MarketingAnalysisOutput = z.infer<typeof MarketingAnalysisOutputSchema>;
+
+// Environmental Analysis Schemas
+export const EnvironmentalAnalysisInputSchema = z.object({
+  companyData: z.string().describe('Company ESG, certifications, and environmental footprint data.'),
+  framework: z.string().optional().describe('Analysis framework.'),
+});
+export type EnvironmentalAnalysisInput = z.infer<typeof EnvironmentalAnalysisInputSchema>;
+export const EnvironmentalAnalysisOutputSchema = z.object({
+  score: z.number().describe('Environmental analysis score 0-10.'),
+  signal: z.enum(['green', 'yellow', 'red']).describe('Signal colour based on thresholds.'),
+  subscores: z.object({
+    impact: z.number(),
+    climate_risk: z.number(),
+    certification: z.number(),
+    esg_alignment: z.number(),
+  }),
+  summary: z.string().describe('Brief narrative of environmental profile.'),
+  risks: z.array(z.string()),
+  recommendations: z.array(z.string()),
+}).describe('Output for Environmental Analysis module.');
+export type EnvironmentalAnalysisOutput = z.infer<typeof EnvironmentalAnalysisOutputSchema>;
+
 // Comprehensive Schemas
 export const ComprehensiveAnalysisInputSchema = z.object({
   tcaInput: GenerateTcaScorecardInputSchema,
@@ -313,6 +467,13 @@ export const ComprehensiveAnalysisInputSchema = z.object({
   founderFitInput: GenerateFounderFitAnalysisInputSchema.optional(),
   teamInput: GenerateTeamAssessmentInputSchema.optional(),
   strategicFitInput: GenerateStrategicFitMatrixInputSchema.optional(),
+  financialInput: FinancialAnalysisInputSchema.optional(),
+  economicInput: EconomicAnalysisInputSchema.optional(),
+  socialInput: SocialAnalysisInputSchema.optional(),
+  marketingInput: MarketingAnalysisInputSchema.optional(),
+  environmentalInput: EnvironmentalAnalysisInputSchema.optional(),
+  funderInput: FunderAnalysisInputSchema.optional(),
+  strategicInput: StrategicAnalysisInputSchema.optional(),
 });
 
 export type ComprehensiveAnalysisInput = z.infer<
@@ -329,6 +490,13 @@ export const ComprehensiveAnalysisOutputSchema = z.object({
   founderFitData: GenerateFounderFitAnalysisOutputSchema.nullable(),
   teamData: GenerateTeamAssessmentOutputSchema.nullable(),
   strategicFitData: GenerateStrategicFitMatrixOutputSchema.nullable(),
+  financialData: FinancialAnalysisOutputSchema.nullable(),
+  economicData: EconomicAnalysisOutputSchema.nullable(),
+  socialData: SocialAnalysisOutputSchema.nullable(),
+  marketingData: MarketingAnalysisOutputSchema.nullable(),
+  environmentalData: EnvironmentalAnalysisOutputSchema.nullable(),
+  funderData: FunderAnalysisOutputSchema.nullable(),
+  strategicData: StrategicAnalysisOutputSchema.nullable(),
 });
 
 export type ComprehensiveAnalysisOutput = z.infer<

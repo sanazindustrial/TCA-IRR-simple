@@ -161,7 +161,7 @@ export const MODULE_REGISTRY: ModuleConfig[] = [
         requiredRole: ['admin', 'analyst'],
         reportTypes: ['dd'],
         frameworks: ['general', 'medtech'],
-        status: 'inactive'
+        status: 'active'
     },
     {
         id: 'ip-technology-review',
@@ -171,7 +171,7 @@ export const MODULE_REGISTRY: ModuleConfig[] = [
         requiredRole: ['admin', 'analyst'],
         reportTypes: ['dd'],
         frameworks: ['general', 'medtech'],
-        status: 'inactive'
+        status: 'active'
     },
     {
         id: 'financials-burn-rate',
@@ -181,7 +181,7 @@ export const MODULE_REGISTRY: ModuleConfig[] = [
         requiredRole: ['admin', 'analyst'],
         reportTypes: ['dd'],
         frameworks: ['general', 'medtech'],
-        status: 'inactive'
+        status: 'active'
     },
     {
         id: 'gtm-strategy',
@@ -191,7 +191,7 @@ export const MODULE_REGISTRY: ModuleConfig[] = [
         requiredRole: ['admin', 'analyst'],
         reportTypes: ['dd'],
         frameworks: ['general', 'medtech'],
-        status: 'inactive'
+        status: 'active'
     },
     {
         id: 'exit-strategy-roadmap',
@@ -201,7 +201,89 @@ export const MODULE_REGISTRY: ModuleConfig[] = [
         requiredRole: ['admin', 'analyst'],
         reportTypes: ['dd'],
         frameworks: ['general', 'medtech'],
-        status: 'inactive'
+        status: 'active'
+    },
+
+    // New Analysis Modules
+    {
+        id: 'financial-analysis',
+        name: 'Financial Analysis',
+        description: 'Revenue model, unit economics, projections, and funding requirements',
+        category: 'analysis',
+        requiredRole: ['admin', 'analyst'],
+        reportTypes: ['dd'],
+        frameworks: ['general', 'medtech'],
+        status: 'active'
+    },
+    {
+        id: 'economic-analysis',
+        name: 'Economic Analysis',
+        description: 'Market size, industry structure, pricing power, and macro indicators',
+        category: 'analysis',
+        requiredRole: ['admin', 'analyst'],
+        reportTypes: ['dd'],
+        frameworks: ['general', 'medtech'],
+        status: 'active'
+    },
+    {
+        id: 'social-analysis',
+        name: 'Social Impact Analysis',
+        description: 'ESG factors, social impact, demographic fit, and stakeholder trust',
+        category: 'analysis',
+        requiredRole: ['admin', 'analyst'],
+        reportTypes: ['dd'],
+        frameworks: ['general', 'medtech'],
+        status: 'active'
+    },
+    {
+        id: 'marketing-analysis',
+        name: 'Marketing Analysis',
+        description: 'GTM strategy, brand positioning, spend efficiency, and digital presence',
+        category: 'analysis',
+        requiredRole: ['admin', 'analyst'],
+        reportTypes: ['dd'],
+        frameworks: ['general', 'medtech'],
+        status: 'active'
+    },
+    {
+        id: 'environmental-analysis',
+        name: 'Environmental Analysis',
+        description: 'Environmental footprint, climate risk, certifications, and ESG alignment',
+        category: 'analysis',
+        requiredRole: ['admin', 'analyst'],
+        reportTypes: ['dd'],
+        frameworks: ['general', 'medtech'],
+        status: 'active'
+    },
+    {
+        id: 'funder-analysis',
+        name: 'Funder Fit Analysis',
+        description: 'Investor alignment, stage readiness, and funding candidacy assessment',
+        category: 'strategic',
+        requiredRole: ['admin', 'analyst'],
+        reportTypes: ['dd'],
+        frameworks: ['general', 'medtech'],
+        status: 'active'
+    },
+    {
+        id: 'strategic-analysis',
+        name: 'Strategic Analysis',
+        description: 'Competitive positioning, moat strength, roadmap clarity, and partnerships',
+        category: 'strategic',
+        requiredRole: ['admin', 'analyst'],
+        reportTypes: ['dd'],
+        frameworks: ['general', 'medtech'],
+        status: 'active'
+    },
+    {
+        id: 'analyst',
+        name: 'Analyst Review',
+        description: 'Manual analyst input, NLP analysis, and AI deviation review',
+        category: 'analysis',
+        requiredRole: ['admin', 'analyst'],
+        reportTypes: ['triage', 'dd'],
+        frameworks: ['general', 'medtech'],
+        status: 'active'
     }
 ];
 

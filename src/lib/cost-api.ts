@@ -112,10 +112,12 @@ export const costApi = {
      * Get cost summary for a date range
      * Falls back to public endpoint if authentication fails
      */
-    async getSummary(startDate?: string, endDate?: string): Promise<CostSummary> {
+    async getSummary(startDate?: string, endDate?: string, userId?: string, activityType?: string): Promise<CostSummary> {
         const params = new URLSearchParams();
         if (startDate) params.append('start_date', startDate);
         if (endDate) params.append('end_date', endDate);
+        if (userId) params.append('user_id', userId);
+        if (activityType) params.append('activity_type', activityType);
 
         const token = getAuthToken();
 

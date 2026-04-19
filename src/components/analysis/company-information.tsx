@@ -23,6 +23,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/colla
 type CompanyInformationProps = {
   framework: 'general' | 'medtech';
   onFrameworkChange: (value: 'general' | 'medtech') => void;
+  /** Set to true when data was populated via auto-extraction to prompt user review */
+  extractionComplete?: boolean;
 };
 
 // Industry verticals
@@ -105,6 +107,7 @@ const REQUIRED_FIELDS = [
 export function CompanyInformation({
   framework,
   onFrameworkChange,
+  extractionComplete,
 }: CompanyInformationProps) {
   const {
     isPrivilegedUser,
@@ -159,13 +162,25 @@ export function CompanyInformation({
     }
   }, [setCompanyInfoAction, setCompanyNameAction, setCompanyDescriptionAction, showValidation]);
 
+  // Badge is shown when core required fields are all filled — confirms data is valid for Startup Steroid integration
+  const isStartupSteroidCompatible =
+    !!(companyName || currentInfo.companyName)?.trim() &&
+    !!currentInfo.industryVertical?.trim() &&
+    !!currentInfo.developmentStage?.trim() &&
+    !!currentInfo.businessModel?.trim() &&
+    !!(companyDescription || currentInfo.companyDescription)?.trim();
+
   return (
     <Card className="shadow-lg">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Globe className="text-primary" />
           Company Information
-          <Badge variant="outline" className="ml-2 text-xs">Startup Steroid Compatible</Badge>
+          {isStartupSteroidCompatible && (
+            <Badge variant="outline" className="ml-auto text-xs font-normal text-green-700 border-green-400 dark:text-green-400 dark:border-green-600">
+              Startup Steroid Compatible
+            </Badge>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -187,7 +202,12 @@ export function CompanyInformation({
         {/* Basic Information */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
-            <Label htmlFor="company-name">Company Name *</Label>
+            <Label htmlFor="company-name" className="flex items-center gap-2">
+              Company Name *
+              {extractionComplete && (companyName || currentInfo.companyName) && (
+                <Badge variant="secondary" className="text-xs font-normal">Auto-extracted — verify</Badge>
+              )}
+            </Label>
             <Input
               id="company-name"
               name="companyName"
@@ -196,8 +216,17 @@ export function CompanyInformation({
               onChange={(e) => {
                 updateCompanyInfo('companyName', e.target.value);
               }}
-              className={showValidation && isFieldEmpty('companyName') ? 'border-red-500 focus:border-red-500' : ''}
+              className={
+                showValidation && isFieldEmpty('companyName')
+                  ? 'border-red-500 focus:border-red-500'
+                  : extractionComplete && (companyName || currentInfo.companyName)
+                    ? 'border-blue-300 dark:border-blue-700'
+                    : ''
+              }
             />
+            {extractionComplete && !(companyName || currentInfo.companyName) && (
+              <p className="text-xs text-amber-600 dark:text-amber-400">Required — could not be detected from the document. Please type it above.</p>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="legal-name">Legal Name</Label>

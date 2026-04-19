@@ -1,6 +1,6 @@
 
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -12,8 +12,10 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Lock, SlidersHorizontal, Info, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Lock, SlidersHorizontal, Info, RotateCcw, Save, History, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
+import { useToast } from '@/hooks/use-toast';
+import { saveConfigVersion, getLatestConfig, getVersionHistory, clearConfigVersions, type ConfigVersion } from '@/lib/module-config-service';
 import {
   Table,
   TableBody,
@@ -103,6 +105,24 @@ export default function GrowthClassifierConfigPage() {
     const [tier2Threshold, setTier2Threshold] = useState(40);
     const [factorScores, setFactorScores] = useState(initialFactorScores);
     const [alpha, setAlpha] = useState(0.7);
+    const [versionHistory, setVersionHistory] = useState<ConfigVersion[]>([]);
+    const [currentVersion, setCurrentVersion] = useState<number | null>(null);
+    const [showHistory, setShowHistory] = useState(false);
+    const { toast } = useToast();
+
+    useEffect(() => {
+        const saved = getLatestConfig<any>('growth');
+        if (saved) {
+            if (saved.isActive !== undefined) setIsActive(saved.isActive);
+            if (saved.tier1Threshold !== undefined) setTier1Threshold(saved.tier1Threshold);
+            if (saved.tier2Threshold !== undefined) setTier2Threshold(saved.tier2Threshold);
+            if (saved.factorScores) setFactorScores(saved.factorScores);
+            if (saved.alpha !== undefined) setAlpha(saved.alpha);
+        }
+        const history = getVersionHistory('growth');
+        setVersionHistory(history);
+        if (history.length > 0) setCurrentVersion(history[0].version);
+    }, []);
 
     const handleFactorScoreChange = (modelId: string, factorId: string, value: string) => {
         const newScores = { ...factorScores };
@@ -116,6 +136,32 @@ export default function GrowthClassifierConfigPage() {
         setTier2Threshold(40);
         setFactorScores(initialFactorScores);
         setAlpha(0.7);
+        clearConfigVersions('growth');
+        setVersionHistory([]);
+        setCurrentVersion(null);
+        toast({ title: 'Defaults Restored', description: 'Growth Classifier configuration reset to defaults.' });
+    };
+
+    const handleSaveConfig = () => {
+        const config = { isActive, tier1Threshold, tier2Threshold, factorScores, alpha };
+        const storedUser = typeof window !== 'undefined' ? localStorage.getItem('loggedInUser') : null;
+        const userEmail = storedUser ? JSON.parse(storedUser).email : undefined;
+        const ver = saveConfigVersion('growth', config, { label: `v${(versionHistory.length + 1)} - Manual Save`, savedBy: userEmail });
+        const history = getVersionHistory('growth');
+        setVersionHistory(history);
+        setCurrentVersion(ver);
+        toast({ title: 'Configuration Saved', description: `Version ${ver} saved successfully.` });
+    };
+
+    const handleLoadVersion = (v: ConfigVersion) => {
+        const cfg = v.config as any;
+        if (cfg.isActive !== undefined) setIsActive(cfg.isActive);
+        if (cfg.tier1Threshold !== undefined) setTier1Threshold(cfg.tier1Threshold);
+        if (cfg.tier2Threshold !== undefined) setTier2Threshold(cfg.tier2Threshold);
+        if (cfg.factorScores) setFactorScores(cfg.factorScores);
+        if (cfg.alpha !== undefined) setAlpha(cfg.alpha);
+        setCurrentVersion(v.version);
+        toast({ title: `Version ${v.version} Loaded`, description: v.label });
     };
 
     const { rawMeans, normalized } = calculateWeights(factorScores);
@@ -285,9 +331,27 @@ export default function GrowthClassifierConfigPage() {
             </div>
 
             <Card className="mt-8">
-                <CardFooter className="p-4 flex justify-end">
-                    <Button>Save Configuration</Button>
+                <CardFooter className="p-4 flex justify-between items-center flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" onClick={handleReset}><RotateCcw className="mr-2 size-4" /> Restore Defaults</Button>
+                    <Button variant="ghost" size="sm" onClick={() => setShowHistory(h => !h)}>
+                      <History className="mr-2 size-4" /> History {versionHistory.length > 0 && `(${versionHistory.length})`}
+                    </Button>
+                    {currentVersion && <span className="text-xs text-muted-foreground">Active: v{currentVersion}</span>}
+                  </div>
+                  <Button onClick={handleSaveConfig}><Save className="mr-2 size-4" /> Save Configuration</Button>
                 </CardFooter>
+                {showHistory && versionHistory.length > 0 && (
+                  <div className="px-4 pb-4 border-t space-y-2 pt-4">
+                    <h4 className="text-sm font-semibold">Version History</h4>
+                    {[...versionHistory].map(v => (
+                      <div key={v.version} className="flex items-center justify-between text-sm p-2 bg-muted/40 rounded">
+                        <span>v{v.version} — {v.label} <span className="text-xs text-muted-foreground">({new Date(v.timestamp).toLocaleString()})</span></span>
+                        <Button size="sm" variant="ghost" onClick={() => handleLoadVersion(v)}><RefreshCw className="size-3 mr-1" /> Load</Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
             </Card>
         </div>
     );

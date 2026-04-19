@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { CompanyInformation } from '@/components/analysis/company-information';
 import { DocumentSubmission, type UploadedFile } from '@/components/analysis/document-submission';
-import { ModuleConfiguration } from '@/components/analysis/module-configuration';
 import { ExternalDataSources } from '@/components/evaluation/external-data-sources';
+import { type AggregatedExternalData } from '@/lib/external-data-fetcher';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
@@ -12,7 +12,7 @@ import { Switch } from '@/components/ui/switch';
 import { EvaluationProvider, useEvaluationContext, type CompanyInformationData } from '@/components/evaluation/evaluation-provider';
 import { useRouter } from 'next/navigation';
 import { runAnalysis } from '@/app/analysis/actions';
-import { ChevronLeft, ChevronRight, Check, Lock, FileText, Database, Settings, Play, Upload, RefreshCw, GitBranch, FileCheck2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Lock, FileText, Database, Settings, Play, Upload, RefreshCw, GitBranch, FileCheck2, TrendingUp, BarChart3, Zap, GitFork, Layers, Cpu, Target, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { trackingService } from '@/lib/tracking-service';
 import { startFreshEvaluation, clearEvaluationState, archiveCurrentEvaluation } from '@/lib/auto-extraction-service';
@@ -266,7 +266,93 @@ function AnalysisSetup({
         submittedTexts = [],
         setSubmittedTextsAction,
         companyInfo,
+        setCompanyInfoAction,
     } = useEvaluationContext();
+
+    // Module selection state — all 10 TCA analysis modules, all enabled by default
+    const [selectedModules, setSelectedModules] = useState<Record<string, boolean>>({
+        'tca-scorecard': true,
+        'risk-assessment': true,
+        'macro-trend': true,
+        'team-assessment': true,
+        'benchmark-comparison': true,
+        'growth-classifier': true,
+        'gap-analysis': true,
+        'founder-fit': true,
+        'strategic-fit': true,
+        'simulation': true,
+    });
+
+    // On mount, sync selectedModules from module-deck-config (Module Control Deck)
+    useEffect(() => {
+        try {
+            const deckConfig = localStorage.getItem('module-deck-config');
+            if (deckConfig) {
+                const deckModules: Array<{ id: string; status: string }> = JSON.parse(deckConfig);
+                const deckIdMap: Record<string, string> = {
+                    'tca': 'tca-scorecard',
+                    'risk': 'risk-assessment',
+                    'benchmark': 'benchmark-comparison',
+                    'macro': 'macro-trend',
+                    'gap': 'gap-analysis',
+                    'growth': 'growth-classifier',
+                    'founderFit': 'founder-fit',
+                    'team': 'team-assessment',
+                    'strategicFit': 'strategic-fit',
+                };
+                setSelectedModules(prev => {
+                    const updated = { ...prev };
+                    for (const m of deckModules) {
+                        const evalId = deckIdMap[m.id];
+                        if (evalId) updated[evalId] = m.status === 'active';
+                    }
+                    return updated;
+                });
+            }
+        } catch {
+            // ignore localStorage errors
+        }
+    }, []);
+
+    // Persist selectedModules to localStorage so analysis/run page can read the active set
+    useEffect(() => {
+        localStorage.setItem('selectedModules', JSON.stringify(selectedModules));
+    }, [selectedModules]);
+
+    // External data enrichment summary
+    const [externalSummary, setExternalSummary] = useState<{ total: number; success: number; fieldsEnriched: number } | null>(null);
+
+    // Enrich missing company info fields from fetched external data
+    const handleExternalDataFetched = useCallback((data: AggregatedExternalData) => {
+        const updates: Partial<CompanyInformationData> = {};
+        const mp = data.companyIntelligence?.marketPosition as Record<string, unknown> | undefined;
+        if (mp) {
+            if (!companyInfo?.website && mp['website']) updates.website = String(mp['website']);
+            if (!companyInfo?.companyDescription && mp['description']) updates.companyDescription = String(mp['description']);
+            if (!companyInfo?.numberOfEmployees && mp['employees']) updates.numberOfEmployees = Number(mp['employees']) || null;
+            if (!companyInfo?.country && mp['country']) updates.country = String(mp['country']);
+            if (!companyInfo?.city && mp['city']) updates.city = String(mp['city']);
+        }
+        const gh = data.technologyData?.githubMetrics as Record<string, unknown> | undefined;
+        if (gh && !companyInfo?.website && gh['url']) {
+            const domainMatch = String(gh['url']).match(/github\.com\/([^/]+)/);
+            if (domainMatch) updates.website = `https://${domainMatch[1]}.com`;
+        }
+        const news = data.newsAndSentiment?.recentNews;
+        if (Array.isArray(news) && news.length > 0 && !companyInfo?.oneLineDescription) {
+            const first = news[0] as Record<string, unknown>;
+            const title = first?.['title'] || first?.['headline'];
+            if (title && String(title).length < 150) updates.oneLineDescription = String(title);
+        }
+        if (Object.keys(updates).length > 0 && setCompanyInfoAction) {
+            setCompanyInfoAction(prev => ({ ...prev, ...updates }));
+        }
+        setExternalSummary({
+            total: data.fetchSummary.totalSources,
+            success: data.fetchSummary.successfulFetches,
+            fieldsEnriched: Object.keys(updates).length,
+        });
+    }, [companyInfo, setCompanyInfoAction]);
 
     const hasDocuments = uploadedFiles.length > 0 || importedUrls.length > 0 || submittedTexts.length > 0;
     const hasCompanyData = (companyInfo?.companyName?.length ?? 0) > 0 || (companyInfo?.companyDescription?.length ?? 0) > 0;
@@ -284,7 +370,10 @@ function AnalysisSetup({
 
         // Check if current step is complete or optional
         if (currentStep === 1) return true; // Can always proceed from step 1
-        if (currentStep === 2) return hasCompanyData || extractionComplete;
+        if (currentStep === 2) {
+            // Require at minimum a company name to proceed
+            return (companyInfo?.companyName?.trim()?.length ?? 0) > 0;
+        }
         if (currentStep === 3) return true; // External data is optional
         if (currentStep === 4) return true; // Module config has defaults
         return false;
@@ -327,6 +416,23 @@ function AnalysisSetup({
         // For other steps, just update the current step
         setCurrentStep(stepId);
     };
+
+    // Company info validation fields for step 5 confirmation panel
+    const companyInfoFields = [
+        { key: 'companyName', label: 'Company Name', required: true, value: companyInfo?.companyName || '' },
+        { key: 'legalName', label: 'Legal Name', required: false, value: companyInfo?.legalName || '' },
+        { key: 'website', label: 'Website', required: false, value: companyInfo?.website || '' },
+        { key: 'numberOfEmployees', label: 'Employees', required: false, value: companyInfo?.numberOfEmployees != null ? String(companyInfo.numberOfEmployees) : '' },
+        { key: 'industryVertical', label: 'Industry Vertical', required: true, value: companyInfo?.industryVertical || '' },
+        { key: 'developmentStage', label: 'Development Stage', required: true, value: companyInfo?.developmentStage || '' },
+        { key: 'businessModel', label: 'Business Model', required: true, value: companyInfo?.businessModel || '' },
+        { key: 'city', label: 'City', required: false, value: companyInfo?.city || '' },
+        { key: 'state', label: 'State / Province', required: false, value: companyInfo?.state || '' },
+        { key: 'country', label: 'Country', required: false, value: companyInfo?.country || '' },
+        { key: 'oneLineDescription', label: 'One-Line Description', required: true, value: companyInfo?.oneLineDescription || '' },
+        { key: 'companyDescription', label: 'Company Description', required: true, value: companyInfo?.companyDescription || '' },
+        { key: 'productDescription', label: 'Product Description', required: true, value: companyInfo?.productDescription || '' },
+    ];
 
     return (
         <div className="space-y-6 mb-12">
@@ -437,10 +543,42 @@ function AnalysisSetup({
                             </div>
                         )}
                         {!isExtracting && extractionComplete && (
-                            <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                                <p className="text-green-700 dark:text-green-300 text-sm flex items-center gap-2">
-                                    <Check className="h-4 w-4" />
-                                    Company information extracted! Please review and edit if needed.
+                            <div className="space-y-3">
+                                <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <p className="text-green-700 dark:text-green-300 text-sm flex items-center gap-2">
+                                            <Check className="h-4 w-4 shrink-0" />
+                                            Data extracted — review the fields below and correct anything that looks wrong before continuing.
+                                        </p>
+                                        {hasDocuments && (
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={onExtractFromDocuments}
+                                                className="shrink-0 text-xs"
+                                            >
+                                                <RefreshCw className="h-3 w-3 mr-1" />
+                                                Re-extract
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
+                                {!(companyInfo?.companyName?.trim()) && (
+                                    <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg">
+                                        <p className="text-amber-800 dark:text-amber-200 text-sm font-medium">
+                                            ⚠️ Company name could not be detected automatically.
+                                        </p>
+                                        <p className="text-amber-700 dark:text-amber-300 text-xs mt-1">
+                                            Please type the correct company name in the field below. It is required to continue.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        {!isExtracting && !extractionComplete && (
+                            <div className="p-4 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-lg">
+                                <p className="text-blue-700 dark:text-blue-300 text-sm">
+                                    Fill in the company information below. <strong>Company name is required</strong> to continue to the next step.
                                 </p>
                             </div>
                         )}
@@ -451,6 +589,7 @@ function AnalysisSetup({
                             </h3>
                             <CompanyInformation framework={framework}
                                 onFrameworkChange={onFrameworkChangeAction}
+                                extractionComplete={extractionComplete}
                             />
                         </div>
 
@@ -482,54 +621,259 @@ function AnalysisSetup({
 
                 {/* Step 3: External Data Sources (Admin/Analyst only) */}
                 {currentStep === 3 && isPrivilegedUser && (
-                    <div className="border rounded-lg p-6">
-                        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                            <Database className="h-5 w-5" />
-                            External Data Sources
-                        </h3>
-                        <p className="text-sm text-muted-foreground mb-4">
-                            Configure external data sources to enrich the analysis with market data, competitor info, and more.
-                        </p>
-                        <ExternalDataSources
-                            framework={framework}
-                            companyName={companyInfo?.companyName || ''}
-                        />
+                    <div className="space-y-4">
+                        {externalSummary && (
+                            <div className={cn(
+                                'p-4 rounded-lg border',
+                                externalSummary.fieldsEnriched > 0
+                                    ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                                    : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+                            )}>
+                                <div className="flex items-center gap-2 text-sm">
+                                    <Check className="h-4 w-4 shrink-0 text-green-600 dark:text-green-400" />
+                                    <span className="font-medium">
+                                        Fetched from {externalSummary.success}/{externalSummary.total} sources.
+                                        {externalSummary.fieldsEnriched > 0
+                                            ? ` ${externalSummary.fieldsEnriched} company field(s) enriched — go back to Company Information to review.`
+                                            : ' No new fields could be auto-filled from external data.'}
+                                    </span>
+                                </div>
+                            </div>
+                        )}
+                        <div className="border rounded-lg p-6">
+                            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                                <Database className="h-5 w-5" />
+                                External Data Sources
+                            </h3>
+                            <p className="text-sm text-muted-foreground mb-4">
+                                Connect external sources to enrich company analysis. Fetched data will automatically complete any empty company information fields.
+                            </p>
+                            <ExternalDataSources
+                                framework={framework}
+                                companyName={companyInfo?.companyName || ''}
+                                onDataFetched={handleExternalDataFetched}
+                            />
+                        </div>
                     </div>
                 )}
 
                 {/* Step 4: Module Configuration (Admin/Analyst only) */}
                 {currentStep === 4 && isPrivilegedUser && (
-                    <div className="border rounded-lg p-6">
-                        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                            <Settings className="h-5 w-5" />
-                            Module Configuration
-                        </h3>
-                        <ModuleConfiguration framework={framework} />
+                    <div className="space-y-4">
+                        <div className="border rounded-lg p-6">
+                            <div className="flex items-center justify-between mb-6">
+                                <div>
+                                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                                        <Settings className="h-5 w-5" />
+                                        Analysis Modules
+                                    </h3>
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                        Select which modules to run.{' '}
+                                        <span className="font-medium text-foreground">
+                                            {Object.values(selectedModules).filter(Boolean).length} / 10
+                                        </span>{' '}
+                                        enabled.
+                                    </p>
+                                </div>
+                                <div className="flex gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setSelectedModules(prev => Object.fromEntries(Object.keys(prev).map(k => [k, true])))}
+                                    >
+                                        Enable All
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setSelectedModules(prev => Object.fromEntries(Object.keys(prev).map(k => [k, false])))}
+                                    >
+                                        Disable All
+                                    </Button>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {([
+                                    { id: 'tca-scorecard', name: 'TCA Scorecard', description: 'Central evaluation across all fundamental categories using the TCA scoring framework.', icon: <Target className="h-5 w-5" /> },
+                                    { id: 'risk-assessment', name: 'Risk Assessment', description: 'Risk analysis across 14 domains: market, technology, regulatory, team, and execution risks.', icon: <AlertTriangle className="h-5 w-5" /> },
+                                    { id: 'macro-trend', name: 'Macro Trend Analysis', description: 'Evaluates alignment with macroeconomic trends, industry cycles, and emerging market conditions.', icon: <TrendingUp className="h-5 w-5" /> },
+                                    { id: 'team-assessment', name: 'Team Assessment', description: 'Deep evaluation of founding team credentials, domain expertise, and execution capability.', icon: <Users className="h-5 w-5" /> },
+                                    { id: 'benchmark-comparison', name: 'Benchmark Comparison', description: 'Performance comparison against sector averages, comparable companies, and industry benchmarks.', icon: <BarChart3 className="h-5 w-5" /> },
+                                    { id: 'growth-classifier', name: 'Growth Classifier', description: 'ML-driven classification of growth trajectory, growth rate patterns, and scalability signals.', icon: <Zap className="h-5 w-5" /> },
+                                    { id: 'gap-analysis', name: 'Gap Analysis', description: 'Identifies capability gaps between current state and requirements for the next growth stage.', icon: <GitFork className="h-5 w-5" /> },
+                                    { id: 'founder-fit', name: 'Founder Fit Analysis', description: 'Assesses founder-market fit, founder-product alignment, and leadership readiness.', icon: <User className="h-5 w-5" /> },
+                                    { id: 'strategic-fit', name: 'Strategic Fit Matrix', description: 'Maps the company against investor thesis, portfolio fit, and strategic value dimensions.', icon: <Layers className="h-5 w-5" /> },
+                                    { id: 'simulation', name: 'Simulation', description: 'Scenario modeling and what-if simulation for financial projections and outcome ranges.', icon: <Cpu className="h-5 w-5" /> },
+                                ] as Array<{ id: string; name: string; description: string; icon: React.ReactNode }>).map((mod) => (
+                                    <div
+                                        key={mod.id}
+                                        className={cn(
+                                            'flex items-start gap-3 p-4 rounded-lg border cursor-pointer select-none transition-colors',
+                                            selectedModules[mod.id]
+                                                ? 'bg-primary/5 border-primary/40 dark:bg-primary/10'
+                                                : 'bg-muted/30 border-muted-foreground/20 opacity-60'
+                                        )}
+                                        onClick={() => setSelectedModules(prev => ({ ...prev, [mod.id]: !prev[mod.id] }))}
+                                    >
+                                        <div className={cn('mt-0.5 shrink-0', selectedModules[mod.id] ? 'text-primary' : 'text-muted-foreground')}>
+                                            {mod.icon}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <span className="font-medium text-sm">{mod.name}</span>
+                                                <div className={cn(
+                                                    'w-4 h-4 rounded border flex items-center justify-center shrink-0',
+                                                    selectedModules[mod.id] ? 'bg-primary border-primary' : 'border-muted-foreground/50 bg-background'
+                                                )}>
+                                                    {selectedModules[mod.id] && <Check className="h-3 w-3 text-primary-foreground" />}
+                                                </div>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{mod.description}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     </div>
                 )}
 
-                {/* Step 5: Run Analysis */}
+                {/* Step 5: Run Analysis — Full Validation & Confirmation Panel */}
                 {currentStep === 5 && (
-                    <div className="border rounded-lg p-6">
-                        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                            <Play className="h-5 w-5" />
-                            Run Analysis
-                        </h3>
-                        <div className="space-y-4">
-                            <div className="bg-muted/50 rounded-lg p-4">
-                                <h4 className="font-medium mb-2">Analysis Summary</h4>
-                                <ul className="text-sm text-muted-foreground space-y-1">
-                                    <li>• Evaluation ID: <span className="font-mono text-primary">{evaluationId}</span></li>
-                                    <li>• Documents: {uploadedFiles.length} files, {importedUrls.length} URLs, {submittedTexts.length} text inputs</li>
-                                    <li>• Company: {companyInfo?.companyName || 'Not specified'}</li>
-                                    <li>• Framework: {framework === 'medtech' ? 'MedTech' : 'General'}</li>
-                                </ul>
+                    <div className="space-y-4">
+                        {/* Company Information Validation */}
+                        <div className="border rounded-lg p-6">
+                            <h3 className="text-base font-semibold mb-4 flex items-center gap-2">
+                                <FileText className="h-4 w-4" />
+                                Company Information
+                                <span className="ml-auto text-sm font-normal text-muted-foreground">
+                                    {companyInfoFields.filter(f => f.value).length} / 13 fields filled
+                                </span>
+                            </h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {companyInfoFields.map((field) => (
+                                    <div
+                                        key={field.key}
+                                        className={cn(
+                                            'flex items-center gap-2 px-3 py-2 rounded-md text-sm',
+                                            field.value
+                                                ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200'
+                                                : field.required
+                                                    ? 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200'
+                                                    : 'bg-muted/50 text-muted-foreground'
+                                        )}
+                                    >
+                                        {field.value
+                                            ? <Check className="h-3.5 w-3.5 shrink-0 text-green-600 dark:text-green-400" />
+                                            : <AlertTriangle className="h-3.5 w-3.5 shrink-0" />}
+                                        <span className="font-medium shrink-0">{field.label}:</span>
+                                        <span className="truncate text-xs">
+                                            {field.value
+                                                ? field.value.length > 45 ? field.value.substring(0, 45) + '…' : field.value
+                                                : field.required ? 'Required — not filled' : 'Not provided'}
+                                        </span>
+                                    </div>
+                                ))}
                             </div>
+                        </div>
+
+                        {/* Data Sources Summary */}
+                        <div className="border rounded-lg p-6">
+                            <h3 className="text-base font-semibold mb-4 flex items-center gap-2">
+                                <Database className="h-4 w-4" />
+                                Data Sources
+                            </h3>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                                <div className="bg-muted/50 rounded-lg p-3">
+                                    <div className="text-2xl font-bold text-primary">{uploadedFiles.length}</div>
+                                    <div className="text-xs text-muted-foreground mt-1">Files Uploaded</div>
+                                </div>
+                                <div className="bg-muted/50 rounded-lg p-3">
+                                    <div className="text-2xl font-bold text-primary">{importedUrls.length}</div>
+                                    <div className="text-xs text-muted-foreground mt-1">URLs Imported</div>
+                                </div>
+                                <div className="bg-muted/50 rounded-lg p-3">
+                                    <div className="text-2xl font-bold text-primary">{submittedTexts.length}</div>
+                                    <div className="text-xs text-muted-foreground mt-1">Text Inputs</div>
+                                </div>
+                                <div className={cn('rounded-lg p-3', externalSummary?.success ? 'bg-green-50 dark:bg-green-900/20' : 'bg-muted/50')}>
+                                    <div className={cn('text-2xl font-bold', externalSummary?.success ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground')}>
+                                        {externalSummary?.success ?? 0}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground mt-1">External Sources</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Modules Selected */}
+                        {isPrivilegedUser && (
+                            <div className="border rounded-lg p-6">
+                                <h3 className="text-base font-semibold mb-4 flex items-center gap-2">
+                                    <Settings className="h-4 w-4" />
+                                    Analysis Modules
+                                    <span className="ml-auto text-sm font-normal text-muted-foreground">
+                                        {Object.values(selectedModules).filter(Boolean).length} / 10 enabled
+                                    </span>
+                                </h3>
+                                <div className="flex flex-wrap gap-2">
+                                    {Object.entries(selectedModules).map(([id, enabled]) => {
+                                        const name = {
+                                            'tca-scorecard': 'TCA Scorecard',
+                                            'risk-assessment': 'Risk Assessment',
+                                            'macro-trend': 'Macro Trend Analysis',
+                                            'team-assessment': 'Team Assessment',
+                                            'benchmark-comparison': 'Benchmark Comparison',
+                                            'growth-classifier': 'Growth Classifier',
+                                            'gap-analysis': 'Gap Analysis',
+                                            'founder-fit': 'Founder Fit Analysis',
+                                            'strategic-fit': 'Strategic Fit Matrix',
+                                            'simulation': 'Simulation',
+                                        }[id] ?? id;
+                                        return (
+                                            <span
+                                                key={id}
+                                                className={cn(
+                                                    'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border',
+                                                    enabled
+                                                        ? 'bg-primary/10 text-primary border-primary/20'
+                                                        : 'bg-muted text-muted-foreground border-muted-foreground/20 line-through'
+                                                )}
+                                            >
+                                                {enabled && <Check className="h-3 w-3" />}
+                                                {name}
+                                            </span>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Confirm & Run */}
+                        <div className="border rounded-lg p-6">
+                            <h3 className="text-base font-semibold mb-1 flex items-center gap-2">
+                                <Play className="h-4 w-4" />
+                                Confirm &amp; Run Analysis
+                            </h3>
+                            <p className="text-sm text-muted-foreground mb-4">
+                                Evaluation ID: <span className="font-mono text-primary">{evaluationId}</span>
+                                {' · '}Framework: {framework === 'medtech' ? 'MedTech' : 'General'}
+                            </p>
+                            {!(companyInfo?.companyName?.trim()) && (
+                                <div className="p-3 mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-300 flex items-center gap-2">
+                                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                                    Company name is required. Go back to Company Information and enter the company name.
+                                </div>
+                            )}
+                            {hasDocuments && !canRunAnalysis && (companyInfo?.companyName?.trim()) && (
+                                <div className="p-3 mb-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg text-sm text-yellow-700 dark:text-yellow-300 flex items-center gap-2">
+                                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                                    Document extraction is still in progress. You can run analysis now and the system will use available data, or wait for extraction to complete for richer results.
+                                </div>
+                            )}
                             <Button
                                 size="lg"
                                 className="w-full"
                                 onClick={handleRunAnalysisAction}
-                                disabled={isLoading || (hasDocuments && !canRunAnalysis)}
+                                disabled={isLoading || !(companyInfo?.companyName?.trim())}
                             >
                                 {isLoading ? (
                                     <>
@@ -590,8 +934,10 @@ export default function EvaluationPage() {
 
     // Workflow step state
     const [currentStep, setCurrentStep] = useState(1);
-    const [evaluationId, setEvaluationId] = useState(() => generateEvaluationId());
-    const [companyId, setCompanyId] = useState(() => generateCompanyId());
+    // Initialize as empty strings to avoid SSR/client hydration mismatch (#418)
+    // IDs are generated client-side in the autosave restore useEffect
+    const [evaluationId, setEvaluationId] = useState('');
+    const [companyId, setCompanyId] = useState('');
     const [isFreshEvaluation, setIsFreshEvaluation] = useState(true);
 
     // Ref to track if auto-extraction has been triggered
@@ -1073,6 +1419,10 @@ export default function EvaluationPage() {
                     if (parsed.companyInfo) {
                         setCompanyInfo(parsed.companyInfo);
                     }
+                    // Restore step so user lands back where they left off
+                    if (parsed.currentStep && parsed.currentStep > 1) {
+                        setCurrentStep(parsed.currentStep);
+                    }
 
                     // Show toast if data was restored
                     const hasData = parsed.uploadedFiles?.length > 0 || parsed.importedUrls?.length > 0 || parsed.submittedTexts?.length > 0 || parsed.companyInfo?.companyName;
@@ -1090,6 +1440,9 @@ export default function EvaluationPage() {
         } catch (e) {
             console.warn('Failed to restore autosaved data:', e);
         }
+        // Generate IDs client-side only (after restore attempt) to avoid SSR hydration mismatch
+        setEvaluationId(prev => prev || generateEvaluationId());
+        setCompanyId(prev => prev || generateCompanyId());
         setIsInitialized(true);
     }, [toast]);
 
@@ -1245,9 +1598,6 @@ export default function EvaluationPage() {
             companyDescription: companyInfo.companyDescription || submittedTexts[0] || '',
             ...companyData,
         }));
-
-        // Clear autosave before navigating
-        clearAutosave();
 
         toast({
             title: 'Starting Analysis',

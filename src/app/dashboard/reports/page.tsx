@@ -99,7 +99,9 @@ function getLocalStorageReports(): Report[] {
       const mapped = {
         id: r.id || `local-${index}`,
         company: r.companyName || 'Unnamed Company',
-        type: r.reportType === 'dd' ? 'Due Diligence' : 'Triage',
+        type: r.reportType === 'dd'
+          ? 'Due Diligence'
+          : (r.id && r.id.startsWith('RPT-SSD-')) ? 'SSD' : 'Triage',
         status: r.metadata?.status === 'completed' ? 'Completed' : 'Draft',
         approval: 'Pending',
         score: score,
@@ -119,84 +121,7 @@ function getLocalStorageReports(): Report[] {
   }
 }
 
-// Fallback data when API is unavailable
-const fallbackReportsData: ReportData[] = [
-  {
-    id: 1,
-    company_name: 'Innovate Inc.',
-    company: 'Innovate Inc.',
-    type: 'Triage',
-    status: 'Completed',
-    approval: 'Approved',
-    score: 8.2,
-    confidence: 88.1,
-    recommendation: 'Recommend',
-    user: { name: 'Admin', email: 'admin@tca.com' },
-    created_at: '10/24/2025',
-    createdAt: '10/24/2025',
-    updated_at: '10/24/2025'
-  },
-  {
-    id: 2,
-    company_name: 'QuantumLeap AI',
-    company: 'QuantumLeap AI',
-    type: 'Triage',
-    status: 'Completed',
-    approval: 'Due Diligence',
-    score: 7.8,
-    confidence: 91.5,
-    recommendation: 'Recommend',
-    user: { name: 'Analyst User', email: 'analyst@tca.com' },
-    created_at: '10/23/2025',
-    createdAt: '10/23/2025',
-    updated_at: '10/23/2025'
-  },
-  {
-    id: 3,
-    company_name: 'SustainaTech',
-    company: 'SustainaTech',
-    type: 'Triage',
-    status: 'Completed',
-    approval: 'Approved',
-    score: 6.5,
-    confidence: 85.2,
-    recommendation: 'Hold',
-    user: { name: 'Standard User', email: 'user@tca.com' },
-    created_at: '10/22/2025',
-    createdAt: '10/22/2025',
-    updated_at: '10/22/2025'
-  },
-  {
-    id: 4,
-    company_name: 'NextGen Med',
-    company: 'NextGen Med',
-    type: 'Triage',
-    status: 'Completed',
-    approval: 'Rejected',
-    score: 4.5,
-    confidence: 90.1,
-    recommendation: 'Reject',
-    user: { name: 'Admin', email: 'admin@tca.com' },
-    created_at: '10/21/2025',
-    createdAt: '10/21/2025',
-    updated_at: '10/21/2025'
-  },
-  {
-    id: 5,
-    company_name: 'CyberSecure',
-    company: 'CyberSecure',
-    type: 'Due Diligence',
-    status: 'Completed',
-    approval: 'Invested',
-    score: 8.9,
-    confidence: 94.0,
-    recommendation: 'Invest',
-    user: { name: 'Analyst User', email: 'analyst@tca.com' },
-    created_at: '10/20/2025',
-    createdAt: '10/20/2025',
-    updated_at: '10/20/2025'
-  },
-];
+
 
 const StatCard = ({
   title,
@@ -355,7 +280,8 @@ export default function ReportsPage() {
                 const report: Report = {
                   id: record.id?.evaluationId || record.evaluationId || `pending-${Date.now()}-${Math.random().toString(36).substring(7)}`,
                   company: record.company?.name || record.companyName || record.company_name || 'Unknown',
-                  type: record.report?.reportType === 'dd' ? 'Due Diligence' : 'Triage',
+                  type: record.report?.reportType === 'dd' ? 'Due Diligence'
+                    : (String(record.id?.evaluationId || record.evaluationId || '')).startsWith('RPT-SSD-') ? 'SSD' : 'Triage',
                   status: 'Pending Sync',
                   approval: 'Pending',
                   score: record.analysis?.overallScore || record.score || 0,
@@ -391,7 +317,8 @@ export default function ReportsPage() {
                 const report: Report = {
                   id: record.id?.evaluationId || `unified-${Date.now()}`,
                   company: record.company?.name || 'Unknown',
-                  type: record.report?.reportType === 'dd' ? 'Due Diligence' : 'Triage',
+                  type: record.report?.reportType === 'dd' ? 'Due Diligence'
+                    : (String(record.id?.evaluationId || '')).startsWith('RPT-SSD-') ? 'SSD' : 'Triage',
                   status: 'Pending Sync',
                   approval: record.workflow?.reviewerApproval?.status || 'Pending',
                   score: record.analysis?.overallScore || 0,
@@ -617,22 +544,9 @@ export default function ReportsPage() {
         }
       }
 
-      // If no reports from either source, use fallback
+      // If no reports from either source, show empty state
       if (mergedReports.length === 0) {
-        const mappedFallback: Report[] = fallbackReportsData.map(r => ({
-          id: r.id,
-          company: r.company_name || r.company || '',
-          type: r.type,
-          status: r.status,
-          approval: r.approval,
-          score: r.score ?? 0,
-          confidence: r.confidence ?? 0,
-          recommendation: r.recommendation || 'Hold',
-          user: r.user,
-          createdAt: r.created_at || r.createdAt || '',
-          missingSections: undefined,
-        }));
-        setAllReports(mappedFallback);
+        setAllReports([]);
       } else {
         // Apply search filter to merged reports
         let filteredReports = mergedReports;
@@ -655,22 +569,8 @@ export default function ReportsPage() {
         setAllReports(filteredReports);
       }
     } catch (error) {
-      console.error('Failed to load reports, using fallback data:', error);
-      // Fallback to local data
-      const mappedFallback: Report[] = fallbackReportsData.map(r => ({
-        id: r.id,
-        company: r.company_name || r.company || '',
-        type: r.type,
-        status: r.status,
-        approval: r.approval,
-        score: r.score ?? 0,
-        confidence: r.confidence ?? 0,
-        recommendation: r.recommendation || 'Hold',
-        user: r.user,
-        createdAt: r.created_at || r.createdAt || '',
-        missingSections: undefined,
-      }));
-      setAllReports(mappedFallback);
+      console.error('Failed to load reports:', error);
+      setAllReports([]);
     } finally {
       setLoading(false);
     }
@@ -910,6 +810,7 @@ export default function ReportsPage() {
               {isPrivilegedUser ? (
                 <>
                   <TabsTrigger value="all">All Reports ({reportsForUser.length})</TabsTrigger>
+                  <TabsTrigger value="ssd">SSD ({allReports.filter(r => r.type === 'SSD').length})</TabsTrigger>
                   <TabsTrigger value="due-diligence">Due Diligence ({allReports.filter(r => r.type === 'Due Diligence').length})</TabsTrigger>
                   <TabsTrigger value="pending">Pending Approval ({pendingReports.length})</TabsTrigger>
                   {pendingSyncCount > 0 && (
@@ -960,6 +861,7 @@ export default function ReportsPage() {
                     <SelectContent>
                       <SelectItem value="all">All Types</SelectItem>
                       <SelectItem value="triage">Triage</SelectItem>
+                      <SelectItem value="ssd">SSD</SelectItem>
                       <SelectItem value="dd">Due Diligence</SelectItem>
                     </SelectContent>
                   </Select>
@@ -992,6 +894,29 @@ export default function ReportsPage() {
                     </div>
                   </Card>
                 )}
+              </TabsContent>
+              <TabsContent value="ssd" className="space-y-4">
+                {allReports.filter(r => r.type === 'SSD').length > 0
+                  ? allReports.filter(r => r.type === 'SSD').map(report => (
+                    <ReportCard
+                      key={report.id}
+                      report={report}
+                      isPrivileged={isPrivilegedUser}
+                      onViewVersions={typeof report.id === 'number' ? () => viewReportVersions(report.id as number, report.company) : undefined}
+                    />
+                  ))
+                  : (
+                    <Card className="p-8 text-center">
+                      <div className="flex flex-col items-center gap-4">
+                        <FileText className="size-12 text-muted-foreground" />
+                        <div>
+                          <h3 className="text-lg font-semibold">No SSD Reports</h3>
+                          <p className="text-muted-foreground mb-4">Run a Standard Scorecard analysis to generate SSD reports.</p>
+                        </div>
+                        <Button asChild><Link href="/dashboard/evaluation">Start SSD Analysis</Link></Button>
+                      </div>
+                    </Card>
+                  )}
               </TabsContent>
               <TabsContent value="due-diligence" className="space-y-4">
                 {allReports.filter(r => r.type === 'Due Diligence').length > 0

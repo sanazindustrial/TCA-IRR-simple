@@ -1,6 +1,6 @@
 
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -19,8 +19,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ArrowLeft, GripVertical, Plus, Trash2, RotateCcw } from 'lucide-react';
+import { ArrowLeft, GripVertical, Plus, Trash2, RotateCcw, Save, History, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
+import { useToast } from '@/hooks/use-toast';
+import { saveConfigVersion, getLatestConfig, getVersionHistory, clearConfigVersions, type ConfigVersion } from '@/lib/module-config-service';
 import { Separator } from '@/components/ui/separator';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -96,7 +98,28 @@ export default function BenchmarkConfigPage() {
     const [benchmarksEnabled, setBenchmarksEnabled] = useState(true);
     const [baselineSource, setBaselineSource] = useState('internal-db');
     const [overlayWeight, setOverlayWeight] = useState(5);
-    
+    const [versionHistory, setVersionHistory] = useState<ConfigVersion[]>([]);
+    const [currentVersion, setCurrentVersion] = useState<number | null>(null);
+    const [showHistory, setShowHistory] = useState(false);
+    const { toast } = useToast();
+
+    useEffect(() => {
+        const saved = getLatestConfig<any>('benchmark');
+        if (saved) {
+            if (saved.benchmarksEnabled !== undefined) setBenchmarksEnabled(saved.benchmarksEnabled);
+            if (saved.baselineSource) setBaselineSource(saved.baselineSource);
+            if (saved.overlayWeight !== undefined) setOverlayWeight(saved.overlayWeight);
+            if (saved.peerPriority) setPeerPriority(saved.peerPriority);
+            if (saved.universalMetrics) setUniversalMetrics(saved.universalMetrics);
+            if (saved.techMetrics) setTechMetrics(saved.techMetrics);
+            if (saved.medMetrics) setMedMetrics(saved.medMetrics);
+            if (saved.scoringLogic) setScoringLogic(saved.scoringLogic);
+        }
+        const history = getVersionHistory('benchmark');
+        setVersionHistory(history);
+        if (history.length > 0) setCurrentVersion(history[0].version);
+    }, []);
+
     const currentJsonConfig = generateJsonConfig({
         benchmarksEnabled,
         overlayWeight,
@@ -115,6 +138,35 @@ export default function BenchmarkConfigPage() {
         setBenchmarksEnabled(true);
         setBaselineSource('internal-db');
         setOverlayWeight(5);
+        clearConfigVersions('benchmark');
+        setVersionHistory([]);
+        setCurrentVersion(null);
+        toast({ title: 'Defaults Restored', description: 'Benchmark configuration reset to defaults.' });
+    };
+
+    const handleSaveConfig = () => {
+        const config = { benchmarksEnabled, baselineSource, overlayWeight, peerPriority, universalMetrics, techMetrics, medMetrics, scoringLogic };
+        const storedUser = typeof window !== 'undefined' ? localStorage.getItem('loggedInUser') : null;
+        const userEmail = storedUser ? JSON.parse(storedUser).email : undefined;
+        const ver = saveConfigVersion('benchmark', config, { label: `v${(versionHistory.length + 1)} - Manual Save`, savedBy: userEmail });
+        const history = getVersionHistory('benchmark');
+        setVersionHistory(history);
+        setCurrentVersion(ver);
+        toast({ title: 'Configuration Saved', description: `Version ${ver} saved successfully.` });
+    };
+
+    const handleLoadVersion = (v: ConfigVersion) => {
+        const cfg = v.config as any;
+        if (cfg.benchmarksEnabled !== undefined) setBenchmarksEnabled(cfg.benchmarksEnabled);
+        if (cfg.baselineSource) setBaselineSource(cfg.baselineSource);
+        if (cfg.overlayWeight !== undefined) setOverlayWeight(cfg.overlayWeight);
+        if (cfg.peerPriority) setPeerPriority(cfg.peerPriority);
+        if (cfg.universalMetrics) setUniversalMetrics(cfg.universalMetrics);
+        if (cfg.techMetrics) setTechMetrics(cfg.techMetrics);
+        if (cfg.medMetrics) setMedMetrics(cfg.medMetrics);
+        if (cfg.scoringLogic) setScoringLogic(cfg.scoringLogic);
+        setCurrentVersion(v.version);
+        toast({ title: `Version ${v.version} Loaded`, description: v.label });
     };
 
 
@@ -346,9 +398,27 @@ export default function BenchmarkConfigPage() {
         </div>
       </div>
        <Card className="mt-8">
-        <CardFooter className="p-4 flex justify-end">
-            <Button>Save Configuration</Button>
+        <CardFooter className="p-4 flex justify-between items-center flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={handleReset}><RotateCcw className="mr-2 size-4" /> Restore Defaults</Button>
+            <Button variant="ghost" size="sm" onClick={() => setShowHistory(h => !h)}>
+              <History className="mr-2 size-4" /> History {versionHistory.length > 0 && `(${versionHistory.length})`}
+            </Button>
+            {currentVersion && <span className="text-xs text-muted-foreground">Active: v{currentVersion}</span>}
+          </div>
+          <Button onClick={handleSaveConfig}><Save className="mr-2 size-4" /> Save Configuration</Button>
         </CardFooter>
+        {showHistory && versionHistory.length > 0 && (
+          <div className="px-4 pb-4 border-t space-y-2 pt-4">
+            <h4 className="text-sm font-semibold">Version History</h4>
+            {[...versionHistory].map(v => (
+              <div key={v.version} className="flex items-center justify-between text-sm p-2 bg-muted/40 rounded">
+                <span>v{v.version} — {v.label} <span className="text-xs text-muted-foreground">({new Date(v.timestamp).toLocaleString()})</span></span>
+                <Button size="sm" variant="ghost" onClick={() => handleLoadVersion(v)}><RefreshCw className="size-3 mr-1" /> Load</Button>
+              </div>
+            ))}
+          </div>
+        )}
       </Card>
     </div>
   );

@@ -21,7 +21,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import type { ComprehensiveAnalysisOutput } from '@/ai/flows/schemas';
 import Loading from '@/app/loading';
-import { ArrowLeft, Calculator, Check, Eye, Lock, Play, SkipForward, SlidersHorizontal, ToggleLeft, ToggleRight, FileText, Settings } from 'lucide-react';
+import { ArrowLeft, Calculator, Check, Eye, Lock, Play, SkipForward, SlidersHorizontal, ToggleLeft, ToggleRight, FileText, Settings, BarChart3, TrendingUp, Users, Megaphone, Leaf } from 'lucide-react';
 import Link from 'next/link';
 import {
   AlertDialog,
@@ -73,6 +73,11 @@ const MODULE_DEFINITIONS: Record<string, { name: string; description: string; we
   founderFit: { name: 'Founder Fit Analysis', description: 'Funding readiness assessment', weight: 12 },
   team: { name: 'Team Assessment', description: 'Team effectiveness evaluation', weight: 13 },
   strategicFit: { name: 'Strategic Fit Matrix', description: 'Strategic alignment scoring', weight: 0 },
+  financial: { name: 'Financial Analysis', description: 'Revenue model, unit economics, projections and funding assessment.', weight: 10 },
+  economic: { name: 'Economic Analysis', description: 'Industry structure, pricing power and macro-cycle resilience.', weight: 10 },
+  social: { name: 'Social Analysis', description: 'Social impact, demographic fit, cultural adoption and stakeholder trust.', weight: 10 },
+  marketing: { name: 'Marketing Analysis', description: 'Positioning, digital presence, spend efficiency and GTM execution.', weight: 10 },
+  environmental: { name: 'Environmental Analysis', description: 'Environmental impact, climate risk, certifications and ESG alignment.', weight: 10 },
 };
 
 const EditableScoreTable = ({
@@ -373,6 +378,7 @@ export default function SimulationPage() {
   const [showWelcome, setShowWelcome] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [simulationHistory, setSimulationHistory] = useState<number[]>([]);
+  const [contextInfo, setContextInfo] = useState<{ evaluationId: string; analysisId: string; companyName: string; userName: string; framework: string; timestamp: string } | null>(null);
 
   // Settings version state
   const [settingsVersions, setSettingsVersions] = useState<SettingsVersion[]>([]);
@@ -410,10 +416,33 @@ export default function SimulationPage() {
     }
   }, []);
 
-  // Check if user is admin
+  // Check if user is admin or analyst
   useEffect(() => {
-    const userRole = localStorage.getItem('userRole') || sessionStorage.getItem('userRole');
-    setIsAdmin(userRole === 'admin' || userRole === 'Admin');
+    try {
+      const storedUser = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
+      const userRole = storedUser.role?.toLowerCase() || '';
+      setIsAdmin(userRole === 'admin' || userRole === 'analyst');
+    } catch {
+      setIsAdmin(false);
+    }
+
+    // Load analysis context from tracking info stored by run/page.tsx
+    try {
+      const trackingRaw = localStorage.getItem('analysisTrackingInfo');
+      if (trackingRaw) {
+        const tracking = JSON.parse(trackingRaw);
+        setContextInfo({
+          evaluationId: tracking.evaluationId || '',
+          analysisId: tracking.analysisId || '',
+          companyName: (tracking.companyName || '').replace(/[\r\n]+/g, ' ').trim(),
+          userName: tracking.userName || '',
+          framework: tracking.framework || 'general',
+          timestamp: tracking.timestamp || '',
+        });
+      }
+    } catch {
+      // ignore
+    }
   }, []);
 
   // Load settings versions on mount
@@ -459,47 +488,16 @@ export default function SimulationPage() {
           }
         }
 
-        // If no valid stored data or TCA data is missing, try to fetch fresh analysis
+        // If no valid stored data or TCA data is missing, redirect to evaluation — no fake fallback
         if (!data || !data.tcaData?.categories || data.tcaData.categories.length === 0) {
-          console.log('No valid TCA data found, fetching fresh analysis...');
-
-          try {
-            // Use default company data or fetch from session storage
-            const companySessionData = sessionStorage.getItem('companyData');
-            const userData = companySessionData ? JSON.parse(companySessionData) : {
-              companyName: 'TechCorp Solutions',
-              companyDescription: 'SaaS technology startup with proven revenue model',
-              sector: 'technology',
-              team_size: 12,
-              monthly_revenue: 85000,
-              monthly_burn: 65000,
-              cash_balance: 800000,
-              market_size: 5000000000,
-              founder_experience: true,
-              technical_team: true,
-              customer_validation: true,
-              revenue_traction: true,
-              patents: false,
-              technical_innovation: true
-            };
-
-            console.log('Fetching fresh analysis with data:', userData);
-            data = await runAnalysis('general', userData);
-
-            // Store the fresh data
-            localStorage.setItem('analysisResult', JSON.stringify(data));
-            console.log('Fresh analysis data fetched and stored:', data);
-
-          } catch (error) {
-            console.error('Failed to fetch fresh analysis:', error);
-            toast({
-              title: 'Analysis Required',
-              description: 'Unable to load analysis data. Please run a new analysis from the evaluation page.',
-              variant: 'destructive'
-            });
-            router.push('/dashboard/evaluation');
-            return;
-          }
+          console.log('No valid TCA data found, redirecting to evaluation...');
+          toast({
+            title: 'Analysis Required',
+            description: 'No real analysis data found. Please run an analysis first from the evaluation page.',
+            variant: 'destructive'
+          });
+          router.push('/dashboard/evaluation');
+          return;
         }
 
         if (data) {
@@ -606,6 +604,44 @@ export default function SimulationPage() {
             initialScores['team'] = [
               { id: 'team-effectiveness', category: 'Team Assessment', score: teamScore }
             ];
+          }
+
+          // Load 5 specialized module scores from localStorage module configs
+          const specializedModules = [
+            { key: 'financial', label: 'Financial Analysis' },
+            { key: 'economic', label: 'Economic Analysis' },
+            { key: 'social', label: 'Social Analysis' },
+            { key: 'marketing', label: 'Marketing Analysis' },
+            { key: 'environmental', label: 'Environmental Analysis' },
+          ];
+          for (const mod of specializedModules) {
+            // First check if analysis result already has this module's data
+            const dataKey = `${mod.key}Data` as keyof typeof data;
+            const moduleData = data[dataKey];
+            if (moduleData && typeof moduleData === 'object' && 'overallScore' in (moduleData as Record<string, unknown>)) {
+              const score = (moduleData as Record<string, unknown>).overallScore;
+              initialScores[mod.key] = [{ id: `${mod.key}-score`, category: mod.label, score: typeof score === 'number' ? Math.min(10, Math.max(0, score)) : 7.0 }];
+            } else {
+              // Derive a default score from saved localStorage module config weights
+              try {
+                const configRaw = localStorage.getItem(`module-config-versions-${mod.key}`);
+                if (configRaw) {
+                  const versions = JSON.parse(configRaw);
+                  const cfg = versions?.[0]?.config;
+                  if (cfg && typeof cfg === 'object') {
+                    const weightValues = Object.values(cfg).filter((v): v is number => typeof v === 'number' && v >= 0 && v <= 1);
+                    const avgWeight = weightValues.length > 0 ? weightValues.reduce((s: number, v: number) => s + v, 0) / weightValues.length : 0.7;
+                    initialScores[mod.key] = [{ id: `${mod.key}-score`, category: mod.label, score: parseFloat((avgWeight * 10).toFixed(1)) }];
+                  } else {
+                    initialScores[mod.key] = [{ id: `${mod.key}-score`, category: mod.label, score: 7.0 }];
+                  }
+                } else {
+                  initialScores[mod.key] = [{ id: `${mod.key}-score`, category: mod.label, score: 7.0 }];
+                }
+              } catch {
+                initialScores[mod.key] = [{ id: `${mod.key}-score`, category: mod.label, score: 7.0 }];
+              }
+            }
           }
 
           // Initialize module configs for all modules
@@ -906,6 +942,35 @@ export default function SimulationPage() {
             <ArrowLeft className="size-4" />
             Back to Analysis Setup
           </Link>
+
+          {/* Context Banner — shows evaluation/company info from run page */}
+          {contextInfo && contextInfo.companyName && (
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-5 px-4 py-3 bg-muted/50 rounded-lg border text-sm">
+              <div className="flex items-center gap-2">
+                <FileText className="size-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Evaluation ID:</span>
+                <span className="font-mono font-medium text-foreground">{contextInfo.evaluationId || '—'}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Users className="size-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Company:</span>
+                <span className="font-semibold text-foreground">{contextInfo.companyName}</span>
+              </div>
+              {contextInfo.userName && (
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">Analyst:</span>
+                  <span className="font-medium text-foreground">{contextInfo.userName}</span>
+                </div>
+              )}
+              {contextInfo.framework && (
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">Framework:</span>
+                  <span className="font-medium text-foreground capitalize">{contextInfo.framework}</span>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-4xl font-bold font-headline text-primary tracking-tight">
@@ -1084,6 +1149,74 @@ export default function SimulationPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ── Expanded Module Analysis (5 specialised modules) ── */}
+      {analysisData && (() => {
+        const EXPANDED_MODULES = [
+          { key: 'financialData' as const, label: 'Financial Analysis', Icon: BarChart3, subscore_labels: { revenue_model: 'Revenue Model', unit_economics: 'Unit Economics', projections: 'Projections', funding_requirements: 'Funding Requirements' } },
+          { key: 'economicData' as const, label: 'Economic Analysis', Icon: TrendingUp, subscore_labels: { industry_structure: 'Industry Structure', pricing_power: 'Pricing Power', macro_indicators: 'Macro Indicators', cycle_resilience: 'Cycle Resilience' } },
+          { key: 'socialData' as const, label: 'Social Analysis', Icon: Users, subscore_labels: { social_impact: 'Social Impact', demographic_fit: 'Demographic Fit', cultural_adoption: 'Cultural Adoption', stakeholder_trust: 'Stakeholder Trust' } },
+          { key: 'marketingData' as const, label: 'Marketing Analysis', Icon: Megaphone, subscore_labels: { positioning: 'Positioning', digital_presence: 'Digital Presence', spend_efficiency: 'Spend Efficiency', gtm_execution: 'GTM Execution' } },
+          { key: 'environmentalData' as const, label: 'Environmental Analysis', Icon: Leaf, subscore_labels: { impact: 'Environmental Impact', climate_risk: 'Climate Risk', certification: 'Certification', esg_alignment: 'ESG Alignment' } },
+        ] as const;
+        const visibleModules = EXPANDED_MODULES.filter(m => analysisData[m.key]);
+        if (visibleModules.length === 0) return null;
+        const signalStyle = (s: string) => s === 'green' ? 'bg-green-100 text-green-800 border-green-300' : s === 'yellow' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' : 'bg-red-100 text-red-800 border-red-300';
+        const signalDot = (s: string) => s === 'green' ? 'bg-green-500' : s === 'yellow' ? 'bg-yellow-500' : 'bg-red-500';
+        return (
+          <div className="container mx-auto px-4 md:px-8 pb-8">
+            <h2 className="text-2xl font-bold text-foreground mb-4">Expanded Module Analysis</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              {visibleModules.map(({ key, label, Icon, subscore_labels }) => {
+                const mod = analysisData[key]!;
+                return (
+                  <Card key={key} className="flex flex-col">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center justify-between gap-2 text-base">
+                        <span className="flex items-center gap-2">
+                          <Icon className="size-5 text-primary" />
+                          {label}
+                        </span>
+                        <span className={`text-xs px-2 py-1 rounded border font-semibold ${signalStyle(mod.signal)}`}>
+                          <span className={`inline-block size-2 rounded-full mr-1 ${signalDot(mod.signal)}`} />
+                          {mod.signal.toUpperCase()}
+                        </span>
+                      </CardTitle>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-2xl font-bold text-primary">{mod.score.toFixed(1)}</span>
+                        <span className="text-sm text-muted-foreground">/ 10</span>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="flex-1 space-y-4">
+                      <div className="space-y-1">
+                        {(Object.entries(mod.subscores) as [string, number][]).map(([k, v]) => (
+                          <div key={k} className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">{(subscore_labels as Record<string, string>)[k] ?? k}</span>
+                            <span className="font-mono font-medium">{v.toFixed(1)}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {mod.summary && <p className="text-sm text-muted-foreground border-t pt-3">{mod.summary}</p>}
+                      {mod.risks?.length > 0 && (
+                        <div className="space-y-1">
+                          <p className="text-xs font-semibold uppercase tracking-wider text-destructive">Risks</p>
+                          <ul className="space-y-1">{mod.risks.map((r, i) => <li key={i} className="text-xs text-muted-foreground flex gap-1.5"><span className="text-destructive mt-0.5">•</span>{r}</li>)}</ul>
+                        </div>
+                      )}
+                      {mod.recommendations?.length > 0 && (
+                        <div className="space-y-1">
+                          <p className="text-xs font-semibold uppercase tracking-wider text-primary">Recommendations</p>
+                          <ul className="space-y-1">{mod.recommendations.map((r, i) => <li key={i} className="text-xs text-muted-foreground flex gap-1.5"><span className="text-primary mt-0.5">›</span>{r}</li>)}</ul>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
     </>
   );
 }

@@ -1,7 +1,7 @@
 
 'use client';
 import * as React from 'react';
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -38,6 +38,8 @@ import {
   Cpu,
   Zap,
   Edit,
+  Loader2,
+  RefreshCw,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -76,11 +78,14 @@ type ApiKey = {
   value: string;
 };
 
+type ConnectionStatus = 'connected' | 'disconnected' | 'testing';
+type ConnectionItem = { name: string; status: ConnectionStatus; message?: string; latency_ms?: number };
+
 
 const initialEnvVars: EnvVar[] = [
   { id: '1', name: 'NODE_ENV', value: 'development', scope: 'backend', description: 'Backend-node only' },
-  { id: '2', name: 'NEXT_PUBLIC_SUPABASE_URL', value: 'https://ixshfrcomwlmybmvupdanv.supabase.co', scope: 'frontend', description: 'Accessible to React frontend' },
-  { id: '3', name: 'NEXT_PUBLIC_SUPABASE_ANON_KEY', value: '*****************', scope: 'frontend', description: 'Accessible to React frontend' },
+  { id: '2', name: 'AZURE_POSTGRESQL_HOST', value: 'tcairrapiccontainer.postgres.database.azure.com', scope: 'backend', description: 'Azure PostgreSQL host — backend only' },
+  { id: '3', name: 'DATABASE_URL', value: 'postgresql://***:***@tcairr...azure.com:5432/tcadb', scope: 'backend', description: 'Full Azure PostgreSQL connection string — backend only' },
   { id: '4', name: 'OPENAI_API_KEY', value: '*****************', scope: 'backend', description: 'Backend-node only' },
   { id: '5', name: 'GEMINI_API_KEY', value: '*****************', scope: 'backend', description: 'Backend-node only' },
   { id: '6', name: 'DATABASE_URL', value: 'postgresql://postgres:password@localhost:5432/pitch.db', scope: 'backend', description: 'Backend-node only' },
@@ -90,25 +95,11 @@ const initialEnvVars: EnvVar[] = [
 const initialApiKeys: ApiKey[] = [
     { id: 'key-1', name: 'Gemini', value: 'AIzaSy****************', keySnippet: 'AIzaSy...' },
     { id: 'key-2', name: 'OpenAI', value: 'sk-****************', keySnippet: 'sk-...' },
-    { id: 'key-3', name: 'Supabase', value: 'eyJhbGci****************', keySnippet: 'eyJhbGci...' },
+    { id: 'key-3', name: 'Azure PostgreSQL', value: '', keySnippet: '' },
     { id: 'key-4', name: 'Crunchbase', value: '', keySnippet: '' },
     { id: 'key-5', name: 'Anthropic', value: '', keySnippet: '' },
     { id: 'key-6', name: 'GitHub', value: '', keySnippet: '' },
 ];
-
-const connections = [
-    { name: 'Database', status: 'disconnected' },
-    { name: 'OpenAI', status: 'disconnected' },
-    { name: 'Supabase', status: 'connected' },
-    { name: 'Smtp', status: 'disconnected' },
-];
-
-const systemHealth = [
-    { name: 'Database Connection', status: 'disconnected'},
-    { name: 'OpenAI API', status: 'disconnected'},
-    { name: 'Supabase', status: 'connected'},
-    { name: 'SMTP Email', status: 'disconnected'},
-]
 
 const configurationFeatures = [
     { name: 'TCA Categories (12) with custom weights'},
@@ -175,8 +166,101 @@ export default function SystemConfigPage() {
   const [apiKeys, setApiKeys] = useState(initialApiKeys);
   const [isApiKeyDialogOpen, setApiKeyDialogOpen] = useState(false);
   const [editingApiKey, setEditingApiKey] = useState<ApiKey | null>(null);
+  const [isTestingAll, setIsTestingAll] = useState(false);
+
+  const [connections, setConnections] = useState<ConnectionItem[]>([
+    { name: 'Database', status: 'disconnected' },
+    { name: 'OpenAI', status: 'disconnected' },
+    { name: 'Azure PostgreSQL', status: 'disconnected' },
+    { name: 'Smtp', status: 'disconnected' },
+  ]);
+  const [systemHealth, setSystemHealth] = useState<ConnectionItem[]>([
+    { name: 'Database Connection', status: 'disconnected' },
+    { name: 'OpenAI API', status: 'disconnected' },
+    { name: 'Azure PostgreSQL', status: 'disconnected' },
+    { name: 'SMTP Email', status: 'disconnected' },
+  ]);
 
   const { toast } = useToast();
+
+  const updateStatus = useCallback((key: string, status: ConnectionStatus, message?: string, latency_ms?: number) => {
+    const connectionMap: Record<string, string[]> = {
+      backend: ['Database'],
+      database: ['Azure PostgreSQL'],
+      openai: ['OpenAI'],
+      smtp: ['Smtp'],
+    };
+    const healthMap: Record<string, string[]> = {
+      backend: ['Database Connection'],
+      database: ['Azure PostgreSQL'],
+      openai: ['OpenAI API'],
+      smtp: ['SMTP Email'],
+    };
+    const connNames = connectionMap[key] || [key];
+    const healthNames = healthMap[key] || [key];
+    setConnections(prev => prev.map(c => connNames.includes(c.name) ? { ...c, status, message, latency_ms } : c));
+    setSystemHealth(prev => prev.map(c => healthNames.includes(c.name) ? { ...c, status, message, latency_ms } : c));
+  }, []);
+
+  const runHealthCheck = useCallback(async () => {
+    // Mark all as testing
+    setConnections(prev => prev.map(c => ({ ...c, status: 'testing' as ConnectionStatus })));
+    setSystemHealth(prev => prev.map(c => ({ ...c, status: 'testing' as ConnectionStatus })));
+    try {
+      const res = await fetch('/api/system-health');
+      const data = await res.json();
+      if (data.results) {
+        const r = data.results;
+        updateStatus('backend', r.backend?.connected ? 'connected' : 'disconnected', r.backend?.message, r.backend?.latency_ms);
+        updateStatus('database', r.database?.connected ? 'connected' : 'disconnected', r.database?.message, r.database?.latency_ms);
+        updateStatus('openai', r.openai?.connected ? 'connected' : 'disconnected', r.openai?.message);
+        updateStatus('smtp', r.smtp?.connected ? 'connected' : 'disconnected', r.smtp?.message);
+      }
+    } catch {
+      setConnections(prev => prev.map(c => ({ ...c, status: 'disconnected' as ConnectionStatus, message: 'Health check failed' })));
+      setSystemHealth(prev => prev.map(c => ({ ...c, status: 'disconnected' as ConnectionStatus, message: 'Health check failed' })));
+    }
+  }, [updateStatus]);
+
+  const handleTestConnection = useCallback(async (name: string) => {
+    // Map display name to health key
+    const keyMap: Record<string, string> = {
+      Database: 'backend', 'Database Connection': 'backend',
+      OpenAI: 'openai', 'OpenAI API': 'openai',
+      'Azure PostgreSQL': 'database',
+      Smtp: 'smtp', 'SMTP Email': 'smtp',
+    };
+    const key = keyMap[name] || name.toLowerCase();
+    updateStatus(key, 'testing');
+    try {
+      const res = await fetch('/api/system-health');
+      const data = await res.json();
+      if (data.results?.[key]) {
+        const r = data.results[key];
+        updateStatus(key, r.connected ? 'connected' : 'disconnected', r.message, r.latency_ms);
+        toast({
+          title: `${name}: ${r.connected ? 'Connected' : 'Disconnected'}`,
+          description: r.message || '',
+          variant: r.connected ? 'default' : 'destructive',
+        });
+      }
+    } catch {
+      updateStatus(key, 'disconnected', 'Request failed');
+      toast({ title: `${name}: Failed`, description: 'Could not reach health endpoint.', variant: 'destructive' });
+    }
+  }, [updateStatus, toast]);
+
+  const handleTestAll = useCallback(async () => {
+    setIsTestingAll(true);
+    await runHealthCheck();
+    setIsTestingAll(false);
+    toast({ title: 'Health check complete', description: 'All connection statuses have been updated.' });
+  }, [runHealthCheck, toast]);
+
+  // Auto-run health check on page load
+  useEffect(() => {
+    runHealthCheck();
+  }, [runHealthCheck]);
 
   const handleVarChange = (id: string, field: 'name' | 'value' | 'scope' | 'description', value: string) => {
     setEnvVars((prev) =>
@@ -242,10 +326,6 @@ export default function SystemConfigPage() {
     toast({ title: 'Downloading .env file' });
   };
 
-  const handleTestConnection = (name: string) => {
-      toast({title: `Testing ${name}...`, description: 'This is a placeholder action.'})
-  }
-
   const handleOpenApiKeyDialog = (key: ApiKey | null) => {
     setEditingApiKey(key);
     setApiKeyDialogOpen(true);
@@ -284,8 +364,8 @@ export default function SystemConfigPage() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={() => toast({title: 'Testing all connections...'})}>
-                <TestTube className="mr-2" /> Test All
+              <Button variant="outline" onClick={handleTestAll} disabled={isTestingAll}>
+                {isTestingAll ? <Loader2 className="mr-2 animate-spin" /> : <TestTube className="mr-2" />} {isTestingAll ? 'Testing...' : 'Test All'}
               </Button>
               <Button onClick={handleDownloadEnv}>
                 <Download className="mr-2" /> Download .env
@@ -435,8 +515,15 @@ export default function SystemConfigPage() {
               <TabsContent value="connection-status">
                   <Card>
                       <CardHeader>
-                          <CardTitle>Connection Status</CardTitle>
-                          <CardDescription>Check the status of external service connections.</CardDescription>
+                          <div className="flex items-center justify-between">
+                              <div>
+                                  <CardTitle>Connection Status</CardTitle>
+                                  <CardDescription>Live status of all external service connections.</CardDescription>
+                              </div>
+                              <Button variant="outline" size="sm" onClick={handleTestAll} disabled={isTestingAll}>
+                                  <RefreshCw className={`mr-2 size-4 ${isTestingAll ? 'animate-spin' : ''}`} /> Refresh
+                              </Button>
+                          </div>
                       </CardHeader>
                       <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           {connections.map(conn => (
@@ -444,9 +531,21 @@ export default function SystemConfigPage() {
                                 <div className="flex items-center justify-between">
                                   <div>
                                       <h3 className="font-semibold">{conn.name}</h3>
-                                      <Button size="sm" className="mt-2" onClick={() => handleTestConnection(conn.name)}>Test Connection</Button>
+                                      {conn.message && <p className="text-xs text-muted-foreground mt-1">{conn.message}</p>}
+                                      {conn.latency_ms != null && conn.latency_ms > 0 && (
+                                          <p className="text-xs text-muted-foreground">{conn.latency_ms}ms</p>
+                                      )}
+                                      <Button size="sm" className="mt-2" onClick={() => handleTestConnection(conn.name)} disabled={conn.status === 'testing'}>
+                                          {conn.status === 'testing' ? <Loader2 className="mr-2 size-3 animate-spin" /> : null}
+                                          Test Connection
+                                      </Button>
                                   </div>
-                                  {conn.status === 'connected' ? (
+                                  {conn.status === 'testing' ? (
+                                      <Badge variant="secondary" className="gap-1.5">
+                                          <Loader2 className="size-3 animate-spin" />
+                                          Testing...
+                                      </Badge>
+                                  ) : conn.status === 'connected' ? (
                                       <Badge variant="success" className="gap-1.5">
                                           <CheckCircle className="size-3"/>
                                           Connected
@@ -472,7 +571,7 @@ export default function SystemConfigPage() {
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                               <Button size="lg" onClick={() => handleTestConnection('Database')}><Database className="mr-2"/> Test Database</Button>
                               <Button size="lg" onClick={() => handleTestConnection('OpenAI API')}><Rocket className="mr-2"/> Test OpenAI API</Button>
-                              <Button size="lg" onClick={() => handleTestConnection('Supabase')}><TestTube className="mr-2"/> Test Supabase</Button>
+                              <Button size="lg" onClick={() => handleTestConnection('Azure PostgreSQL')}><TestTube className="mr-2"/> Test Azure PostgreSQL</Button>
                           </div>
                           <Card>
                               <CardHeader>
@@ -481,10 +580,23 @@ export default function SystemConfigPage() {
                               <CardContent className="space-y-2">
                                   {systemHealth.map(item => (
                                       <div key={item.name} className="flex justify-between items-center text-sm p-2 rounded-md bg-muted/50">
-                                          <p className="font-medium text-muted-foreground">{item.name}:</p>
-                                          <Badge variant={item.status === 'connected' ? 'success' : 'destructive'}>
-                                              {item.status}
-                                          </Badge>
+                                          <div>
+                                              <p className="font-medium text-muted-foreground">{item.name}</p>
+                                              {item.message && <p className="text-xs text-muted-foreground">{item.message}</p>}
+                                          </div>
+                                          {item.status === 'testing' ? (
+                                              <Badge variant="secondary" className="gap-1.5">
+                                                  <Loader2 className="size-3 animate-spin" />Testing...
+                                              </Badge>
+                                          ) : item.status === 'connected' ? (
+                                              <Badge variant="success" className="gap-1.5">
+                                                  <CheckCircle className="size-3" />{item.latency_ms != null && item.latency_ms > 0 ? `Connected (${item.latency_ms}ms)` : 'Connected'}
+                                              </Badge>
+                                          ) : (
+                                              <Badge variant="destructive" className="gap-1.5">
+                                                  <XCircle className="size-3" />Disconnected
+                                              </Badge>
+                                          )}
                                       </div>
                                   ))}
                               </CardContent>
