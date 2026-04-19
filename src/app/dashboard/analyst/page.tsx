@@ -491,7 +491,16 @@ export default function ReviewerDashboardPage() {
                       </div>
                     </div>
                     <div className="flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-8">
-                      <Badge variant={review.status === 'Completed' ? 'success' : (review.status === 'In Progress' ? 'default' : 'warning')}>{review.status}</Badge>
+                      <Badge
+                        variant="outline"
+                        className={
+                          review.status === 'Completed'
+                            ? 'text-green-600 border-green-300 bg-green-50'
+                            : review.status === 'In Progress'
+                            ? ''
+                            : 'text-amber-600 border-amber-300 bg-amber-50'
+                        }
+                      >{review.status}</Badge>
                       <div className='text-sm text-muted-foreground'>
                         <p>Assigned: {review.assigned}</p>
                         <p>Due: {review.due}</p>

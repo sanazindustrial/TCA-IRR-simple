@@ -40,6 +40,9 @@ import {
   ClipboardCheck,
   Save,
   Eye,
+  Download,
+  Settings,
+  AlertCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
@@ -50,6 +53,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
@@ -69,6 +73,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import reportsApi from '@/lib/reports-api';
 
 // Define workflow steps
 const WORKFLOW_STEPS = [
@@ -76,7 +81,9 @@ const WORKFLOW_STEPS = [
   { id: 2, name: 'Document Upload', icon: FileUp, description: 'Upload relevant documents' },
   { id: 3, name: 'External Data', icon: Database, description: 'Connect external data sources' },
   { id: 4, name: 'Analysis Areas', icon: FileSearch, description: 'Select areas to analyze' },
-  { id: 5, name: 'Review & Generate', icon: BrainCircuit, description: 'Review and generate report' },
+  { id: 5, name: 'Report Sections', icon: Settings, description: 'Configure report sections' },
+  { id: 6, name: 'Review & Generate', icon: BrainCircuit, description: 'Review and generate report' },
+  { id: 7, name: 'Storage & Export', icon: Download, description: 'Save & download report' },
 ];
 
 // Due Diligence analysis areas
@@ -107,6 +114,36 @@ interface ExternalDataResult {
   data: unknown;
   error?: string;
 }
+
+interface ReportSection {
+  id: string;
+  title: string;
+  description: string;
+  active: boolean;
+}
+
+const DEFAULT_DD_SECTIONS: ReportSection[] = [
+  { id: 'dd-exec-summary', title: 'Executive Summary', description: 'High-level overview and key findings', active: true },
+  { id: 'dd-company-overview', title: 'Company Overview', description: 'Business model, history, and market position', active: true },
+  { id: 'dd-financial-analysis', title: 'Financial Analysis', description: 'Revenue, costs, cash flow, and projections', active: true },
+  { id: 'dd-financial-projections', title: 'Financial Projections', description: 'Forward-looking financial models', active: true },
+  { id: 'dd-legal-compliance', title: 'Legal & Compliance', description: 'Corporate structure, contracts, and IP', active: true },
+  { id: 'dd-ip-analysis', title: 'IP & Patents', description: 'Intellectual property portfolio assessment', active: true },
+  { id: 'dd-commercial', title: 'Commercial Analysis', description: 'Market position and competitive landscape', active: true },
+  { id: 'dd-customer-analysis', title: 'Customer Analysis', description: 'Customer base, churn, and NPS', active: true },
+  { id: 'dd-management', title: 'Management Assessment', description: 'Leadership team and key personnel', active: true },
+  { id: 'dd-org-structure', title: 'Organizational Structure', description: 'Team hierarchy and succession planning', active: true },
+  { id: 'dd-technology', title: 'Technology Assessment', description: 'Tech stack, scalability, and technical debt', active: true },
+  { id: 'dd-operations', title: 'Operational Review', description: 'Processes, supply chain, and efficiency', active: true },
+  { id: 'dd-risk-assessment', title: 'Risk Assessment', description: 'Market, operational, and regulatory risks', active: true },
+  { id: 'dd-valuation', title: 'Valuation Analysis', description: 'DCF, comparables, and transaction analysis', active: true },
+  { id: 'dd-synergies', title: 'Synergy Analysis', description: 'Revenue and cost synergy opportunities', active: true },
+  { id: 'dd-esg', title: 'ESG Assessment', description: 'Environmental, social, and governance factors', active: true },
+  { id: 'dd-red-flags', title: 'Red Flags & Deal Risks', description: 'Critical issues requiring attention', active: true },
+  { id: 'dd-recommendations', title: 'Key Recommendations', description: 'Actionable recommendations and conditions', active: true },
+  { id: 'dd-analyst-comments', title: 'Analyst Commentary', description: 'Analyst notes and qualitative observations', active: true },
+  { id: 'dd-appendix', title: 'Appendix & Data Sources', description: 'Supporting data and references', active: true },
+];
 
 export default function DueDiligenceWorkflowPage() {
   // Step management
@@ -154,6 +191,14 @@ export default function DueDiligenceWorkflowPage() {
   // Generation
   const [isLoading, setIsLoading] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+
+  // Report sections & storage
+  const [userRole, setUserRole] = useState<'admin' | 'analyst' | 'standard'>('standard');
+  const [reportSections, setReportSections] = useState<ReportSection[]>([]);
+  const [savedReportId, setSavedReportId] = useState<number | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<unknown>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -224,11 +269,15 @@ export default function DueDiligenceWorkflowPage() {
       case 4:
         return selectedAreas.length > 0;
       case 5:
+        return reportSections.filter((s) => s.active).length > 0;
+      case 6:
+        return true;
+      case 7:
         return true;
       default:
         return false;
     }
-  }, [currentStep, companyName, selectedSources, selectedAreas]);
+  }, [currentStep, companyName, selectedSources, selectedAreas, reportSections]);
 
   const nextStep = () => {
     if (canProceed() && currentStep < WORKFLOW_STEPS.length) {
@@ -318,9 +367,21 @@ export default function DueDiligenceWorkflowPage() {
       localStorage.setItem('ddContext', JSON.stringify(ddContext));
 
       const comprehensiveData = await runAnalysis('medtech');
+      setAnalysisResult(comprehensiveData);
       localStorage.setItem('analysisResult', JSON.stringify(comprehensiveData));
       localStorage.setItem('analysisFramework', 'medtech');
-      router.push('/analysis/result');
+
+      const savedReport = await reportsApi.createReport({
+        company_name: companyName,
+        report_type: 'due_diligence',
+        analysis_data: comprehensiveData as Record<string, unknown>,
+        missing_sections: reportSections.filter((s) => !s.active).map((s) => s.id),
+      });
+      setSavedReportId(savedReport.id);
+
+      if (!completedSteps.includes(6)) setCompletedSteps((prev) => [...prev, 6]);
+      setCurrentStep(7);
+      toast({ title: 'Report Generated', description: 'Your due diligence report has been saved.' });
     } catch (error) {
       console.error('Failed to run DD analysis:', error);
       toast({
@@ -353,6 +414,70 @@ export default function DueDiligenceWorkflowPage() {
     localStorage.setItem('ddWorkflowDraft', JSON.stringify(draft));
     toast({ title: 'Draft saved', description: 'Your progress has been saved.' });
   };
+
+  // Section config helpers
+  const toggleSection = (sectionId: string) => {
+    setReportSections((prev) =>
+      prev.map((s) => (s.id === sectionId ? { ...s, active: !s.active } : s))
+    );
+  };
+
+  const toggleAllSections = (active: boolean) => {
+    setReportSections((prev) => prev.map((s) => ({ ...s, active })));
+  };
+
+  const handleSaveReport = async () => {
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      const saved = await reportsApi.createReport({
+        company_name: companyName,
+        report_type: 'due_diligence',
+        analysis_data: (analysisResult ?? {}) as Record<string, unknown>,
+        missing_sections: reportSections.filter((s) => !s.active).map((s) => s.id),
+      });
+      setSavedReportId(saved.id);
+      toast({ title: 'Report saved', description: `Report #${saved.id} saved successfully.` });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to save report.';
+      setSaveError(msg);
+      toast({ variant: 'destructive', title: 'Save failed', description: msg });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDownloadJSON = () => {
+    if (!analysisResult) return;
+    const blob = new Blob([JSON.stringify(analysisResult, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `due-diligence-${companyName.replace(/\s+/g, '-').toLowerCase()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadCSV = () => {
+    const rows: string[][] = [['Section ID', 'Title', 'Description', 'Active']];
+    reportSections.forEach((s) => rows.push([s.id, s.title, s.description, String(s.active)]));
+    const csv = rows.map((r) => r.map((c) => `"${c}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `dd-sections-${companyName.replace(/\s+/g, '-').toLowerCase()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Load role and section config on mount
+  useEffect(() => {
+    const role = (localStorage.getItem('userRole') || 'standard') as 'admin' | 'analyst' | 'standard';
+    setUserRole(role);
+    const saved = localStorage.getItem('report-config-dd');
+    setReportSections(saved ? JSON.parse(saved) : DEFAULT_DD_SECTIONS);
+  }, []);
 
   // Load draft on mount
   useEffect(() => {
@@ -969,6 +1094,53 @@ export default function DueDiligenceWorkflowPage() {
 
       case 5:
         return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="size-5" />
+                Configure Report Sections
+              </CardTitle>
+              <CardDescription>
+                Select which sections to include in the due diligence report. All sections are active by default.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-semibold">
+                  {reportSections.filter((s) => s.active).length} / {reportSections.length} sections active
+                </Label>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => toggleAllSections(true)}>
+                    Enable All
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => toggleAllSections(false)}>
+                    Disable All
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+                {reportSections.map((section) => (
+                  <div
+                    key={section.id}
+                    className="flex items-center justify-between rounded-lg border p-3"
+                  >
+                    <div className="space-y-0.5 flex-1 mr-4">
+                      <p className="text-sm font-medium">{section.title}</p>
+                      <p className="text-xs text-muted-foreground">{section.description}</p>
+                    </div>
+                    <Switch
+                      checked={section.active}
+                      onCheckedChange={() => toggleSection(section.id)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        );
+
+      case 6:
+        return (
           <div className="space-y-6">
             <Card>
               <CardHeader>
@@ -1056,6 +1228,87 @@ export default function DueDiligenceWorkflowPage() {
               </CardFooter>
             </Card>
           </div>
+        );
+
+      case 7:
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Download className="size-5" />
+                Storage & Export
+              </CardTitle>
+              <CardDescription>
+                Your due diligence report has been generated. Save it and download a copy.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="rounded-lg border bg-muted/30 p-4 space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Company</p>
+                  <p className="font-semibold">{companyName}</p>
+                  <p className="text-sm text-muted-foreground">{companyIndustry}</p>
+                </div>
+                <div className="rounded-lg border bg-muted/30 p-4 space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Areas Analyzed</p>
+                  <p className="font-semibold text-2xl">{selectedAreas.length}</p>
+                  <p className="text-sm text-muted-foreground">of {DD_AREAS.length} areas</p>
+                </div>
+                <div className="rounded-lg border bg-muted/30 p-4 space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Sections</p>
+                  <p className="font-semibold">{reportSections.filter((s) => s.active).length}</p>
+                  <p className="text-sm text-muted-foreground">active sections</p>
+                </div>
+              </div>
+
+              {savedReportId && (
+                <div className="rounded-lg border border-green-300 bg-green-50/40 p-4 flex items-center gap-3">
+                  <CheckCircle2 className="size-5 text-green-600 shrink-0" />
+                  <div>
+                    <p className="font-semibold text-sm text-green-800">Saved as Report #{savedReportId}</p>
+                    <p className="text-xs text-green-700">Due diligence report saved successfully to the database.</p>
+                  </div>
+                </div>
+              )}
+
+              {saveError && (
+                <div className="rounded-lg border border-red-300 bg-red-50/40 p-3 text-sm text-red-700">
+                  <AlertCircle className="inline size-4 mr-1" />
+                  {saveError}
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-3">
+                {!savedReportId && (
+                  <Button onClick={handleSaveReport} disabled={isSaving} className="gap-2">
+                    {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                    {isSaving ? 'Saving...' : 'Save Report'}
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  onClick={handleDownloadJSON}
+                  className="gap-2"
+                  disabled={!analysisResult}
+                >
+                  <Download className="size-4" />
+                  Download JSON
+                </Button>
+                <Button variant="outline" onClick={handleDownloadCSV} className="gap-2">
+                  <Download className="size-4" />
+                  Download Sections CSV
+                </Button>
+                {savedReportId && (
+                  <Button variant="outline" asChild className="gap-2">
+                    <Link href="/dashboard/reports">
+                      <Eye className="size-4" />
+                      View All Reports
+                    </Link>
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         );
 
       default:
@@ -1163,7 +1416,7 @@ export default function DueDiligenceWorkflowPage() {
           Step {currentStep} of {WORKFLOW_STEPS.length}
         </div>
 
-        {currentStep < WORKFLOW_STEPS.length ? (
+        {currentStep < WORKFLOW_STEPS.length && currentStep !== 6 ? (
           <Button onClick={nextStep} disabled={!canProceed()}>
             Next <ArrowRight className="ml-2 size-4" />
           </Button>

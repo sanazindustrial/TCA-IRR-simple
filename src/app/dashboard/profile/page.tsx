@@ -76,9 +76,12 @@ export default function ProfilePage() {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ full_name: name }),
+        body: JSON.stringify({ full_name: name, email: user.email }),
       });
-      if (!res.ok) throw new Error('Failed to save');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({})) as { detail?: string; message?: string };
+        throw new Error(errData.detail || errData.message || `Server returned ${res.status}`);
+      }
       const updated = await res.json();
       setUser(updated);
       // Sync avatar to localStorage for sidebar
@@ -87,8 +90,9 @@ export default function ProfilePage() {
       localStorage.setItem('loggedInUser', JSON.stringify({ ...base, name, avatar: avatarUrl }));
       window.dispatchEvent(new Event('storage'));
       toast({ title: 'Profile Updated', description: 'Your changes have been saved successfully.' });
-    } catch {
-      toast({ title: 'Error', description: 'Failed to save profile changes.', variant: 'destructive' });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to save profile changes.';
+      toast({ title: 'Error', description: msg, variant: 'destructive' });
     } finally {
       setSaving(false);
     }
