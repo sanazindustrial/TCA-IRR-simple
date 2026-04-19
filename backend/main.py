@@ -53,6 +53,32 @@ def create_json_response_with_datetime(content, status_code: int = 200):
                     media_type="application/json")
 
 
+async def _run_migrations():
+    """Apply pending SQL migration files in order"""
+    import glob
+    import pathlib
+    migrations_dir = pathlib.Path(__file__).parent / "app" / "db" / "migrations"
+    sql_files = sorted(migrations_dir.glob("*.sql"))
+    async with db_manager.pool.acquire() as conn:
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS schema_migrations (
+                filename TEXT PRIMARY KEY,
+                applied_at TIMESTAMPTZ DEFAULT NOW()
+            )
+        """)
+        for sql_file in sql_files:
+            already = await conn.fetchval(
+                "SELECT 1 FROM schema_migrations WHERE filename = $1", sql_file.name
+            )
+            if not already:
+                sql = sql_file.read_text(encoding="utf-8")
+                await conn.execute(sql)
+                await conn.execute(
+                    "INSERT INTO schema_migrations (filename) VALUES ($1)", sql_file.name
+                )
+                logger.info(f"Background: Applied migration {sql_file.name}")
+
+
 async def _background_init():
     """Heavy initialization in background - doesn't block startup"""
     global _app_ready, _init_error
@@ -61,6 +87,13 @@ async def _background_init():
         logger.info("Background: Starting database connection...")
         await db_manager.connect()
         logger.info("Background: Database connection established")
+
+        # Run pending migrations
+        try:
+            await _run_migrations()
+            logger.info("Background: Migrations completed")
+        except Exception as e:
+            logger.warning(f"Background: Migration warning (non-fatal): {e}")
 
         # Initialize AI service connection (non-blocking, just log status)
         try:
