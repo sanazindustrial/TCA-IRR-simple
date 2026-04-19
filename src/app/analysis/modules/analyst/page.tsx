@@ -34,6 +34,8 @@ type AnalysisData = {
   gaps: Array<{ category: string; status: 'covered' | 'gap' | 'partial'; detail: string }>;
   keywords: Array<{ word: string; count: number; group: string }>;
   aiVsHuman: Array<{ area: string; aiNote: string; analystNote: string; aligned: boolean }>;
+  aiScoresMap: Record<string, number>;
+  humanScoresMap: Record<string, number>;
 };
 
 type WorkflowStep = {
@@ -241,10 +243,14 @@ export default function AnalystAnalysisPage() {
       return { word, count, group };
     });
     // 4. AI vs Human
+    const aiScoresMap: Record<string, number> = {};
+    const humanScoresMap: Record<string, number> = {};
     const aiVsHuman: AnalysisData['aiVsHuman'] = Object.keys(THEME_KEYWORDS).map(area => {
       const keywords = THEME_KEYWORDS[area];
       const analystCoverage = keywords.filter(k => analystNotes.toLowerCase().includes(k));
       const commentsCoverage = keywords.filter(k => filledComments.some(c => c.toLowerCase().includes(k)));
+      aiScoresMap[area] = parseFloat(((commentsCoverage.length / keywords.length) * 10).toFixed(1));
+      humanScoresMap[area] = parseFloat(((analystCoverage.length / keywords.length) * 10).toFixed(1));
       return {
         area,
         aiNote: commentsCoverage.length > 0 ? `${commentsCoverage.length} indicator(s) found in NLP comments` : 'No indicators found in comments',
@@ -252,7 +258,7 @@ export default function AnalystAnalysisPage() {
         aligned: (commentsCoverage.length > 0) === (analystCoverage.length > 0),
       };
     });
-    setAnalysisData({ sentiment: { positive, negative, neutral, total: totalComments }, gaps: gapRows, keywords: keywordData, aiVsHuman });
+    setAnalysisData({ sentiment: { positive, negative, neutral, total: totalComments }, gaps: gapRows, keywords: keywordData, aiVsHuman, aiScoresMap, humanScoresMap });
     toast({
       title: "Analysis Started",
       description: "Running thematic, sentiment, deep analysis, and AI vs. human gap analysis."
@@ -489,6 +495,11 @@ export default function AnalystAnalysisPage() {
               </TabsContent>
             </Tabs>
           </CardContent>
+          <CardFooter className="p-4 border-t flex justify-end">
+            <Button onClick={() => setCurrentStep(2)}>
+              Next Step <ArrowRight className="ml-2 size-4" />
+            </Button>
+          </CardFooter>
         </Card>
 
         <Card className={currentStep === 2 ? 'ring-2 ring-primary' : ''}>
@@ -509,6 +520,19 @@ export default function AnalystAnalysisPage() {
               <Textarea id="analyst-notes" value={analystNotes} onChange={e => setAnalystNotes(e.target.value)} rows={8} placeholder="Summarize key findings, compare AI vs. human analysis, sentiment analysis, and provide overall impressions..." />
             </div>
           </CardContent>
+          <CardFooter className="p-4 border-t flex justify-between">
+            <Button variant="outline" onClick={() => setCurrentStep(1)}>
+              <ArrowLeft className="mr-2 size-4" /> Previous Step
+            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleSave}>
+                <Save className="mr-2 size-4" /> Save Progress
+              </Button>
+              <Button onClick={() => setCurrentStep(3)}>
+                Next Step <ArrowRight className="ml-2 size-4" />
+              </Button>
+            </div>
+          </CardFooter>
         </Card>
 
         <Card className={currentStep === 3 ? 'ring-2 ring-primary' : ''}>
@@ -563,6 +587,50 @@ export default function AnalystAnalysisPage() {
           </CardFooter>
         </Card>
 
+        <Card className={currentStep === 4 ? 'ring-2 ring-primary' : ''}>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Badge variant={currentStep > 4 ? 'default' : 'outline'} className="size-6 flex items-center justify-center p-0">4</Badge>
+              <CardTitle>Run Analysis</CardTitle>
+            </div>
+            <CardDescription>Execute thematic, sentiment, deep content, and AI vs Human gap analysis on your inputs.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col items-center justify-center py-12 gap-6 text-center">
+              <BrainCircuit className="size-16 text-primary opacity-80" />
+              <div>
+                <h3 className="text-xl font-semibold mb-2">Ready to Run Analysis</h3>
+                <p className="text-muted-foreground max-w-md">Click the button below to process your documents, qualitative insights, and NLP comments through thematic, sentiment, and AI-Human comparison analysis.</p>
+              </div>
+              <div className="grid grid-cols-3 gap-6 text-center w-full max-w-md">
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <p className="text-2xl font-bold">{uploadedFiles.length + importedUrls.length + submittedTexts.length}</p>
+                  <p className="text-sm text-muted-foreground">Sources</p>
+                </div>
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <p className="text-2xl font-bold">{comments.filter(c => c.trim()).length}</p>
+                  <p className="text-sm text-muted-foreground">Comments</p>
+                </div>
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <p className="text-2xl font-bold">{(analystNotes.trim() || ceoQa.trim()) ? '✓' : '—'}</p>
+                  <p className="text-sm text-muted-foreground">Notes</p>
+                </div>
+              </div>
+              <Button size="lg" className="bg-primary gap-2" onClick={() => { handleRunAnalysis(); setCurrentStep(5); }}>
+                <BrainCircuit className="mr-2 size-5" /> Run Full Analysis
+              </Button>
+            </div>
+          </CardContent>
+          <CardFooter className="p-4 border-t flex justify-between">
+            <Button variant="outline" onClick={() => setCurrentStep(3)}>
+              <ArrowLeft className="mr-2 size-4" /> Previous Step
+            </Button>
+            <Button variant="outline" onClick={handleSave}>
+              <Save className="mr-2 size-4" /> Save Progress
+            </Button>
+          </CardFooter>
+        </Card>
+
         {analysisResults && (
           <div className="space-y-8 mt-8">
             {/* Step 5: Review Results */}
@@ -592,7 +660,10 @@ export default function AnalystAnalysisPage() {
                   handleRunAnalysisAction={() => { }}
                 >
                   <AnalystComments />
-                  <AnalystAIDeviation />
+                  <AnalystAIDeviation
+                    aiScores={analysisData?.aiScoresMap}
+                    humanScores={analysisData?.humanScoresMap}
+                  />
                 </EvaluationProvider>
               </CardContent>
               <CardFooter className="p-4 border-t flex justify-between">
