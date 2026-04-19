@@ -8,7 +8,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Timer, Eye, Save, Loader2, CheckCircle2, XCircle, AlertTriangle, ClipboardCheck, Shield, ArrowRight, MessageSquare, RefreshCw } from 'lucide-react';
+import { Timer, Eye, Save, Loader2, CheckCircle2, XCircle, AlertTriangle, ClipboardCheck, Shield, ArrowRight, MessageSquare, RefreshCw, BarChart3, TrendingUp, Users, Megaphone, Leaf } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -374,6 +374,16 @@ export default function AnalysisResultPage({
     const [isPreview, setIsPreview] = useState(false);
     const [isUsingSampleData, setIsUsingSampleData] = useState(false);
 
+    const redirectToRunAnalysis = (description: string) => {
+        setIsUsingSampleData(false);
+        toast({
+            variant: 'destructive',
+            title: 'No Analysis Data',
+            description,
+        });
+        router.push('/dashboard/evaluation');
+    };
+
     // Unified Record Tracking State
     const [evaluationId, setEvaluationId] = useState<string | null>(null);
     const [analysisId, setAnalysisId] = useState<string | null>(null);
@@ -467,7 +477,7 @@ export default function AnalysisResultPage({
                     setRole('user');
                 }
 
-                // Load analysis data from localStorage or use sample data
+                // Load real analysis data from localStorage
                 // First, validate that stored analysis belongs to current evaluation
                 const storedEvalIdForValidation = localStorage.getItem('currentEvaluationId');
                 const urlEvalId = params?.evalId;
@@ -478,14 +488,8 @@ export default function AnalysisResultPage({
                     localStorage.removeItem('analysisResult');
                     localStorage.removeItem('analysisTrackingInfo');
                     localStorage.removeItem('reportApprovalStatus');
-                    setAnalysisData(sampleAnalysisData);
-                    setIsUsingSampleData(true);
                     setIsLoading(false);
-                    toast({
-                        variant: 'destructive',
-                        title: 'No Analysis Data',
-                        description: 'No analysis data found for this evaluation. Please run analysis first.',
-                    });
+                    redirectToRunAnalysis('No analysis data found for this evaluation. Please run analysis first.');
                     return;
                 }
 
@@ -500,7 +504,7 @@ export default function AnalysisResultPage({
 
                             // If score > 10, it's on 0-100 scale, convert to 0-10
                             if (compositeScore > 10) {
-                                compositeScore = compositeScore / 10;
+                                compositeScore /= 10;
                             }
 
                             // If score is still 0 or too low, recalculate from categories
@@ -535,16 +539,23 @@ export default function AnalysisResultPage({
                         }
 
                         setAnalysisData(parsedAnalysis);
+                        // If backend was unreachable, actions.ts marks the result with _isFallbackData.
+                        // Never display fallback/sample data — redirect the user to run a real analysis.
+                        if ((parsedAnalysis as any)._isFallbackData) {
+                            setIsLoading(false);
+                            redirectToRunAnalysis('The analysis could not reach the backend and returned no real data. Please run a new analysis with your company details.');
+                            return;
+                        }
                         setIsUsingSampleData(false);
                         console.log('Loaded analysis data with composite score:', parsedAnalysis.tcaData?.compositeScore);
                     } catch (e) {
                         console.error('Failed to parse analysis data:', e);
-                        setAnalysisData(sampleAnalysisData);
-                        setIsUsingSampleData(true);
+                        redirectToRunAnalysis('Stored analysis data is invalid. Please run the analysis again.');
+                        return;
                     }
-                } else {
-                    setAnalysisData(sampleAnalysisData);
-                    setIsUsingSampleData(true);
+                } else if (!isPreview) {
+                    redirectToRunAnalysis('No real analysis results were found. Please run analysis first.');
+                    return;
                 }
 
                 // Load unified record tracking IDs
@@ -560,12 +571,10 @@ export default function AnalysisResultPage({
                     }
                 }
 
-                // Load analysis duration
+                // Load analysis duration (only show real duration, never a fake default)
                 const storedDuration = localStorage.getItem('analysisDuration');
                 if (storedDuration) {
                     setAnalysisDuration(parseFloat(storedDuration));
-                } else {
-                    setAnalysisDuration(45.32); // Default sample duration
                 }
 
                 // Load framework from localStorage
@@ -610,16 +619,17 @@ export default function AnalysisResultPage({
                 console.error('Error loading user and config:', error);
                 setRole('user');
                 setReportType('triage');
-                setAnalysisData(sampleAnalysisData);
-                setIsUsingSampleData(true);
-                setAnalysisDuration(45.32);
+                setIsUsingSampleData(false);
+                setAnalysisDuration(null);
+                redirectToRunAnalysis('Unable to load a real analysis result. Please start a new analysis.');
+                return;
             } finally {
                 setIsLoading(false);
             }
         };
 
         loadUserAndConfig();
-    }, [params?.type, params?.evalId, params?.company, isPreview]); // Fixed: avoid object reference in deps
+    }, [params.type, isPreview, params]);
 
     // Load configuration based on role and report type - Dynamic Configuration
     useEffect(() => {
@@ -656,10 +666,18 @@ export default function AnalysisResultPage({
                 } else {
                     // Force standard users back to triage with notification
                     console.warn('SECURITY: Standard user blocked from DD report access');
-                    // Don't call setReportType here - it causes infinite loop
-                    // Report type is already being set in the previous useEffect
+                    setReportType('triage');
                     configKey = 'report-config-triage-standard';
                     defaultConfig = triageStandardConfig;
+
+                    // Show access denied notification
+                    setTimeout(() => {
+                        toast({
+                            variant: 'destructive',
+                            title: 'Access Denied',
+                            description: 'Due Diligence reports are restricted to admin and analyst accounts only.',
+                        });
+                    }, 500);
                 }
             } else {
                 // Fallback for any other report type
@@ -1322,6 +1340,130 @@ export default function AnalysisResultPage({
                             </Button>
                         </div>
                     )}
+
+                    {/* ── Expanded Module Analysis (5 specialised modules) ── */}
+                    {(() => {
+                        const EXPANDED_MODULES = [
+                            {
+                                key: 'financialData' as const,
+                                label: 'Financial Analysis',
+                                Icon: BarChart3,
+                                subscore_labels: { revenue_model: 'Revenue Model', unit_economics: 'Unit Economics', projections: 'Projections', funding_requirements: 'Funding Requirements' },
+                            },
+                            {
+                                key: 'economicData' as const,
+                                label: 'Economic Analysis',
+                                Icon: TrendingUp,
+                                subscore_labels: { industry_structure: 'Industry Structure', pricing_power: 'Pricing Power', macro_indicators: 'Macro Indicators', cycle_resilience: 'Cycle Resilience' },
+                            },
+                            {
+                                key: 'socialData' as const,
+                                label: 'Social Analysis',
+                                Icon: Users,
+                                subscore_labels: { social_impact: 'Social Impact', demographic_fit: 'Demographic Fit', cultural_adoption: 'Cultural Adoption', stakeholder_trust: 'Stakeholder Trust' },
+                            },
+                            {
+                                key: 'marketingData' as const,
+                                label: 'Marketing Analysis',
+                                Icon: Megaphone,
+                                subscore_labels: { positioning: 'Positioning', digital_presence: 'Digital Presence', spend_efficiency: 'Spend Efficiency', gtm_execution: 'GTM Execution' },
+                            },
+                            {
+                                key: 'environmentalData' as const,
+                                label: 'Environmental Analysis',
+                                Icon: Leaf,
+                                subscore_labels: { impact: 'Environmental Impact', climate_risk: 'Climate Risk', certification: 'Certification', esg_alignment: 'ESG Alignment' },
+                            },
+                        ] as const;
+
+                        const visibleModules = EXPANDED_MODULES.filter(m => (analysisData as any)[m.key]);
+                        if (visibleModules.length === 0) return null;
+
+                        const signalStyle = (signal: string) => {
+                            if (signal === 'green') return 'bg-green-100 text-green-800 border-green-300';
+                            if (signal === 'yellow') return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+                            return 'bg-red-100 text-red-800 border-red-300';
+                        };
+                        const signalDot = (signal: string) => {
+                            if (signal === 'green') return 'bg-green-500';
+                            if (signal === 'yellow') return 'bg-yellow-500';
+                            return 'bg-red-500';
+                        };
+
+                        return (
+                            <div className="mt-8 space-y-6">
+                                <h2 className="text-2xl font-bold text-foreground">Expanded Module Analysis</h2>
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                                    {visibleModules.map(({ key, label, Icon, subscore_labels }) => {
+                                        const mod = (analysisData as any)[key] as NonNullable<typeof analysisData['financialData']>;
+                                        return (
+                                            <Card key={key} className="flex flex-col">
+                                                <CardHeader className="pb-3">
+                                                    <CardTitle className="flex items-center justify-between gap-2 text-base">
+                                                        <span className="flex items-center gap-2">
+                                                            <Icon className="size-5 text-primary" />
+                                                            {label}
+                                                        </span>
+                                                        <span className={`text-xs px-2 py-1 rounded border font-semibold ${signalStyle(mod.signal)}`}>
+                                                            <span className={`inline-block size-2 rounded-full mr-1 ${signalDot(mod.signal)}`} />
+                                                            {mod.signal.toUpperCase()}
+                                                        </span>
+                                                    </CardTitle>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <span className="text-2xl font-bold text-primary">{mod.score.toFixed(1)}</span>
+                                                        <span className="text-sm text-muted-foreground">/ 10</span>
+                                                    </div>
+                                                </CardHeader>
+                                                <CardContent className="flex-1 space-y-4">
+                                                    {/* Subscores */}
+                                                    <div className="space-y-1">
+                                                        {(Object.entries(mod.subscores) as [string, number][]).map(([k, v]) => (
+                                                            <div key={k} className="flex justify-between text-sm">
+                                                                <span className="text-muted-foreground">{(subscore_labels as Record<string, string>)[k] ?? k}</span>
+                                                                <span className="font-mono font-medium">{v.toFixed(1)}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                    {/* Summary */}
+                                                    {mod.summary && (
+                                                        <p className="text-sm text-muted-foreground border-t pt-3">{mod.summary}</p>
+                                                    )}
+                                                    {/* Risks */}
+                                                    {mod.risks?.length > 0 && (
+                                                        <div className="space-y-1">
+                                                            <p className="text-xs font-semibold uppercase tracking-wider text-destructive">Risks</p>
+                                                            <ul className="space-y-1">
+                                                                {mod.risks.map((r: string, i: number) => (
+                                                                    <li key={i} className="text-xs text-muted-foreground flex gap-1.5">
+                                                                        <span className="text-destructive mt-0.5">•</span>
+                                                                        {r}
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                        </div>
+                                                    )}
+                                                    {/* Recommendations */}
+                                                    {mod.recommendations?.length > 0 && (
+                                                        <div className="space-y-1">
+                                                            <p className="text-xs font-semibold uppercase tracking-wider text-primary">Recommendations</p>
+                                                            <ul className="space-y-1">
+                                                                {mod.recommendations.map((r: string, i: number) => (
+                                                                    <li key={i} className="text-xs text-muted-foreground flex gap-1.5">
+                                                                        <span className="text-primary mt-0.5">›</span>
+                                                                        {r}
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                        </div>
+                                                    )}
+                                                </CardContent>
+                                            </Card>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        );
+                    })()}
 
                     <ReportView
                         analysisData={analysisData}

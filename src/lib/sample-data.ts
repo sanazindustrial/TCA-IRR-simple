@@ -116,6 +116,64 @@ export type ComprehensiveAnalysisOutput = {
         interpretation: string;
     };
     strategicFitData: any;
+    financialData: {
+        score: number;
+        signal: 'green' | 'yellow' | 'red';
+        subscores: { revenue_model: number; unit_economics: number; projections: number; funding_requirements: number };
+        summary: string;
+        risks: string[];
+        recommendations: string[];
+    } | null;
+    economicData: {
+        score: number;
+        signal: 'green' | 'yellow' | 'red';
+        subscores: { industry_structure: number; pricing_power: number; macro_indicators: number; cycle_resilience: number };
+        summary: string;
+        risks: string[];
+        recommendations: string[];
+    } | null;
+    socialData: {
+        score: number;
+        signal: 'green' | 'yellow' | 'red';
+        subscores: { social_impact: number; demographic_fit: number; cultural_adoption: number; stakeholder_trust: number };
+        summary: string;
+        risks: string[];
+        recommendations: string[];
+    } | null;
+    marketingData: {
+        score: number;
+        signal: 'green' | 'yellow' | 'red';
+        subscores: { positioning: number; digital_presence: number; spend_efficiency: number; gtm_execution: number };
+        summary: string;
+        risks: string[];
+        recommendations: string[];
+    } | null;
+    environmentalData: {
+        score: number;
+        signal: 'green' | 'yellow' | 'red';
+        subscores: { impact: number; climate_risk: number; certification: number; esg_alignment: number };
+        summary: string;
+        risks: string[];
+        recommendations: string[];
+    } | null;
+    funderData: {
+        score: number;
+        signal: 'green' | 'yellow' | 'red';
+        readinessScore: number;
+        subscores: { investor_alignment: number; stage_readiness: number; deck_quality: number; network_strength: number };
+        investorList: Array<{ name: string; thesis: string; match: number; stage: string }>;
+        summary: string;
+        risks: string[];
+        recommendations: string[];
+    } | null;
+    strategicData: {
+        score: number;
+        signal: 'green' | 'yellow' | 'red';
+        subscores: { competitive_positioning: number; moat_strength: number; roadmap_clarity: number; partnership_potential: number };
+        summary: string;
+        risks: string[];
+        recommendations: string[];
+    } | null;
 };
 
 export const sampleAnalysisData: ComprehensiveAnalysisOutput = {
@@ -518,5 +576,12 @@ export const sampleAnalysisData: ComprehensiveAnalysisOutput = {
         ],
         interpretation: 'Strong technical team.'
     },
-    strategicFitData: {}
+    strategicFitData: {},
+    financialData: null,
+    economicData: null,
+    socialData: null,
+    marketingData: null,
+    environmentalData: null,
+    funderData: null,
+    strategicData: null,
 };
