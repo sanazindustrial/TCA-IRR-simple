@@ -504,7 +504,7 @@ export default function AnalysisResultPage({
 
                             // If score > 10, it's on 0-100 scale, convert to 0-10
                             if (compositeScore > 10) {
-                                compositeScore = compositeScore / 10;
+                                compositeScore /= 10;
                             }
 
                             // If score is still 0 or too low, recalculate from categories
