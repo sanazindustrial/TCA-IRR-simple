@@ -39,12 +39,9 @@ import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ExportButtons } from '@/components/evaluation/export-buttons';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { EvaluationProvider } from '@/components/evaluation/evaluation-provider';
-import { ReportType } from '@/app/analysis/result/page';
 import { costApi, CostSummary, fallbackCostData } from '@/lib/cost-api';
 
 // Use fallback data as initial state
@@ -167,13 +164,6 @@ export default function CostManagementPage() {
   }
 
   return (
-    <EvaluationProvider role={'user'} reportType={'dd'} framework={'general'} onFrameworkChangeAction={function (): void {
-      throw new Error('Function not implemented.');
-    }} setReportTypeAction={function (): void {
-      throw new Error('Function not implemented.');
-    }} isLoading={false} handleRunAnalysisAction={function (): void {
-      throw new Error('Function not implemented.');
-    }}>
       <div className="bg-muted/30 min-h-screen">
         <div className="container mx-auto p-4 md:p-8">
           <header className="mb-8">
@@ -253,7 +243,6 @@ export default function CostManagementPage() {
             </div>
             <div className="ml-auto flex items-center gap-2">
               <Button variant="outline" onClick={handleRefresh}><RefreshCw className="mr-2" /> Refresh Data</Button>
-              <ExportButtons />
             </div>
           </div>
 
@@ -398,7 +387,7 @@ export default function CostManagementPage() {
                         <TableCell>{trend.date}</TableCell>
                         <TableCell className="text-right font-medium">${trend.cost.toFixed(2)}</TableCell>
                         <TableCell className="text-right text-muted-foreground">
-                          {Math.floor(Math.random() * 100000 + 50000).toLocaleString()}
+                          {trend.executions ? trend.executions.toLocaleString() : '-'}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -409,7 +398,7 @@ export default function CostManagementPage() {
           </div>
         </div>
       </div>
-    </EvaluationProvider>
+    </div>
   );
 }
 
