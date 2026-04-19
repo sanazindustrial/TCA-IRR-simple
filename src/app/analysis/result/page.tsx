@@ -72,6 +72,19 @@ type ReviewCheckItem = {
     checked: boolean;
 };
 
+type WizardResult = {
+    savedAt: string;
+    sentiment: { positive: number; negative: number; neutral: number; total: number };
+    gaps: Array<{ category: string; status: 'covered' | 'gap' | 'partial'; detail: string }>;
+    keywords: Array<{ word: string; count: number; group: string }>;
+    aiVsHuman: Array<{ area: string; aiNote: string; analystNote: string; aligned: boolean }>;
+    aiScoresMap: Record<string, number>;
+    humanScoresMap: Record<string, number>;
+    ceoQa: string;
+    analystNotes: string;
+    comments: string[];
+};
+
 const defaultReviewChecklist: ReviewCheckItem[] = [
     { id: 'data-accuracy', label: 'Data accuracy verified', checked: false },
     { id: 'scoring-consistency', label: 'TCA scoring consistency checked', checked: false },
@@ -297,11 +310,13 @@ function getComponentData(componentId: string, analysisData: ComprehensiveAnalys
 function ReportView({
     analysisData,
     isPreview,
-    visibleSections
+    visibleSections,
+    wizardResult
 }: {
     analysisData: ComprehensiveAnalysisOutput;
     isPreview: boolean;
     visibleSections: ReportSection[];
+    wizardResult?: WizardResult | null;
 }) {
     const visibleComponents = allReportComponents.filter(comp =>
         visibleSections.some(section => section.id === comp.id && section.active)
@@ -320,6 +335,21 @@ function ReportView({
                 return <Component data={analysisData.riskData} />;
             case 'flag-analysis-narrative':
                 return <Component riskData={analysisData.riskData} tcaData={analysisData.tcaData} />;
+            case 'analyst-ai-deviation':
+                return <Component
+                    aiScores={wizardResult?.aiScoresMap}
+                    humanScores={wizardResult?.humanScoresMap}
+                    companyName={(analysisData as any).companyName}
+                    readOnly={true}
+                />;
+            case 'analyst-comments':
+                return <Component
+                    wizardSentiment={wizardResult?.sentiment}
+                    wizardKeywords={wizardResult?.keywords}
+                    wizardComments={wizardResult?.comments}
+                />;
+            case 'gap-analysis':
+                return <Component wizardGaps={wizardResult?.gaps} />;
             default:
                 return <Component data={getComponentData(id, analysisData)} />;
         }
@@ -369,6 +399,7 @@ export default function AnalysisResultPage({
     const [framework, setFramework] = useState<'general' | 'medtech'>('general');
     const [visibleSections, setVisibleSections] = useState<ReportSection[]>([]);
     const [analysisData, setAnalysisData] = useState<ComprehensiveAnalysisOutput>(sampleAnalysisData);
+    const [wizardResult, setWizardResult] = useState<WizardResult | null>(null);
     const [analysisDuration, setAnalysisDuration] = useState<number | null>(null);
     const [params, setParams] = useState<{ preview?: string; type?: string; evalId?: string; anlId?: string; company?: string; user?: string }>({});
     const [isPreview, setIsPreview] = useState(false);
@@ -557,6 +588,16 @@ export default function AnalysisResultPage({
                 } else if (!isPreview) {
                     redirectToRunAnalysis('No real analysis results were found. Please run analysis first.');
                     return;
+                }
+
+                // Load analyst wizard computed results (persisted by analyst wizard page)
+                const storedWizardResult = localStorage.getItem('analyst-wizard-result');
+                if (storedWizardResult) {
+                    try {
+                        setWizardResult(JSON.parse(storedWizardResult));
+                    } catch (e) {
+                        console.warn('Failed to parse analyst wizard result:', e);
+                    }
                 }
 
                 // Load unified record tracking IDs
@@ -1467,6 +1508,7 @@ export default function AnalysisResultPage({
                         analysisData={analysisData}
                         isPreview={isPreview}
                         visibleSections={visibleSections}
+                        wizardResult={wizardResult}
                     />
                 </div>
             </main>

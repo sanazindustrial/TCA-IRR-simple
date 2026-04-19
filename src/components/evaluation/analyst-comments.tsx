@@ -41,7 +41,43 @@ const getSentimentIcon = (sentiment: string) => {
   return <Meh className="text-muted-foreground" />;
 };
 
-export function AnalystComments() {
+interface WizardSentiment { positive: number; negative: number; neutral: number; total: number; }
+interface WizardKeyword { word: string; count: number; group: string; }
+interface AnalystCommentsProps {
+  wizardSentiment?: WizardSentiment;
+  wizardKeywords?: WizardKeyword[];
+  wizardComments?: string[];
+}
+
+export function AnalystComments({ wizardSentiment, wizardKeywords, wizardComments }: AnalystCommentsProps = {}) {
+  // Derive live display data from wizard props when available
+  const derivedSentiment = wizardSentiment
+    ? wizardSentiment.positive >= wizardSentiment.negative
+      ? wizardSentiment.positive > wizardSentiment.neutral ? 'Positive' : 'Neutral'
+      : 'Negative'
+    : commentsData.sentiment;
+
+  const derivedTone = wizardSentiment
+    ? [
+        wizardSentiment.positive > 0 ? 'Optimistic' : null,
+        wizardSentiment.neutral > 0 ? 'Analytical' : null,
+        wizardSentiment.negative > 0 ? 'Cautious' : null,
+      ].filter(Boolean) as string[]
+    : commentsData.tone;
+
+  // Top 3 unique keyword groups as themes
+  const derivedThemes = wizardKeywords && wizardKeywords.length > 0
+    ? Array.from(new Set(wizardKeywords.map((k) => k.group))).slice(0, 3)
+    : commentsData.comments.map((c) => c.theme);
+
+  // Actual analyst comments as plain text entries
+  const derivedComments = wizardComments && wizardComments.length > 0
+    ? wizardComments.filter(Boolean).slice(0, 5).map((text, i) => ({
+        text,
+        theme: derivedThemes[i % derivedThemes.length] ?? 'General',
+        sentiment: derivedSentiment,
+      }))
+    : commentsData.comments;
   return (
     <DashboardCard
       title="Analyst Comments & Analysis"
@@ -55,8 +91,8 @@ export function AnalystComments() {
           </CardHeader>
           <CardContent>
             <p className='text-2xl font-bold flex items-center justify-center gap-2'>
-              {getSentimentIcon(commentsData.sentiment)}
-              {commentsData.sentiment}
+              {getSentimentIcon(derivedSentiment)}
+              {derivedSentiment}
             </p>
           </CardContent>
         </Card>
@@ -65,7 +101,7 @@ export function AnalystComments() {
             <CardTitle className='text-base'>Dominant Tone</CardTitle>
           </CardHeader>
           <CardContent className='flex flex-wrap gap-2 justify-center'>
-            {commentsData.tone.map(t => <Badge key={t} variant="secondary">{t}</Badge>)}
+            {derivedTone.map(t => <Badge key={t} variant="secondary">{t}</Badge>)}
           </CardContent>
         </Card>
         <Card>
@@ -73,7 +109,7 @@ export function AnalystComments() {
             <CardTitle className='text-base'>Key Themes</CardTitle>
           </CardHeader>
           <CardContent className='flex flex-wrap gap-2 justify-center'>
-            {commentsData.comments.map(c => <Badge key={c.theme} variant="outline">{c.theme}</Badge>)}
+            {derivedThemes.map(theme => <Badge key={theme} variant="outline">{theme}</Badge>)}
           </CardContent>
         </Card>
       </div>
@@ -81,7 +117,7 @@ export function AnalystComments() {
       <Separator />
 
       <div className="mt-6 space-y-4">
-        {commentsData.comments.map((comment, index) => (
+        {derivedComments.map((comment, index) => (
           <div key={index} className="p-4 bg-muted/50 rounded-lg border border-dashed">
             <div className="flex justify-between items-center mb-2">
               <Badge variant="outline">{comment.theme}</Badge>
@@ -93,6 +129,11 @@ export function AnalystComments() {
             <p className="text-muted-foreground">{comment.text}</p>
           </div>
         ))}
+        {wizardSentiment && (
+          <div className="mt-4 p-3 rounded-lg bg-muted/30 border text-xs text-muted-foreground">
+            Sentiment breakdown — Positive: {wizardSentiment.positive} &nbsp;|&nbsp; Neutral: {wizardSentiment.neutral} &nbsp;|&nbsp; Negative: {wizardSentiment.negative} &nbsp;(of {wizardSentiment.total} comment{wizardSentiment.total !== 1 ? 's' : ''})
+          </div>
+        )}
       </div>
     </DashboardCard>
   );
