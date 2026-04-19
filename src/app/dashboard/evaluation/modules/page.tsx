@@ -36,14 +36,22 @@ import {
 
 const allModules = [
     { id: 'tca', name: 'TCA Scorecard', description: 'Central evaluation across fundamental categories.', status: 'active', version: '2.1', link: '/dashboard/evaluation/modules/tca' },
-    { id: 'risk', name: 'Risk Flags', description: 'Risk analysis across 14 domains.', status: 'active', version: '1.8', link: '/dashboard/evaluation/modules/risk' },
+    { id: 'risk', name: 'Risk Assessment', description: 'Risk analysis across 14 domains.', status: 'active', version: '1.8', link: '/dashboard/evaluation/modules/risk' },
     { id: 'benchmark', name: 'Benchmark Comparison', description: 'Performance vs. sector averages.', status: 'active', version: '1.5', link: '/dashboard/evaluation/modules/benchmark' },
-    { id: 'macro', name: 'Macro Trend Alignment', description: 'PESTEL analysis and trend scores.', status: 'active', version: '1.2', link: '/dashboard/evaluation/modules/macro' },
+    { id: 'macro', name: 'Macro Trend Analysis', description: 'PESTEL analysis and trend scores.', status: 'active', version: '1.2', link: '/dashboard/evaluation/modules/macro' },
     { id: 'gap', name: 'Gap Analysis', description: 'Identify performance gaps.', status: 'active', version: '2.0', link: '/dashboard/evaluation/modules/gap' },
-    { id: 'growth', name: 'Growth Classifier', description: 'Predict growth potential.', status: 'active', version: '3.1', link: '/dashboard/evaluation/modules/growth' },
-    { id: 'funderFit', name: 'Funder Fit Analysis', description: 'Investor matching & readiness.', status: 'active', version: '1.0', link: '/dashboard/evaluation/modules/funderFit' },
+    { id: 'growth', name: 'Growth Classification', description: 'Predict growth potential.', status: 'active', version: '3.1', link: '/dashboard/evaluation/modules/growth' },
+    { id: 'founderFit', name: 'Founder Fit Analysis', description: 'Investor matching & readiness.', status: 'active', version: '1.0', link: '/dashboard/evaluation/modules/founderFit' },
     { id: 'team', name: 'Team Assessment', description: 'Analyze founder and team strength.', status: 'active', version: '1.4', link: '/dashboard/evaluation/modules/team' },
     { id: 'strategicFit', name: 'Strategic Fit Matrix', description: 'Align with strategic pathways.', status: 'active', version: '1.1', link: '/dashboard/evaluation/modules/strategicFit' },
+    { id: 'financial', name: 'Financial Analysis', description: 'Revenue model, burn rate, and financial health.', status: 'active', version: '1.0', link: '/dashboard/evaluation/modules/financial' },
+    { id: 'economic', name: 'Economic Analysis', description: 'Market size, pricing, and economic viability.', status: 'active', version: '1.0', link: '/dashboard/evaluation/modules/economic' },
+    { id: 'social', name: 'Social Impact Analysis', description: 'ESG factors and social impact metrics.', status: 'active', version: '1.0', link: '/dashboard/evaluation/modules/social' },
+    { id: 'marketing', name: 'Marketing Analysis', description: 'GTM strategy, brand positioning, and channels.', status: 'active', version: '1.0', link: '/dashboard/evaluation/modules/marketing' },
+    { id: 'environmental', name: 'Environmental Analysis', description: 'Environmental compliance and sustainability.', status: 'active', version: '1.0', link: '/dashboard/evaluation/modules/environmental' },
+    { id: 'funder', name: 'Funder Fit Analysis', description: 'Investor alignment and funding readiness.', status: 'active', version: '1.0', link: '/dashboard/evaluation/modules/funder' },
+    { id: 'strategic', name: 'Strategic Analysis', description: 'Competitive positioning and strategic roadmap.', status: 'active', version: '1.0', link: '/dashboard/evaluation/modules/strategic' },
+    { id: 'analyst', name: 'Analyst Review', description: 'Manual analyst input, NLP analysis, and AI deviation review.', status: 'active', version: '1.0', link: '/analysis/modules/analyst' },
 ];
 
 
@@ -61,7 +69,17 @@ export default function ModuleControlDeck() {
         try {
             const savedModules = localStorage.getItem('module-deck-config');
             if (savedModules) {
-                setModules(JSON.parse(savedModules));
+                const parsed = JSON.parse(savedModules);
+                // Merge: preserve saved toggle state, but always add new modules from allModules
+                const savedStatusMap: Record<string, string> = {};
+                parsed.forEach((m: { id: string; status: string }) => { savedStatusMap[m.id] = m.status; });
+                const defaultIds = new Set(allModules.map(m => m.id));
+                const customModules = parsed.filter((m: { id: string }) => !defaultIds.has(m.id));
+                const merged = [
+                    ...allModules.map(m => ({ ...m, status: savedStatusMap[m.id] || m.status })),
+                    ...customModules,
+                ];
+                setModules(merged);
             } else {
                 setModules(allModules);
             }
@@ -225,7 +243,7 @@ export default function ModuleControlDeck() {
                     </CardHeader>
                     <CardContent>
                         <Button asChild className="w-full justify-start">
-                            <Link href="/analysis/modules/Analyst"><MessageSquareQuote /> Analyst Analysis & Manual Input</Link>
+                            <Link href="/analysis/modules/analyst"><MessageSquareQuote /> Analyst Analysis & Manual Input</Link>
                         </Button>
                     </CardContent>
                 </Card>

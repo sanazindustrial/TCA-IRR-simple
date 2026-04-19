@@ -99,21 +99,11 @@ export function ExportButtons() {
     try {
       const storedData = localStorage.getItem('analysisResult');
       if (!storedData) {
-        toast({
-          variant: 'destructive',
-          title: 'No Data Found',
-          description: 'Please run an analysis before exporting data.'
-        });
         return null;
       }
       return JSON.parse(storedData);
     } catch (error) {
       console.error("Failed to parse analysis data from localStorage:", error);
-      toast({
-        variant: 'destructive',
-        title: 'Export Failed',
-        description: 'Could not read analysis data.'
-      });
       return null;
     }
   }
@@ -2557,14 +2547,16 @@ export function ExportButtons() {
 
   return (
     <>
-      <ReportPreview
-        isOpen={showPreview}
-        onClose={() => setShowPreview(false)}
-        analysisData={getAnalysisData() || {} as any}
-        companyName={getCompanyName()}
-        onExportPDF={handleExportFullReport}
-        onExportJSON={handleDownloadZip}
-      />
+      {showPreview && (
+        <ReportPreview
+          isOpen={showPreview}
+          onClose={() => setShowPreview(false)}
+          analysisData={getAnalysisData() || {} as any}
+          companyName={getCompanyName()}
+          onExportPDF={handleExportFullReport}
+          onExportJSON={handleDownloadZip}
+        />
+      )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm" className="flex items-center gap-2">
@@ -2574,7 +2566,13 @@ export function ExportButtons() {
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-64" align="end">
           {/* Preview Report Button */}
-          <DropdownMenuItem onClick={() => setShowPreview(true)} className="flex items-center gap-3 py-2 text-primary font-medium">
+          <DropdownMenuItem onClick={() => {
+            if (!localStorage.getItem('analysisResult')) {
+              toast({ variant: 'destructive', title: 'No Data Found', description: 'Please run an analysis before previewing the report.' });
+              return;
+            }
+            setShowPreview(true);
+          }} className="flex items-center gap-3 py-2 text-primary font-medium">
             <Eye className="size-4" />
             <span>Preview Report</span>
           </DropdownMenuItem>
