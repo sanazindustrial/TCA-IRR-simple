@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import reportsApi from '@/lib/reports-api';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -22,6 +23,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
+import { Switch } from '@/components/ui/switch';
+import { cn } from '@/lib/utils';
 import {
   Dialog,
   DialogContent,
@@ -33,6 +36,7 @@ import {
 } from '@/components/ui/dialog';
 import {
   ArrowLeft,
+  ArrowRight,
   RefreshCw,
   Zap,
   Activity,
@@ -47,6 +51,9 @@ import {
   BarChart3,
   Users,
   Timer,
+  Building2,
+  Settings,
+  Download,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
@@ -89,6 +96,33 @@ interface AuditStats {
     total_evaluated: number;
   };
 }
+
+interface ReportSection {
+  id: string;
+  title: string;
+  description: string;
+  active: boolean;
+}
+
+const DEFAULT_SSD_SECTIONS: ReportSection[] = [
+  { id: 'ss-page-1', title: 'Market Opportunity', description: 'Market size, trends, and opportunity assessment', active: true },
+  { id: 'ss-page-2', title: 'Product & Technology', description: 'Product maturity, tech stack, and IP', active: true },
+  { id: 'ss-page-3', title: 'Team & Founders', description: 'Founder backgrounds and team composition', active: true },
+  { id: 'ss-page-4', title: 'Business Model', description: 'Revenue model, pricing, and unit economics', active: true },
+  { id: 'ss-page-5', title: 'Traction & Metrics', description: 'Growth metrics, revenue, and KPIs', active: true },
+  { id: 'ss-page-6', title: 'Competitive Analysis', description: 'Competitive landscape and differentiation', active: true },
+  { id: 'ss-page-7', title: 'Go-to-Market Strategy', description: 'Customer acquisition and distribution', active: true },
+  { id: 'ss-page-8', title: 'Financial Overview', description: 'Funding history, burn rate, and projections', active: true },
+  { id: 'ss-page-9', title: 'Risk Assessment', description: 'Key risks and mitigation strategies', active: true },
+  { id: 'ss-page-10', title: 'Investment Recommendation', description: 'Final score and investment thesis', active: true },
+];
+
+const SSD_WIZARD_STEPS = [
+  { id: 1, name: 'Company Setup', icon: Building2 },
+  { id: 2, name: 'Report Sections', icon: Settings },
+  { id: 3, name: 'Storage Options', icon: Download },
+  { id: 4, name: 'Submit & Track', icon: Zap },
+];
 
 function StatusBadge({ status }: { status: string }) {
   switch (status.toLowerCase()) {
@@ -145,6 +179,71 @@ export default function SSDReportPage() {
     callback_url: '',
   });
 
+  // Wizard state
+  const [wizardStep, setWizardStep] = useState(1);
+  const [ssdSections, setSsdSections] = useState<ReportSection[]>([]);
+  const [trackingId, setTrackingId] = useState<string | null>(null);
+  const [saveToDatabase, setSaveToDatabase] = useState(false);
+  const [downloadAfterSubmit, setDownloadAfterSubmit] = useState(false);
+  const [savedDbReportId, setSavedDbReportId] = useState<number | null>(null);
+  const [pollingStatus, setPollingStatus] = useState<'idle' | 'polling' | 'done' | 'failed'>('idle');
+  const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopPolling = useCallback(() => {
+    if (pollingIntervalRef.current !== null) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+  }, []);
+
+  const startPolling = useCallback((tid: string) => {
+    stopPolling();
+    setPollingStatus('polling');
+    pollingIntervalRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/ssd/audit/logs`, { headers: SSD_HEADERS });
+        if (!res.ok) return;
+        const data = await res.json();
+        const allLogs: AuditLog[] = Array.isArray(data) ? data : (data as { logs?: AuditLog[] }).logs ?? [];
+        const entry = allLogs.find((l) => l.tracking_id === tid);
+        if (entry?.status === 'completed') {
+          stopPolling();
+          setPollingStatus('done');
+          // Auto-download the report
+          try {
+            const reportRes = await fetch(`${API_BASE}/api/v1/ssd/audit/logs/${tid}/report`, {
+              headers: SSD_HEADERS,
+            });
+            if (reportRes.ok) {
+              const reportData = await reportRes.json();
+              const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `ssd-report-${tid}.json`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+            }
+          } catch {
+            // download failed silently
+          }
+        } else if (entry?.status === 'failed') {
+          stopPolling();
+          setPollingStatus('failed');
+        }
+      } catch {
+        // ignore transient poll errors
+      }
+    }, 10_000);
+  }, [stopPolling]);
+
+  // Clean up polling on unmount
+  useEffect(() => {
+    return () => stopPolling();
+  }, [stopPolling]);
+
   const fetchStats = useCallback(async () => {
     setIsLoadingStats(true);
     setStatsError(null);
@@ -179,6 +278,40 @@ export default function SSDReportPage() {
     fetchStats();
     fetchLogs();
   }, [fetchStats, fetchLogs]);
+
+  // Load SSD section config when dialog opens
+  useEffect(() => {
+    if (submitOpen) {
+      const saved = localStorage.getItem('report-config-ssd-sections');
+      setSsdSections(saved ? JSON.parse(saved) : DEFAULT_SSD_SECTIONS);
+    }
+  }, [submitOpen]);
+
+  const toggleSsdSection = (id: string) => {
+    setSsdSections((prev) => prev.map((s) => (s.id === id ? { ...s, active: !s.active } : s)));
+  };
+
+  const toggleAllSsdSections = (active: boolean) => {
+    setSsdSections((prev) => prev.map((s) => ({ ...s, active })));
+  };
+
+  const wizardCanProceed = () => {
+    switch (wizardStep) {
+      case 1: return submitForm.company_name.trim().length > 0 && submitForm.founder_email.trim().length > 0;
+      case 2: return ssdSections.filter((s) => s.active).length > 0;
+      case 3: return true;
+      case 4: return true;
+      default: return false;
+    }
+  };
+
+  const wizardNext = () => {
+    if (wizardCanProceed() && wizardStep < 4) setWizardStep((s) => s + 1);
+  };
+
+  const wizardPrev = () => {
+    if (wizardStep > 1) setWizardStep((s) => s - 1);
+  };
 
   const handleViewReport = async (trackingId: string) => {
     setViewingReport(trackingId);
@@ -221,6 +354,10 @@ export default function SSDReportPage() {
       if (submitForm.callback_url.trim()) {
         body.callback_url = submitForm.callback_url;
       }
+      const activeSectionIds = ssdSections.filter((s) => s.active).map((s) => s.id);
+      if (activeSectionIds.length > 0 && activeSectionIds.length < ssdSections.length) {
+        body.pages = activeSectionIds.join(',');
+      }
       const res = await fetch(`${API_BASE}/api/v1/ssd/evaluate`, {
         method: 'POST',
         headers: SSD_HEADERS,
@@ -233,14 +370,47 @@ export default function SSDReportPage() {
         );
       }
       const data = await res.json();
+      const tid = (data as { tracking_id?: string }).tracking_id ?? '';
+      setTrackingId(tid);
       toast({
         title: 'Submission successful',
-        description: `Tracking ID: ${(data as { tracking_id?: string }).tracking_id ?? 'N/A'}`,
+        description: `Tracking ID: ${tid || 'N/A'}`,
       });
-      setSubmitOpen(false);
-      setSubmitForm({ company_name: '', founder_email: '', callback_url: '' });
       fetchLogs();
       fetchStats();
+
+      // Save to database immediately if requested
+      if (saveToDatabase && tid) {
+        try {
+          const userRaw = typeof window !== 'undefined' ? localStorage.getItem('loggedInUser') : null;
+          const userId = userRaw ? ((JSON.parse(userRaw) as { id?: number }).id ?? 1) : 1;
+          const saved = await reportsApi.createReport(
+            {
+              company_name: submitForm.company_name,
+              report_type: 'ssd',
+              analysis_data: {
+                tracking_id: tid,
+                founder_email: submitForm.founder_email,
+                pages: ssdSections.filter((s) => s.active).map((s) => s.id),
+              },
+            },
+            userId,
+          );
+          setSavedDbReportId(saved.id);
+          toast({ title: 'Saved to database', description: `Report #${saved.id} created.` });
+        } catch {
+          toast({
+            variant: 'destructive',
+            title: 'Database save failed',
+            description: 'Submission was successful but could not save to database.',
+          });
+        }
+      }
+
+      // Start polling for completion and auto-download if requested
+      if (downloadAfterSubmit && tid) {
+        startPolling(tid);
+      }
     } catch (err) {
       toast({
         variant: 'destructive',
@@ -291,69 +461,310 @@ export default function SSDReportPage() {
             <RefreshCw className="size-4" />
             Refresh
           </Button>
-          <Dialog open={submitOpen} onOpenChange={setSubmitOpen}>
+          <Dialog
+            open={submitOpen}
+            onOpenChange={(open) => {
+              setSubmitOpen(open);
+              if (!open) {
+                stopPolling();
+                setWizardStep(1);
+                setTrackingId(null);
+                setSavedDbReportId(null);
+                setPollingStatus('idle');
+                setSubmitForm({ company_name: '', founder_email: '', callback_url: '' });
+              }
+            }}
+          >
             <DialogTrigger asChild>
               <Button size="sm" className="gap-2">
                 <Plus className="size-4" />
                 Submit New
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-2xl">
               <DialogHeader>
                 <DialogTitle>Submit SSD Evaluation</DialogTitle>
                 <DialogDescription>
-                  Submit a new startup for SSD accelerator evaluation. Results are processed
-                  asynchronously.
+                  Step {wizardStep} of {SSD_WIZARD_STEPS.length} —{' '}
+                  {SSD_WIZARD_STEPS[wizardStep - 1].name}
                 </DialogDescription>
               </DialogHeader>
-              <div className="space-y-4 py-2">
-                <div className="space-y-2">
-                  <Label htmlFor="ssd-company">
-                    Company Name <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="ssd-company"
-                    placeholder="e.g., QuantumLeap AI"
-                    value={submitForm.company_name}
-                    onChange={(e) =>
-                      setSubmitForm((f) => ({ ...f, company_name: e.target.value }))
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="ssd-email">
-                    Founder Email <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="ssd-email"
-                    type="email"
-                    placeholder="founder@company.com"
-                    value={submitForm.founder_email}
-                    onChange={(e) =>
-                      setSubmitForm((f) => ({ ...f, founder_email: e.target.value }))
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="ssd-callback">Callback URL (optional)</Label>
-                  <Input
-                    id="ssd-callback"
-                    placeholder="https://your-webhook.com/callback"
-                    value={submitForm.callback_url}
-                    onChange={(e) =>
-                      setSubmitForm((f) => ({ ...f, callback_url: e.target.value }))
-                    }
-                  />
-                </div>
+
+              {/* Step indicator */}
+              <div className="flex items-center justify-between my-1">
+                {SSD_WIZARD_STEPS.map((step, idx) => {
+                  const Icon = step.icon;
+                  const isActive = wizardStep === step.id;
+                  const isDone = (wizardStep > step.id) || (!!trackingId && step.id === 4);
+                  return (
+                    <div key={step.id} className="flex items-center">
+                      <div className="flex flex-col items-center gap-1">
+                        <div
+                          className={cn(
+                            'size-8 rounded-full flex items-center justify-center transition-colors',
+                            isActive && 'bg-primary text-primary-foreground',
+                            isDone && !isActive && 'bg-green-500 text-white',
+                            !isActive && !isDone && 'bg-muted text-muted-foreground'
+                          )}
+                        >
+                          {isDone && !isActive ? (
+                            <CheckCircle2 className="size-4" />
+                          ) : (
+                            <Icon className="size-4" />
+                          )}
+                        </div>
+                        <span className="text-xs whitespace-nowrap hidden sm:block">
+                          {step.name}
+                        </span>
+                      </div>
+                      {idx < SSD_WIZARD_STEPS.length - 1 && (
+                        <div
+                          className={cn(
+                            'h-0.5 w-10 mx-1 mb-4',
+                            wizardStep > step.id ? 'bg-green-500' : 'bg-border'
+                          )}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setSubmitOpen(false)}>
-                  Cancel
+
+              {/* Step content */}
+              <div className="min-h-[240px]">
+                {wizardStep === 1 && (
+                  <div className="space-y-4 py-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="ssd-company">
+                        Company Name <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        id="ssd-company"
+                        placeholder="e.g., QuantumLeap AI"
+                        value={submitForm.company_name}
+                        onChange={(e) =>
+                          setSubmitForm((f) => ({ ...f, company_name: e.target.value }))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="ssd-email">
+                        Founder Email <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        id="ssd-email"
+                        type="email"
+                        placeholder="founder@company.com"
+                        value={submitForm.founder_email}
+                        onChange={(e) =>
+                          setSubmitForm((f) => ({ ...f, founder_email: e.target.value }))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="ssd-callback">Callback URL (optional)</Label>
+                      <Input
+                        id="ssd-callback"
+                        placeholder="https://your-webhook.com/callback"
+                        value={submitForm.callback_url}
+                        onChange={(e) =>
+                          setSubmitForm((f) => ({ ...f, callback_url: e.target.value }))
+                        }
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {wizardStep === 2 && (
+                  <div className="space-y-3 py-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">
+                        {ssdSections.filter((s) => s.active).length} / {ssdSections.length} pages
+                        active
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => toggleAllSsdSections(true)}
+                        >
+                          Enable All
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => toggleAllSsdSections(false)}
+                        >
+                          Disable All
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
+                      {ssdSections.map((section) => (
+                        <div
+                          key={section.id}
+                          className="flex items-center justify-between rounded-lg border p-3"
+                        >
+                          <div className="flex-1 mr-3 space-y-0.5">
+                            <p className="text-sm font-medium">{section.title}</p>
+                            <p className="text-xs text-muted-foreground">{section.description}</p>
+                          </div>
+                          <Switch
+                            checked={section.active}
+                            onCheckedChange={() => toggleSsdSection(section.id)}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {wizardStep === 3 && (
+                  <div className="space-y-4 py-4">
+                    <p className="text-sm text-muted-foreground">
+                      Choose how to store and export the evaluation results after submission.
+                    </p>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <p className="text-sm font-medium">Save to Database</p>
+                          <p className="text-xs text-muted-foreground">
+                            Persist report results via the reports API
+                          </p>
+                        </div>
+                        <Switch
+                          checked={saveToDatabase}
+                          onCheckedChange={setSaveToDatabase}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <p className="text-sm font-medium">Download JSON on Completion</p>
+                          <p className="text-xs text-muted-foreground">
+                            Automatically download the report when processing completes
+                          </p>
+                        </div>
+                        <Switch
+                          checked={downloadAfterSubmit}
+                          onCheckedChange={setDownloadAfterSubmit}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {wizardStep === 4 && (
+                  <div className="space-y-4 py-2">
+                    {!trackingId ? (
+                      <>
+                        <div className="rounded-lg bg-muted/40 border p-4 space-y-2 text-sm">
+                          <p>
+                            <span className="font-medium">Company:</span>{' '}
+                            {submitForm.company_name}
+                          </p>
+                          <p>
+                            <span className="font-medium">Email:</span> {submitForm.founder_email}
+                          </p>
+                          {submitForm.callback_url && (
+                            <p>
+                              <span className="font-medium">Callback:</span>{' '}
+                              {submitForm.callback_url}
+                            </p>
+                          )}
+                          <p>
+                            <span className="font-medium">Pages:</span>{' '}
+                            {ssdSections.filter((s) => s.active).length} of {ssdSections.length}{' '}
+                            active
+                          </p>
+                          <p>
+                            <span className="font-medium">Save to DB:</span>{' '}
+                            {saveToDatabase ? 'Yes' : 'No'}
+                          </p>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Click Submit to start the evaluation. Results are processed
+                          asynchronously — you will receive a tracking ID immediately.
+                        </p>
+                      </>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="rounded-lg border border-green-300 bg-green-50/40 p-4 flex items-center gap-3">
+                          <CheckCircle2 className="size-5 text-green-600 shrink-0" />
+                          <div>
+                            <p className="font-semibold text-green-800 text-sm">
+                              Evaluation Submitted
+                            </p>
+                            <p className="text-xs text-green-700 font-mono mt-0.5">
+                              Tracking ID: {trackingId}
+                            </p>
+                          </div>
+                        </div>
+                        {savedDbReportId && (
+                          <div className="rounded-lg border border-blue-300 bg-blue-50/40 p-3 flex items-center gap-2 text-sm">
+                            <CheckCircle2 className="size-4 text-blue-600 shrink-0" />
+                            <span className="text-blue-800">Saved to database as Report #{savedDbReportId}</span>
+                          </div>
+                        )}
+                        {pollingStatus === 'polling' && (
+                          <div className="rounded-lg border bg-muted/40 p-3 flex items-center gap-2 text-sm">
+                            <Loader2 className="size-4 animate-spin text-primary shrink-0" />
+                            <span className="text-muted-foreground">Waiting for evaluation to complete — will auto-download when ready&hellip;</span>
+                          </div>
+                        )}
+                        {pollingStatus === 'done' && (
+                          <div className="rounded-lg border border-green-300 bg-green-50/40 p-3 flex items-center gap-2 text-sm">
+                            <CheckCircle2 className="size-4 text-green-600 shrink-0" />
+                            <span className="text-green-800">Report completed and downloaded successfully.</span>
+                          </div>
+                        )}
+                        {pollingStatus === 'failed' && (
+                          <div className="rounded-lg border border-red-300 bg-red-50/40 p-3 text-sm text-red-700">
+                            Evaluation failed — no report available for download.
+                          </div>
+                        )}
+                        <p className="text-sm text-muted-foreground">
+                          The evaluation is processing asynchronously. Check the audit log below
+                          for status updates.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <DialogFooter className="flex items-center justify-between sm:justify-between gap-2">
+                <Button
+                  variant="outline"
+                  onClick={wizardStep === 1 ? () => setSubmitOpen(false) : wizardPrev}
+                  disabled={submitting}
+                >
+                  {wizardStep === 1 ? 'Cancel' : (
+                    <>
+                      <ArrowLeft className="mr-1 size-4" />
+                      Back
+                    </>
+                  )}
                 </Button>
-                <Button onClick={handleSubmit} disabled={submitting} className="gap-2">
-                  {submitting && <Loader2 className="size-4 animate-spin" />}
-                  Submit Evaluation
-                </Button>
+                {wizardStep < 4 && (
+                  <Button onClick={wizardNext} disabled={!wizardCanProceed()}>
+                    Next
+                    <ArrowRight className="ml-1 size-4" />
+                  </Button>
+                )}
+                {wizardStep === 4 && !trackingId && (
+                  <Button onClick={handleSubmit} disabled={submitting} className="gap-2">
+                    {submitting && <Loader2 className="size-4 animate-spin" />}
+                    {submitting ? 'Submitting...' : (
+                      <>
+                        <Zap className="size-4" />
+                        Submit Evaluation
+                      </>
+                    )}
+                  </Button>
+                )}
+                {wizardStep === 4 && trackingId && (
+                  <Button onClick={() => setSubmitOpen(false)}>Done</Button>
+                )}
               </DialogFooter>
             </DialogContent>
           </Dialog>

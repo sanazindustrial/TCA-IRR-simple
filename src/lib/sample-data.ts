@@ -156,6 +156,24 @@ export type ComprehensiveAnalysisOutput = {
         risks: string[];
         recommendations: string[];
     } | null;
+    funderData: {
+        score: number;
+        signal: 'green' | 'yellow' | 'red';
+        readinessScore: number;
+        subscores: { investor_alignment: number; stage_readiness: number; deck_quality: number; network_strength: number };
+        investorList: Array<{ name: string; thesis: string; match: number; stage: string }>;
+        summary: string;
+        risks: string[];
+        recommendations: string[];
+    } | null;
+    strategicData: {
+        score: number;
+        signal: 'green' | 'yellow' | 'red';
+        subscores: { competitive_positioning: number; moat_strength: number; roadmap_clarity: number; partnership_potential: number };
+        summary: string;
+        risks: string[];
+        recommendations: string[];
+    } | null;
 };
 
 export const sampleAnalysisData: ComprehensiveAnalysisOutput = {
@@ -564,4 +582,6 @@ export const sampleAnalysisData: ComprehensiveAnalysisOutput = {
     socialData: null,
     marketingData: null,
     environmentalData: null,
+    funderData: null,
+    strategicData: null,
 };
