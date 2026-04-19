@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -373,6 +373,7 @@ export default function AnalysisResultPage({
     const [params, setParams] = useState<{ preview?: string; type?: string; evalId?: string; anlId?: string; company?: string; user?: string }>({});
     const [isPreview, setIsPreview] = useState(false);
     const [isUsingSampleData, setIsUsingSampleData] = useState(false);
+    const hasSavedRef = useRef(false);
 
     const redirectToRunAnalysis = (description: string) => {
         setIsUsingSampleData(false);
@@ -917,16 +918,17 @@ export default function AnalysisResultPage({
         }
     };
 
-    // Auto-save analysis when data is loaded
+    // Auto-save analysis when data is loaded (fires once per page session)
     useEffect(() => {
         const autoSaveAnalysis = async () => {
-            // Don't auto-save if using sample data, in preview mode, or missing required data
-            if (!analysisData || !role || isPreview || isUsingSampleData) {
+            // Don't auto-save if already saved this session, using sample data, in preview mode, or missing required data
+            if (hasSavedRef.current || !analysisData || !role || isPreview || isUsingSampleData) {
                 if (isUsingSampleData) {
                     console.log('Skipping auto-save: Using sample data');
                 }
                 return;
             }
+            hasSavedRef.current = true;
 
             try {
                 const user = localStorage.getItem('loggedInUser') || localStorage.getItem('user');
@@ -956,10 +958,6 @@ export default function AnalysisResultPage({
                 });
 
                 console.log(`Analysis auto-saved with ID: ${reportId}, EvalID: ${savedEvalId}`);
-                toast({
-                    title: 'Report Saved',
-                    description: `Your ${reportType} report has been saved with pending approval status.`,
-                });
             } catch (error) {
                 console.error('Auto-save failed:', error);
                 toast({
