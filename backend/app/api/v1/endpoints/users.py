@@ -63,7 +63,7 @@ async def get_users(page: int = 1,
             # Fetch users with search
             rows = await db.fetch(
                 """
-                SELECT id, username, email, role, is_active, created_at, updated_at
+                SELECT id, username, email, full_name, role, is_active, created_at, updated_at
                 FROM users 
                 WHERE username ILIKE $1 OR email ILIKE $1
                 ORDER BY created_at DESC
@@ -78,7 +78,7 @@ async def get_users(page: int = 1,
             # Fetch users
             rows = await db.fetch(
                 """
-                SELECT id, username, email, role, is_active, created_at, updated_at
+                SELECT id, username, email, full_name, role, is_active, created_at, updated_at
                 FROM users 
                 ORDER BY created_at DESC
                 LIMIT $1 OFFSET $2
@@ -90,7 +90,6 @@ async def get_users(page: int = 1,
         users = []
         for row in rows:
             user_dict = dict(row)
-            user_dict['full_name'] = None  # Column doesn't exist in DB
             users.append(UserResponse(**user_dict))
         
         # Calculate pagination
@@ -308,7 +307,7 @@ async def get_user(user_id: int,
     try:
         row = await db.fetchrow(
             """
-            SELECT id, username, email, role, is_active, created_at, updated_at
+            SELECT id, username, email, full_name, role, is_active, created_at, updated_at
             FROM users WHERE id = $1
             """,
             user_id
@@ -320,9 +319,7 @@ async def get_user(user_id: int,
                 detail="User not found"
             )
         
-        user_dict = dict(row)
-        user_dict['full_name'] = None
-        return UserResponse(**user_dict)
+        return UserResponse(**dict(row))
         
     except HTTPException:
         raise
@@ -402,6 +399,11 @@ async def update_user(user_id: int,
             values.append(user_update.is_active)
             param_count += 1
         
+        if user_update.full_name is not None:
+            update_fields.append(f"full_name = ${param_count}")
+            values.append(user_update.full_name.strip() or None)
+            param_count += 1
+
         if not update_fields:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -418,16 +420,13 @@ async def update_user(user_id: int,
         query = f"""
             UPDATE users SET {', '.join(update_fields)}
             WHERE id = ${param_count}
-            RETURNING id, username, email, role, is_active, created_at, updated_at
+            RETURNING id, username, email, full_name, role, is_active, created_at, updated_at
         """
         
         row = await db.fetchrow(query, *values)
         
-        user_dict = dict(row)
-        user_dict['full_name'] = None
-        
         logger.info(f"User {user_id} updated by {current_user['username']}")
-        return UserResponse(**user_dict)
+        return UserResponse(**dict(row))
         
     except HTTPException:
         raise

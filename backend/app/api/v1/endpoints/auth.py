@@ -82,14 +82,13 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(
 
     try:
         user = await db.fetchrow(
-            "SELECT id, username, email, role, is_active, created_at FROM users WHERE username = $1",
+            "SELECT id, username, email, full_name, role, is_active, created_at FROM users WHERE username = $1",
             username)
 
         if user is None:
             raise credentials_exception
 
         user_dict = dict(user)
-        user_dict['full_name'] = None  # Column doesn't exist in DB
         if not user_dict['is_active']:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
                                 detail="User account is inactive")
@@ -128,15 +127,13 @@ async def get_optional_current_user(
             return None
 
         user = await db.fetchrow(
-            "SELECT id, username, email, role, is_active, created_at FROM users WHERE username = $1",
+            "SELECT id, username, email, full_name, role, is_active, created_at FROM users WHERE username = $1",
             username)
 
         if user is None or not user['is_active']:
             return None
 
-        user_dict = dict(user)
-        user_dict['full_name'] = None
-        return user_dict
+        return dict(user)
 
     except Exception as e:
         logger.debug(f"Optional auth check failed: {e}")
@@ -147,13 +144,12 @@ async def get_user_by_username(db: asyncpg.Connection, username: str) -> dict:
     """Get user by username"""
     try:
         user = await db.fetchrow(
-            "SELECT id, username, email, password_hash, role, is_active FROM users WHERE username = $1",
+            "SELECT id, username, email, full_name, password_hash, role, is_active FROM users WHERE username = $1",
             username)
         if user:
             user_dict = dict(user)
             # Map password_hash to password for compatibility with verify_password
             user_dict['password'] = user_dict.pop('password_hash', None)
-            user_dict['full_name'] = None  # Column doesn't exist in DB
             return user_dict
         return None
     except Exception as e:
@@ -165,13 +161,12 @@ async def get_user_by_email(db: asyncpg.Connection, email: str) -> dict:
     """Get user by email address"""
     try:
         user = await db.fetchrow(
-            "SELECT id, username, email, password_hash, role, is_active FROM users WHERE email = $1",
+            "SELECT id, username, email, full_name, password_hash, role, is_active FROM users WHERE email = $1",
             email)
         if user:
             user_dict = dict(user)
             # Map password_hash to password for compatibility with verify_password
             user_dict['password'] = user_dict.pop('password_hash', None)
-            user_dict['full_name'] = None  # Column doesn't exist in DB
             return user_dict
         return None
     except Exception as e:
@@ -390,13 +385,11 @@ async def register(request: Request,
         # Fetch created user
         created_user_row = await db.fetchrow(
             """
-            SELECT id, username, email, role, is_active, created_at, updated_at
+            SELECT id, username, email, full_name, role, is_active, created_at, updated_at
             FROM users WHERE id = $1
             """, user_id)
         
-        # Add full_name as None for compatibility with UserResponse model
         created_user = dict(created_user_row)
-        created_user['full_name'] = None
 
         # Log successful registration
         await audit_logger.log(
