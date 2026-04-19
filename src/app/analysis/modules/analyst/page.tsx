@@ -258,7 +258,20 @@ export default function AnalystAnalysisPage() {
         aligned: (commentsCoverage.length > 0) === (analystCoverage.length > 0),
       };
     });
-    setAnalysisData({ sentiment: { positive, negative, neutral, total: totalComments }, gaps: gapRows, keywords: keywordData, aiVsHuman, aiScoresMap, humanScoresMap });
+    const computedResult = { sentiment: { positive, negative, neutral, total: totalComments }, gaps: gapRows, keywords: keywordData, aiVsHuman, aiScoresMap, humanScoresMap };
+    setAnalysisData(computedResult);
+    // Persist so the /analysis/result page can load it and update all modules
+    try {
+      localStorage.setItem('analyst-wizard-result', JSON.stringify({
+        savedAt: new Date().toISOString(),
+        ...computedResult,
+        ceoQa,
+        analystNotes,
+        comments: filledComments,
+      }));
+    } catch (e) {
+      console.warn('Failed to persist analyst wizard result:', e);
+    }
     toast({
       title: "Analysis Started",
       description: "Running thematic, sentiment, deep analysis, and AI vs. human gap analysis."
