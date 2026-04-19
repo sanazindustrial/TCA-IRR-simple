@@ -1,6 +1,6 @@
 
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -29,8 +29,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Edit, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Calculator, Edit, RotateCcw, Save, History, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
+import { useToast } from '@/hooks/use-toast';
+import { saveConfigVersion, getLatestConfig, getVersionHistory, clearConfigVersions, type ConfigVersion } from '@/lib/module-config-service';
 
 interface WeightDimensions {
   stage: number;
@@ -77,6 +79,26 @@ export default function FunderFitConfigPage() {
   const [weights, setWeights] = useState(initialWeights);
   const [affectsRouting, setAffectsRouting] = useState(true);
   const [affectsLanguage, setAffectsLanguage] = useState(true);
+  const [formula, setFormula] = useState('Score = Σ (Dimension Weight × Fit Score)');
+  const [formulaExample, setFormulaExample] = useState('e.g. 0.30×85 + 0.20×70 + 0.25×90 + 0.15×75 + 0.10×80 = 81.75 → Strong Fit (≥75)');
+  const [versionHistory, setVersionHistory] = useState<ConfigVersion[]>([]);
+  const [currentVersion, setCurrentVersion] = useState<number | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const saved = getLatestConfig<typeof initialWeights & { isActive: boolean; thresholds: { strong: number; moderate: number }; affectsRouting: boolean; affectsLanguage: boolean }>('funder');
+    if (saved) {
+      if (saved.isActive !== undefined) setIsActive(saved.isActive);
+      if (saved.thresholds) setThresholds(saved.thresholds);
+      if (saved.tech && saved.med_life) setWeights({ tech: saved.tech, med_life: saved.med_life });
+      if (saved.affectsRouting !== undefined) setAffectsRouting(saved.affectsRouting);
+      if (saved.affectsLanguage !== undefined) setAffectsLanguage(saved.affectsLanguage);
+    }
+    const history = getVersionHistory('funder');
+    setVersionHistory(history);
+    if (history.length > 0) setCurrentVersion(history[history.length - 1].version);
+  }, []);
 
   const handleWeightChange = (sector: 'tech' | 'med_life', dimension: keyof WeightDimensions, value: string) => {
     const newWeights = { ...weights };
@@ -98,6 +120,32 @@ export default function FunderFitConfigPage() {
     setWeights(initialWeights);
     setAffectsRouting(true);
     setAffectsLanguage(true);
+    clearConfigVersions('funder');
+    setVersionHistory([]);
+    setCurrentVersion(null);
+    toast({ title: 'Defaults Restored', description: 'Funder Fit configuration reset to defaults.' });
+  };
+
+  const handleSaveConfig = () => {
+    const config = { isActive, thresholds, ...weights, affectsRouting, affectsLanguage };
+    const storedUser = typeof window !== 'undefined' ? localStorage.getItem('loggedInUser') : null;
+    const userEmail = storedUser ? JSON.parse(storedUser).email : undefined;
+    const ver = saveConfigVersion('funder', config, { label: `v${(versionHistory.length + 1)} - Manual Save`, savedBy: userEmail });
+    const history = getVersionHistory('funder');
+    setVersionHistory(history);
+    setCurrentVersion(ver);
+    toast({ title: 'Configuration Saved', description: `Version ${ver} saved successfully.` });
+  };
+
+  const handleLoadVersion = (v: ConfigVersion) => {
+    const cfg = v.config as any;
+    if (cfg.isActive !== undefined) setIsActive(cfg.isActive);
+    if (cfg.thresholds) setThresholds(cfg.thresholds);
+    if (cfg.tech && cfg.med_life) setWeights({ tech: cfg.tech, med_life: cfg.med_life });
+    if (cfg.affectsRouting !== undefined) setAffectsRouting(cfg.affectsRouting);
+    if (cfg.affectsLanguage !== undefined) setAffectsLanguage(cfg.affectsLanguage);
+    setCurrentVersion(v.version);
+    toast({ title: `Version ${v.version} Loaded`, description: v.label });
   };
 
   const weightDimensions = Object.keys(weights.tech) as (keyof WeightDimensions)[];
@@ -252,6 +300,36 @@ export default function FunderFitConfigPage() {
           </Card>
           <Card>
             <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Calculator className="size-4" /> Score Calculation</CardTitle>
+              <CardDescription>Formula used by the backend for investor matching.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label className="text-xs text-muted-foreground">Weighted Score Formula (0–100)</Label>
+                <Input
+                  value={formula}
+                  onChange={(e) => setFormula(e.target.value)}
+                  className="text-xs bg-muted/50 p-2 rounded-md font-mono mt-1 h-auto"
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Example (Tech sector defaults)</Label>
+                <Input
+                  value={formulaExample}
+                  onChange={(e) => setFormulaExample(e.target.value)}
+                  className="text-xs text-muted-foreground p-2 bg-muted/50 rounded-md font-mono mt-1 h-auto"
+                />
+              </div>
+              <div className="text-xs text-muted-foreground space-y-1 border-t pt-2">
+                <p className="font-medium">Thresholds (0–100 scale)</p>
+                <p>Strong Fit: ≥ {thresholds.strong}</p>
+                <p>Moderate Fit: ≥ {thresholds.moderate}</p>
+                <p>Weak Fit: &lt; {thresholds.moderate}</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
               <CardTitle>JSON Configuration</CardTitle>
               <CardDescription>Current configuration for backend use.</CardDescription>
             </CardHeader>
@@ -262,9 +340,27 @@ export default function FunderFitConfigPage() {
         </div>
       </div>
       <Card className="mt-8">
-        <CardFooter className="p-4 flex justify-end">
-          <Button>Save Configuration</Button>
+        <CardFooter className="p-4 flex justify-between items-center flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={handleReset}><RotateCcw className="mr-2 size-4" /> Restore Defaults</Button>
+            <Button variant="ghost" size="sm" onClick={() => setShowHistory(h => !h)}>
+              <History className="mr-2 size-4" /> History {versionHistory.length > 0 && `(${versionHistory.length})`}
+            </Button>
+            {currentVersion && <span className="text-xs text-muted-foreground">Active: v{currentVersion}</span>}
+          </div>
+          <Button onClick={handleSaveConfig}><Save className="mr-2 size-4" /> Save Configuration</Button>
         </CardFooter>
+        {showHistory && versionHistory.length > 0 && (
+          <div className="px-4 pb-4 border-t space-y-2 pt-4">
+            <h4 className="text-sm font-semibold">Version History</h4>
+            {[...versionHistory].reverse().map(v => (
+              <div key={v.version} className="flex items-center justify-between text-sm p-2 bg-muted/40 rounded">
+                <span>v{v.version} — {v.label} <span className="text-xs text-muted-foreground">({new Date(v.timestamp).toLocaleString()})</span></span>
+                <Button size="sm" variant="ghost" onClick={() => handleLoadVersion(v)}><RefreshCw className="size-3 mr-1" /> Load</Button>
+              </div>
+            ))}
+          </div>
+        )}
       </Card>
     </div>
   );

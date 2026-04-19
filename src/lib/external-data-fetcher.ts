@@ -376,130 +376,62 @@ async function fetchCompanyNews(companyName: string): Promise<any> {
  * Fetch all available external data for a company
  */
 export async function fetchExternalData(params: CompanySearchParams): Promise<AggregatedExternalData> {
-  const startTime = Date.now();
   const results: ExternalDataResult[] = [];
-  const { companyName, domain, ticker, industry } = params;
-  
-  // Helper to add result
-  const addResult = (sourceId: string, sourceName: string, category: string, success: boolean, data: any, error?: string, responseTime: number = 0) => {
-    results.push({
-      sourceId,
-      sourceName,
-      category,
-      success,
-      data,
-      error,
-      fetchedAt: new Date().toISOString(),
-      responseTime,
-    });
-  };
-  
-  // Parallel fetching with individual timeouts
-  const fetchPromises: Promise<void>[] = [];
-  
-  // Group A: Public/No-Auth sources
-  fetchPromises.push(
-    (async () => {
+  const { companyName, industry } = params;
+  const q = encodeURIComponent(companyName);
+  const industryQ = encodeURIComponent(industry || companyName);
+
+  // Route all requests through the server-side API proxy to avoid CORS failures.
+  // The /api/external-data route fetches externally on the server where CORS is not enforced.
+  const proxysources = [
+    { id: 'sec-edgar',        name: 'SEC EDGAR',          category: 'Financial Data',   url: `/api/external-data?source=sec&query=${q}` },
+    { id: 'clinical-trials',  name: 'ClinicalTrials.gov', category: 'Medical Research', url: `/api/external-data?source=clinical-trials&query=${industryQ}&limit=5` },
+    { id: 'fda',              name: 'OpenFDA',            category: 'Regulatory Data',  url: `/api/external-data?source=fda&query=${q}&type=drug&limit=5` },
+    { id: 'worldbank',        name: 'World Bank',         category: 'Economic Data',    url: `/api/external-data?source=worldbank&country=US&indicator=NY.GDP.MKTP.CD` },
+    { id: 'github',           name: 'GitHub',             category: 'Technology Sources', url: `/api/external-data?source=github&query=${q}&limit=5` },
+    { id: 'news',             name: 'News (HackerNews)',  category: 'News & Media',     url: `/api/external-data?source=news&query=${q}&limit=10` },
+  ];
+
+  await Promise.allSettled(
+    proxysources.map(async (src) => {
       const start = Date.now();
-      const cacheKey = `sec-edgar-${companyName}`;
-      let data = getCachedData(cacheKey);
-      if (!data && checkRateLimit('sec-edgar')) {
-        data = await fetchSECEdgar(companyName);
-        setCachedData(cacheKey, data);
-      }
-      addResult('sec-edgar', 'SEC EDGAR', 'Financial Data', !data?.error, data, data?.error, Date.now() - start);
-    })()
-  );
-  
-  fetchPromises.push(
-    (async () => {
-      const start = Date.now();
-      const cacheKey = `hackernews-${companyName}`;
-      let data = getCachedData(cacheKey);
-      if (!data && checkRateLimit('hackernews')) {
-        data = await fetchHackerNews(companyName);
-        setCachedData(cacheKey, data);
-      }
-      addResult('hackernews', 'Hacker News', 'Technology Sources', !data?.error, data, data?.error, Date.now() - start);
-    })()
-  );
-  
-  fetchPromises.push(
-    (async () => {
-      const start = Date.now();
-      const cacheKey = `pwc-${companyName}`;
-      let data = getCachedData(cacheKey);
-      if (!data && checkRateLimit('paperswithcode')) {
-        data = await fetchPapersWithCode(industry || companyName);
-        setCachedData(cacheKey, data);
-      }
-      addResult('paperswithcode', 'Papers With Code', 'AI & ML Sources', !data?.error, data, data?.error, Date.now() - start);
-    })()
-  );
-  
-  // Group B: API Key sources (if keys available)
-  fetchPromises.push(
-    (async () => {
-      const start = Date.now();
-      const cacheKey = `github-${companyName}`;
-      let data = getCachedData(cacheKey);
-      if (!data && checkRateLimit('github')) {
-        data = await fetchGitHub(companyName);
-        setCachedData(cacheKey, data);
-      }
-      addResult('github', 'GitHub', 'Technology Sources', !data?.error, data, data?.error, Date.now() - start);
-    })()
-  );
-  
-  if (ticker) {
-    fetchPromises.push(
-      (async () => {
-        const start = Date.now();
-        const cacheKey = `alphavantage-${ticker}`;
-        let data = getCachedData(cacheKey);
-        if (!data && checkRateLimit('alpha-vantage')) {
-          data = await fetchAlphaVantage(ticker);
-          setCachedData(cacheKey, data);
+      try {
+        const cacheKey = `proxy-${src.id}-${companyName}`;
+        let responseData = getCachedData(cacheKey);
+        if (!responseData) {
+          const res = await fetch(src.url, { signal: AbortSignal.timeout(15000) });
+          responseData = await res.json();
+          if (res.ok) setCachedData(cacheKey, responseData);
         }
-        addResult('alpha-vantage', 'Alpha Vantage', 'Financial Data', !data?.error, data, data?.error, Date.now() - start);
-      })()
-    );
-  }
-  
-  fetchPromises.push(
-    (async () => {
-      const start = Date.now();
-      const cacheKey = `fred-gdp`;
-      let data = getCachedData(cacheKey);
-      if (!data && checkRateLimit('fred')) {
-        data = await fetchFRED('GDP');
-        setCachedData(cacheKey, data, 60 * 60 * 1000); // 1 hour cache for economic data
+        const success = responseData?.success !== false && !responseData?.error;
+        results.push({
+          sourceId: src.id,
+          sourceName: src.name,
+          category: src.category,
+          success,
+          data: success ? responseData?.data : null,
+          error: success ? undefined : (responseData?.error || 'Fetch failed'),
+          fetchedAt: new Date().toISOString(),
+          responseTime: Date.now() - start,
+        });
+      } catch (error) {
+        results.push({
+          sourceId: src.id,
+          sourceName: src.name,
+          category: src.category,
+          success: false,
+          data: null,
+          error: error instanceof Error ? error.message : String(error),
+          fetchedAt: new Date().toISOString(),
+          responseTime: Date.now() - start,
+        });
       }
-      addResult('fred', 'FRED', 'Economic Data', !data?.error, data, data?.error, Date.now() - start);
-    })()
+    })
   );
-  
-  fetchPromises.push(
-    (async () => {
-      const start = Date.now();
-      const cacheKey = `news-${companyName}`;
-      let data = getCachedData(cacheKey);
-      if (!data && checkRateLimit('news-aggregator')) {
-        data = await fetchCompanyNews(companyName);
-        setCachedData(cacheKey, data);
-      }
-      addResult('news-aggregator', 'News Aggregator', 'News & Media', !data?.error, data, data?.error, Date.now() - start);
-    })()
-  );
-  
-  // Wait for all fetches to complete
-  await Promise.allSettled(fetchPromises);
-  
-  // Aggregate results
+
   const successfulFetches = results.filter(r => r.success).length;
   const totalResponseTime = results.reduce((sum, r) => sum + r.responseTime, 0);
-  
-  // Process and categorize data
+
   const aggregated: AggregatedExternalData = {
     companyIntelligence: {},
     technologyData: {},
@@ -514,46 +446,35 @@ export async function fetchExternalData(params: CompanySearchParams): Promise<Ag
     },
     rawResults: results,
   };
-  
-  // Populate categories from results
+
   results.forEach(result => {
-    if (!result.success) return;
-    
+    if (!result.success || !result.data) return;
     switch (result.sourceId) {
       case 'sec-edgar':
-        aggregated.financialData.secFilings = result.data.filings;
+        aggregated.financialData.secFilings = Array.isArray(result.data) ? result.data : result.data?.filings || [];
         break;
-      case 'alpha-vantage':
-        aggregated.financialData.marketData = result.data.overview;
-        break;
-      case 'fred':
-        aggregated.financialData.economicIndicators = result.data.observations;
+      case 'worldbank':
+        aggregated.financialData.economicIndicators = result.data;
         break;
       case 'github':
-        aggregated.technologyData.githubMetrics = {
-          publicRepos: result.data.publicRepos,
-          followers: result.data.followers,
-          organization: result.data.organization,
-        };
-        aggregated.technologyData.developerActivity = result.data.searchResults;
+        aggregated.technologyData.githubMetrics = result.data;
+        aggregated.technologyData.developerActivity = result.data;
         break;
-      case 'hackernews':
-        aggregated.technologyData.communityEngagement = {
-          stories: result.data.stories,
-          sentiment: calculateSentiment(result.data.stories),
-        };
-        aggregated.newsAndSentiment.trendTopics = extractTopics(result.data.stories);
+      case 'news':
+        aggregated.newsAndSentiment.recentNews = Array.isArray(result.data) ? result.data : [];
+        aggregated.newsAndSentiment.sentimentScore = calculateNewsSentiment(
+          Array.isArray(result.data) ? result.data : []
+        );
+        aggregated.newsAndSentiment.trendTopics = extractTopics(
+          Array.isArray(result.data) ? result.data : []
+        );
         break;
-      case 'paperswithcode':
-        aggregated.technologyData.techStack = result.data.papers?.map((p: any) => p.title) || [];
-        break;
-      case 'news-aggregator':
-        aggregated.newsAndSentiment.recentNews = result.data.news;
-        aggregated.newsAndSentiment.sentimentScore = calculateNewsSentiment(result.data.news);
+      case 'clinical-trials':
+        aggregated.companyIntelligence.fundingHistory = Array.isArray(result.data) ? result.data : [];
         break;
     }
   });
-  
+
   return aggregated;
 }
 

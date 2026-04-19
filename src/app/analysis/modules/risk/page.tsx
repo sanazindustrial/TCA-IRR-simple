@@ -1,6 +1,6 @@
 
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -20,8 +20,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ArrowLeft, AlertTriangle, RotateCcw, Plus, Trash2, GripVertical } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, RotateCcw, Plus, Trash2, GripVertical, Save, History, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
+import { useToast } from '@/hooks/use-toast';
+import { saveConfigVersion, getLatestConfig, getVersionHistory, clearConfigVersions, type ConfigVersion } from '@/lib/module-config-service';
 
 const initialRiskDomains = [
     { id: '1', name: 'Regulatory / Compliance', techWeight: 5, medWeight: 15 },
@@ -50,6 +52,21 @@ export default function RiskFlagsConfigPage() {
   const [domains, setDomains] = useState(initialRiskDomains);
   const [penalties, setPenalties] = useState(initialPenalties);
   const [newDomainName, setNewDomainName] = useState('');
+  const [versionHistory, setVersionHistory] = useState<ConfigVersion[]>([]);
+  const [currentVersion, setCurrentVersion] = useState<number | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const saved = getLatestConfig<any>('risk');
+    if (saved) {
+      if (saved.domains) setDomains(saved.domains);
+      if (saved.penalties) setPenalties(saved.penalties);
+    }
+    const history = getVersionHistory('risk');
+    setVersionHistory(history);
+    if (history.length > 0) setCurrentVersion(history[0].version);
+  }, []);
 
   const totalTechWeight = domains.reduce((sum, d) => sum + d.techWeight, 0);
   const totalMedWeight = domains.reduce((sum, d) => sum + d.medWeight, 0);
@@ -114,6 +131,34 @@ export default function RiskFlagsConfigPage() {
 
   const resetPenalties = () => {
     setPenalties(initialPenalties);
+  };
+
+  const handleSaveConfig = () => {
+    const config = { domains, penalties };
+    const storedUser = typeof window !== 'undefined' ? localStorage.getItem('loggedInUser') : null;
+    const userEmail = storedUser ? JSON.parse(storedUser).email : undefined;
+    const ver = saveConfigVersion('risk', config, { label: `v${(versionHistory.length + 1)} - Manual Save`, savedBy: userEmail });
+    const history = getVersionHistory('risk');
+    setVersionHistory(history);
+    setCurrentVersion(ver);
+    toast({ title: 'Configuration Saved', description: `Version ${ver} saved successfully.` });
+  };
+
+  const handleRestoreDefaults = () => {
+    setDomains(initialRiskDomains);
+    setPenalties(initialPenalties);
+    clearConfigVersions('risk');
+    setVersionHistory([]);
+    setCurrentVersion(null);
+    toast({ title: 'Defaults Restored', description: 'Risk configuration reset to defaults.' });
+  };
+
+  const handleLoadVersion = (v: ConfigVersion) => {
+    const cfg = v.config as any;
+    if (cfg.domains) setDomains(cfg.domains);
+    if (cfg.penalties) setPenalties(cfg.penalties);
+    setCurrentVersion(v.version);
+    toast({ title: `Version ${v.version} Loaded`, description: v.label });
   };
   
   return (
@@ -233,7 +278,6 @@ export default function RiskFlagsConfigPage() {
                             <Button variant="outline" size="sm" onClick={() => handleNormalize('med')} disabled={totalMedWeight === 100}>Normalize</Button>
                         </div>
                     </div>
-                    <Button>Save Configuration</Button>
                 </CardFooter>
             </Card>
         </div>
@@ -295,6 +339,29 @@ export default function RiskFlagsConfigPage() {
             </Card>
         </div>
       </div>
+      <Card className="mt-8">
+        <CardFooter className="p-4 flex justify-between items-center flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={handleRestoreDefaults}><RotateCcw className="mr-2 size-4" /> Restore Defaults</Button>
+            <Button variant="ghost" size="sm" onClick={() => setShowHistory(h => !h)}>
+              <History className="mr-2 size-4" /> History {versionHistory.length > 0 && `(${versionHistory.length})`}
+            </Button>
+            {currentVersion && <span className="text-xs text-muted-foreground">Active: v{currentVersion}</span>}
+          </div>
+          <Button onClick={handleSaveConfig}><Save className="mr-2 size-4" /> Save Configuration</Button>
+        </CardFooter>
+        {showHistory && versionHistory.length > 0 && (
+          <div className="px-4 pb-4 border-t space-y-2 pt-4">
+            <h4 className="text-sm font-semibold">Version History</h4>
+            {[...versionHistory].map(v => (
+              <div key={v.version} className="flex items-center justify-between text-sm p-2 bg-muted/40 rounded">
+                <span>v{v.version} — {v.label} <span className="text-xs text-muted-foreground">({new Date(v.timestamp).toLocaleString()})</span></span>
+                <Button size="sm" variant="ghost" onClick={() => handleLoadVersion(v)}><RefreshCw className="size-3 mr-1" /> Load</Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
     </div>
   );
 }

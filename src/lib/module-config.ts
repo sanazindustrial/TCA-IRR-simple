@@ -61,7 +61,14 @@ export const DEFAULT_CONFIGS: Record<string, string[]> = {
         'gap-analysis',
         'team-assessment',
         'funder-fit-analysis',
-        'strategic-fit-matrix'
+        'strategic-fit-matrix',
+        'financial-analysis',
+        'economic-analysis',
+        'social-analysis',
+        'marketing-analysis',
+        'environmental-analysis',
+        'funder-analysis',
+        'strategic-analysis',
     ],
     'dd-medtech': [
         'quick-summary',
@@ -76,7 +83,14 @@ export const DEFAULT_CONFIGS: Record<string, string[]> = {
         'funder-fit-analysis',
         'strategic-fit-matrix',
         'regulatory-compliance',
-        'clinical-pathway'
+        'clinical-pathway',
+        'financial-analysis',
+        'economic-analysis',
+        'social-analysis',
+        'marketing-analysis',
+        'environmental-analysis',
+        'funder-analysis',
+        'strategic-analysis',
     ]
 };
 
@@ -187,7 +201,15 @@ export class ConfigurationManager {
             'funder-fit-analysis': 'Funder Fit Analysis',
             'strategic-fit-matrix': 'Strategic Fit Matrix',
             'regulatory-compliance': 'Regulatory Compliance Review',
-            'clinical-pathway': 'Clinical Pathway Analysis'
+            'clinical-pathway': 'Clinical Pathway Analysis',
+            'financial-analysis': 'Financial Analysis',
+            'economic-analysis': 'Economic Analysis',
+            'social-analysis': 'Social Impact Analysis',
+            'marketing-analysis': 'Marketing Analysis',
+            'environmental-analysis': 'Environmental Analysis',
+            'funder-analysis': 'Funder Fit Analysis',
+            'strategic-analysis': 'Strategic Analysis',
+            'analyst': 'Analyst Review',
         };
 
         return titles[id] || id.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());

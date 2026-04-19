@@ -84,6 +84,8 @@ export function TwoPhaseUpload({
     const [textInput, setTextInput] = useState('');
     const pitchDeckInputRef = useRef<HTMLInputElement>(null);
     const additionalFilesInputRef = useRef<HTMLInputElement>(null);
+    // Per-file extraction timer: filename → seconds taken
+    const [fileExtractionTimes, setFileExtractionTimes] = useState<Record<string, number>>({});
 
     // Check if pitch deck is already uploaded
     useEffect(() => {
@@ -127,6 +129,7 @@ export function TwoPhaseUpload({
                     file.type.includes('word') || file.name.endsWith('.docx') || file.name.endsWith('.doc') ||
                     file.type.includes('presentation') || file.name.endsWith('.pptx') || file.name.endsWith('.ppt')) {
                     const base64Content = await fileToBase64(file);
+                    const extractStart = Date.now();
                     const response = await fetch('https://tcairrapiccontainer.azurewebsites.net/api/v1/analysis/extract-text-from-file', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -139,7 +142,9 @@ export function TwoPhaseUpload({
                     if (response.ok) {
                         const result = await response.json();
                         textContent = result.text_content || '';
-                        console.log(`[Phase 1] Extracted ${textContent.length} characters from pitch deck: ${file.name}`);
+                        const elapsed = (Date.now() - extractStart) / 1000;
+                        setFileExtractionTimes(prev => ({ ...prev, [file.name]: elapsed }));
+                        console.log(`[Phase 1] Extracted ${textContent.length} characters from pitch deck: ${file.name} in ${elapsed.toFixed(1)}s`);
                     }
                 } else {
                     textContent = await file.text();
@@ -162,8 +167,8 @@ export function TwoPhaseUpload({
                 }
             };
 
-            const existingFiles = JSON.parse(localStorage.getItem('processedFiles') || '[]');
-            localStorage.setItem('processedFiles', JSON.stringify([...existingFiles, pitchDeckData]));
+            // Start fresh: pitch deck is phase 1, so clear any files from previous sessions
+            localStorage.setItem('processedFiles', JSON.stringify([pitchDeckData]));
 
             setPitchDeckUploaded(true);
             setIsProcessing(false);
@@ -186,6 +191,7 @@ export function TwoPhaseUpload({
                     if (file.type === 'application/pdf' || file.name.endsWith('.pdf') ||
                         file.type.includes('word') || file.name.endsWith('.docx')) {
                         const base64Content = await fileToBase64(file);
+                        const extractStart = Date.now();
                         const response = await fetch('https://tcairrapiccontainer.azurewebsites.net/api/v1/analysis/extract-text-from-file', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -194,6 +200,8 @@ export function TwoPhaseUpload({
                         if (response.ok) {
                             const result = await response.json();
                             textContent = result.text_content || '';
+                            const elapsed = (Date.now() - extractStart) / 1000;
+                            setFileExtractionTimes(prev => ({ ...prev, [file.name]: elapsed }));
                         }
                     } else if (file.type === 'text/plain' || file.type === 'application/json') {
                         textContent = await file.text();
@@ -370,6 +378,13 @@ export function TwoPhaseUpload({
                                         <p className="text-sm text-green-600 dark:text-green-500">
                                             {uploadedFiles.find(f => f.name.toLowerCase().includes('pitch') || f.name.toLowerCase().endsWith('.pdf'))?.name || uploadedFiles[0]?.name}
                                         </p>
+                                        {(() => {
+                                            const pitchFile = uploadedFiles.find(f => f.name.toLowerCase().includes('pitch') || f.name.toLowerCase().endsWith('.pdf')) || uploadedFiles[0];
+                                            const t = pitchFile && fileExtractionTimes[pitchFile.name];
+                                            return t !== undefined ? (
+                                                <p className="text-xs text-green-500 mt-1">Extracted in {t.toFixed(1)}s</p>
+                                            ) : null;
+                                        })()}
                                     </div>
                                 </div>
 
@@ -461,6 +476,11 @@ export function TwoPhaseUpload({
                                                     <FileText className="h-4 w-4 text-muted-foreground" />
                                                     <span className="text-sm">{file.name}</span>
                                                     <Badge variant="outline" className="text-xs">{formatBytes(file.size)}</Badge>
+                                                    {fileExtractionTimes[file.name] !== undefined && (
+                                                        <span className="text-xs text-green-600 dark:text-green-400">
+                                                            Extracted in {fileExtractionTimes[file.name].toFixed(1)}s
+                                                        </span>
+                                                    )}
                                                 </div>
                                                 <Button variant="ghost" size="sm" onClick={() => removeFile(index)}>
                                                     <X className="h-4 w-4" />

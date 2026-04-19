@@ -350,19 +350,33 @@ export default function DataSourcesPage() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load sources from Azure Storage on mount
+  // Load sources on mount: localStorage first, then cloud
   useEffect(() => {
     const loadSources = async () => {
       try {
         setIsLoading(true);
+        // 1. Try localStorage first (fast, always available)
+        try {
+          const localData = localStorage.getItem('data-sources-config');
+          if (localData) {
+            const parsed: Source[] = JSON.parse(localData);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setSources(parsed);
+              setCloudSynced(false);
+              setIsLoading(false);
+              return; // Local data found, no need for cloud
+            }
+          }
+        } catch (localErr) {
+          console.warn('localStorage read failed:', localErr);
+        }
+        // 2. Fallback to cloud
         const savedSources = await azureStorage.getItem<Source[]>('data-sources-config');
         if (savedSources && Array.isArray(savedSources) && savedSources.length > 0) {
           setSources(savedSources);
           setCloudSynced(true);
-          toast({
-            title: 'Sources Loaded',
-            description: `Loaded ${savedSources.length} sources from cloud storage.`,
-          });
+          // Mirror to localStorage for next visit
+          try { localStorage.setItem('data-sources-config', JSON.stringify(savedSources)); } catch (_) { /* quota */ }
         }
       } catch (error) {
         console.warn('Could not load sources from cloud, using defaults:', error);
@@ -373,24 +387,40 @@ export default function DataSourcesPage() {
     loadSources();
   }, []);
 
-  // Save sources to Azure Storage
+  // Auto-save to localStorage whenever sources change (debounced)
+  useEffect(() => {
+    if (isLoading) return;
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem('data-sources-config', JSON.stringify(sources));
+      } catch (e) {
+        console.warn('Auto-save to localStorage failed (quota?):', e);
+      }
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [sources, isLoading]);
+
+  // Save sources — always writes localStorage, tries cloud
   const saveToCloud = useCallback(async () => {
     try {
       setIsSaving(true);
+      // Always save to localStorage first (guaranteed persistence)
+      localStorage.setItem('data-sources-config', JSON.stringify(sources));
+      // Then attempt cloud sync (non-blocking)
       await azureStorage.setItem('data-sources-config', sources);
       setCloudSynced(true);
       setHasUnsavedChanges(false);
       toast({
         title: 'Configuration Saved',
-        description: `Successfully saved ${sources.length} sources to cloud storage.`,
+        description: `Saved ${sources.length} sources locally and synced to cloud.`,
       });
     } catch (error) {
-      console.error('Failed to save to cloud:', error);
-      setCloudSynced(false);
+      // localStorage save already succeeded above; only cloud failed
+      console.warn('Cloud sync failed, data is saved locally:', error);
+      setHasUnsavedChanges(false);
       toast({
-        variant: 'destructive',
-        title: 'Save Failed',
-        description: 'Could not save configuration to cloud storage.',
+        title: 'Saved Locally',
+        description: 'Configuration saved to local storage. Cloud sync unavailable.',
       });
     } finally {
       setIsSaving(false);

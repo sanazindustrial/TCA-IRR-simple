@@ -1,15 +1,15 @@
-'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+'use client';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
-import { Slider } from '@/components/ui/slider';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useToast } from '@/hooks/use-toast';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+    CardFooter,
+} from '@/components/ui/card';
 import {
     Table,
     TableBody,
@@ -18,691 +18,347 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { ArrowLeft, Edit, Settings, SlidersHorizontal, BrainCircuit, Plus, Trash2, MessageSquareQuote, Calculator, FileCog, Import } from 'lucide-react';
+import Link from 'next/link';
+import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { useRouter } from 'next/navigation';
+import { useToast } from '@/hooks/use-toast';
+import { runAnalysis } from '@/app/analysis/actions';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import {
-    Settings,
-    Plus,
-    Copy,
-    Archive,
-    Check,
-    GitCompare,
-    Play,
-    History,
-    Layers,
-    SlidersHorizontal
-} from 'lucide-react';
-import {
-    settingsApi,
-    SettingsVersion,
-    ModuleSetting,
-    TCACategory,
-    SimulationRun,
-    MODULE_DEFINITIONS,
-    DEFAULT_TCA_CATEGORIES,
-} from '@/lib/settings-api';
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+
+const DEFAULT_MODULES = [
+    { id: 'tca', name: 'TCA Scorecard', description: 'Central evaluation across fundamental categories.', status: 'active', version: '1.0', link: '/analysis/modules/tca' },
+    { id: 'risk', name: 'Risk Assessment', description: 'Risk analysis across 14 domains.', status: 'active', version: '1.0', link: '/analysis/modules/risk' },
+    { id: 'benchmark', name: 'Benchmark Comparison', description: 'Performance vs. sector averages.', status: 'active', version: '1.0', link: '/analysis/modules/benchmark' },
+    { id: 'macro', name: 'Macro Trend Analysis', description: 'PESTEL analysis and trend scores.', status: 'active', version: '1.0', link: '/analysis/modules/macro' },
+    { id: 'gap', name: 'Gap Analysis', description: 'Identify performance gaps.', status: 'active', version: '1.0', link: '/analysis/modules/gap' },
+    { id: 'growth', name: 'Growth Classification', description: 'Predict growth potential.', status: 'active', version: '1.0', link: '/analysis/modules/growth' },
+    { id: 'founderFit', name: 'Founder Fit Analysis', description: 'Investor matching & readiness.', status: 'active', version: '1.0', link: '/analysis/modules/founderFit' },
+    { id: 'team', name: 'Team Assessment', description: 'Analyze founder and team strength.', status: 'active', version: '1.0', link: '/analysis/modules/team' },
+    { id: 'strategicFit', name: 'Strategic Fit Matrix', description: 'Align with strategic pathways.', status: 'active', version: '1.0', link: '/analysis/modules/strategicFit' },
+    { id: 'financial', name: 'Financial Analysis', description: 'Revenue model, burn rate, and financial health.', status: 'active', version: '1.0', link: '/analysis/modules/financial' },
+    { id: 'economic', name: 'Economic Analysis', description: 'Market size, pricing, and economic viability.', status: 'active', version: '1.0', link: '/analysis/modules/economic' },
+    { id: 'social', name: 'Social Impact Analysis', description: 'ESG factors and social impact metrics.', status: 'active', version: '1.0', link: '/analysis/modules/social' },
+    { id: 'marketing', name: 'Marketing Analysis', description: 'GTM strategy, brand positioning, and channels.', status: 'active', version: '1.0', link: '/analysis/modules/marketing' },
+    { id: 'environmental', name: 'Environmental Analysis', description: 'Environmental compliance and sustainability.', status: 'active', version: '1.0', link: '/analysis/modules/environmental' },
+    { id: 'funder', name: 'Funder Fit Analysis', description: 'Investor alignment and funding readiness.', status: 'active', version: '1.0', link: '/analysis/modules/funder' },
+    { id: 'strategic', name: 'Strategic Analysis', description: 'Competitive positioning and strategic roadmap.', status: 'active', version: '1.0', link: '/analysis/modules/strategic' },
+    { id: 'analyst', name: 'Analyst Review', description: 'Manual analyst input, NLP analysis, and AI deviation review.', status: 'active', version: '1.0', link: '/analysis/modules/analyst' },
+];
+
+function getModuleVersions(): Record<string, string> {
+    if (typeof window === 'undefined') return {};
+    const versions: Record<string, string> = {};
+    DEFAULT_MODULES.forEach(m => {
+        try {
+            const stored = localStorage.getItem(`module-config-versions-${m.id}`);
+            if (stored) {
+                const history = JSON.parse(stored);
+                if (Array.isArray(history) && history.length > 0) {
+                    versions[m.id] = `${history.length}`;
+                }
+            }
+        } catch { /* ignore */ }
+    });
+    return versions;
+}
+
 
 export default function ModuleSettingsPage() {
-    const [versions, setVersions] = useState<SettingsVersion[]>([]);
-    const [selectedVersion, setSelectedVersion] = useState<SettingsVersion | null>(null);
-    const [simulationRuns, setSimulationRuns] = useState<SimulationRun[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [showCreateDialog, setShowCreateDialog] = useState(false);
-    const [newVersionName, setNewVersionName] = useState('');
-    const [newVersionDescription, setNewVersionDescription] = useState('');
-    const [copyFromVersion, setCopyFromVersion] = useState<number | null>(null);
-    const [editingModule, setEditingModule] = useState<string | null>(null);
-    const [editingCategory, setEditingCategory] = useState<number | null>(null);
-
+    const [modules, setModules] = useState(DEFAULT_MODULES);
+    const [newModuleName, setNewModuleName] = useState('');
+    const [newModuleDesc, setNewModuleDesc] = useState('');
+    const [addModuleError, setAddModuleError] = useState('');
+    const router = useRouter();
     const { toast } = useToast();
+    const [isLoading, setIsLoading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Load versions on mount
-    const loadVersions = useCallback(async () => {
+    useEffect(() => {
         try {
-            setIsLoading(true);
-            const data = await settingsApi.getVersions(true);
-            setVersions(data);
-
-            // Select active version by default
-            const activeVersion = data.find(v => v.is_active);
-            if (activeVersion) {
-                const fullVersion = await settingsApi.getVersion(activeVersion.id);
-                setSelectedVersion(fullVersion);
-            } else if (data.length > 0) {
-                const fullVersion = await settingsApi.getVersion(data[0].id);
-                setSelectedVersion(fullVersion);
+            const savedVersions = getModuleVersions();
+            // Merge saved deck config (active/inactive toggles) with DEFAULT_MODULES
+            // Always ensure all DEFAULT_MODULES are present
+            const savedDeck = localStorage.getItem('module-deck-config');
+            let savedStatusMap: Record<string, string> = {};
+            let customModules: typeof DEFAULT_MODULES = [];
+            if (savedDeck) {
+                const parsed: typeof DEFAULT_MODULES = JSON.parse(savedDeck);
+                parsed.forEach(m => { savedStatusMap[m.id] = m.status; });
+                // Keep any custom (non-default) modules from the saved deck
+                const defaultIds = new Set(DEFAULT_MODULES.map(d => d.id));
+                customModules = parsed.filter(m => !defaultIds.has(m.id));
             }
+            const merged = DEFAULT_MODULES.map(m => ({
+                ...m,
+                status: savedStatusMap[m.id] || m.status,
+                version: savedVersions[m.id] ? `${savedVersions[m.id]}` : m.version,
+            }));
+            setModules([...merged, ...customModules]);
         } catch (error) {
-            console.error('Failed to load settings versions:', error);
-            toast({
-                title: 'Error',
-                description: 'Failed to load settings versions. Using local defaults.',
-                variant: 'destructive',
-            });
-            // Use local defaults as fallback
-            const defaultVersion: SettingsVersion = {
-                id: 0,
-                version_number: 1,
-                version_name: 'Default (Local)',
-                is_active: true,
-                is_archived: false,
-                created_at: new Date().toISOString(),
-                module_settings: Object.entries(MODULE_DEFINITIONS).map(([id, def], index) => ({
-                    module_id: id,
-                    module_name: def.name,
-                    weight: def.weight,
-                    is_enabled: true,
-                    priority: index + 1,
-                    settings: {},
-                    thresholds: {},
-                })),
-                tca_categories: DEFAULT_TCA_CATEGORIES.map((name, index) => ({
-                    id: index + 1,
-                    category_name: name,
-                    category_order: index + 1,
-                    weight: 8.33,
-                    is_active: true,
-                    factors: [],
-                })),
-            };
-            setSelectedVersion(defaultVersion);
-            setVersions([defaultVersion]);
-        } finally {
-            setIsLoading(false);
-        }
-    }, [toast]);
-
-    const loadSimulationHistory = useCallback(async () => {
-        try {
-            const runs = await settingsApi.getSimulationRuns({ limit: 50 });
-            setSimulationRuns(runs);
-        } catch (error) {
-            console.error('Failed to load simulation history:', error);
+            console.error("Failed to load module settings from localStorage", error);
+            setModules(DEFAULT_MODULES);
         }
     }, []);
 
-    useEffect(() => {
-        loadVersions();
-        loadSimulationHistory();
-    }, [loadVersions, loadSimulationHistory]);
-
-    const handleSelectVersion = async (versionId: number) => {
-        try {
-            const fullVersion = await settingsApi.getVersion(versionId);
-            setSelectedVersion(fullVersion);
-        } catch (error) {
-            toast({
-                title: 'Error',
-                description: 'Failed to load version details',
-                variant: 'destructive',
-            });
-        }
+    const handleToggle = (id: string) => {
+        const updatedModules = modules.map(m =>
+            m.id === id
+                ? { ...m, status: m.status === 'active' ? 'inactive' : 'active' }
+                : m
+        );
+        setModules(updatedModules);
+        localStorage.setItem('module-deck-config', JSON.stringify(updatedModules));
+        toast({
+            title: 'Configuration Updated',
+            description: `Module "${updatedModules.find(m => m.id === id)?.name}" has been ${updatedModules.find(m => m.id === id)?.status === 'active' ? 'activated' : 'deactivated'}.`,
+        });
     };
 
-    const handleCreateVersion = async () => {
-        if (!newVersionName.trim()) {
-            toast({
-                title: 'Error',
-                description: 'Version name is required',
-                variant: 'destructive',
-            });
+    const handleAddModule = () => {
+        if (!newModuleName.trim() || !newModuleDesc.trim()) {
+            setAddModuleError('Module name and description are required.');
             return;
         }
+        setAddModuleError('');
+        const newModule = {
+            id: `custom-${Date.now()}`,
+            name: newModuleName,
+            description: newModuleDesc,
+            status: 'active' as 'active' | 'inactive',
+            version: '1.0',
+            link: `/dashboard/evaluation/modules/custom-${Date.now()}`,
+        };
+        const updatedModules = [newModule, ...modules];
+        setModules(updatedModules);
+        localStorage.setItem('module-deck-config', JSON.stringify(updatedModules));
+        setNewModuleName('');
+        setNewModuleDesc('');
+        toast({ title: 'Module Added', description: `${newModule.name} has been added.` });
+    };
 
+    const handleRemoveModule = (id: string) => {
+        const updatedModules = modules.filter(m => m.id !== id);
+        setModules(updatedModules);
+        localStorage.setItem('module-deck-config', JSON.stringify(updatedModules));
+        toast({ title: 'Module Removed', variant: 'destructive' });
+    };
+
+    const handleRunAnalysis = async () => {
+        setIsLoading(true);
+        toast({
+            title: 'Starting Analysis...',
+            description: 'Navigating to run page to process active modules.',
+        });
         try {
-            const newVersion = await settingsApi.createVersion({
-                version_name: newVersionName,
-                description: newVersionDescription,
-                copy_from_version: copyFromVersion || undefined,
-            });
-
-            if (newVersion) {
-                setVersions(prev => [newVersion, ...prev]);
-                setSelectedVersion(newVersion);
-                setShowCreateDialog(false);
-                setNewVersionName('');
-                setNewVersionDescription('');
-                setCopyFromVersion(null);
-
-                toast({
-                    title: 'Success',
-                    description: `Version "${newVersion.version_name}" created`,
-                });
-            }
+            // Store framework and navigate to run page (NOT what-if)
+            // Run page will load only active modules from settings
+            localStorage.setItem('analysisFramework', 'general');
+            router.push('/analysis/run');
         } catch (error) {
+            console.error('Failed to run analysis:', error);
             toast({
-                title: 'Error',
-                description: 'Failed to create new version',
                 variant: 'destructive',
+                title: 'Analysis Failed',
+                description: error instanceof Error ? error.message : 'An unknown error occurred.',
             });
+        } finally {
+            setIsLoading(false);
         }
     };
 
-    const handleActivateVersion = async (versionId: number) => {
-        try {
-            await settingsApi.activateVersion(versionId);
-            setVersions(prev => prev.map(v => ({ ...v, is_active: v.id === versionId })));
-
-            toast({
-                title: 'Success',
-                description: 'Version activated',
-            });
-        } catch (error) {
-            toast({
-                title: 'Error',
-                description: 'Failed to activate version',
-                variant: 'destructive',
-            });
-        }
-    };
-
-    const handleArchiveVersion = async (versionId: number) => {
-        try {
-            await settingsApi.archiveVersion(versionId);
-            setVersions(prev => prev.map(v =>
-                v.id === versionId ? { ...v, is_archived: true } : v
-            ));
-
-            toast({
-                title: 'Success',
-                description: 'Version archived',
-            });
-        } catch (error) {
-            toast({
-                title: 'Error',
-                description: 'Failed to archive version',
-                variant: 'destructive',
-            });
-        }
-    };
-
-    const handleModuleWeightChange = async (moduleId: string, weight: number) => {
-        if (!selectedVersion) return;
-
-        // Update locally first for responsive UI
-        setSelectedVersion(prev => {
-            if (!prev) return prev;
-            return {
-                ...prev,
-                module_settings: prev.module_settings?.map(m =>
-                    m.module_id === moduleId ? { ...m, weight } : m
-                ),
-            };
+    const handleBulkAction = (action: 'activate' | 'deactivate') => {
+        const newStatus = action === 'activate' ? 'active' : 'inactive';
+        const updatedModules = modules.map(m => ({ ...m, status: newStatus }));
+        setModules(updatedModules);
+        localStorage.setItem('module-deck-config', JSON.stringify(updatedModules));
+        toast({
+            title: `Bulk Action: ${action === 'activate' ? 'Activated' : 'Deactivated'} All`,
+            description: `All modules have been set to ${newStatus}.`,
         });
-
-        // Persist to API if not local-only
-        if (selectedVersion.id !== 0) {
-            try {
-                await settingsApi.updateModuleSetting(selectedVersion.id, moduleId, { weight });
-            } catch (error) {
-                console.error('Failed to save module weight:', error);
-            }
-        }
-    };
-
-    const handleModuleToggle = async (moduleId: string, enabled: boolean) => {
-        if (!selectedVersion) return;
-
-        setSelectedVersion(prev => {
-            if (!prev) return prev;
-            return {
-                ...prev,
-                module_settings: prev.module_settings?.map(m =>
-                    m.module_id === moduleId ? { ...m, is_enabled: enabled } : m
-                ),
-            };
-        });
-
-        if (selectedVersion.id !== 0) {
-            try {
-                await settingsApi.updateModuleSetting(selectedVersion.id, moduleId, { is_enabled: enabled });
-            } catch (error) {
-                console.error('Failed to save module toggle:', error);
-            }
-        }
-    };
-
-    const handleCategoryWeightChange = async (categoryId: number, weight: number) => {
-        if (!selectedVersion) return;
-
-        setSelectedVersion(prev => {
-            if (!prev) return prev;
-            return {
-                ...prev,
-                tca_categories: prev.tca_categories?.map(c =>
-                    c.id === categoryId ? { ...c, weight } : c
-                ),
-            };
-        });
-
-        if (selectedVersion.id !== 0) {
-            try {
-                await settingsApi.updateTCACategory(selectedVersion.id, categoryId, { weight });
-            } catch (error) {
-                console.error('Failed to save category weight:', error);
-            }
-        }
-    };
-
-    const handleCategoryToggle = async (categoryId: number, active: boolean) => {
-        if (!selectedVersion) return;
-
-        setSelectedVersion(prev => {
-            if (!prev) return prev;
-            return {
-                ...prev,
-                tca_categories: prev.tca_categories?.map(c =>
-                    c.id === categoryId ? { ...c, is_active: active } : c
-                ),
-            };
-        });
-
-        if (selectedVersion.id !== 0) {
-            try {
-                await settingsApi.updateTCACategory(selectedVersion.id, categoryId, { is_active: active });
-            } catch (error) {
-                console.error('Failed to save category toggle:', error);
-            }
-        }
-    };
-
-    // Calculate totals
-    const totalModuleWeight = selectedVersion?.module_settings
-        ?.filter(m => m.is_enabled)
-        .reduce((sum, m) => sum + m.weight, 0) || 0;
-
-    const totalCategoryWeight = selectedVersion?.tca_categories
-        ?.filter(c => c.is_active)
-        .reduce((sum, c) => sum + c.weight, 0) || 0;
-
-    if (isLoading) {
-        return (
-            <div className="container mx-auto p-8 flex items-center justify-center min-h-[400px]">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                    <p className="text-muted-foreground">Loading settings...</p>
-                </div>
-            </div>
-        );
     }
+
+    const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const content = e.target?.result;
+                const newModule = JSON.parse(content as string);
+                if (newModule.name && newModule.description) {
+                    const fullNewModule = {
+                        id: `custom-import-${Date.now()}`,
+                        status: 'active',
+                        version: '1.0',
+                        link: `/dashboard/evaluation/modules/custom-import-${Date.now()}`,
+                        ...newModule
+                    };
+                    const updatedModules = [fullNewModule, ...modules];
+                    setModules(updatedModules);
+                    localStorage.setItem('module-deck-config', JSON.stringify(updatedModules));
+                    toast({ title: 'Module Imported', description: `Successfully imported "${newModule.name}".` });
+                } else {
+                    throw new Error('JSON must contain "name" and "description" fields.');
+                }
+            } catch (error) {
+                toast({ variant: 'destructive', title: 'Import Failed', description: error instanceof Error ? error.message : 'Invalid JSON format.' });
+            }
+        };
+        reader.readAsText(file);
+    };
+
+    const activeModulesCount = modules.filter(m => m.status === 'active').length;
 
     return (
         <div className="container mx-auto p-4 md:p-8">
-            <div className="flex justify-between items-start mb-8">
-                <div>
-                    <h1 className="text-3xl font-bold flex items-center gap-3">
-                        <Settings className="h-8 w-8" />
-                        Module Settings
-                    </h1>
-                    <p className="text-muted-foreground mt-2">
-                        Configure module weights and TCA categories for simulation analysis. Changes are versioned and tracked.
-                    </p>
-                </div>
-                <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-                    <DialogTrigger asChild>
-                        <Button>
-                            <Plus className="mr-2 h-4 w-4" />
-                            New Version
+            <header className="mb-8">
+                <Link
+                    href="/dashboard"
+                    className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary mb-4"
+                >
+                    <ArrowLeft className="size-4" />
+                    Back to Dashboard
+                </Link>
+                <div className='flex items-center justify-between'>
+                    <div>
+                        <h1 className="text-4xl md:text-5xl font-bold font-headline text-primary tracking-tight">
+                            Module Settings
+                        </h1>
+                        <p className="mt-4 text-lg text-muted-foreground max-w-3xl">
+                            Manage modules, run analysis, and access advanced configuration tools.
+                        </p>
+                    </div>
+                    <div className='flex items-center gap-2'>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button size="lg" variant="outline">
+                                    <SlidersHorizontal /> Bulk Actions
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                                <DropdownMenuItem onClick={() => handleBulkAction('activate')}>Activate All Modules</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleBulkAction('deactivate')}>Deactivate All Modules</DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                        <Button size="lg" onClick={handleRunAnalysis} disabled={isLoading}>
+                            <BrainCircuit className="mr-2" /> {isLoading ? 'Analyzing...' : 'Run Full Analysis'}
                         </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Create New Settings Version</DialogTitle>
-                            <DialogDescription>
-                                Create a new version of module settings. You can copy from an existing version or start fresh.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4 py-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="version-name">Version Name *</Label>
-                                <Input
-                                    id="version-name"
-                                    value={newVersionName}
-                                    onChange={(e) => setNewVersionName(e.target.value)}
-                                    placeholder="e.g., Q1 2025 Settings"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="version-description">Description</Label>
-                                <Input
-                                    id="version-description"
-                                    value={newVersionDescription}
-                                    onChange={(e) => setNewVersionDescription(e.target.value)}
-                                    placeholder="Optional description"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label>Copy From</Label>
-                                <Select
-                                    value={copyFromVersion?.toString() || 'none'}
-                                    onValueChange={(v) => setCopyFromVersion(v === 'none' ? null : parseInt(v))}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Start with defaults" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="none">Start with defaults</SelectItem>
-                                        {versions.map(v => (
-                                            <SelectItem key={v.id} value={v.id.toString()}>
-                                                {v.version_name} (v{v.version_number})
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
+                    </div>
+                </div>
+            </header>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg flex items-center gap-2"><MessageSquareQuote /> Analyst Tools</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <Button asChild className="w-full justify-start">
+                            <Link href="/analysis/modules/analyst"><MessageSquareQuote /> Analyst Analysis & Manual Input</Link>
+                        </Button>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg flex items-center gap-2"><Calculator /> Simulation Tools</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <Button asChild className="w-full justify-start">
+                            <Link href="/analysis/what-if"><Calculator /> What-If Analysis</Link>
+                        </Button>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg flex items-center gap-2"><FileCog /> Report Tools</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <Button asChild className="w-full justify-start">
+                            <Link href="/dashboard/reports/configure"><FileCog /> Report Section Config</Link>
+                        </Button>
+                    </CardContent>
+                </Card>
+            </div>
+
+            <Card className="mb-8">
+                <CardHeader>
+                    <CardTitle>Add New Module</CardTitle>
+                    <CardDescription>Add a custom module to the evaluation workflow manually or by importing a JSON file.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <Input placeholder="Module Name" value={newModuleName} onChange={(e) => setNewModuleName(e.target.value)} />
+                        <Input placeholder="Module Description" value={newModuleDesc} onChange={(e) => setNewModuleDesc(e.target.value)} />
+                        <div className="flex gap-2">
+                            <Button onClick={handleAddModule} className="flex-1"><Plus className="mr-2" /> Add Module</Button>
+                            <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="flex-1">
+                                <Import className="mr-2" /> Import JSON
+                            </Button>
+                            <input type="file" ref={fileInputRef} onChange={handleFileImport} className="hidden" accept=".json" aria-label="Import module configuration from JSON file" />
                         </div>
-                        <DialogFooter>
-                            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
-                                Cancel
-                            </Button>
-                            <Button onClick={handleCreateVersion}>
-                                Create Version
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
-            </div>
+                    </div>
+                    {addModuleError && <p className="text-sm text-destructive mt-2">{addModuleError}</p>}
+                </CardContent>
+            </Card>
 
-            <div className="grid grid-cols-12 gap-6">
-                {/* Left Sidebar - Version List */}
-                <div className="col-span-3">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-lg flex items-center gap-2">
-                                <Layers className="h-5 w-5" />
-                                Versions
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-2">
-                            {versions.filter(v => !v.is_archived).map(version => (
-                                <div
-                                    key={version.id}
-                                    onClick={() => handleSelectVersion(version.id)}
-                                    className={`p-3 rounded-lg cursor-pointer transition-colors ${selectedVersion?.id === version.id
-                                            ? 'bg-primary text-primary-foreground'
-                                            : 'hover:bg-muted'
-                                        }`}
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <span className="font-medium">{version.version_name}</span>
-                                        {version.is_active && (
-                                            <Badge variant="secondary" className="bg-green-100 text-green-700">
-                                                Active
-                                            </Badge>
-                                        )}
-                                    </div>
-                                    <p className={`text-xs mt-1 ${selectedVersion?.id === version.id ? 'text-primary-foreground/70' : 'text-muted-foreground'
-                                        }`}>
-                                        v{version.version_number} • {new Date(version.created_at).toLocaleDateString()}
-                                    </p>
-                                </div>
+            <Card>
+                <CardHeader>
+                    <CardTitle className='flex justify-between items-center'>
+                        <span>Analysis Modules</span>
+                        <div className='flex items-center gap-4 text-sm'>
+                            <span className='text-muted-foreground'>Active Modules: {activeModulesCount} / {modules.length}</span>
+                        </div>
+                    </CardTitle>
+                    <CardDescription>
+                        Toggle modules on or off for the next analysis run. Click the edit icon to access its specific configuration page.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className='w-[80px]'>Status</TableHead>
+                                <TableHead>Module</TableHead>
+                                <TableHead>Description</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {modules.map(mod => (
+                                <TableRow key={mod.id} className={mod.status === 'inactive' ? 'opacity-40' : ''}>
+                                    <TableCell>
+                                        <Switch checked={mod.status === 'active'} onCheckedChange={() => handleToggle(mod.id)} />
+                                    </TableCell>
+                                    <TableCell className="font-semibold">
+                                        {mod.name}
+                                        <span className="ml-2 text-xs text-muted-foreground font-mono">v{mod.version}</span>
+                                    </TableCell>
+                                    <TableCell className="text-muted-foreground text-xs">{mod.description}</TableCell>
+                                    <TableCell className="text-right">
+                                        <Button asChild variant="ghost" size="icon">
+                                            <Link href={mod.link}><Edit className="size-4" /></Link>
+                                        </Button>
+                                        <Button variant="ghost" size="icon" onClick={() => handleRemoveModule(mod.id)}>
+                                            <Trash2 className="size-4 text-destructive" />
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
                             ))}
-                        </CardContent>
-                    </Card>
-
-                    {/* Version Actions */}
-                    {selectedVersion && (
-                        <Card className="mt-4">
-                            <CardHeader>
-                                <CardTitle className="text-sm">Version Actions</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-2">
-                                {!selectedVersion.is_active && (
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="w-full justify-start"
-                                        onClick={() => handleActivateVersion(selectedVersion.id)}
-                                    >
-                                        <Check className="mr-2 h-4 w-4" />
-                                        Set as Active
-                                    </Button>
-                                )}
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="w-full justify-start"
-                                    onClick={() => {
-                                        setCopyFromVersion(selectedVersion.id);
-                                        setNewVersionName(`${selectedVersion.version_name} (Copy)`);
-                                        setShowCreateDialog(true);
-                                    }}
-                                >
-                                    <Copy className="mr-2 h-4 w-4" />
-                                    Duplicate
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="w-full justify-start text-orange-600"
-                                    onClick={() => handleArchiveVersion(selectedVersion.id)}
-                                >
-                                    <Archive className="mr-2 h-4 w-4" />
-                                    Archive
-                                </Button>
-                            </CardContent>
-                        </Card>
-                    )}
-                </div>
-
-                {/* Main Content */}
-                <div className="col-span-9">
-                    {selectedVersion && (
-                        <Tabs defaultValue="modules">
-                            <TabsList className="mb-4">
-                                <TabsTrigger value="modules" className="flex items-center gap-2">
-                                    <SlidersHorizontal className="h-4 w-4" />
-                                    Modules (9)
-                                </TabsTrigger>
-                                <TabsTrigger value="tca" className="flex items-center gap-2">
-                                    <Layers className="h-4 w-4" />
-                                    TCA Categories (12)
-                                </TabsTrigger>
-                                <TabsTrigger value="history" className="flex items-center gap-2">
-                                    <History className="h-4 w-4" />
-                                    Simulation History
-                                </TabsTrigger>
-                            </TabsList>
-
-                            {/* Modules Tab */}
-                            <TabsContent value="modules">
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle>Module Configuration</CardTitle>
-                                        <CardDescription>
-                                            Configure weights and enable/disable modules. Total weight of enabled modules:{' '}
-                                            <span className={totalModuleWeight === 100 ? 'text-green-600' : 'text-orange-600'}>
-                                                {totalModuleWeight.toFixed(1)}%
-                                            </span>
-                                        </CardDescription>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <Table>
-                                            <TableHeader>
-                                                <TableRow>
-                                                    <TableHead className="w-[50px]">Enabled</TableHead>
-                                                    <TableHead>Module</TableHead>
-                                                    <TableHead className="w-[200px]">Weight (%)</TableHead>
-                                                    <TableHead className="w-[80px] text-right">Value</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {selectedVersion.module_settings?.map((module) => (
-                                                    <TableRow key={module.module_id} className={!module.is_enabled ? 'opacity-50' : ''}>
-                                                        <TableCell>
-                                                            <Switch
-                                                                checked={module.is_enabled}
-                                                                onCheckedChange={(checked) => handleModuleToggle(module.module_id, checked)}
-                                                            />
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <div>
-                                                                <p className="font-medium">{module.module_name}</p>
-                                                                <p className="text-xs text-muted-foreground">
-                                                                    {MODULE_DEFINITIONS[module.module_id as keyof typeof MODULE_DEFINITIONS]?.description || ''}
-                                                                </p>
-                                                            </div>
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <Slider
-                                                                value={[module.weight]}
-                                                                onValueChange={([value]) => handleModuleWeightChange(module.module_id, value)}
-                                                                max={50}
-                                                                min={0}
-                                                                step={1}
-                                                                disabled={!module.is_enabled}
-                                                            />
-                                                        </TableCell>
-                                                        <TableCell className="text-right font-mono">
-                                                            {module.weight.toFixed(1)}%
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))}
-                                            </TableBody>
-                                        </Table>
-                                    </CardContent>
-                                </Card>
-                            </TabsContent>
-
-                            {/* TCA Categories Tab */}
-                            <TabsContent value="tca">
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle>TCA Categories (12 Total)</CardTitle>
-                                        <CardDescription>
-                                            Configure weights for each TCA category. Total weight of active categories:{' '}
-                                            <span className={Math.abs(totalCategoryWeight - 100) < 1 ? 'text-green-600' : 'text-orange-600'}>
-                                                {totalCategoryWeight.toFixed(1)}%
-                                            </span>
-                                        </CardDescription>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <Table>
-                                            <TableHeader>
-                                                <TableRow>
-                                                    <TableHead className="w-[50px]">Active</TableHead>
-                                                    <TableHead>Category</TableHead>
-                                                    <TableHead className="w-[200px]">Weight (%)</TableHead>
-                                                    <TableHead className="w-[80px] text-right">Value</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {selectedVersion.tca_categories?.map((category) => (
-                                                    <TableRow key={category.id} className={!category.is_active ? 'opacity-50' : ''}>
-                                                        <TableCell>
-                                                            <Switch
-                                                                checked={category.is_active}
-                                                                onCheckedChange={(checked) => handleCategoryToggle(category.id!, checked)}
-                                                            />
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <div>
-                                                                <p className="font-medium">{category.category_name}</p>
-                                                                {category.description && (
-                                                                    <p className="text-xs text-muted-foreground">{category.description}</p>
-                                                                )}
-                                                            </div>
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <Slider
-                                                                value={[category.weight]}
-                                                                onValueChange={([value]) => handleCategoryWeightChange(category.id!, value)}
-                                                                max={20}
-                                                                min={0}
-                                                                step={0.5}
-                                                                disabled={!category.is_active}
-                                                            />
-                                                        </TableCell>
-                                                        <TableCell className="text-right font-mono">
-                                                            {category.weight.toFixed(1)}%
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))}
-                                            </TableBody>
-                                        </Table>
-                                    </CardContent>
-                                </Card>
-                            </TabsContent>
-
-                            {/* History Tab */}
-                            <TabsContent value="history">
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle className="flex items-center gap-2">
-                                            <Play className="h-5 w-5" />
-                                            Simulation History
-                                        </CardTitle>
-                                        <CardDescription>
-                                            Review past simulation runs and their results
-                                        </CardDescription>
-                                    </CardHeader>
-                                    <CardContent>
-                                        {simulationRuns.length === 0 ? (
-                                            <div className="text-center py-8 text-muted-foreground">
-                                                <History className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                                                <p>No simulation runs recorded yet</p>
-                                                <p className="text-sm">Run simulations from the Simulation page to see history here</p>
-                                            </div>
-                                        ) : (
-                                            <Table>
-                                                <TableHeader>
-                                                    <TableRow>
-                                                        <TableHead>Run ID</TableHead>
-                                                        <TableHead>Company</TableHead>
-                                                        <TableHead>TCA Score</TableHead>
-                                                        <TableHead>Settings Version</TableHead>
-                                                        <TableHead>Run At</TableHead>
-                                                        <TableHead>Status</TableHead>
-                                                    </TableRow>
-                                                </TableHeader>
-                                                <TableBody>
-                                                    {simulationRuns.map((run) => (
-                                                        <TableRow key={run.id}>
-                                                            <TableCell className="font-mono">#{run.id}</TableCell>
-                                                            <TableCell>{run.company_name || '-'}</TableCell>
-                                                            <TableCell>
-                                                                <Badge variant="outline" className="font-mono">
-                                                                    {run.tca_score?.toFixed(2) || '-'}/10
-                                                                </Badge>
-                                                            </TableCell>
-                                                            <TableCell>v{run.settings_version_id}</TableCell>
-                                                            <TableCell>
-                                                                {new Date(run.run_at).toLocaleString()}
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                <Badge
-                                                                    variant={run.status === 'completed' ? 'default' : 'secondary'}
-                                                                    className={run.status === 'completed' ? 'bg-green-100 text-green-700' : ''}
-                                                                >
-                                                                    {run.status}
-                                                                </Badge>
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    ))}
-                                                </TableBody>
-                                            </Table>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            </TabsContent>
-                        </Tabs>
-                    )}
-                </div>
-            </div>
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
         </div>
     );
 }
+
+

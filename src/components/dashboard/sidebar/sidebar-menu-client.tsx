@@ -44,6 +44,12 @@ import {
     Calculator,
     Gauge,
     Lightbulb,
+    Globe,
+    Leaf,
+    Building2,
+    Compass,
+    LineChart,
+    Megaphone,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -60,6 +66,7 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
     const [user, setUser] = useState<AppUser | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [modulesOpen, setModulesOpen] = useState(pathname.startsWith('/analysis/modules'));
+    const [reportsOpen, setReportsOpen] = useState(pathname.startsWith('/dashboard/reports'));
 
     useEffect(() => {
         const updateUser = () => {
@@ -166,6 +173,47 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
             <SidebarSeparator />
 
             <SidebarGroup>
+                <SidebarGroupLabel>Report Generation</SidebarGroupLabel>
+                <SidebarMenu>
+                    <Collapsible open={reportsOpen} onOpenChange={setReportsOpen} className="group/collapsible">
+                        <SidebarMenuItem>
+                            <CollapsibleTrigger asChild>
+                                <SidebarMenuButton tooltip="Report Generation">
+                                    <FileText />
+                                    <span>Generate Reports</span>
+                                    <ChevronDown className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+                                </SidebarMenuButton>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                                <SidebarMenuSub>
+                                    <SidebarMenuSubItem>
+                                        <SidebarMenuSubButton href="/dashboard/reports/triage" isActive={pathname === '/dashboard/reports/triage'}>
+                                            <Target className="size-4" />
+                                            <span>Triage Report</span>
+                                        </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                    <SidebarMenuSubItem>
+                                        <SidebarMenuSubButton href="/dashboard/reports/due-diligence" isActive={pathname === '/dashboard/reports/due-diligence'}>
+                                            <Shield className="size-4" />
+                                            <span>Due Diligence</span>
+                                        </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                    <SidebarMenuSubItem>
+                                        <SidebarMenuSubButton href="/dashboard/reports/ssd" isActive={pathname === '/dashboard/reports/ssd'}>
+                                            <Activity className="size-4" />
+                                            <span>SSD Report</span>
+                                        </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                </SidebarMenuSub>
+                            </CollapsibleContent>
+                        </SidebarMenuItem>
+                    </Collapsible>
+                </SidebarMenu>
+            </SidebarGroup>
+
+            <SidebarSeparator />
+
+            <SidebarGroup>
                 <SidebarGroupLabel>Analysis Modules</SidebarGroupLabel>
                 <SidebarMenu>
                     <Collapsible open={modulesOpen} onOpenChange={setModulesOpen} className="group/collapsible">
@@ -231,6 +279,48 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
                                         <SidebarMenuSubButton href="/analysis/modules/strategicFit" isActive={pathname === '/analysis/modules/strategicFit'}>
                                             <Target className="size-4" />
                                             <span>Strategic Fit Matrix</span>
+                                        </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                    <SidebarMenuSubItem>
+                                        <SidebarMenuSubButton href="/analysis/modules/financial" isActive={pathname === '/analysis/modules/financial'}>
+                                            <DollarSign className="size-4" />
+                                            <span>Financial Analysis</span>
+                                        </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                    <SidebarMenuSubItem>
+                                        <SidebarMenuSubButton href="/analysis/modules/economic" isActive={pathname === '/analysis/modules/economic'}>
+                                            <LineChart className="size-4" />
+                                            <span>Economic Analysis</span>
+                                        </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                    <SidebarMenuSubItem>
+                                        <SidebarMenuSubButton href="/analysis/modules/social" isActive={pathname === '/analysis/modules/social'}>
+                                            <Globe className="size-4" />
+                                            <span>Social Analysis</span>
+                                        </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                    <SidebarMenuSubItem>
+                                        <SidebarMenuSubButton href="/analysis/modules/marketing" isActive={pathname === '/analysis/modules/marketing'}>
+                                            <Megaphone className="size-4" />
+                                            <span>Marketing Analysis</span>
+                                        </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                    <SidebarMenuSubItem>
+                                        <SidebarMenuSubButton href="/analysis/modules/environmental" isActive={pathname === '/analysis/modules/environmental'}>
+                                            <Leaf className="size-4" />
+                                            <span>Environmental Analysis</span>
+                                        </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                    <SidebarMenuSubItem>
+                                        <SidebarMenuSubButton href="/analysis/modules/funder" isActive={pathname === '/analysis/modules/funder'}>
+                                            <Building2 className="size-4" />
+                                            <span>Funder Fit</span>
+                                        </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                    <SidebarMenuSubItem>
+                                        <SidebarMenuSubButton href="/analysis/modules/strategic" isActive={pathname === '/analysis/modules/strategic'}>
+                                            <Compass className="size-4" />
+                                            <span>Strategic Analysis</span>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
                                     <SidebarMenuSubItem>

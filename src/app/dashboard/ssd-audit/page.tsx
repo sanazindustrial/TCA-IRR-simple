@@ -799,11 +799,27 @@ export default function SsdAuditLogPage() {
                             <Loader2 className="size-8 animate-spin text-muted-foreground" />
                         </div>
                     ) : !apiAvailable ? (
-                        <div className="text-center py-8 text-muted-foreground">
+                        <div className="text-center py-8 text-muted-foreground space-y-4">
                             <AlertTriangle className="size-12 mx-auto mb-4 text-yellow-500 opacity-70" />
-                            <p className="font-medium">Startup Steroid Integration Not Available</p>
-                            <p className="text-sm mt-2">The Startup Steroid integration backend is pending deployment.</p>
-                            <p className="text-sm">Please contact your administrator to deploy the latest backend code.</p>
+                            <p className="font-medium">Startup Steroid Audit Logs Unavailable</p>
+                            {connectionTest?.success ? (
+                                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-sm">
+                                    <CheckCircle2 className="size-4" />
+                                    Backend is reachable — audit endpoint not yet deployed
+                                </div>
+                            ) : (
+                                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-sm">
+                                    <XCircle className="size-4" />
+                                    Backend connection failed — check connection test above
+                                </div>
+                            )}
+                            <p className="text-sm max-w-md mx-auto">
+                                The <code>/api/v1/ssd/audit/logs</code> endpoint is not available on the backend. Ensure the Startup Steroid integration is deployed.
+                            </p>
+                            <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
+                                <RefreshCw className={`size-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                                Retry
+                            </Button>
                         </div>
                     ) : logs.length === 0 ? (
                         <div className="text-center py-8 text-muted-foreground">

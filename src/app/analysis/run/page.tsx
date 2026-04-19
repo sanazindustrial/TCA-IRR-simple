@@ -27,7 +27,9 @@ import {
     SlidersHorizontal,
     Download,
     Save,
-    RefreshCw
+    RefreshCw,
+    Megaphone,
+    Leaf
 } from 'lucide-react';
 import Link from 'next/link';
 import { runAnalysis } from '@/app/analysis/actions';
@@ -110,6 +112,26 @@ const ALL_MODULES = [
         active: true
     },
     {
+        id: 'founder-fit',
+        apiId: 'founderFit',
+        name: 'Founder Fit Analysis',
+        version: 'v1.0',
+        description: 'Assess founder-market fit and leadership readiness.',
+        icon: Users,
+        weight: 10,
+        active: true
+    },
+    {
+        id: 'strategic-fit',
+        apiId: 'strategicFit',
+        name: 'Strategic Fit Matrix',
+        version: 'v1.0',
+        description: 'Strategic alignment and portfolio fit evaluation.',
+        icon: Target,
+        weight: 10,
+        active: true
+    },
+    {
         id: 'simulation',
         apiId: 'sim',
         name: 'Simulation',
@@ -117,6 +139,56 @@ const ALL_MODULES = [
         description: 'What-if scenario modeling and projections.',
         icon: Compass,
         weight: 12,
+        active: true
+    },
+    {
+        id: 'financial-analysis',
+        apiId: 'financial',
+        name: 'Financial Analysis',
+        version: 'v1.0',
+        description: 'Revenue model, unit economics, projections and funding assessment.',
+        icon: BarChart3,
+        weight: 10,
+        active: true
+    },
+    {
+        id: 'economic-analysis',
+        apiId: 'economic',
+        name: 'Economic Analysis',
+        version: 'v1.0',
+        description: 'Industry structure, pricing power and macro-cycle resilience.',
+        icon: TrendingUp,
+        weight: 10,
+        active: true
+    },
+    {
+        id: 'social-analysis',
+        apiId: 'social',
+        name: 'Social Analysis',
+        version: 'v1.0',
+        description: 'Social impact, demographic fit, cultural adoption and stakeholder trust.',
+        icon: Users,
+        weight: 10,
+        active: true
+    },
+    {
+        id: 'marketing-analysis',
+        apiId: 'marketing',
+        name: 'Marketing Analysis',
+        version: 'v1.0',
+        description: 'Positioning, digital presence, spend efficiency and GTM execution.',
+        icon: Megaphone,
+        weight: 10,
+        active: true
+    },
+    {
+        id: 'environmental-analysis',
+        apiId: 'environmental',
+        name: 'Environmental Analysis',
+        version: 'v1.0',
+        description: 'Environmental impact, climate risk, certifications and ESG alignment.',
+        icon: Leaf,
+        weight: 10,
         active: true
     },
 ];
@@ -177,24 +249,75 @@ export default function AnalysisRunPage() {
     const [totalTime, setTotalTime] = useState<string>('0.0s');
     const [storedTrackingParams, setStoredTrackingParams] = useState<string>('');
 
-    // Load active module settings from API
+    // Mapping from evaluation wizard Step 4 module IDs → run page apiId
+    const EVAL_ID_TO_API_ID: Record<string, string> = {
+        'tca-scorecard': 'tca',
+        'risk-assessment': 'risk',
+        'macro-trend': 'macro',
+        'team-assessment': 'team',
+        'benchmark-comparison': 'benchmark',
+        'growth-classifier': 'growth',
+        'gap-analysis': 'gap',
+        'founder-fit': 'founderFit',
+        'strategic-fit': 'strategicFit',
+        'simulation': 'sim',
+        'financial-analysis': 'financial',
+        'economic-analysis': 'economic',
+        'social-analysis': 'social',
+        'marketing-analysis': 'marketing',
+        'environmental-analysis': 'environmental',
+    };
+
+    // Load active module settings — priority: localStorage (eval wizard) > localStorage (modules page) > API > defaults
     useEffect(() => {
         const loadModuleSettings = async () => {
             try {
+                // Priority 1: selectedModules from evaluation wizard Step 4
+                const selectedModulesRaw = localStorage.getItem('selectedModules');
+                if (selectedModulesRaw) {
+                    const selectedModules: Record<string, boolean> = JSON.parse(selectedModulesRaw);
+                    const activeMap: Record<string, boolean> = {};
+                    Object.entries(selectedModules).forEach(([evalId, isActive]) => {
+                        const apiId = EVAL_ID_TO_API_ID[evalId];
+                        if (apiId) activeMap[apiId] = isActive;
+                    });
+                    if (Object.keys(activeMap).length > 0) {
+                        setModules(ALL_MODULES.map(m => ({
+                            ...m,
+                            active: activeMap[m.apiId] !== undefined ? activeMap[m.apiId] : m.active,
+                        })));
+                        return;
+                    }
+                }
+
+                // Priority 2: module-deck-config from modules settings page
+                const deckConfigRaw = localStorage.getItem('module-deck-config');
+                if (deckConfigRaw) {
+                    const deckConfig: Array<{ id: string; status: string }> = JSON.parse(deckConfigRaw);
+                    const activeMap: Record<string, boolean> = {};
+                    deckConfig.forEach(m => { activeMap[m.id] = m.status === 'active'; });
+                    if (Object.keys(activeMap).length > 0) {
+                        setModules(ALL_MODULES.map(m => ({
+                            ...m,
+                            active: activeMap[m.apiId] !== undefined ? activeMap[m.apiId] : m.active,
+                        })));
+                        return;
+                    }
+                }
+
+                // Priority 3: API settings
                 const activeVersion = await settingsApi.getActiveVersion();
                 if (activeVersion?.module_settings) {
-                    // Update modules with active status from settings
-                    const updatedModules = ALL_MODULES.map(module => {
+                    setModules(ALL_MODULES.map(module => {
                         const setting = activeVersion.module_settings?.find(
                             ms => ms.module_id === module.apiId
                         );
                         return {
                             ...module,
                             active: setting ? setting.is_enabled : module.active,
-                            weight: setting ? setting.weight : module.weight
+                            weight: setting ? setting.weight : module.weight,
                         };
-                    });
-                    setModules(updatedModules);
+                    }));
                 }
             } catch (error) {
                 console.warn('Could not load module settings, using defaults:', error);
@@ -203,6 +326,7 @@ export default function AnalysisRunPage() {
             }
         };
         loadModuleSettings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Initialize module states when active modules are determined
@@ -297,7 +421,8 @@ export default function AnalysisRunPage() {
     // Run the full analysis
     const runFullAnalysis = useCallback(async () => {
         setIsStarted(true);
-        setStartTime(Date.now());
+        const analysisStartTime = Date.now(); // local var — avoids stale state closure
+        setStartTime(analysisStartTime);
         setExtractionPhase('extracting');
 
         try {
@@ -329,7 +454,7 @@ export default function AnalysisRunPage() {
             });
 
             // Get user data from localStorage
-            let userData = {};
+            let userData: Record<string, unknown> = {};
             try {
                 const companyDataStr = localStorage.getItem('companyData');
                 if (companyDataStr) {
@@ -339,8 +464,38 @@ export default function AnalysisRunPage() {
                 console.warn('Could not parse company data');
             }
 
+            // Ensure companyName is always explicitly set so fallback data uses the real name
+            if (!userData.companyName && companyInfo.name) {
+                userData.companyName = companyInfo.name;
+            }
+            if (!userData.companyDescription) {
+                userData.companyDescription = (userData.companyDescription as string) || localStorage.getItem('analysisCompanyDescription') || '';
+            }
+
+            // Load processedFiles — contains full extracted text content from uploaded documents
+            try {
+                const processedFilesStr = localStorage.getItem('processedFiles');
+                if (processedFilesStr) {
+                    userData.processedFilesData = JSON.parse(processedFilesStr);
+                    console.log('[run] Loaded processedFilesData:', (userData.processedFilesData as any[]).length, 'files');
+                }
+            } catch (e) {
+                console.warn('Could not parse processedFiles', e);
+            }
+
+            // Load auto-extraction schema — structured data extracted from documents
+            try {
+                const extractionDataStr = localStorage.getItem('current_extraction_data');
+                if (extractionDataStr) {
+                    userData.extractionData = JSON.parse(extractionDataStr);
+                    console.log('[run] Loaded extractionData for company:', (userData.extractionData as any)?.company_analysis?.company_name);
+                }
+            } catch (e) {
+                console.warn('Could not parse extraction data', e);
+            }
+
             // Run actual analysis API call
-            const analysisPromise = runAnalysis(framework, userData);
+            const analysisPromise = runAnalysis(framework, userData as Parameters<typeof runAnalysis>[1]);
 
             // Wait for both progress simulations and actual API call
             const [progressResults, apiResult] = await Promise.all([
@@ -388,8 +543,8 @@ export default function AnalysisRunPage() {
                 moduleScores['growth'] = Math.min(10, (tier * 2) + (confidence * 4));
             }
             if (apiResult.founderFitData) {
-                // Use readiness score for founder fit
-                moduleScores['founderFit'] = apiResult.founderFitData.readinessScore || 7;
+                // readinessScore is 0-100 scale — divide by 10 for display on 0-10 badge
+                moduleScores['founderFit'] = (apiResult.founderFitData.readinessScore || 70) / 10;
             }
             if (apiResult.teamData) {
                 // Use team score if available
@@ -405,6 +560,7 @@ export default function AnalysisRunPage() {
                 setModuleStates(prev => ({
                     ...prev,
                     [m.id]: {
+                        ...prev[m.id], // preserve startTime so elapsed time can be computed
                         status: 'success',
                         progress: 100,
                         message: 'Complete',
@@ -437,7 +593,7 @@ export default function AnalysisRunPage() {
             localStorage.setItem('analysisCompanyName', companyInfo.name);
             localStorage.setItem('analysisFramework', companyInfo.framework);
 
-            const elapsed = (Date.now() - startTime) / 1000;
+            const elapsed = (Date.now() - analysisStartTime) / 1000; // use local var, not stale state
             setTotalTime(`${elapsed.toFixed(1)}s`);
             localStorage.setItem('analysisDuration', elapsed.toFixed(2));
 
@@ -583,13 +739,13 @@ export default function AnalysisRunPage() {
             <div className="container mx-auto p-6 max-w-6xl">
                 {/* Header */}
                 <header className="mb-8">
-                    <Link
-                        href="/dashboard/evaluation"
+                    <button
+                        onClick={() => router.push('/dashboard/evaluation')}
                         className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary mb-4"
                     >
                         <ArrowLeft className="size-4" />
                         Back to Evaluation
-                    </Link>
+                    </button>
 
                     <div className="flex items-center justify-between">
                         <div>
@@ -723,12 +879,19 @@ export default function AnalysisRunPage() {
 
                                         <div className="flex items-center justify-between text-xs">
                                             <span className="text-muted-foreground">{state.message}</span>
-                                            {state.score !== undefined && (
-                                                <Badge className="bg-green-500">{state.score.toFixed(1)}/10</Badge>
-                                            )}
-                                            {state.status === 'running' && (
-                                                <span className="font-mono">{state.progress.toFixed(0)}%</span>
-                                            )}
+                                            <div className="flex items-center gap-2">
+                                                {state.score !== undefined && (
+                                                    <Badge className="bg-green-500">{state.score.toFixed(1)}/10</Badge>
+                                                )}
+                                                {state.status === 'running' && (
+                                                    <span className="font-mono">{state.progress.toFixed(0)}%</span>
+                                                )}
+                                                {state.status === 'success' && state.endTime && state.startTime && (
+                                                    <span className="text-muted-foreground font-mono">
+                                                        {((state.endTime - state.startTime) / 1000).toFixed(1)}s
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 </CardContent>

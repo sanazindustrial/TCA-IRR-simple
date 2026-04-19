@@ -87,8 +87,7 @@ async def comprehensive_analysis(company_data: Dict[str, Any]):
             )
 
             # If AI analysis fails, use calculated fallback
-            if ai_results.get(
-                    "status") != "success" or not ai_results.get("results"):
+            if not ai_results.get("module_results"):
                 logger.warning(
                     "AI analysis failed or incomplete, using calculated fallback"
                 )
@@ -117,68 +116,350 @@ def _calculate_fallback_analysis(
     company_name = company_data.get("company_name", "Unknown Company")
 
     # Calculate TCA scores based on available data
-    tca_categories = _calculate_tca_categories(company_data)
-    composite_score = _calculate_composite_score(tca_categories)
+    tca_categories_list = _calculate_tca_categories(company_data)
+    composite_score = _calculate_composite_score(tca_categories_list)
+
+    # Convert categories list → dict format expected by frontend
+    # (raw_score 0-10, weight as decimal fraction 0-1)
+    categories_dict: Dict[str, Any] = {}
+    for cat in tca_categories_list:
+        key = (cat["category"].lower().replace(" ", "_").replace(
+            "-", "_").replace("&", "and").replace("/", "_"))
+        categories_dict[key] = {
+            "name": cat["category"],
+            "raw_score": cat["rawScore"],
+            "weight": cat["weight"] / 100,  # int % → decimal
+            "weighted_score": cat["weightedScore"],
+            "notes": cat.get("interpretation", f"Analysis for {cat['category']}")
+        }
 
     # Generate risk assessment
-    risk_data = _calculate_risk_assessment(company_data, tca_categories)
+    risk_data_raw = _calculate_risk_assessment(company_data, tca_categories_list)
 
-    # Generate recommendation
-    recommendation = _generate_recommendation(composite_score, risk_data)
+    # Convert risk flags list → domain-keyed dict expected by frontend
+    risk_flags_dict: Dict[str, Any] = {}
+    for flag in risk_data_raw.get("riskFlags", []):
+        domain_key = (flag["category"].lower().replace(" ", "_")
+                      .replace("-", "_").replace("/", "_"))
+        level = ("red" if flag["severity"] == "high"
+                 else ("yellow" if flag["severity"] == "medium" else "green"))
+        risk_flags_dict[domain_key] = {
+            "level": {"value": level},
+            "trigger": flag["description"],
+            "impact": f"Impact on {flag['category']} performance",
+            "severity_score": 8.0 if flag["severity"] == "high" else 5.0,
+            "mitigation": flag["mitigation"],
+            "ai_recommendation": f"Prioritize {flag['category'].lower()} improvements"
+        }
+
+    # Derive gap analysis from low-scoring categories
+    gaps: List[Dict[str, Any]] = []
+    priority_areas: List[str] = []
+    quick_wins: List[str] = []
+    target_score = 7.5
+    for cat_key, cat_data in categories_dict.items():
+        score = cat_data["raw_score"]
+        if score < target_score:
+            gap_size = round((target_score - score) * 10)
+            priority = ("High" if score < 5.5
+                        else ("Medium" if score < 6.5 else "Low"))
+            gaps.append({
+                "category": cat_data["name"],
+                "gap_size": gap_size,
+                "priority": priority,
+                "gap_percentage": round(gap_size * 1.5)
+            })
+            if priority == "High":
+                priority_areas.append(f"Improve {cat_data['name']}")
+            else:
+                quick_wins.append(f"Enhance {cat_data['name']}")
+
+    # Derive benchmark percentiles from category scores
+    category_benchmarks: Dict[str, Any] = {
+        cat_key: {
+            "percentile_rank": min(95, max(20, round(cat_data["raw_score"] * 10))),
+            "sector_average": 65,
+            "z_score": round((cat_data["raw_score"] - 6.5) / 1.5, 2)
+        }
+        for cat_key, cat_data in categories_dict.items()
+    }
+
+    overall_risk_score = min(10.0, 5.0 + len(risk_data_raw.get("riskFlags", [])) * 0.5)
+    recommendation = _generate_recommendation(composite_score, risk_data_raw)
+    growth_tier = max(1, min(5, round(composite_score / 20)))
 
     return {
         "analysis_id": f"calc_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
         "company_name": company_name,
-        "executive_summary": {
-            "overall_score": composite_score,
-            "recommendation": recommendation["overall"],
-            "key_strengths": recommendation["strengths"],
-            "key_concerns": recommendation["concerns"]
-        },
-        "tca_data": {
-            "categories": tca_categories,
-            "compositeScore": composite_score,
-            "summary": recommendation["summary"]
-        },
-        "risk_data": risk_data,
-        "detailed_analysis": {
-            "market_analysis": _analyze_market_potential(company_data),
-            "financial_analysis": _analyze_financial_health(company_data),
-            "team_analysis": _analyze_team_strength(company_data),
-            "risk_assessment": risk_data["summary"]
-        },
+        "ai_powered": False,
         "status": "completed",
+        "final_tca_score": composite_score,  # 0-100; actions.ts divides by 10
+        "investment_recommendation": recommendation["overall"],
+        "confidence_score": 0.70,
+        # TCA Scorecard — categories in dict format with snake_case keys
+        "scorecard": {
+            "categories": categories_dict,
+            "overall_score": composite_score
+        },
+        # Risk Assessment — flags as domain-keyed dict
+        "risk_assessment": {
+            "overall_risk_score": overall_risk_score,
+            "flags": risk_flags_dict
+        },
+        # PESTEL proxy — basic defaults
+        "pestel_analysis": {
+            "political": 6.5,
+            "economic": 7.0,
+            "social": 7.0,
+            "technological": 7.5,
+            "environmental": 6.0,
+            "legal": 6.5,
+            "composite_score": 70.0,
+            "trend_alignment": {}
+        },
+        # Benchmark derived from TCA category scores
+        "benchmark_analysis": {
+            "category_benchmarks": category_benchmarks,
+            "overall_percentile": min(95, max(20, round(composite_score)))
+        },
+        # Growth classification estimated from composite score
+        "growth_classification": {
+            "tier": growth_tier,
+            "confidence": 0.65,
+            "analysis": f"Composite TCA score: {composite_score:.1f}/100",
+            "scenarios": [],
+            "models": [],
+            "interpretation": (
+                f"Tier {growth_tier} company based on TCA composite score of {composite_score:.1f}"
+            )
+        },
+        # Gap analysis from categories below target
+        "gap_analysis": {
+            "gaps": gaps[:5],
+            "priority_areas": priority_areas[:3],
+            "quick_wins": quick_wins[:3],
+            "total_gaps": len(gaps)
+        } if gaps else None,
+        # Funder/founder fit proxy
+        "funder_analysis": {
+            "funding_readiness_score": min(100, round(composite_score)),
+            "investor_matches": [{
+                "investor_name": "Growth Capital Partners",
+                "sector_focus": "Technology & Innovation",
+                "fit_score": min(100, round(composite_score)),
+                "stage_match": company_data.get("development_stage", "Seed")
+            }],
+            "recommended_round_size": max(1, round(composite_score / 20))
+        },
+        # Team analysis proxy
+        "team_analysis": {
+            "founders": [{
+                "name": "Founding Team",
+                "experience_score": min(100, round(composite_score)),
+                "track_record": "Experienced team with domain expertise"
+            }],
+            "team_completeness": min(100, round(composite_score)),
+            "diversity_score": 70
+        },
+        # Strategic fit proxy
+        "strategic_fit": {
+            "score": round(composite_score / 10, 1),
+            "strategic_positioning": recommendation["overall"],
+            "scalability_potential": round(composite_score / 10, 1)
+        },
         "created_at": datetime.now().isoformat()
     }
 
 
 def _format_ai_results(ai_results: Dict[str, Any],
                        company_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Format AI analysis results into consistent structure"""
+    """Format AI analysis results into structure expected by frontend"""
     from datetime import datetime
 
-    results = ai_results.get("results", {})
+    module_results = ai_results.get("module_results", {})
+
+    # ── TCA Scorecard ──
+    tca = module_results.get("tca_scorecard", {})
+    tca_categories = tca.get("categories", {})  # dict with raw_score/weight(decimal)
+    tca_score = tca.get("overall_score", 0.0)   # 0-100 scale
+
+    # ── Risk Assessment ──
+    risk = module_results.get("risk_assessment", {})
+    risk_domains = risk.get("risk_domains", {})
+    risk_flags_dict: Dict[str, Any] = {}
+    for domain, score in risk_domains.items():
+        level = "red" if score >= 7 else ("yellow" if score >= 4 else "green")
+        risk_flags_dict[domain] = {
+            "level": {"value": level},
+            "trigger": f"Risk score {score:.1f}/10",
+            "impact": f"Potential impact on {domain.replace('_', ' ')} performance",
+            "severity_score": score,
+            "mitigation": f"Implement {domain.replace('_', ' ')} risk mitigation",
+            "ai_recommendation": f"Proactively address {domain.replace('_', ' ')} exposure"
+        }
+    overall_risk_score = risk.get("overall_risk_score", 5.0)
+
+    # ── Market Analysis → PESTEL proxy ──
+    market = module_results.get("market_analysis", {})
+    market_score = market.get("market_score", 7.0)  # 0-10
+
+    # ── Team Assessment ──
+    team = module_results.get("team_assessment", {})
+    team_score = team.get("team_score", 7.0)
+    completeness_raw = team.get("team_completeness", 0.75)
+    team_completeness_pct = (round(completeness_raw * 100)
+                             if completeness_raw <= 1.0
+                             else round(completeness_raw))
+    founders_raw = (company_data.get("founders")
+                    or company_data.get("team_data", {}).get("founders", []))
+    if isinstance(founders_raw, list) and founders_raw:
+        founder_list: List[Dict[str, Any]] = [
+            {
+                "name": f.get("name", f"Co-Founder {i+1}"),
+                "experience_score": min(100, round(team_score * 10)),
+                "track_record": f.get("background", "Experienced professional")
+            }
+            for i, f in enumerate(founders_raw[:3])
+        ]
+    else:
+        founder_list = [{
+            "name": "Founding Team",
+            "experience_score": min(100, round(team_score * 10)),
+            "track_record": "Experienced team with domain expertise"
+        }]
+
+    # ── Growth Assessment ──
+    growth = module_results.get("growth_assessment", {})
+    growth_score = growth.get("growth_potential_score", 6.5)  # 0-10
+    growth_tier = max(1, min(5, round(growth_score / 2)))
+
+    # ── Investment Readiness → Funder Fit proxy ──
+    invest = module_results.get("investment_readiness", {})
+    readiness = invest.get("readiness_score", 7.0)  # 0-10
+    funding_readiness_pct = min(100, round(readiness * 10))
+
+    # ── Business Model → Strategic Fit proxy ──
+    biz = module_results.get("business_model", {})
+
+    # ── Gap Analysis derived from TCA categories ──
+    gaps: List[Dict[str, Any]] = []
+    priority_areas: List[str] = []
+    quick_wins: List[str] = []
+    target_score = 7.5
+    for cat_key, cat_data in tca_categories.items():
+        if isinstance(cat_data, dict):
+            score = cat_data.get("raw_score", 7.0)
+            if score < target_score:
+                gap_size = round((target_score - score) * 10)
+                priority = ("High" if score < 5.5
+                            else ("Medium" if score < 6.5 else "Low"))
+                gaps.append({
+                    "category": cat_data.get("name", cat_key.replace("_", " ").title()),
+                    "gap_size": gap_size,
+                    "priority": priority,
+                    "gap_percentage": round(gap_size * 1.5)
+                })
+                cat_display = cat_data.get("name", cat_key.replace("_", " "))
+                if priority == "High":
+                    priority_areas.append(f"Improve {cat_display}")
+                else:
+                    quick_wins.append(f"Enhance {cat_display}")
+
+    # ── Benchmark derived from TCA category scores ──
+    category_benchmarks: Dict[str, Any] = {}
+    for cat_key, cat_data in tca_categories.items():
+        if isinstance(cat_data, dict):
+            score = cat_data.get("raw_score", 7.0)
+            category_benchmarks[cat_key] = {
+                "percentile_rank": min(95, max(20, round(score * 10))),
+                "sector_average": 65,
+                "z_score": round((score - 6.5) / 1.5, 2)
+            }
 
     return {
         "analysis_id": f"ai_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
         "company_name": company_data.get("company_name", "Unknown Company"),
         "ai_powered": True,
-        "executive_summary": {
-            "overall_score":
-            results.get("tca_scorecard", {}).get("overall_score", 0),
-            "recommendation":
-            results.get("tca_scorecard", {}).get("recommendation",
-                                                 "Further analysis needed"),
-            "key_strengths":
-            results.get("tca_scorecard", {}).get("key_insights", [])[:3],
-            "key_concerns":
-            results.get("risk_assessment", {}).get("major_risks", [])[:3]
-        },
-        "tca_data": results.get("tca_scorecard", {}),
-        "risk_data": results.get("risk_assessment", {}),
-        "benchmark_data": results.get("benchmark_comparison", {}),
-        "founder_data": results.get("founder_analysis", {}),
         "status": "completed",
+        "final_tca_score": ai_results.get("final_tca_score", tca_score),  # 0-100
+        "investment_recommendation": ai_results.get(
+            "investment_recommendation", tca.get("recommendation", "")),
+        "confidence_score": ai_results.get("confidence_score", 0.75),
+        # TCA Scorecard — categories already in dict/snake_case format from ai_service
+        "scorecard": {
+            "categories": tca_categories,
+            "overall_score": tca_score
+        } if tca_categories else None,
+        # Risk Assessment — flags as domain-keyed dict
+        "risk_assessment": {
+            "overall_risk_score": overall_risk_score,
+            "flags": risk_flags_dict
+        } if risk else None,
+        # PESTEL derived from market_analysis
+        "pestel_analysis": {
+            "political": 6.5,
+            "economic": round(market_score * 0.9, 1),
+            "social": 7.0,
+            "technological": round(market_score, 1),
+            "environmental": 6.0,
+            "legal": 6.5,
+            "composite_score": round(market_score * 10, 1),
+            "trend_alignment": {
+                "market_opportunity": str(market.get("growth_potential", "positive"))
+            }
+        } if market else None,
+        # Benchmark derived from TCA category scores
+        "benchmark_analysis": {
+            "category_benchmarks": category_benchmarks,
+            "overall_percentile": min(95, max(20, round(tca_score)))
+        } if category_benchmarks else None,
+        # Growth classification from growth_assessment
+        "growth_classification": {
+            "tier": growth_tier,
+            "confidence": growth.get("confidence", 0.75),
+            "analysis": (
+                f"Growth potential: {growth_score:.1f}/10. "
+                f"Scalability index: {growth.get('scalability_index', 6.0):.1f}/10"
+            ),
+            "scenarios": [],
+            "models": [],
+            "interpretation": (
+                f"Tier {growth_tier} growth company with {growth_score:.1f}/10 potential"
+            )
+        } if growth else None,
+        # Gap analysis from low TCA category scores
+        "gap_analysis": {
+            "gaps": gaps[:5],
+            "priority_areas": priority_areas[:3],
+            "quick_wins": quick_wins[:3],
+            "total_gaps": len(gaps)
+        } if gaps else None,
+        # Funder analysis from investment_readiness
+        "funder_analysis": {
+            "funding_readiness_score": funding_readiness_pct,
+            "investor_matches": [{
+                "investor_name": "Growth Capital Partners",
+                "sector_focus": (
+                    f"{company_data.get('framework', 'technology')} investments"
+                ),
+                "fit_score": funding_readiness_pct,
+                "stage_match": company_data.get("development_stage", "Seed")
+            }],
+            "recommended_round_size": max(1, round(readiness * 0.5))
+        } if invest else None,
+        # Team analysis from team_assessment
+        "team_analysis": {
+            "founders": founder_list,
+            "team_completeness": team_completeness_pct,
+            "diversity_score": 70
+        } if team else None,
+        # Strategic fit from business_model
+        "strategic_fit": {
+            "score": biz.get("business_model_score", 7.0),
+            "strategic_positioning": str(
+                biz.get("strategic_positioning", "Strong market positioning")),
+            "scalability_potential": biz.get("scalability_potential", 7.0)
+        } if biz else None,
         "created_at": datetime.now().isoformat(),
         "ai_errors": ai_results.get("errors", [])
     }
@@ -562,37 +843,82 @@ async def extract_company_info(request_data: Dict[str, Any]):
     
     extracted = {}
     content_lower = content.lower()
+
+    # ── helpers ──────────────────────────────────────────────────────────────
+    def _clean_text(t: str, max_len: int = 500) -> str:
+        return re.sub(r'\s+', ' ', t).strip()[:max_len]
+
+    def _find_section(heading_re: str, content: str, max_chars: int = 600) -> str | None:
+        """Return text following a section heading."""
+        m = re.search(
+            r"(?:^|\n)\s*" + heading_re + r"\s*[:\-–]?\s*\n?((?:[^\n]{5,}\n?){1,5})",
+            content, re.IGNORECASE | re.MULTILINE,
+        )
+        if m:
+            return _clean_text(m.group(1), max_chars)
+        return None
     
     # ========== COMPANY NAME EXTRACTION (Enhanced) ==========
+    # Blocklist: generic/template phrases that should never be a company name
+    COMPANY_NAME_BLOCKLIST = {
+        "startup steroid", "startup steroid compatible", "pitch deck", "investor presentation",
+        "executive summary", "company overview", "business plan", "table of contents",
+        "confidential", "thank you", "questions", "contact us", "appendix", "disclaimer",
+        "about us", "our company", "our startup", "company name", "enter company name",
+        "your company", "example company", "sample company", "template", "slide", "overview",
+        "introduction", "agenda", "mission", "vision", "problem", "solution", "market",
+        "traction", "team", "financials", "ask", "summary", "background",
+    }
+
+    def is_valid_company_name(name: str) -> bool:
+        """Reject generic/template phrases and too-short/too-long names."""
+        if not name or len(name.strip()) < 2 or len(name.strip()) > 100:
+            return False
+        name_lower = name.lower().strip()
+        # Reject if it IS a blocked phrase or CONTAINS a blocked phrase as the whole name
+        if name_lower in COMPANY_NAME_BLOCKLIST:
+            return False
+        # Reject if any blocklist term appears as a substantial part (>50%) of the name
+        for blocked in COMPANY_NAME_BLOCKLIST:
+            if blocked in name_lower and len(blocked) / len(name_lower) > 0.5:
+                return False
+        return True
+
     name_patterns = [
-        # Explicit labels with value after colon/equals
+        # 1. Explicit labels (highest confidence)
         r"(?:company\s*name|legal\s*name|startup\s*name|organization)[:\s=]+([A-Za-z0-9\s&.,'\-]+?)(?:\n|$|\s{2,}|Website|Founded|Industry|Location|Address)",
-        # Pitch deck title patterns
+        # 2. Pitch deck title with explicit qualifier
         r"^([A-Z][A-Za-z0-9\s&'\-]{2,35})\s*[-–—:]\s*(?:pitch|deck|presentation|investor|overview)",
-        # "About [Company]" pattern
+        # 3. Explicit introduction phrases
         r"(?:welcome to|introducing|about|presenting)\s+([A-Z][A-Za-z0-9\s&'\-]{2,35})(?:\s|$|\n|,)",
-        # Company with legal suffix at start of line
+        # 4. Company with legal suffix at start of line (clear indicator)
         r"(?:^|\n)\s*([A-Z][A-Za-z0-9\s&'\-]{2,25})(?:\s+(?:Inc\.?|LLC|Ltd\.?|Corp\.?|Co\.?|GmbH|PLC|SA))\s*(?:\n|$|,)",
-        # Header/Title format (all caps or title case at beginning)
-        r"^([A-Z][A-Z0-9\s&'\-]{3,30})\s*\n",
-        # After "Overview of" or similar
+        # 5. "Overview of" pattern
         r"(?:overview of|profile of|summary of)\s+([A-Z][A-Za-z0-9\s&'\-]{2,35})",
+        # 6. All-caps header — LAST resort only, very conservative (single word or 2-3 word max)
+        r"^([A-Z][A-Z]{1,15}(?:\s+[A-Z]{2,15}){0,1})\s*\n",
     ]
     for pattern in name_patterns:
         match = re.search(pattern, content, re.IGNORECASE | re.MULTILINE)
         if match:
             name = match.group(1).strip()
-            # Clean up the name - remove trailing punctuation and common words
+            # Clean up trailing punctuation and template suffixes
             name = re.sub(r'[,.:;]+$', '', name).strip()
-            name = re.sub(r'\s*(overview|pitch|deck|presentation)$', '', name, flags=re.IGNORECASE).strip()
-            if len(name) >= 2 and len(name) <= 100:
+            name = re.sub(r'\s*(overview|pitch|deck|presentation|compatible|template)$', '', name, flags=re.IGNORECASE).strip()
+            if is_valid_company_name(name):
                 extracted["company_name"] = name
                 break
     
     # ========== LEGAL NAME (if different) ==========
-    legal_match = re.search(r"(?:legal\s*name|registered\s*(?:as|name))[:\s=]+([A-Za-z0-9\s&.,'\-]+?)(?:\n|$|\s{2,})", content, re.IGNORECASE)
-    if legal_match:
-        extracted["legal_name"] = legal_match.group(1).strip()[:100]
+    legal_patterns = [
+        r"(?:legal\s*name|registered\s*(?:as|name)|trading\s*as|dba|d\.b\.a\.)[:\s=]+([A-Za-z0-9\s&.,'\-]+?)(?:\n|$|\s{2,})",
+        r"(?:^|\n)\s*([A-Z][A-Za-z0-9\s&'\-]{2,40})\s*(?:Inc\.?|LLC|Ltd\.?|Corp\.?|Co\.?|GmbH|PLC|SA|SAS|BV|Pty)[\s.,\n]",
+    ]
+    for pattern in legal_patterns:
+        match = re.search(pattern, content, re.IGNORECASE | re.MULTILINE)
+        if match:
+            extracted["legal_name"] = match.group(1).strip()[:100]
+            break
     
     # ========== WEBSITE EXTRACTION (Enhanced) ==========
     # Try explicit label first
@@ -609,46 +935,123 @@ async def extract_company_info(request_data: Dict[str, Any]):
     # ========== DESCRIPTION / ONE-LINER EXTRACTION (Enhanced) ==========
     # One-line description
     one_liner_patterns = [
-        r"(?:one[\s-]?liner?|tagline|slogan|elevator\s*pitch)[:\s=]+([^\n]{10,150})",
-        r"(?:we\s+(?:are|help|enable|provide|build))\s+([^\n.]{10,150}\.?)",
+        r"(?:one[\s-]?liner?|tagline|slogan|elevator\s*pitch)[:\s=]+([^\n]{10,200})",
+        r"(?:we\s+(?:are|help|enable|provide|build|develop|create|power|transform|connect))\s+([^\n.]{15,200}\.?)",
+        r"(?:our\s+(?:mission|vision))[:\s=]+([^\n]{15,200})",
     ]
     for pattern in one_liner_patterns:
         match = re.search(pattern, content, re.IGNORECASE)
         if match:
-            extracted["one_line_description"] = match.group(1).strip()[:200]
+            extracted["one_line_description"] = _clean_text(match.group(1), 200)
             break
-    
-    # Full description
+
+    # Full description — try explicit sections first
     desc_patterns = [
-        r"(?:company\s*description|about\s*us|overview|executive\s*summary)[:\s=]+([^\n]{30,}(?:\n[^\n]{20,}){0,3})",
-        r"(?:mission|our\s*mission)[:\s=]+([^\n]{20,300})",
-        r"(?:^|\n)([A-Z][^.]{30,300}(?:company|startup|platform|solution|service|business)[^.]{10,200}\.)",
+        r"(?:company\s*description|about\s*us|overview|executive\s*summary)[:\s=]+([^\n]{30,}(?:\n[^\n]{20,}){0,4})",
+        r"(?:mission|our\s*mission)[:\s=]+([^\n]{20,400})",
+        r"(?:^|\n)([A-Z][^.!?]{30,400}(?:company|startup|platform|solution|service|technology|software|product|business)[^.!?]{5,300}[.!?])",
     ]
     for pattern in desc_patterns:
         match = re.search(pattern, content, re.IGNORECASE | re.MULTILINE)
         if match:
-            desc = match.group(1).strip()[:700]
-            # Clean up
-            desc = re.sub(r'\s+', ' ', desc)
-            extracted["description"] = desc
+            extracted["description"] = _clean_text(match.group(1), 700)
             break
+
+    # Fallback: join consecutive non-header lines into paragraphs, then pick first good one
+    if "description" not in extracted:
+        lines = content.split('\n')
+        joined_paras = []
+        current = []
+        for line in lines:
+            stripped = line.strip()
+            # A "break" line is empty, all-caps, or ends with ':'
+            is_break = (not stripped
+                        or stripped.isupper()
+                        or stripped.endswith(':')
+                        or re.match(r'^[•\-\*>]', stripped))
+            if is_break:
+                if current:
+                    joined_paras.append(' '.join(current))
+                    current = []
+            else:
+                current.append(stripped)
+        if current:
+            joined_paras.append(' '.join(current))
+        for para in joined_paras:
+            if (len(para) >= 60
+                    and not para.startswith('http')
+                    and para.count(' ') >= 5):
+                extracted["description"] = _clean_text(para, 700)
+                break
+
+    # If still nothing, try first 3 sentences from the content
+    if "description" not in extracted:
+        sentences = re.findall(r'[A-Z][^.!?]{30,300}[.!?]', content)
+        if sentences:
+            extracted["description"] = _clean_text(' '.join(sentences[:3]), 600)
+
+    # One-liner fallback: first sentence of description
+    if "one_line_description" not in extracted and extracted.get("description"):
+        first_sent = re.split(r'(?<=[.!?])\s', extracted["description"])[0]
+        if 15 <= len(first_sent) <= 220:
+            extracted["one_line_description"] = first_sent.strip()
+
+    # Last-resort one-liner: any tagline-length line near the top of the document
+    if "one_line_description" not in extracted:
+        for line in content.split('\n')[:50]:
+            line = line.strip()
+            if (20 <= len(line) <= 150
+                    and ' ' in line
+                    and not line.isupper()
+                    and not line.endswith(':')
+                    and not line.startswith('http')):
+                extracted["one_line_description"] = line
+                break
     
-    # ========== PRODUCT DESCRIPTION ==========
+    # ========== PRODUCT DESCRIPTION (Enhanced) ==========
     product_patterns = [
-        r"(?:product|solution|platform|service)\s*(?:description|overview)?[:\s=]+([^\n]{20,}(?:\n[^\n]{20,}){0,2})",
-        r"(?:what\s*we\s*(?:do|build|offer))[:\s=]+([^\n]{20,300})",
+        r"(?:product|solution|platform|service)\s*(?:description|overview|details)?[:\s=]+([^\n]{20,}(?:\n[^\n]{20,}){0,3})",
+        r"(?:what\s*we\s*(?:do|build|offer|provide))[:\s=]+([^\n]{20,400})",
+        r"(?:our\s*(?:product|solution|platform|technology))[:\s=]+([^\n]{20,400})",
+        r"(?:key\s*features?|core\s*features?)[:\s=]+([^\n]{20,}(?:\n[^\n]{10,}){0,5})",
+        r"(?:how\s*it\s*works?)[:\s=]+([^\n]{20,}(?:\n[^\n]{10,}){0,3})",
     ]
     for pattern in product_patterns:
         match = re.search(pattern, content, re.IGNORECASE)
         if match:
-            extracted["product_description"] = match.group(1).strip()[:500]
+            extracted["product_description"] = _clean_text(match.group(1), 500)
             break
+
+    # Fallback: look for problem/solution sections
+    if "product_description" not in extracted:
+        solution_section = _find_section(r"(?:solution|our\s*solution|the\s*solution)", content, 500)
+        if solution_section:
+            extracted["product_description"] = solution_section
+
+    # Fallback: problem statement + solution combined
+    if "product_description" not in extracted:
+        problem_section = _find_section(r"(?:problem|the\s*problem|pain\s*point)", content, 300)
+        solution_section2 = _find_section(r"(?:solution|our\s*solution)", content, 300)
+        if problem_section and solution_section2:
+            extracted["product_description"] = f"Problem: {problem_section} Solution: {solution_section2}"[:500]
+        elif solution_section2:
+            extracted["product_description"] = solution_section2
+
+    # Last resort: use description as product_description
+    if "product_description" not in extracted and extracted.get("description"):
+        extracted["product_description"] = extracted["description"][:500]
     
     # ========== EMPLOYEE COUNT (Enhanced) ==========
     emp_patterns = [
-        r"(?:employees?|team\s*(?:size|members)|headcount|staff)[:\s=]+(\d{1,5})",
-        r"(\d{1,5})\s*(?:employees?|team\s*members?|people|staff)",
-        r"(?:team\s*of|staff\s*of)\s*(\d{1,5})",
+        r"(?:employees?|team\s*(?:size|members?)|headcount|staff)[:\s=]+(\d{1,5})",
+        r"(\d{1,5})\s*(?:full[\s-]?time\s+)?(?:employees?|team\s*members?|people|staff)",
+        r"(?:team\s*of|staff\s*of|workforce\s*of)\s*(\d{1,5})",
+        r"(\d{1,5})[\s-]person\s+team",
+        r"(\d{1,5})[\s-]member\s+team",
+        r"over\s+(\d{1,5})\s+employees?",
+        r"(\d{1,5})\+\s*employees?",
+        r"team\s+of\s+(\d{1,5})\+?",
+        r"(\d{1,5})\s*-\s*\d{1,5}\s*employees?",   # range — take lower bound
     ]
     for pattern in emp_patterns:
         match = re.search(pattern, content, re.IGNORECASE)
@@ -672,33 +1075,158 @@ async def extract_company_info(request_data: Dict[str, Any]):
             else:
                 extracted["country"] = parts[-1][:50]
     
+    # Comprehensive US state abbreviations and full names
+    US_STATES = {
+        "AL": "Alabama", "AK": "Alaska", "AZ": "Arizona", "AR": "Arkansas",
+        "CA": "California", "CO": "Colorado", "CT": "Connecticut", "DE": "Delaware",
+        "FL": "Florida", "GA": "Georgia", "HI": "Hawaii", "ID": "Idaho",
+        "IL": "Illinois", "IN": "Indiana", "IA": "Iowa", "KS": "Kansas",
+        "KY": "Kentucky", "LA": "Louisiana", "ME": "Maine", "MD": "Maryland",
+        "MA": "Massachusetts", "MI": "Michigan", "MN": "Minnesota", "MS": "Mississippi",
+        "MO": "Missouri", "MT": "Montana", "NE": "Nebraska", "NV": "Nevada",
+        "NH": "New Hampshire", "NJ": "New Jersey", "NM": "New Mexico", "NY": "New York",
+        "NC": "North Carolina", "ND": "North Dakota", "OH": "Ohio", "OK": "Oklahoma",
+        "OR": "Oregon", "PA": "Pennsylvania", "RI": "Rhode Island", "SC": "South Carolina",
+        "SD": "South Dakota", "TN": "Tennessee", "TX": "Texas", "UT": "Utah",
+        "VT": "Vermont", "VA": "Virginia", "WA": "Washington", "WV": "West Virginia",
+        "WI": "Wisconsin", "WY": "Wyoming", "DC": "Washington DC",
+    }
+    US_STATE_NAMES = {v.lower(): v for v in US_STATES.values()}
+
     # Fallback location patterns
     if "city" not in extracted:
         location_patterns = [
-            r"(?:based\s*in|located\s*in|headquarters?\s*in)\s+([A-Za-z\s]+),\s*([A-Za-z\s]+)",
-            r"([A-Za-z]+),\s*(CA|NY|TX|WA|MA|FL|IL|PA|OH|GA|NC|NJ|VA|AZ|CO|MD|TN)\b",
+            # "Based in City, State" or "Located in City, Country"
+            r"(?:based\s*in|located\s*in|headquarters?\s*in|offices?\s*in)\s+([A-Za-z][A-Za-z\s]{1,30}),\s*([A-Za-z][A-Za-z\s]{1,30})",
+            # "City, ST" (US 2-letter abbrev)
+            r"([A-Za-z][A-Za-z\s]{1,25}),\s*(" + "|".join(US_STATES.keys()) + r")\b",
+            # "City, Full State Name"
+            r"([A-Za-z][A-Za-z\s]{1,25}),\s*(" + "|".join(re.escape(s) for s in US_STATES.values()) + r")\b",
         ]
         for pattern in location_patterns:
             match = re.search(pattern, content, re.IGNORECASE)
             if match:
-                extracted["city"] = match.group(1).strip()[:50]
-                extracted["state"] = match.group(2).strip()[:50]
+                city_candidate = match.group(1).strip()[:50]
+                state_candidate = match.group(2).strip()[:50]
+                # Expand abbreviation
+                state_full = US_STATES.get(state_candidate.upper(), state_candidate)
+                extracted["city"] = city_candidate
+                extracted["state"] = state_full
+                if not extracted.get("country"):
+                    extracted["country"] = "United States"
                 break
+
+    # State fallback: scan content for US state names
+    if "state" not in extracted:
+        for abbr, full in US_STATES.items():
+            if re.search(r'\b' + re.escape(abbr) + r'\b', content):
+                extracted["state"] = full
+                if not extracted.get("country"):
+                    extracted["country"] = "United States"
+                break
+        if "state" not in extracted:
+            for name_lower, name_full in US_STATE_NAMES.items():
+                if re.search(r'\b' + re.escape(name_full) + r'\b', content, re.IGNORECASE):
+                    extracted["state"] = name_full
+                    if not extracted.get("country"):
+                        extracted["country"] = "United States"
+                    break
     
     # Country
+    KNOWN_COUNTRIES = [
+        "United States", "United Kingdom", "Canada", "Germany", "France",
+        "Australia", "India", "Israel", "Singapore", "Netherlands", "Sweden",
+        "Norway", "Denmark", "Finland", "Switzerland", "Austria", "Spain",
+        "Italy", "Portugal", "Belgium", "Ireland", "New Zealand", "Japan",
+        "South Korea", "China", "Brazil", "Mexico", "Nigeria", "Kenya",
+        "South Africa", "UAE", "United Arab Emirates", "Saudi Arabia",
+        "Indonesia", "Malaysia", "Thailand", "Vietnam", "Pakistan",
+        "Estonia", "Latvia", "Lithuania", "Poland", "Czech Republic",
+        "Hungary", "Romania", "Ukraine", "Turkey", "Egypt",
+    ]
+    COUNTRY_ALIASES = {
+        "US": "United States", "USA": "United States", "U.S.": "United States",
+        "U.S.A.": "United States", "UK": "United Kingdom", "U.K.": "United Kingdom",
+        "UAE": "United Arab Emirates",
+    }
+    # City → country inference
+    CITY_COUNTRY = {
+        "san francisco": "United States", "new york": "United States",
+        "los angeles": "United States", "seattle": "United States",
+        "boston": "United States", "chicago": "United States",
+        "austin": "United States", "denver": "United States",
+        "miami": "United States", "atlanta": "United States",
+        "london": "United Kingdom", "manchester": "United Kingdom",
+        "berlin": "Germany", "munich": "Germany", "hamburg": "Germany",
+        "paris": "France", "amsterdam": "Netherlands", "stockholm": "Sweden",
+        "oslo": "Norway", "copenhagen": "Denmark", "helsinki": "Finland",
+        "zurich": "Switzerland", "geneva": "Switzerland",
+        "tel aviv": "Israel", "jerusalem": "Israel",
+        "toronto": "Canada", "vancouver": "Canada", "montreal": "Canada",
+        "sydney": "Australia", "melbourne": "Australia",
+        "bangalore": "India", "mumbai": "India", "delhi": "India",
+        "hyderabad": "India", "chennai": "India", "pune": "India",
+        "singapore": "Singapore",
+        "dubai": "United Arab Emirates", "abu dhabi": "United Arab Emirates",
+        "tokyo": "Japan", "seoul": "South Korea", "shanghai": "China",
+        "beijing": "China", "sao paulo": "Brazil",
+        "nairobi": "Kenya", "lagos": "Nigeria",
+        "tallinn": "Estonia", "riga": "Latvia", "vilnius": "Lithuania",
+        "warsaw": "Poland", "prague": "Czech Republic", "budapest": "Hungary",
+        "kyiv": "Ukraine", "istanbul": "Turkey", "cairo": "Egypt",
+    }
     country_patterns = [
         r"(?:country|nation)[:\s=]+([A-Za-z\s]+?)(?:\n|$|,)",
-        r"(?:US|USA|United States|UK|United Kingdom|Canada|Germany|France|Australia|India|Israel|Singapore)",
+        r"(?:headquartered|located|based|registered)\s+in\s+([A-Za-z\s]+?)(?:\.|,|$|\n)",
     ]
     if "country" not in extracted:
         for pattern in country_patterns:
             match = re.search(pattern, content, re.IGNORECASE)
             if match:
-                country = match.group(0) if match.lastindex is None else match.group(1)
-                # Normalize country names
-                country_map = {"US": "United States", "USA": "United States", "UK": "United Kingdom"}
-                extracted["country"] = country_map.get(country.strip().upper(), country.strip())[:50]
+                raw = match.group(1).strip()
+                country = COUNTRY_ALIASES.get(raw.upper(), None) or COUNTRY_ALIASES.get(raw, None)
+                if not country:
+                    for known in KNOWN_COUNTRIES:
+                        if known.lower() == raw.lower():
+                            country = known
+                            break
+                if country:
+                    extracted["country"] = country
+                    break
+    # Fallback: scan for known country names/aliases in content
+    if "country" not in extracted:
+        for alias, full in COUNTRY_ALIASES.items():
+            if re.search(r'\b' + re.escape(alias) + r'\b', content):
+                extracted["country"] = full
                 break
+    if "country" not in extracted:
+        for known in KNOWN_COUNTRIES:
+            if re.search(r'\b' + re.escape(known) + r'\b', content, re.IGNORECASE):
+                extracted["country"] = known
+                break
+    # City → country inference
+    if "country" not in extracted and "city" in extracted:
+        city_key = extracted["city"].lower().strip()
+        if city_key in CITY_COUNTRY:
+            extracted["country"] = CITY_COUNTRY[city_key]
+    # Also infer country from city anywhere in text
+    if "country" not in extracted:
+        for city, ctry in CITY_COUNTRY.items():
+            if re.search(r'\b' + re.escape(city) + r'\b', content_lower):
+                if "city" not in extracted:
+                    extracted["city"] = city.title()
+                extracted["country"] = ctry
+                break
+
+    # Website fallback: extract domain from email address
+    if "website" not in extracted:
+        email_match = re.search(r'[a-zA-Z0-9._%+\-]+@([a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})', content)
+        if email_match:
+            domain = email_match.group(1)
+            # Exclude generic domains
+            if domain not in ('gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com',
+                              'icloud.com', 'me.com', 'aol.com', 'protonmail.com'):
+                extracted["website"] = f"https://{domain}"
     
     # ========== FOUNDING DATE / YEAR ==========
     founded_patterns = [
@@ -715,30 +1243,65 @@ async def extract_company_info(request_data: Dict[str, Any]):
                 break
     
     # ========== FUNDING STAGE (Enhanced) ==========
-    stage_keywords = {
-        "pre-seed": "Pre-seed",
-        "preseed": "Pre-seed",
-        "seed round": "Seed",
-        "seed stage": "Seed", 
-        "seed funding": "Seed",
-        "series a": "Series A",
-        "series b": "Series B",
-        "series c": "Series C+",
-        "series d": "Series C+",
-        "growth stage": "Growth",
-        "growth round": "Growth",
-        "late stage": "Growth",
-        "ipo": "Public",
-        "public company": "Public",
-        "bootstrapped": "Bootstrapped",
-        "pre-revenue": "Pre-seed",
-        "mvp": "Pre-seed",
-        "early stage": "Seed",
-    }
-    for keyword, stage in stage_keywords.items():
-        if keyword in content_lower:
-            extracted["development_stage"] = stage
-            break
+    # Check explicit label first
+    stage_label_match = re.search(
+        r"(?:stage|funding stage|investment stage|current stage|round)[:\s=]+([^\n,]{3,40})",
+        content, re.IGNORECASE
+    )
+    if stage_label_match:
+        raw_stage = stage_label_match.group(1).strip().lower()
+        stage_map = {
+            "pre-seed": "Pre-seed", "preseed": "Pre-seed", "pre seed": "Pre-seed",
+            "seed": "Seed", "seed round": "Seed", "seed stage": "Seed",
+            "series a": "Series A", "series-a": "Series A",
+            "series b": "Series B", "series-b": "Series B",
+            "series c": "Series C+", "series d": "Series C+", "series e": "Series C+",
+            "growth": "Growth", "late stage": "Growth", "late-stage": "Growth",
+            "pre-ipo": "Pre-IPO", "ipo": "Pre-IPO",
+        }
+        for key, val in stage_map.items():
+            if key in raw_stage:
+                extracted["development_stage"] = val
+                break
+        if not extracted.get("development_stage"):
+            extracted["development_stage"] = _clean_text(stage_label_match.group(1), 40)
+
+    if not extracted.get("development_stage"):
+        stage_keywords = [
+            ("pre-seed", "Pre-seed"),
+            ("preseed", "Pre-seed"),
+            ("seed round", "Seed"),
+            ("seed stage", "Seed"),
+            ("seed funding", "Seed"),
+            ("series a", "Series A"),
+            ("series b", "Series B"),
+            ("series c", "Series C+"),
+            ("series d", "Series C+"),
+            ("growth stage", "Growth"),
+            ("growth round", "Growth"),
+            ("late stage", "Growth"),
+            ("late-stage", "Growth"),
+            ("growth equity", "Growth"),
+            ("angel round", "Pre-seed"),
+            ("angel funding", "Pre-seed"),
+            ("vc-backed", "Seed"),
+            ("vc backed", "Seed"),
+            ("venture capital", "Seed"),
+            ("bootstrapped", "Pre-seed"),
+            ("pre-revenue", "Pre-seed"),
+            ("mvp", "Pre-seed"),
+            ("minimum viable product", "Pre-seed"),
+            ("early stage", "Seed"),
+            ("early-stage", "Seed"),
+            ("pre-ipo", "Pre-IPO"),
+            ("ipo", "Pre-IPO"),
+            ("public company", "Pre-IPO"),
+            ("seed", "Seed"),
+        ]
+        for keyword, stage in stage_keywords:
+            if keyword in content_lower:
+                extracted["development_stage"] = stage
+                break
     
     # ========== FUNDING AMOUNT ==========
     funding_patterns = [
@@ -760,97 +1323,148 @@ async def extract_company_info(request_data: Dict[str, Any]):
             break
     
     # ========== INDUSTRY VERTICAL (Enhanced) ==========
-    industry_keywords = {
-        "software as a service": "Software/SaaS",
-        "saas": "Software/SaaS",
-        "software": "Software/SaaS",
-        "fintech": "FinTech",
-        "financial technology": "FinTech",
-        "financial services": "FinTech",
-        "healthtech": "HealthTech/MedTech",
-        "health tech": "HealthTech/MedTech",
-        "healthcare technology": "HealthTech/MedTech",
-        "medtech": "HealthTech/MedTech",
-        "medical technology": "HealthTech/MedTech",
-        "medical device": "HealthTech/MedTech",
-        "biotech": "BioTech",
-        "biotechnology": "BioTech",
-        "life sciences": "BioTech",
-        "e-commerce": "E-commerce",
-        "ecommerce": "E-commerce",
-        "retail tech": "E-commerce",
-        "edtech": "EdTech",
-        "education technology": "EdTech",
-        "learning platform": "EdTech",
-        "cleantech": "CleanTech/GreenTech",
-        "clean technology": "CleanTech/GreenTech",
-        "green tech": "CleanTech/GreenTech",
-        "sustainability": "CleanTech/GreenTech",
-        "renewable": "CleanTech/GreenTech",
-        "proptech": "PropTech",
-        "property technology": "PropTech",
-        "real estate tech": "PropTech",
-        "artificial intelligence": "AI/ML",
-        "machine learning": "AI/ML",
-        "deep learning": "AI/ML",
-        "cybersecurity": "Cybersecurity",
-        "security": "Cybersecurity",
-        "insurtech": "InsurTech",
-        "insurance technology": "InsurTech",
-        "logistics": "Logistics/Supply Chain",
-        "supply chain": "Logistics/Supply Chain",
-        "foodtech": "FoodTech",
-        "food technology": "FoodTech",
-        "agtech": "AgTech",
-        "agriculture technology": "AgTech",
-        "gaming": "Gaming/Entertainment",
-        "entertainment": "Gaming/Entertainment",
-        "media": "Media/Content",
-        "content platform": "Media/Content",
-        "hr tech": "HR Tech",
-        "human resources": "HR Tech",
-        "marketing tech": "MarTech",
-        "martech": "MarTech",
-        "advertising": "AdTech",
-        "adtech": "AdTech",
-    }
-    for keyword, industry in industry_keywords.items():
-        if keyword in content_lower:
-            extracted["industry_vertical"] = industry
-            break
+    # Check explicit label first (highest confidence)
+    industry_label_match = re.search(
+        r"(?:industry|sector|vertical|space)\s*[:\-–=]\s*([^\n,]{3,60})",
+        content, re.IGNORECASE
+    )
+    if industry_label_match:
+        extracted["industry_vertical"] = _clean_text(industry_label_match.group(1), 60)
+
+    if not extracted.get("industry_vertical"):
+        # Ordered: specific multi-word phrases first, then single keywords
+        # (more specific → less specific to avoid false matches)
+        industry_keywords = [
+            ("artificial intelligence", "AI/ML"),
+            ("machine learning", "AI/ML"),
+            ("deep learning", "AI/ML"),
+            ("generative ai", "AI/ML"),
+            ("large language model", "AI/ML"),
+            ("llm", "AI/ML"),
+            ("fintech", "FinTech"),
+            ("financial technology", "FinTech"),
+            ("financial services", "FinTech"),
+            ("payments", "FinTech"),
+            ("insurtech", "InsurTech"),
+            ("insurance technology", "InsurTech"),
+            ("healthtech", "HealthTech/MedTech"),
+            ("health tech", "HealthTech/MedTech"),
+            ("healthcare technology", "HealthTech/MedTech"),
+            ("medtech", "HealthTech/MedTech"),
+            ("medical technology", "HealthTech/MedTech"),
+            ("medical device", "HealthTech/MedTech"),
+            ("digital health", "HealthTech/MedTech"),
+            ("biotech", "BioTech"),
+            ("biotechnology", "BioTech"),
+            ("life sciences", "BioTech"),
+            ("pharmaceutical", "BioTech"),
+            ("edtech", "EdTech"),
+            ("education technology", "EdTech"),
+            ("learning platform", "EdTech"),
+            ("e-learning", "EdTech"),
+            ("cleantech", "CleanTech/GreenTech"),
+            ("clean technology", "CleanTech/GreenTech"),
+            ("green tech", "CleanTech/GreenTech"),
+            ("sustainability", "CleanTech/GreenTech"),
+            ("renewable energy", "CleanTech/GreenTech"),
+            ("climate tech", "CleanTech/GreenTech"),
+            ("proptech", "PropTech"),
+            ("property technology", "PropTech"),
+            ("real estate tech", "PropTech"),
+            ("cybersecurity", "Cybersecurity"),
+            ("information security", "Cybersecurity"),
+            ("cyber security", "Cybersecurity"),
+            ("e-commerce", "E-commerce"),
+            ("ecommerce", "E-commerce"),
+            ("online retail", "E-commerce"),
+            ("retail tech", "E-commerce"),
+            ("agtech", "AgTech"),
+            ("agriculture technology", "AgTech"),
+            ("precision farming", "AgTech"),
+            ("logistics", "Logistics/Supply Chain"),
+            ("supply chain", "Logistics/Supply Chain"),
+            ("foodtech", "FoodTech"),
+            ("food technology", "FoodTech"),
+            ("gaming", "Gaming/Entertainment"),
+            ("game development", "Gaming/Entertainment"),
+            ("entertainment", "Gaming/Entertainment"),
+            ("media", "Media/Content"),
+            ("content platform", "Media/Content"),
+            ("hr tech", "HR Tech"),
+            ("human resources", "HR Tech"),
+            ("workforce", "HR Tech"),
+            ("hrtech", "HR Tech"),
+            ("marketing tech", "MarTech"),
+            ("martech", "MarTech"),
+            ("adtech", "AdTech"),
+            ("advertising technology", "AdTech"),
+            ("iot", "IoT"),
+            ("internet of things", "IoT"),
+            ("hardware", "Hardware"),
+            ("semiconductor", "Hardware"),
+            ("software as a service", "Software/SaaS"),
+            ("saas", "Software/SaaS"),
+            ("cloud software", "Software/SaaS"),
+            ("enterprise software", "Enterprise Software"),
+            ("software", "Software/SaaS"),
+        ]
+        for keyword, industry in industry_keywords:
+            if keyword in content_lower:
+                extracted["industry_vertical"] = industry
+                break
     
     # ========== BUSINESS MODEL (Enhanced) ==========
-    model_keywords = {
-        "b2b saas": "B2B SaaS",
-        "b2b software": "B2B SaaS",
-        "enterprise software": "B2B SaaS",
-        "b2c saas": "B2C SaaS",
-        "consumer saas": "B2C SaaS",
-        "b2b": "B2B",
-        "b2c": "B2C",
-        "b2b2c": "B2B2C",
-        "marketplace": "Marketplace",
-        "two-sided marketplace": "Marketplace",
-        "subscription": "Subscription",
-        "recurring revenue": "Subscription",
-        "freemium": "Freemium",
-        "free trial": "Freemium",
-        "platform": "Platform",
-        "api": "API/Platform",
-        "licensing": "Licensing",
-        "transactional": "Transactional",
-        "per-transaction": "Transactional",
-        "advertising": "Advertising",
-        "ad-supported": "Advertising",
-        "hardware": "Hardware",
-        "device": "Hardware",
-        "consulting": "Services",
-        "professional services": "Services",
-    }
-    for keyword, model in model_keywords.items():
-        if keyword in content_lower:
-            extracted["business_model"] = model
-            break
+    # Check explicit label first
+    bm_label_match = re.search(
+        r"(?:business model|revenue model|monetization model|go[\s-]?to[\s-]?market|pricing model)\s*[:\-–=]\s*([^\n]{5,100})",
+        content, re.IGNORECASE
+    )
+    if bm_label_match:
+        extracted["business_model"] = _clean_text(bm_label_match.group(1), 80)
+
+    if not extracted.get("business_model"):
+        # Ordered: most specific multi-word first
+        model_keywords = [
+            ("b2b saas", "B2B SaaS"),
+            ("b2b software", "B2B SaaS"),
+            ("enterprise saas", "B2B SaaS"),
+            ("b2c saas", "B2C SaaS"),
+            ("consumer saas", "B2C SaaS"),
+            ("b2b2c", "B2B2C"),
+            ("two-sided marketplace", "Marketplace"),
+            ("two sided marketplace", "Marketplace"),
+            ("marketplace", "Marketplace"),
+            ("platform business", "Platform"),
+            ("usage-based pricing", "Usage-Based"),
+            ("usage based pricing", "Usage-Based"),
+            ("pay-as-you-go", "Usage-Based"),
+            ("pay as you go", "Usage-Based"),
+            ("per-transaction", "Transaction Fee"),
+            ("transaction fee", "Transaction Fee"),
+            ("subscription-based", "Subscription"),
+            ("subscription model", "Subscription"),
+            ("recurring revenue", "Subscription"),
+            ("annual recurring", "Subscription"),
+            ("freemium", "Freemium"),
+            ("free trial", "Freemium"),
+            ("licensing model", "Licensing"),
+            ("software licensing", "Licensing"),
+            ("licensing", "Licensing"),
+            ("advertising model", "Advertising"),
+            ("ad-supported", "Advertising"),
+            ("professional services", "Professional Services"),
+            ("consulting", "Professional Services"),
+            ("hardware + software", "Hardware + Software"),
+            ("hardware and software", "Hardware + Software"),
+            ("b2b", "B2B SaaS"),
+            ("b2c", "B2C SaaS"),
+            ("platform", "Platform"),
+            ("subscription", "Subscription"),
+        ]
+        for keyword, model in model_keywords:
+            if keyword in content_lower:
+                extracted["business_model"] = model
+                break
     
     # ========== REVENUE / FINANCIALS ==========
     revenue_patterns = [
@@ -887,7 +1501,51 @@ async def extract_company_info(request_data: Dict[str, Any]):
         extracted["industry_vertical"] = "FinTech"
     elif framework == "saas" and not extracted.get("industry_vertical"):
         extracted["industry_vertical"] = "Software/SaaS"
-    
+
+    # ========== COMPANY NAME FALLBACK (Title/First Heading) ==========
+    if not extracted.get("company_name"):
+        # Try to find the first meaningful heading in the document
+        lines = content.split('\n')
+        for line in lines[:30]:
+            line = line.strip()
+            # Skip empty, pure-number, URL, or very long lines
+            if not line or len(line) < 2 or len(line) > 60:
+                continue
+            if line.startswith('http') or line.startswith('www'):
+                continue
+            if re.match(r'^\d+[\s.)]', line):
+                continue
+            # Skip generic template/slide labels
+            if re.match(r'^(slide|page|section|appendix|table\s*of|confidential|disclaimer|agenda|©|copyright|\d+$)', line, re.IGNORECASE):
+                continue
+            # Accept Title Case or ALL CAPS short text as potential company name
+            word_count = len(line.split())
+            if 1 <= word_count <= 5:
+                candidate = line.strip('.,;:!?')
+                if is_valid_company_name(candidate):
+                    extracted["company_name"] = candidate
+                    break
+
+    # ========== LEGAL NAME FALLBACK ==========
+    # If legal name not explicitly found, use company name as default
+    if "legal_name" not in extracted and extracted.get("company_name"):
+        # Check if company name already has a legal suffix — if so it IS the legal name
+        if re.search(r'\b(?:Inc\.?|LLC|Ltd\.?|Corp\.?|Co\.?|GmbH|PLC|SA|BV|Pty|SAS)\b',
+                     extracted["company_name"], re.IGNORECASE):
+            extracted["legal_name"] = extracted["company_name"]
+        else:
+            # Use company name as-is — user can correct in the form
+            extracted["legal_name"] = extracted["company_name"]
+
+    # ========== CITY FALLBACK FROM KNOWN CITIES IN CITY_COUNTRY ==========
+    if "city" not in extracted:
+        for city_name, ctry in CITY_COUNTRY.items():
+            if re.search(r'\b' + re.escape(city_name) + r'\b', content_lower):
+                extracted["city"] = city_name.title()
+                if "country" not in extracted:
+                    extracted["country"] = ctry
+                break
+
     logger.info(f"Extracted company info: {list(extracted.keys())} - {len(extracted)} fields")
     
     return extracted
