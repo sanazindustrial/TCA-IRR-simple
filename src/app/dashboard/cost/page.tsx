@@ -77,10 +77,15 @@ const StatCard = ({
 export default function CostManagementPage() {
   const [costData, setCostData] = useState<CostSummary>(initialCostData);
   const [isLoading, setIsLoading] = useState(true);
-  const [dateRange, setDateRange] = useState({
-    from: new Date(new Date().setDate(new Date().getDate() - 30)),
-    to: new Date(),
-  });
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | undefined>(undefined);
+
+  // Initialize dates client-side only to avoid SSR hydration mismatch
+  useEffect(() => {
+    setDateRange({
+      from: new Date(new Date().setDate(new Date().getDate() - 30)),
+      to: new Date(),
+    });
+  }, []);
   const [activityFilter, setActivityFilter] = useState('all');
   const [userFilter, setUserFilter] = useState('all');
   const [liveUpdate, setLiveUpdate] = useState(true);
@@ -88,6 +93,7 @@ export default function CostManagementPage() {
 
   // Fetch real data from API
   const fetchCostData = useCallback(async () => {
+    if (!dateRange) return; // Not yet initialized client-side
     setIsLoading(true);
     try {
       const startDate = format(dateRange.from, 'yyyy-MM-dd');
@@ -262,12 +268,12 @@ export default function CostManagementPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <Card className="lg:col-span-1 bg-green-600 text-white">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-success-foreground/80">Total Cost</CardTitle>
-                <DollarSign className="size-4 text-success-foreground/70" />
+                <CardTitle className="text-sm font-medium text-white/80">Total Cost</CardTitle>
+                <DollarSign className="size-4 text-white/70" />
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold">${costData.totalCost.toFixed(2)}</div>
-                <p className="text-xs text-success-foreground/80">Period: 11/01/2023 - 11/14/2023</p>
+                <p className="text-xs text-white/80">Period: 11/01/2023 - 11/14/2023</p>
               </CardContent>
             </Card>
             <StatCard
