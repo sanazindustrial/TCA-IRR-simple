@@ -6015,6 +6015,7 @@ async def extract_text_from_file(data: dict = Body(...)):
     try:
         # ------------------------------------------------------------------ PDF
         if ext.endswith('.pdf'):
+            fitz_ok = False
             try:
                 import fitz  # PyMuPDF
                 pdf_doc = fitz.open(stream=file_bytes, filetype="pdf")
@@ -6037,7 +6038,10 @@ async def extract_text_from_file(data: dict = Body(...)):
                                 pass
                 pdf_doc.close()
                 text_content = "\n".join(parts)
-            except ImportError:
+                fitz_ok = True
+            except Exception:
+                pass  # fall through to pdfplumber
+            if not fitz_ok:
                 try:
                     import pdfplumber
                     with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
@@ -6045,8 +6049,6 @@ async def extract_text_from_file(data: dict = Body(...)):
                     text_content = "\n".join(parts)
                 except Exception as e2:
                     text_content = f"[PDF extraction failed: {e2}]"
-            except Exception as e:
-                text_content = f"[PDF extraction failed: {e}]"
 
         # ---------------------------------------------------------------- DOCX
         elif ext.endswith('.docx'):
@@ -6070,7 +6072,8 @@ async def extract_text_from_file(data: dict = Body(...)):
                                 blob = rel.target_part.blob
                                 fmt = ("jpeg" if blob[:3] == b'\xff\xd8\xff'
                                        else "gif" if blob[:6] in (b'GIF87a', b'GIF89a')
-                                       else "png")
+                                       else "png" if blob[:4] == b'\x89PNG'
+                                       else "png")  # default for bmp/tiff/webp etc.
                                 images.append({
                                     "data": base64.b64encode(blob).decode('utf-8'),
                                     "format": fmt,
@@ -6086,6 +6089,8 @@ async def extract_text_from_file(data: dict = Body(...)):
         # --------------------------------------------------------- DOC (legacy)
         elif ext.endswith('.doc'):
             extracted = False
+            tmp_path = None
+            # Try antiword first
             try:
                 with tempfile.NamedTemporaryFile(suffix='.doc', delete=False) as tmp:
                     tmp.write(file_bytes)
@@ -6094,27 +6099,71 @@ async def extract_text_from_file(data: dict = Body(...)):
                     ['antiword', tmp_path],
                     capture_output=True, text=True, timeout=30
                 )
-                os.unlink(tmp_path)
                 if result.returncode == 0 and result.stdout.strip():
                     text_content = result.stdout
                     extracted = True
             except Exception:
                 pass
+            finally:
+                if tmp_path:
+                    try:
+                        os.unlink(tmp_path)
+                    except OSError:
+                        pass
 
+            # Try catdoc as second tool fallback
+            if not extracted:
+                tmp_path2 = None
+                try:
+                    with tempfile.NamedTemporaryFile(suffix='.doc', delete=False) as tmp:
+                        tmp.write(file_bytes)
+                        tmp_path2 = tmp.name
+                    result = subprocess.run(
+                        ['catdoc', tmp_path2],
+                        capture_output=True, text=True, timeout=30
+                    )
+                    if result.returncode == 0 and result.stdout.strip():
+                        text_content = result.stdout
+                        extracted = True
+                except Exception:
+                    pass
+                finally:
+                    if tmp_path2:
+                        try:
+                            os.unlink(tmp_path2)
+                        except OSError:
+                            pass
+
+            # olefile heuristic fallback
             if not extracted:
                 try:
                     import olefile
                     ole = olefile.OleFileIO(io.BytesIO(file_bytes))
-                    if ole.exists('WordDocument'):
-                        stream = ole.openstream('WordDocument').read()
-                        raw = stream.decode('latin-1', errors='ignore')
-                        cleaned = ''.join(c for c in raw if c.isprintable() or c in '\n\r\t ')
-                        text_content = re.sub(r'[^\x20-\x7E\n\r\t]{3,}', ' ', cleaned).strip()
+                    parts = []
+                    # Try 1Table / 0Table for text piece table content
+                    for stream_name in ('1Table', '0Table', 'WordDocument'):
+                        if ole.exists(stream_name):
+                            try:
+                                stream = ole.openstream(stream_name).read()
+                                # Attempt UTF-16-LE first (newer Word), then latin-1
+                                for enc in ('utf-16-le', 'latin-1'):
+                                    try:
+                                        decoded = stream.decode(enc, errors='ignore')
+                                        cleaned = ''.join(
+                                            c for c in decoded if c.isprintable() or c in '\n\r\t '
+                                        )
+                                        cleaned = re.sub(r'[ \t]{4,}', ' ', cleaned).strip()
+                                        if len(cleaned) > 50:
+                                            parts.append(cleaned)
+                                            break
+                                    except Exception:
+                                        pass
+                            except Exception:
+                                pass
                     ole.close()
-                    if not text_content:
-                        text_content = f"[DOC text could not be fully extracted: {filename}]"
+                    text_content = '\n'.join(parts) if parts else f"[DOC text could not be fully extracted: {filename}]"
                 except ImportError:
-                    text_content = f"[DOC extraction: antiword unavailable and olefile not installed for {filename}]"
+                    text_content = f"[DOC extraction: antiword/catdoc unavailable and olefile not installed for {filename}]"
                 except Exception as e:
                     text_content = f"[DOC extraction failed: {e}]"
 
@@ -6150,6 +6199,7 @@ async def extract_text_from_file(data: dict = Body(...)):
         # --------------------------------------------------------- PPT (legacy)
         elif ext.endswith('.ppt'):
             extracted = False
+            tmp_path = None
             try:
                 with tempfile.NamedTemporaryFile(suffix='.ppt', delete=False) as tmp:
                     tmp.write(file_bytes)
@@ -6158,25 +6208,35 @@ async def extract_text_from_file(data: dict = Body(...)):
                     ['catppt', tmp_path],
                     capture_output=True, text=True, timeout=30
                 )
-                os.unlink(tmp_path)
                 if result.returncode == 0 and result.stdout.strip():
                     text_content = result.stdout
                     extracted = True
             except Exception:
                 pass
+            finally:
+                if tmp_path:
+                    try:
+                        os.unlink(tmp_path)
+                    except OSError:
+                        pass
 
             if not extracted:
                 try:
                     import olefile
                     ole = olefile.OleFileIO(io.BytesIO(file_bytes))
                     parts = []
-                    for entry in ole.listdir():
+                    # PPT text lives in the 'PowerPoint Document' stream
+                    ppt_stream_name = 'PowerPoint Document'
+                    if ole.exists(ppt_stream_name):
+                        stream_data = ole.openstream(ppt_stream_name).read()
+                        # Heuristic: extract printable UTF-16-LE runs of > 3 chars
                         try:
-                            stream = ole.openstream(entry).read()
-                            text = stream.decode('utf-16-le', errors='ignore')
-                            cleaned = ''.join(c for c in text if c.isprintable() or c in '\n\r\t')
-                            if len(cleaned.strip()) > 10:
-                                parts.append(cleaned)
+                            text_utf16 = stream_data.decode('utf-16-le', errors='ignore')
+                            words = [
+                                w for w in re.split(r'[\x00-\x1f]+', text_utf16)
+                                if len(w.strip()) > 3 and any(c.isalpha() for c in w)
+                            ]
+                            parts.extend(words)
                         except Exception:
                             pass
                     ole.close()
@@ -6190,7 +6250,7 @@ async def extract_text_from_file(data: dict = Body(...)):
         elif ext.endswith('.xlsx'):
             try:
                 import openpyxl
-                wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
+                wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True, read_only=True)
                 parts = []
                 for sheet_name in wb.sheetnames:
                     parts.append(f"=== Sheet: {sheet_name} ===")
@@ -6226,7 +6286,12 @@ async def extract_text_from_file(data: dict = Body(...)):
         elif ext.endswith('.rtf'):
             try:
                 from striprtf.striprtf import rtf_to_text
-                text_content = rtf_to_text(file_bytes.decode('utf-8', errors='ignore'))
+                # Try UTF-8 first; fall back to Windows-1252 / latin-1 for older RTF files
+                try:
+                    rtf_str = file_bytes.decode('utf-8')
+                except UnicodeDecodeError:
+                    rtf_str = file_bytes.decode('latin-1', errors='replace')
+                text_content = rtf_to_text(rtf_str)
             except ImportError:
                 text_content = "[RTF extraction requires striprtf]"
             except Exception as e:
@@ -6238,10 +6303,12 @@ async def extract_text_from_file(data: dict = Body(...)):
                 from odf.opendocument import load as odf_load
                 from odf import text as odf_text, teletype
                 doc = odf_load(io.BytesIO(file_bytes))
-                parts = [
-                    teletype.extractText(elem)
-                    for elem in doc.body.getElementsByType(odf_text.P)
-                ]
+                # Extract both paragraphs (P) and headings (H) in document order
+                elements = (
+                    list(doc.body.getElementsByType(odf_text.P)) +
+                    list(doc.body.getElementsByType(odf_text.H))
+                )
+                parts = [teletype.extractText(elem) for elem in elements]
                 text_content = "\n".join(p for p in parts if p.strip())
             except ImportError:
                 text_content = "[ODT extraction requires odfpy]"
