@@ -122,9 +122,17 @@ export const MODULE_DEFINITIONS = {
     benchmark: { name: 'Benchmark Comparison', description: 'Performance vs. sector averages', weight: 10, version: '1.5' },
     growth: { name: 'Growth Classifier', description: 'Predict growth potential', weight: 10, version: '3.1' },
     gap: { name: 'Gap Analysis', description: 'Identify performance gaps', weight: 10, version: '2.0' },
-    funderFit: { name: 'Funder Fit Analysis', description: 'Investor matching & readiness', weight: 10, version: '1.0' },
+    founderFit: { name: 'Founder Fit Analysis', description: 'Investor matching & readiness', weight: 10, version: '1.0' },
     team: { name: 'Team Assessment', description: 'Analyze founder and team strength', weight: 10, version: '1.4' },
     strategicFit: { name: 'Strategic Fit Matrix', description: 'Align with strategic pathways', weight: 5, version: '1.1' },
+    financial: { name: 'Financial Analysis', description: 'Revenue model, burn rate, and financial health', weight: 8, version: '1.0' },
+    economic: { name: 'Economic Analysis', description: 'Market size, pricing, and economic viability', weight: 8, version: '1.0' },
+    social: { name: 'Social Impact Analysis', description: 'ESG factors and social impact metrics', weight: 5, version: '1.0' },
+    marketing: { name: 'Marketing Analysis', description: 'GTM strategy, brand positioning, and channels', weight: 5, version: '1.0' },
+    environmental: { name: 'Environmental Analysis', description: 'Environmental compliance and sustainability', weight: 5, version: '1.0' },
+    funder: { name: 'Funder Fit Analysis', description: 'Investor alignment and funding readiness', weight: 8, version: '1.0' },
+    strategic: { name: 'Strategic Analysis', description: 'Competitive positioning and strategic roadmap', weight: 5, version: '1.0' },
+    analyst: { name: 'Analyst Review', description: 'Manual analyst input, NLP analysis, and AI deviation review', weight: 5, version: '1.0' },
 };
 
 // Default 12 TCA categories

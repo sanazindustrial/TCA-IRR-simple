@@ -28,6 +28,7 @@ import hashlib
 import io
 import re
 from urllib.parse import urlparse
+import html as _html
 
 # Import database configuration
 from database_config import db_manager, db_config
@@ -1164,6 +1165,12 @@ class EvaluationCreate(BaseModel):
     framework: Optional[str] = "general"
     sector: Optional[str] = None
     request_id: Optional[str] = None
+
+    @validator('company_name')
+    def sanitize_company_name(cls, v):
+        if not v or not v.strip():
+            raise ValueError('company_name cannot be empty')
+        return _html.escape(v.strip())[:255]
 
 
 # ── Role Permission Models ──────────────────────────────────────────
@@ -2979,10 +2986,11 @@ async def run_comprehensive_analysis(request: Request):
             f"Running comprehensive analysis for framework: {framework}")
         logger.info(f"Company: {company_data.get('name', 'Unknown')}")
 
-        # Simulate analysis processing
-        await asyncio.sleep(2)  # Simulate processing time
+        # Compute real analysis from actual company data
+        return _calculate_fallback_analysis(company_data)
 
-        # Generate comprehensive analysis results
+        # NOTE: The hardcoded block below is intentionally unreachable.
+        # It is preserved as reference only. All scores are now computed above.
         analysis_result = {
             "final_tca_score": 78.5,
             "investment_recommendation": "Proceed with due diligence",
@@ -3192,6 +3200,10 @@ async def upload_files(request: Request):
         files_data = data.get('files', [])
         company_name = data.get('company_name', None)
 
+        # BUG-SEC-001: Sanitize user-supplied company_name
+        if company_name is not None:
+            company_name = _html.escape(str(company_name))[:255]
+
         processed_files = []
         async with db_manager.get_connection() as conn:
             for file_info in files_data:
@@ -3302,6 +3314,9 @@ async def upload_files_multipart(files: List[UploadFile] = File(...),
                                  company_name: Optional[str] = Form(None)):
     """Handle multipart file uploads with real extraction"""
     try:
+        # BUG-SEC-001: Sanitize user-supplied company_name from form field
+        if company_name is not None:
+            company_name = _html.escape(str(company_name))[:255]
         processed_files = []
         async with db_manager.get_connection() as conn:
             for uploaded_file in files:
@@ -3604,6 +3619,15 @@ async def submit_text(request: Request):
             'extracted_text', '')
         title = data.get('title', 'Text Submission')
         company_name = data.get('company_name', None)
+
+        # BUG-DATA-002: Reject empty text body
+        if not text or not str(text).strip():
+            raise HTTPException(status_code=400, detail="Text content cannot be empty")
+
+        # BUG-SEC-001: Sanitize user-supplied metadata to prevent stored XSS
+        title = _html.escape(str(title))[:500]
+        if company_name is not None:
+            company_name = _html.escape(str(company_name))[:255]
 
         # Build extracted_data: merge auto-generated stats with user-provided data
         extracted_data = {
@@ -8268,6 +8292,8 @@ async def extract_company_info(data: dict = Body(...)):
             r'(?:company\s*name|business\s*name|organization|startup|venture)[:\s]+([A-Z][A-Za-z0-9\s&.,]+?)(?:\n|,|\.)',
             r'(?:^|\n)([A-Z][A-Za-z0-9]+(?:\s+[A-Z][a-z]+){0,3})\s+(?:Inc|LLC|Ltd|Corp|Limited|GmbH|Co\.|Company)',
             r'(?:welcome\s+to|about)\s+([A-Z][A-Za-z0-9\s]+?)(?:\n|,|\.)',
+            # Title line followed by pitch/deck keywords (e.g. "AcmeCorp - Pitch Deck")
+            r'^([A-Za-z][A-Za-z0-9\s&.,]{1,60}?)\s*[-–—|]\s*(?:pitch|deck|presentation|investor)',
         ]
 
         for pattern in name_patterns:
@@ -8417,13 +8443,26 @@ async def extract_company_info(data: dict = Body(...)):
 
         # Validation: ensure we have at least company_name
         if not extracted.get('company_name') and len(content) > 10:
-            # Try to extract first capitalized phrase as company name
-            words = content.split()[:20]
-            for i, word in enumerate(words):
-                if word[0].isupper() and len(word) > 2:
-                    extracted['company_name'] = ' '.join(words[i:i +
-                                                               3]).strip()[:50]
+            # Phase 1: scan the first few non-trivial lines (most pitch decks put the
+            # company name as the first heading with no "Company Name:" label)
+            skip_prefixes = re.compile(
+                r'^(?:pitch|deck|slide|presentation|investor|welcome|agenda|contents|'
+                r'overview|about|summary|introduction|confidential)',
+                re.IGNORECASE)
+            lines = [l.strip() for l in content.split('\n') if l.strip()]
+            for line in lines[:8]:
+                if (3 <= len(line) <= 80 and
+                        re.match(r'^[A-Za-z]', line) and
+                        not skip_prefixes.match(line) and
+                        not re.search(r'\b\d{4}\b', line)):
+                    extracted['company_name'] = line[:80]
                     break
+        if not extracted.get('company_name') and len(content) > 10:
+            # Phase 2: take the first 3 capitalized words from the document
+            words = [w for w in content.split()[:50]
+                     if w and len(w) > 2 and w[0].isalpha() and w[0].isupper()]
+            if words:
+                extracted['company_name'] = ' '.join(words[:3]).strip()[:50]
 
         return {
             "success": True,
@@ -8911,6 +8950,279 @@ async def update_company(company_id: str, data: dict = Body(...)):
         return {"success": False, "error": str(e)}
 
 
+
+# --- Real TCA Calculation Helpers ---
+
+def _calculate_tca_categories(company_data: dict) -> list:
+    """Calculate TCA category scores based on actual company data"""
+    category_config = {
+        "Leadership": {"weight": 0.20, "factors": ["founder_experience", "leadership_track_record"]},
+        "Product-Market Fit": {"weight": 0.20, "factors": ["market_validation", "customer_feedback", "product_traction"]},
+        "Team Strength": {"weight": 0.10, "factors": ["team_experience", "technical_skills", "domain_expertise"]},
+        "Technology & IP": {"weight": 0.10, "factors": ["tech_innovation", "ip_portfolio", "technical_moat"]},
+        "Business Model & Financials": {"weight": 0.10, "factors": ["revenue_model", "financial_metrics", "burn_rate"]},
+        "Go-to-Market Strategy": {"weight": 0.10, "factors": ["sales_strategy", "marketing_approach", "customer_acquisition"]},
+        "Competition & Moat": {"weight": 0.05, "factors": ["competitive_advantage", "market_differentiation"]},
+        "Market Potential": {"weight": 0.05, "factors": ["market_size", "growth_rate", "market_timing"]},
+        "Traction": {"weight": 0.05, "factors": ["customer_growth", "revenue_growth", "partnerships"]},
+        "Scalability": {"weight": 0.025, "factors": ["technical_scalability", "business_scalability"]},
+        "Risk Assessment": {"weight": 0.025, "factors": ["identified_risks", "mitigation_strategies"]},
+    }
+    categories = []
+    for category_name, config in category_config.items():
+        raw_score = _calculate_category_score(company_data, category_name, config["factors"])
+        weighted_score = raw_score * config["weight"]
+        flag_color = "green" if raw_score >= 8.0 else "yellow" if raw_score >= 6.5 else "red"
+        categories.append({
+            "category": category_name,
+            "rawScore": round(raw_score, 1),
+            "weight": int(config["weight"] * 100),
+            "weightedScore": round(weighted_score, 2),
+            "flag": flag_color,
+            "description": f"Evaluation of {category_name.lower()} performance",
+            "strengths": f"Strong performance indicators in {category_name.lower()}",
+            "concerns": "Areas for improvement identified" if raw_score < 7.0 else "Minor optimization opportunities",
+            "interpretation": (
+                f"Excellent {category_name.lower()} performance - key competitive advantage" if raw_score >= 8.0
+                else f"Good {category_name.lower()} showing - meets investment criteria" if raw_score >= 6.5
+                else f"{category_name} needs improvement - requires attention"
+            ),
+            "aiRecommendation": (
+                f"Leverage strong {category_name.lower()} in investment narrative" if raw_score >= 8.0
+                else f"Continue building on {category_name.lower()} foundation" if raw_score >= 6.5
+                else f"Priority: Address {category_name.lower()} weaknesses before investment"
+            ),
+        })
+    return categories
+
+
+def _calculate_category_score(company_data: dict, category: str, factors: list) -> float:
+    """Calculate score for a specific TCA category from actual company data"""
+    base_score = 5.0
+    if category == "Leadership":
+        score = base_score
+        if company_data.get("founder_experience"):
+            score += 2.0
+        if company_data.get("leadership_team"):
+            score += 1.5
+        if company_data.get("advisory_board"):
+            score += 0.5
+        return min(score, 10.0)
+    elif category == "Product-Market Fit":
+        score = base_score
+        if company_data.get("customer_validation"):
+            score += 2.5
+        if company_data.get("revenue_traction"):
+            score += 2.0
+        if company_data.get("market_feedback"):
+            score += 1.0
+        return min(score, 10.0)
+    elif category == "Team Strength":
+        score = base_score
+        team_size = company_data.get("team_size", 0)
+        if isinstance(team_size, str):
+            try:
+                team_size = int(team_size)
+            except (ValueError, TypeError):
+                team_size = 0
+        if team_size >= 5:
+            score += 1.5
+        if company_data.get("technical_team"):
+            score += 2.0
+        if company_data.get("industry_experience"):
+            score += 1.5
+        return min(score, 10.0)
+    elif category == "Technology & IP":
+        score = base_score
+        if company_data.get("patents"):
+            score += 2.0
+        if company_data.get("technical_innovation"):
+            score += 1.5
+        if company_data.get("tech_stack"):
+            score += 1.0
+        return min(score, 10.0)
+    elif category == "Market Potential":
+        score = base_score
+        market_size = company_data.get("market_size", 0)
+        if isinstance(market_size, str):
+            try:
+                market_size = float(market_size.replace(",", "").replace("$", "").replace("B", "e9").replace("M", "e6"))
+            except (ValueError, TypeError):
+                market_size = 0
+        if market_size > 1_000_000_000:
+            score += 2.5
+        elif market_size > 100_000_000:
+            score += 1.5
+        growth_rate = company_data.get("growth_rate", 0)
+        if isinstance(growth_rate, str):
+            try:
+                growth_rate = float(growth_rate.replace("%", "")) / 100
+            except (ValueError, TypeError):
+                growth_rate = 0
+        if growth_rate > 0.1:
+            score += 1.5
+        return min(score, 10.0)
+    elif category == "Business Model & Financials":
+        score = base_score
+        if company_data.get("revenue_model"):
+            score += 1.5
+        monthly_revenue = company_data.get("monthly_revenue", 0)
+        if isinstance(monthly_revenue, str):
+            try:
+                monthly_revenue = float(monthly_revenue.replace(",", "").replace("$", ""))
+            except (ValueError, TypeError):
+                monthly_revenue = 0
+        if monthly_revenue > 0:
+            score += 2.0
+        if company_data.get("positive_unit_economics"):
+            score += 1.5
+        return min(score, 10.0)
+    else:
+        score = base_score
+        for factor in factors:
+            if company_data.get(factor):
+                score += 1.0
+        return min(score, 10.0)
+
+
+def _calculate_composite_score(categories: list) -> float:
+    """Calculate composite TCA score (0-100) from weighted categories"""
+    total_weighted_score = sum(cat["weightedScore"] for cat in categories)
+    return round(total_weighted_score * 10, 1)
+
+
+def _calculate_risk_assessment(company_data: dict, tca_categories: list) -> dict:
+    """Calculate risk assessment from actual company data and TCA scores"""
+    risk_flags = []
+    for cat in tca_categories:
+        if cat["rawScore"] < 6.5:
+            risk_flags.append({
+                "category": cat["category"],
+                "severity": "high" if cat["rawScore"] < 5.0 else "medium",
+                "description": f"Below threshold performance in {cat['category']}",
+                "mitigation": f"Focus improvement efforts on {cat['category'].lower()}",
+            })
+    if company_data.get("competitive_landscape") == "highly_competitive":
+        risk_flags.append({
+            "category": "Market Risk",
+            "severity": "medium",
+            "description": "Highly competitive market environment",
+            "mitigation": "Strengthen differentiation strategy",
+        })
+    burn_rate = company_data.get("monthly_burn", 0)
+    cash_balance = company_data.get("cash_balance", 0)
+    try:
+        burn_rate = float(burn_rate) if burn_rate else 0
+        cash_balance = float(cash_balance) if cash_balance else 0
+    except (ValueError, TypeError):
+        burn_rate, cash_balance = 0, 0
+    if burn_rate > 0 and cash_balance > 0 and cash_balance / burn_rate < 12:
+        risk_flags.append({
+            "category": "Financial Risk",
+            "severity": "high",
+            "description": "Limited cash runway (< 12 months)",
+            "mitigation": "Secure additional funding or reduce burn rate",
+        })
+    high_risks = len([r for r in risk_flags if r["severity"] == "high"])
+    medium_risks = len([r for r in risk_flags if r["severity"] == "medium"])
+    overall_risk = "HIGH" if high_risks > 2 else "MEDIUM" if (high_risks > 0 or medium_risks > 3) else "LOW"
+    return {
+        "riskLevel": overall_risk,
+        "riskFlags": risk_flags,
+        "totalRisks": len(risk_flags),
+        "highSeverityRisks": high_risks,
+        "mediumSeverityRisks": medium_risks,
+        "summary": f"Identified {len(risk_flags)} risk factors with {overall_risk.lower()} overall risk level",
+    }
+
+
+def _generate_recommendation(composite_score: float, risk_data: dict) -> dict:
+    """Generate investment recommendation from actual scores and risks"""
+    if composite_score >= 80 and risk_data["riskLevel"] in ["LOW", "MEDIUM"]:
+        overall = "STRONG INVEST - High potential with manageable risks"
+        tier = "Tier 1"
+    elif composite_score >= 70 and risk_data["riskLevel"] != "HIGH":
+        overall = "INVEST - Solid opportunity with acceptable risk profile"
+        tier = "Tier 2"
+    elif composite_score >= 60:
+        overall = "CONDITIONAL - Potential with improvement needed"
+        tier = "Tier 3"
+    else:
+        overall = "PASS - Significant concerns identified"
+        tier = "No Investment"
+    strengths = []
+    concerns = []
+    if composite_score >= 75:
+        strengths.append("Strong overall fundamentals")
+    if risk_data["riskLevel"] == "LOW":
+        strengths.append("Low risk profile")
+    if not risk_data["riskFlags"]:
+        strengths.append("No critical risks identified")
+    if composite_score < 70:
+        concerns.append("Below target composite score")
+    if risk_data["highSeverityRisks"] > 0:
+        concerns.append("High severity risks present")
+    if len(risk_data["riskFlags"]) > 3:
+        concerns.append("Multiple risk factors identified")
+    return {
+        "overall": overall,
+        "tier": tier,
+        "strengths": strengths[:3],
+        "concerns": concerns[:3],
+        "summary": f"TCA Analysis: {composite_score}/100 - {tier} recommendation. {overall}",
+    }
+
+
+def _calculate_fallback_analysis(company_data: dict) -> dict:
+    """Run real TCA analysis computed from actual company data fields"""
+    tca_categories = _calculate_tca_categories(company_data)
+    composite_score = _calculate_composite_score(tca_categories)
+    risk_assessment = _calculate_risk_assessment(company_data, tca_categories)
+    recommendation = _generate_recommendation(composite_score, risk_assessment)
+
+    # Build scorecard in the format expected by the frontend transformer
+    scorecard_categories = {}
+    for cat in tca_categories:
+        key = (cat["category"].lower()
+               .replace(" ", "_").replace("&", "and").replace("-", "_").replace("/", "_"))
+        scorecard_categories[key] = {
+            "name": cat["category"],
+            "raw_score": cat["rawScore"],
+            "weight": cat["weight"] / 100,
+            "weighted_score": round(cat["rawScore"] * cat["weight"] / 100, 2),
+            "notes": cat["interpretation"],
+        }
+
+    flags_dict = {}
+    for f in risk_assessment["riskFlags"]:
+        flag_key = f["category"].lower().replace(" ", "_")
+        flags_dict[flag_key] = {
+            "level": {"value": "red" if f["severity"] == "high" else "yellow"},
+            "trigger": f["description"],
+            "impact": f["description"],
+            "severity_score": 8 if f["severity"] == "high" else 5,
+            "mitigation": f["mitigation"],
+            "ai_recommendation": f["mitigation"],
+        }
+
+    return {
+        "final_tca_score": composite_score,
+        "investment_recommendation": recommendation["overall"],
+        "scorecard": {"categories": scorecard_categories},
+        "risk_assessment": {
+            "overall_risk_score": round(
+                max(1, 10 - risk_assessment["highSeverityRisks"] * 2 - risk_assessment["mediumSeverityRisks"]), 1
+            ),
+            "risk_level": risk_assessment["riskLevel"],
+            "flags": flags_dict,
+        },
+        "tca_categories": tca_categories,
+        "recommendation": recommendation,
+        "ai_powered": False,
+        "status": "completed",
+    }
+
+
 # --- Analysis Run/What-If/Results Endpoints ---
 @app.get("/api/v1/analysis/run/{analysis_id}")
 async def get_analysis_run(analysis_id: str):
@@ -8942,43 +9254,43 @@ async def create_analysis_run(data: dict = Body(...)):
         company_id = data.get('company_id') or data.get('companyId')
         framework = data.get('framework', 'tca_standard')
 
-        # Generate mock analysis results
-        modules = [
-            "TCA Scorecard", "Risk Assessment", "Macro Trends",
-            "Team Analysis", "Benchmark", "Growth Classifier", "Gap Analysis",
-            "Simulation"
-        ]
+        # Compute real analysis from submitted company data
+        company_data = data.get('company_data', {})
+        if not company_data:
+            # Accept flat company fields at the top level as a fallback
+            company_data = {k: v for k, v in data.items()
+                           if k not in ('company_id', 'companyId', 'framework', 'modules')}
 
-        import random
-        scores = {
-            module: round(random.uniform(5, 10), 1)
-            for module in modules
+        tca_categories = _calculate_tca_categories(company_data)
+        composite_score = _calculate_composite_score(tca_categories)
+        risk_data = _calculate_risk_assessment(company_data, tca_categories)
+        recommendation = _generate_recommendation(composite_score, risk_data)
+
+        # Map TCA category scores to module scores
+        cat_map = {c["category"]: c["rawScore"] for c in tca_categories}
+        module_scores = {
+            "TCA Scorecard": round(composite_score / 10, 1),
+            "Risk Assessment": cat_map.get("Risk Assessment", round(composite_score / 10, 1)),
+            "Macro Trends": cat_map.get("Market Potential", round(composite_score / 10, 1)),
+            "Team Analysis": cat_map.get("Team Strength", round(composite_score / 10, 1)),
+            "Benchmark": round(composite_score / 10, 1),
+            "Growth Classifier": cat_map.get("Traction", round(composite_score / 10, 1)),
+            "Gap Analysis": cat_map.get("Go-to-Market Strategy", round(composite_score / 10, 1)),
+            "Simulation": round(composite_score / 10, 1),
         }
-        overall_score = round(sum(scores.values()) / len(scores), 1)
+        overall_score = round(composite_score / 10, 1)
 
         return {
-            "success":
-            True,
-            "analysis_id":
-            analysis_id,
-            "company_id":
-            company_id,
-            "framework":
-            framework,
-            "status":
-            "completed",
-            "overall_score":
-            overall_score,
-            "module_scores":
-            scores,
-            "risk_level":
-            "Low" if overall_score >= 7 else
-            "Medium" if overall_score >= 5 else "High",
-            "recommendation":
-            "Strong candidate for investment"
-            if overall_score >= 7 else "Requires further due diligence",
-            "created_at":
-            datetime.utcnow().isoformat()
+            "success": True,
+            "analysis_id": analysis_id,
+            "company_id": company_id,
+            "framework": framework,
+            "status": "completed",
+            "overall_score": overall_score,
+            "module_scores": module_scores,
+            "risk_level": risk_data["riskLevel"],
+            "recommendation": recommendation["overall"],
+            "created_at": datetime.utcnow().isoformat(),
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -8992,22 +9304,37 @@ async def run_what_if_analysis(data: dict = Body(...)):
         base_analysis_id = data.get('analysis_id')
         parameters = data.get('parameters', {})
 
-        import random
+        # Derive scenarios from real base analysis + parameter adjustments
+        company_data = data.get('company_data', {})
+        if not company_data:
+            company_data = {k: v for k, v in data.items()
+                           if k not in ('analysis_id', 'parameters', 'scenario_id')}
 
-        # Generate scenario results
+        tca_categories = _calculate_tca_categories(company_data)
+        composite_score = _calculate_composite_score(tca_categories)
+        base_score_10 = round(composite_score / 10, 1)
+
+        # Apply parameter adjustments to upside/downside
+        revenue_adj = float(parameters.get('revenue_growth_improvement', 0)) * 0.05
+        market_adj = float(parameters.get('market_expansion', 0)) * 0.03
+        team_adj = float(parameters.get('team_expansion', 0)) * 0.04
+        total_adj = revenue_adj + market_adj + team_adj
+        upside_delta = max(total_adj, 0.5)
+        downside_delta = max(total_adj, 0.5)
+
         scenarios = {
             "base_case": {
-                "overall_score": round(random.uniform(6, 8), 1),
-                "probability": 0.60
+                "overall_score": base_score_10,
+                "probability": 0.60,
             },
             "upside_case": {
-                "overall_score": round(random.uniform(8, 10), 1),
-                "probability": 0.25
+                "overall_score": round(min(base_score_10 + upside_delta, 10.0), 1),
+                "probability": 0.25,
             },
             "downside_case": {
-                "overall_score": round(random.uniform(4, 6), 1),
-                "probability": 0.15
-            }
+                "overall_score": round(max(base_score_10 - downside_delta, 0.0), 1),
+                "probability": 0.15,
+            },
         }
 
         return {
@@ -9017,17 +9344,11 @@ async def run_what_if_analysis(data: dict = Body(...)):
             "scenarios": scenarios,
             "parameters_applied": parameters,
             "sensitivity_analysis": {
-                "revenue_growth": {
-                    "impact": "+0.5 per 10%"
-                },
-                "market_size": {
-                    "impact": "+0.3 per $1B"
-                },
-                "team_experience": {
-                    "impact": "+0.4 per 5 years"
-                }
+                "revenue_growth": {"impact": "+0.5 per 10%"},
+                "market_size": {"impact": "+0.3 per $1B"},
+                "team_experience": {"impact": "+0.4 per 5 years"},
             },
-            "created_at": datetime.utcnow().isoformat()
+            "created_at": datetime.utcnow().isoformat(),
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -9035,26 +9356,29 @@ async def run_what_if_analysis(data: dict = Body(...)):
 
 @app.get("/api/v1/analysis/what-if/{scenario_id}")
 async def get_what_if_scenario(scenario_id: str):
-    """Get what-if scenario results"""
+    """Get what-if scenario results by ID"""
     try:
-        import random
+        # Attempt to look up the scenario from the database
+        try:
+            async with db_manager.get_connection() as conn:
+                row = await conn.fetchrow(
+                    "SELECT * FROM what_if_scenarios WHERE id = $1", scenario_id
+                )
+                if row:
+                    return {
+                        "success": True,
+                        "scenario_id": scenario_id,
+                        "scenarios": row.get("scenarios") or {},
+                    }
+        except Exception:
+            pass  # Table may not exist; fall through
+
+        # Scenario not found — return empty result, not fake hardcoded scores
         return {
             "success": True,
             "scenario_id": scenario_id,
-            "scenarios": {
-                "base_case": {
-                    "overall_score": 7.2,
-                    "probability": 0.60
-                },
-                "upside_case": {
-                    "overall_score": 8.5,
-                    "probability": 0.25
-                },
-                "downside_case": {
-                    "overall_score": 5.8,
-                    "probability": 0.15
-                }
-            }
+            "scenarios": {},
+            "message": "Scenario not found. Submit a new what-if analysis to generate real scenarios.",
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
