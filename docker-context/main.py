@@ -1618,6 +1618,7 @@ class UserUpdateRequest(BaseModel):
     email: Optional[EmailStr] = None
     role: Optional[str] = None
     is_active: Optional[bool] = None
+    full_name: Optional[str] = None
 
 
 class InviteUserRequest(BaseModel):
@@ -1735,9 +1736,16 @@ async def get_user(user_id: int, current_user: dict = Depends(get_current_user))
 @app.put("/users/{user_id}")
 @app.put("/api/v1/users/{user_id}")
 async def update_user(user_id: int, request: UserUpdateRequest, current_user: dict = Depends(get_current_user)):
-    """Update user (admin only)"""
-    if current_user.get("role", "").lower() != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
+    """Update user - admins can update any user, users can update their own profile"""
+    is_admin = current_user.get("role", "").lower() == "admin"
+    is_self = current_user["id"] == user_id
+
+    if not is_admin and not is_self:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    # Non-admins cannot change role or active status
+    if not is_admin and (request.role is not None or request.is_active is not None):
+        raise HTTPException(status_code=403, detail="Admin access required to change role or status")
     
     try:
         async with db_manager.get_connection() as conn:
@@ -1751,6 +1759,11 @@ async def update_user(user_id: int, request: UserUpdateRequest, current_user: di
             params = []
             param_idx = 1
             
+            if request.full_name is not None:
+                updates.append(f"full_name = ${param_idx}")
+                params.append(request.full_name)
+                param_idx += 1
+
             if request.email is not None:
                 updates.append(f"email = ${param_idx}")
                 params.append(request.email)
@@ -1774,9 +1787,15 @@ async def update_user(user_id: int, request: UserUpdateRequest, current_user: di
             
             query = f"UPDATE users SET {', '.join(updates)} WHERE id = ${param_idx}"
             await conn.execute(query, *params)
+
+            # Return updated user object
+            updated = await conn.fetchrow(
+                "SELECT id, username, email, role, is_active, full_name FROM users WHERE id = $1",
+                user_id
+            )
         
-        logger.info(f"User {user_id} updated by admin {current_user['id']}")
-        return {"message": "User updated successfully"}
+        logger.info(f"User {user_id} updated by {'admin ' + str(current_user['id']) if is_admin else 'self'}")
+        return dict(updated)
         
     except HTTPException:
         raise
@@ -5962,46 +5981,107 @@ async def create_analysis_session_v1(data: dict = Body(...)):
 @app.post("/api/v1/analysis/extract-text-from-file")
 async def extract_text_from_file(data: dict = Body(...)):
     """Extract text content from PDF, Word documents, or other file types"""
+    import base64
+    import io
+
     try:
         content = data.get('content', '')
         filename = data.get('filename', 'unknown')
-        
-        # If content is base64 encoded, decode it
-        import base64
         text_content = ""
-        
+
+        if not content:
+            return {"success": False, "text_content": "", "error": "No content provided"}
+
+        # Decode base64 to raw bytes
         try:
-            # Try to decode base64 content
-            if content and len(content) > 100:
-                # For demo, extract any readable text patterns from base64
-                decoded = base64.b64decode(content)
-                # Try to find text patterns
-                try:
-                    text_content = decoded.decode('utf-8', errors='ignore')
-                except:
-                    text_content = decoded.decode('latin-1', errors='ignore')
-                
-                # Clean up non-printable characters
-                text_content = ''.join(c for c in text_content if c.isprintable() or c in '\n\r\t ')
-                
-                # If still no good content, generate placeholder based on filename
-                if len(text_content.strip()) < 50:
-                    text_content = f"[Document content from {filename}]\n"
-                    text_content += "This document contains company information that has been processed.\n"
-                    text_content += f"File: {filename}\n"
+            file_bytes = base64.b64decode(content)
         except Exception as e:
-            logger.warning(f"Error decoding file content: {e}")
-            text_content = f"[Content extracted from {filename}]"
-        
+            logger.warning(f"Base64 decode failed for {filename}: {e}")
+            return {"success": False, "text_content": "", "error": "Invalid base64 content"}
+
+        ext = filename.lower()
+
+        if ext.endswith('.pdf'):
+            # Use PyMuPDF (fitz) for accurate PDF text extraction
+            try:
+                import fitz  # PyMuPDF
+                pdf_doc = fitz.open(stream=file_bytes, filetype="pdf")
+                parts = [pdf_doc.load_page(i).get_text() for i in range(len(pdf_doc))]
+                pdf_doc.close()
+                text_content = "\n".join(parts)
+            except ImportError:
+                try:
+                    import pdfplumber
+                    with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+                        parts = [p.extract_text() for p in pdf.pages if p.extract_text()]
+                    text_content = "\n".join(parts)
+                except ImportError:
+                    text_content = f"[PDF extraction requires PyMuPDF or pdfplumber: {filename}]"
+                except Exception as e:
+                    text_content = f"[PDF extraction failed: {e}]"
+            except Exception as e:
+                text_content = f"[PDF extraction failed: {e}]"
+
+        elif ext.endswith('.docx') or ext.endswith('.doc'):
+            try:
+                import docx
+                doc = docx.Document(io.BytesIO(file_bytes))
+                text_content = "\n".join(p.text for p in doc.paragraphs)
+            except ImportError:
+                text_content = f"[DOCX extraction requires python-docx: {filename}]"
+            except Exception as e:
+                text_content = f"[DOCX extraction failed: {e}]"
+
+        elif ext.endswith('.pptx'):
+            try:
+                from pptx import Presentation
+                prs = Presentation(io.BytesIO(file_bytes))
+                parts = []
+                for i, slide in enumerate(prs.slides, 1):
+                    parts.append(f"=== Slide {i} ===")
+                    parts.extend(shape.text for shape in slide.shapes if hasattr(shape, "text") and shape.text)
+                text_content = "\n".join(parts)
+            except ImportError:
+                text_content = f"[PPTX extraction requires python-pptx: {filename}]"
+            except Exception as e:
+                text_content = f"[PPTX extraction failed: {e}]"
+
+        elif ext.endswith('.xlsx') or ext.endswith('.xls'):
+            try:
+                import openpyxl
+                wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
+                parts = []
+                for sheet_name in wb.sheetnames:
+                    parts.append(f"=== Sheet: {sheet_name} ===")
+                    for row in wb[sheet_name].iter_rows(values_only=True):
+                        row_text = "\t".join(str(c) if c is not None else "" for c in row)
+                        if row_text.strip():
+                            parts.append(row_text)
+                text_content = "\n".join(parts)
+            except ImportError:
+                text_content = f"[Excel extraction requires openpyxl: {filename}]"
+            except Exception as e:
+                text_content = f"[Excel extraction failed: {e}]"
+
+        elif ext.endswith('.txt') or ext.endswith('.csv') or ext.endswith('.json'):
+            text_content = file_bytes.decode('utf-8', errors='replace')
+
+        else:
+            # Unknown type: attempt utf-8, strip non-printable chars
+            raw = file_bytes.decode('utf-8', errors='ignore')
+            text_content = ''.join(c for c in raw if c.isprintable() or c in '\n\r\t ')
+            if len(text_content.strip()) < 20:
+                text_content = f"[Unsupported file type: {filename}]"
+
         return {
             "success": True,
-            "text_content": text_content if text_content else f"[Processed document: {filename}]",
+            "text_content": text_content,
             "filename": filename,
             "char_count": len(text_content),
             "timestamp": datetime.utcnow().isoformat()
         }
     except Exception as e:
-        logger.error(f"Error extracting text: {e}")
+        logger.error(f"Error extracting text from {data.get('filename', 'unknown')}: {e}")
         return {
             "success": False,
             "text_content": "",
