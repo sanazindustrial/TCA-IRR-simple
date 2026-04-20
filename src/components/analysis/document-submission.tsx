@@ -104,26 +104,25 @@ export function DocumentSubmission({
       setUploadedFiles((prev) => [...prev, ...newFiles]);
       setIsProcessing(true);
 
-      // Process files - extract text from PDFs via backend API
+      // Process files - extract text via backend API for binary formats
       const processedFiles = await Promise.all(files.map(async (file) => {
         let textContent = '';
+        let imageCount = 0;
+        const fname = file.name.toLowerCase();
 
-        // For text-based files, read directly
-        if (file.type === 'text/plain' || file.name.endsWith('.txt') || file.name.endsWith('.csv')) {
+        // Plain-text formats can be read directly in the browser
+        const isPlainText = fname.endsWith('.txt') || fname.endsWith('.csv') ||
+          fname.endsWith('.json') || file.type === 'text/plain' ||
+          file.type === 'application/json';
+
+        if (isPlainText) {
           try {
             textContent = await file.text();
           } catch (e) {
             console.warn('Could not read text file:', file.name);
           }
-        } else if (file.type === 'application/json' || file.name.endsWith('.json')) {
-          try {
-            textContent = await file.text();
-          } catch (e) {
-            console.warn('Could not read JSON file:', file.name);
-          }
-        } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf') ||
-          file.type.includes('word') || file.name.endsWith('.docx') || file.name.endsWith('.doc')) {
-          // For PDFs and Word docs, send to backend for text extraction
+        } else {
+          // All binary formats: PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, RTF, ODT → backend
           try {
             const base64Content = await fileToBase64(file);
             const response = await fetch('https://tcairrapiccontainer.azurewebsites.net/api/v1/analysis/extract-text-from-file', {
@@ -132,23 +131,23 @@ export function DocumentSubmission({
               body: JSON.stringify({
                 content: base64Content,
                 filename: file.name,
+                extract_images: true,
               }),
             });
 
             if (response.ok) {
               const result = await response.json();
               textContent = result.text_content || '';
-              console.log(`Extracted ${textContent.length} characters from ${file.name}`);
+              imageCount = result.image_count || 0;
+              console.log(`Extracted ${textContent.length} chars, ${imageCount} image(s) from ${file.name}`);
             } else {
-              console.warn('Backend extraction failed for:', file.name);
-              textContent = `[File extraction pending: ${file.name}]`;
+              console.warn('Backend extraction failed for:', file.name, response.status);
+              textContent = `[File extraction failed (HTTP ${response.status}): ${file.name}]`;
             }
           } catch (e) {
             console.warn('Could not extract text from:', file.name, e);
             textContent = `[File extraction failed: ${file.name}]`;
           }
-        } else {
-          textContent = `[Unsupported file type: ${file.name}]`;
         }
 
         return {
@@ -157,6 +156,7 @@ export function DocumentSubmission({
           type: file.type,
           extracted_data: {
             text_content: textContent,
+            image_count: imageCount,
             financial_data: { revenue: 0, burn_rate: 0, runway_months: 0 },
             key_metrics: { team_size: 0, customers: 0, mrr: 0 }
           }

@@ -1,7 +1,6 @@
 'use server';
 
 import type { ComprehensiveAnalysisOutput } from '@/ai/flows/schemas';
-import { sampleAnalysisData } from '@/lib/sample-data';
 
 // Try different backend URLs based on environment
 const BACKEND_API_URL = 'https://tcairrapiccontainer.azurewebsites.net'; // Production fallback
@@ -35,8 +34,7 @@ export async function runAnalysis(
   try {
     // 1. Input Validation - Now inside try-catch to prevent crash
     if (!['general', 'medtech'].includes(framework)) {
-      console.error(`Invalid framework: ${framework}, returning sample data`);
-      return sampleAnalysisData as unknown as ComprehensiveAnalysisOutput;
+      throw new Error(`Invalid analysis framework: ${framework}`);
     }
     // Test basic connectivity first (non-blocking)
     console.log('Testing backend connectivity...');
@@ -77,10 +75,9 @@ export async function runAnalysis(
 
       // Company data structure - Use real user data if provided
       company_data: {
-        name: userData?.companyName || 'Sample Company',
+        name: userData?.companyName || '',
         description: userData?.companyDescription ||
-          (processedTexts[0] ? (typeof processedTexts[0] === 'string' ? processedTexts[0] : String(processedTexts[0])) : '').slice(0, 200) ||
-          'AI-powered startup using machine learning for optimization',
+          (processedTexts[0] ? (typeof processedTexts[0] === 'string' ? processedTexts[0] : String(processedTexts[0])) : '').slice(0, 200) || '',
         stage: 'seed',
         sector: backendSectorMap[framework],
         framework: framework,
@@ -95,25 +92,24 @@ export async function runAnalysis(
       // TCA Input structure - Use real user data if provided
       tcaInput: {
         founderQuestionnaire: userData?.submittedTexts?.[0] ||
-          (processedTexts[0] ? (typeof processedTexts[0] === 'string' ? processedTexts[0] : String(processedTexts[0])) : '') ||
-          'Our team has extensive experience in AI and SaaS. We are solving a major pain point in the market.',
-        uploadedPitchDecks: userData?.uploadedFiles?.map(f => f.name).join(', ') || processedFiles.map((f: any) => f.name).join(', ') || 'Pitch deck contains market analysis, product roadmap, and financial projections.',
-        financials: userData?.submittedTexts?.[1] || `Revenue: $${extractedFinancials.revenue}, Burn: $${extractedFinancials.burn_rate}/month, Runway: ${extractedFinancials.runway_months} months` || 'We have secured $500k in pre-seed funding and have a 12-month runway.',
+          (processedTexts[0] ? (typeof processedTexts[0] === 'string' ? processedTexts[0] : String(processedTexts[0])) : ''),
+        uploadedPitchDecks: userData?.uploadedFiles?.map(f => f.name).join(', ') || processedFiles.map((f: any) => f.name).join(', ') || '',
+        financials: userData?.submittedTexts?.[1] || `Revenue: $${extractedFinancials.revenue}, Burn: $${extractedFinancials.burn_rate}/month, Runway: ${extractedFinancials.runway_months} months`,
         framework: framework,
         processed_files_count: processedFiles.length,
         processed_urls_count: processedUrls.length,
         processed_texts_count: processedTexts.length
       },      // Risk Input structure - Use real user data if provided
       riskInput: {
-        uploadedDocuments: userData?.uploadedFiles?.map(f => f.name).join(', ') || 'Business plan, financial statements, and IP registrations.',
-        complianceChecklists: userData?.submittedTexts?.[2] || 'GDPR, CCPA, and industry-specific regulations checklist reviewed.',
+        uploadedDocuments: userData?.uploadedFiles?.map(f => f.name).join(', ') || '',
+        complianceChecklists: userData?.submittedTexts?.[2] || '',
         framework: framework,
       },
 
       // Macro Input structure - Use real user data if provided
       macroInput: {
-        companyDescription: userData?.companyDescription || 'A B2B SaaS company using AI to optimize supply chains.',
-        newsFeedData: userData?.importedUrls?.join(', ') || 'Recent articles on supply chain disruptions and the rise of AI in logistics.',
+        companyDescription: userData?.companyDescription || '',
+        newsFeedData: userData?.importedUrls?.join(', ') || '',
         trendDatabaseData: 'Data from World Bank and IMF on global trade and technology adoption.',
         sector: framework,
       },
@@ -142,7 +138,7 @@ export async function runAnalysis(
 
       // Analysis configuration
       stage: 'seed',
-      companyName: 'Sample Company'
+      companyName: userData?.companyName || ''
     };
 
     console.log('Making request to:', `${BACKEND_API_URL}${API_VERSION}/analysis/comprehensive`);
@@ -176,9 +172,7 @@ export async function runAnalysis(
     } catch (fetchError) {
       clearTimeout(timeoutId);
       console.error('Backend fetch error:', fetchError);
-      // Return sample data instead of crashing
-      console.warn('Returning sample analysis data due to fetch error');
-      return sampleAnalysisData as unknown as ComprehensiveAnalysisOutput;
+      throw new Error(`Backend analysis request failed: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`);
     }
 
     const backendData = await response.json();
@@ -207,10 +201,9 @@ export async function runAnalysis(
       };
     }) : [];
 
-    // CRITICAL FIX: If no TCA categories from backend, use sample data
+    // If no TCA categories from backend, leave empty — caller handles this state
     if (tcaCategories.length === 0) {
-      console.warn('No TCA categories from backend, using sample data');
-      tcaCategories = sampleAnalysisData.tcaData.categories;
+      console.warn('No TCA categories returned from backend');
     }
 
     // Calculate composite score correctly: sum of weighted scores (0-10 scale)
@@ -225,7 +218,7 @@ export async function runAnalysis(
         ? backendData.final_tca_score / 10
         : backendData.final_tca_score;
     } else {
-      compositeScore = 7.5; // Default fallback
+      compositeScore = 0; // No data available
     }
     // Ensure score is in valid 0-10 range
     compositeScore = Math.max(0, Math.min(10, compositeScore));
@@ -351,8 +344,6 @@ export async function runAnalysis(
       timestamp: new Date().toISOString(),
     });
 
-    // Return sample data as fallback instead of crashing
-    console.warn('Returning sample analysis data as fallback');
-    return sampleAnalysisData as unknown as ComprehensiveAnalysisOutput;
+    throw new Error(`Analysis failed: ${(error as Error).message}`);
   }
 }

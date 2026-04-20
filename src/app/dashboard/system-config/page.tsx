@@ -79,8 +79,8 @@ type ApiKey = {
 
 const initialEnvVars: EnvVar[] = [
   { id: '1', name: 'NODE_ENV', value: 'development', scope: 'backend', description: 'Backend-node only' },
-  { id: '2', name: 'NEXT_PUBLIC_SUPABASE_URL', value: 'https://ixshfrcomwlmybmvupdanv.supabase.co', scope: 'frontend', description: 'Accessible to React frontend' },
-  { id: '3', name: 'NEXT_PUBLIC_SUPABASE_ANON_KEY', value: '*****************', scope: 'frontend', description: 'Accessible to React frontend' },
+  { id: '2', name: 'AZURE_POSTGRESQL_HOST', value: 'tcairrapiccontainer.postgres.database.azure.com', scope: 'backend', description: 'Azure PostgreSQL host' },
+  { id: '3', name: 'DATABASE_URL', value: 'postgresql://***:***@tcairr...azure.com:5432/tcadb', scope: 'backend', description: 'Backend-node only' },
   { id: '4', name: 'OPENAI_API_KEY', value: '*****************', scope: 'backend', description: 'Backend-node only' },
   { id: '5', name: 'GEMINI_API_KEY', value: '*****************', scope: 'backend', description: 'Backend-node only' },
   { id: '6', name: 'DATABASE_URL', value: 'postgresql://postgres:password@localhost:5432/pitch.db', scope: 'backend', description: 'Backend-node only' },
@@ -90,7 +90,7 @@ const initialEnvVars: EnvVar[] = [
 const initialApiKeys: ApiKey[] = [
     { id: 'key-1', name: 'Gemini', value: 'AIzaSy****************', keySnippet: 'AIzaSy...' },
     { id: 'key-2', name: 'OpenAI', value: 'sk-****************', keySnippet: 'sk-...' },
-    { id: 'key-3', name: 'Supabase', value: 'eyJhbGci****************', keySnippet: 'eyJhbGci...' },
+    { id: 'key-3', name: 'Azure PostgreSQL', value: '', keySnippet: '' },
     { id: 'key-4', name: 'Crunchbase', value: '', keySnippet: '' },
     { id: 'key-5', name: 'Anthropic', value: '', keySnippet: '' },
     { id: 'key-6', name: 'GitHub', value: '', keySnippet: '' },
@@ -99,14 +99,14 @@ const initialApiKeys: ApiKey[] = [
 const connections = [
     { name: 'Database', status: 'disconnected' },
     { name: 'OpenAI', status: 'disconnected' },
-    { name: 'Supabase', status: 'connected' },
+    { name: 'Azure PostgreSQL', status: 'disconnected' },
     { name: 'Smtp', status: 'disconnected' },
 ];
 
 const systemHealth = [
     { name: 'Database Connection', status: 'disconnected'},
     { name: 'OpenAI API', status: 'disconnected'},
-    { name: 'Supabase', status: 'connected'},
+    { name: 'Azure PostgreSQL', status: 'disconnected'},
     { name: 'SMTP Email', status: 'disconnected'},
 ]
 
@@ -472,7 +472,7 @@ export default function SystemConfigPage() {
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                               <Button size="lg" onClick={() => handleTestConnection('Database')}><Database className="mr-2"/> Test Database</Button>
                               <Button size="lg" onClick={() => handleTestConnection('OpenAI API')}><Rocket className="mr-2"/> Test OpenAI API</Button>
-                              <Button size="lg" onClick={() => handleTestConnection('Supabase')}><TestTube className="mr-2"/> Test Supabase</Button>
+                              <Button size="lg" onClick={() => handleTestConnection('Azure PostgreSQL')}><TestTube className="mr-2"/> Test Azure PostgreSQL</Button>
                           </div>
                           <Card>
                               <CardHeader>

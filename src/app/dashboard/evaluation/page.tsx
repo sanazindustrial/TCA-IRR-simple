@@ -887,6 +887,15 @@ export default function EvaluationPage() {
                 if (extractedData.city) updates.city = extractedData.city;
                 if (extractedData.number_of_employees) updates.numberOfEmployees = extractedData.number_of_employees;
 
+                // If API didn't return a company name, try local pattern fallback before giving up
+                if (!updates.companyName) {
+                    const localName = extractNameFromContent(allContent);
+                    if (localName) {
+                        updates.companyName = localName;
+                        console.log('Used local fallback for company name:', localName);
+                    }
+                }
+
                 // Update company info with extracted data
                 if (Object.keys(updates).length > 0) {
                     setCompanyInfo(prev => ({ ...prev, ...updates }));
@@ -894,8 +903,8 @@ export default function EvaluationPage() {
                 }
 
                 // Generate company ID based on extracted name
-                if (extractedData.company_name) {
-                    const newCompanyId = generateCompanyId(extractedData.company_name);
+                if (updates.companyName) {
+                    const newCompanyId = generateCompanyId(updates.companyName);
                     setCompanyId(newCompanyId);
                 }
 
@@ -986,6 +995,19 @@ export default function EvaluationPage() {
                 if (name.length > 2 && !name.toLowerCase().includes('pitch') && !name.toLowerCase().includes('deck')) {
                     return name;
                 }
+            }
+        }
+        // Last resort: scan the first few non-trivial lines — pitch decks commonly have the
+        // company name as a plain heading on slide 1 with no label prefix.
+        const SKIP_LINE_PREFIXES = /^(?:pitch|deck|slide|presentation|investor|welcome|agenda|contents|overview|about|summary|introduction|confidential)/i;
+        const lines = content.split('\n').map((l: string) => l.trim()).filter((l: string) => l.length >= 3 && l.length <= 80);
+        for (const line of lines.slice(0, 8)) {
+            if (
+                /^[A-Za-z]/.test(line) &&
+                !SKIP_LINE_PREFIXES.test(line) &&
+                !/\b\d{4}\b/.test(line)
+            ) {
+                return line.slice(0, 100);
             }
         }
         return '';

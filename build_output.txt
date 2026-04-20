@@ -1,0 +1,25 @@
+
+> tca-irr-app@1.0.0 build
+> next build
+
+   ▲ Next.js 15.3.3
+   - Environments: .env.production
+
+   Creating an optimized production build ...
+Failed to compile.
+
+./src/middleware.ts
+Error:   [31mx[0m Expression expected
+   ,-[[36;1;4mc:\Users\Allot\Desktop\TCA-IRR-APP-main- simplify\TCA-IRR-simple\src\middleware.ts[0m:1:1]
+ [2m1[0m | .import { NextRequest, NextResponse } from 'next/server';
+   : [35;1m^[0m
+ [2m2[0m | import {
+ [2m3[0m |     CSP_HEADERS,
+ [2m3[0m |     RateLimiter,
+   `----
+
+Caused by:
+    Syntax Error
+
+
+> Build failed because of webpack errors

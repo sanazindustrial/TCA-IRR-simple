@@ -162,8 +162,8 @@ export function TwoPhaseUpload({
                 }
             };
 
-            const existingFiles = JSON.parse(localStorage.getItem('processedFiles') || '[]');
-            localStorage.setItem('processedFiles', JSON.stringify([...existingFiles, pitchDeckData]));
+            // Start fresh: pitch deck is phase 1, so clear any files from previous sessions
+            localStorage.setItem('processedFiles', JSON.stringify([pitchDeckData]));
 
             setPitchDeckUploaded(true);
             setIsProcessing(false);
