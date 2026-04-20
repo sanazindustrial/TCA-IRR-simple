@@ -98,7 +98,20 @@ export default function CostManagementPage() {
         userFilter !== 'all' ? userFilter : undefined,
         activityFilter !== 'all' ? activityFilter : undefined,
       );
-      setCostData(data);
+      // Merge with fallbackCostData to ensure all fields exist (API may return partial data)
+      setCostData({
+        ...fallbackCostData,
+        ...data,
+        aiBreakdown: {
+          ...fallbackCostData.aiBreakdown,
+          ...(data?.aiBreakdown ?? {}),
+          models: data?.aiBreakdown?.models ?? fallbackCostData.aiBreakdown.models,
+          costByUser: data?.aiBreakdown?.costByUser ?? fallbackCostData.aiBreakdown.costByUser,
+          costByReportType: data?.aiBreakdown?.costByReportType ?? fallbackCostData.aiBreakdown.costByReportType,
+        },
+        breakdown: data?.breakdown ?? fallbackCostData.breakdown,
+        trends: data?.trends ?? fallbackCostData.trends,
+      });
     } catch (error) {
       console.error('Failed to fetch cost data:', error);
       toast({
@@ -150,11 +163,11 @@ export default function CostManagementPage() {
     fetchCostData();
   }
 
-  const aiCostPercentage = costData.totalCost > 0
-    ? (costData.aiBreakdown.totalAiCost / costData.totalCost) * 100
+  const aiCostPercentage = (costData?.totalCost ?? 0) > 0
+    ? ((costData?.aiBreakdown?.totalAiCost ?? 0) / costData.totalCost) * 100
     : 0;
 
-  if (isLoading && !costData.totalRequests) {
+  if (isLoading && !(costData?.totalRequests)) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -247,7 +260,7 @@ export default function CostManagementPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card className="lg:col-span-1 bg-success text-success-foreground">
+            <Card className="lg:col-span-1 bg-green-600 text-white">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-success-foreground/80">Total Cost</CardTitle>
                 <DollarSign className="size-4 text-success-foreground/70" />
@@ -285,7 +298,7 @@ export default function CostManagementPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
-                  {costData.breakdown.map(item => (
+                  {(costData?.breakdown ?? []).map(item => (
                     <div key={item.category}>
                       <div className="flex justify-between mb-1">
                         <p className="text-sm font-medium">{item.category}</p>
@@ -398,7 +411,6 @@ export default function CostManagementPage() {
           </div>
         </div>
       </div>
-    </div>
   );
 }
 
