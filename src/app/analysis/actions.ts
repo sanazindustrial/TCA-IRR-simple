@@ -29,6 +29,8 @@ export async function runAnalysis(
     submittedTexts?: string[];
     companyName?: string;
     companyDescription?: string;
+    moduleConfigs?: Record<string, any>;
+    activeModules?: Array<{ module_id: string; weight: number; is_enabled: boolean }>;
   }
 ): Promise<ComprehensiveAnalysisOutput> {
   try {
@@ -138,7 +140,12 @@ export async function runAnalysis(
 
       // Analysis configuration
       stage: 'seed',
-      companyName: userData?.companyName || ''
+      companyName: userData?.companyName || '',
+
+      // Module configuration — saved formula/threshold settings from analyst config pages
+      moduleConfigs: userData?.moduleConfigs || {},
+      // Active modules list with weights for backend to use in weighted scoring
+      activeModules: userData?.activeModules || [],
     };
 
     console.log('Making request to:', `${BACKEND_API_URL}${API_VERSION}/analysis/comprehensive`);
