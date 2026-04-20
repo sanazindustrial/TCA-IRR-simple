@@ -254,13 +254,7 @@ export default function DatabaseSearchPage() {
   });
 
   return (
-        <EvaluationProvider role={'user'} reportType={'dd'} framework={'general'} onFrameworkChangeAction={function (): void {
-      throw new Error('Function not implemented.');
-    } } setReportTypeAction={function (): void {
-      throw new Error('Function not implemented.');
-    } } isLoading={false} handleRunAnalysisAction={function (): void {
-      throw new Error('Function not implemented.');
-    } }>
+        <EvaluationProvider role={'user'} reportType={'dd'} framework={'general'} onFrameworkChangeAction={() => {}} setReportTypeAction={() => {}} isLoading={false} handleRunAnalysisAction={() => {}}>
       <div className="container mx-auto p-4 md:p-8">
         <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
             <div>

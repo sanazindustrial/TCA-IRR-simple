@@ -645,17 +645,16 @@ export default function ReportsPage() {
     await loadReports();
   };
 
-  // Get current user email from localStorage
-  const currentUserEmail = typeof window !== 'undefined'
-    ? (() => {
-      try {
-        const user = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
-        return user.email || localStorage.getItem('userEmail') || 'user@tca.com';
-      } catch {
-        return localStorage.getItem('userEmail') || 'user@tca.com';
-      }
-    })()
-    : 'user@tca.com';
+  // Get current user email from localStorage (client-side only to avoid SSR hydration mismatch)
+  const [currentUserEmail, setCurrentUserEmail] = useState('user@tca.com');
+  useEffect(() => {
+    try {
+      const user = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
+      setCurrentUserEmail(user.email || localStorage.getItem('userEmail') || 'user@tca.com');
+    } catch {
+      setCurrentUserEmail(localStorage.getItem('userEmail') || 'user@tca.com');
+    }
+  }, []);
 
   const reportsForUser = allReports.filter(r => isPrivilegedUser || r.user.email === currentUserEmail);
   const myReports = allReports.filter(r => r.user.email === currentUserEmail);
