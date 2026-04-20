@@ -366,10 +366,27 @@ export default function DueDiligenceWorkflowPage() {
       };
       localStorage.setItem('ddContext', JSON.stringify(ddContext));
 
-      const comprehensiveData = await runAnalysis('medtech');
+      const ddFramework: 'general' | 'medtech' =
+        companyIndustry.toLowerCase().includes('health') ||
+        companyIndustry.toLowerCase().includes('bio') ||
+        companyIndustry.toLowerCase().includes('med')
+          ? 'medtech' : 'general';
+
+      const comprehensiveData = await runAnalysis(ddFramework, {
+        companyName,
+        companyDescription: [companyDescription, companyIndustry, dealType].filter(Boolean).join(' | '),
+        uploadedFiles: uploadedFiles as unknown as any[],
+        importedUrls,
+        submittedTexts,
+        activeModules: selectedAreas.map(areaId => ({
+          module_id: areaId,
+          weight: 10,
+          is_enabled: true,
+        })),
+      });
       setAnalysisResult(comprehensiveData);
       localStorage.setItem('analysisResult', JSON.stringify(comprehensiveData));
-      localStorage.setItem('analysisFramework', 'medtech');
+      localStorage.setItem('analysisFramework', ddFramework);
 
       const savedReport = await reportsApi.createReport({
         company_name: companyName,

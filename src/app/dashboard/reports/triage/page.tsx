@@ -383,7 +383,14 @@ export default function TriageReportWizardPage() {
     }, 1500);
 
     try {
-      const analysisData = await runAnalysis(framework);
+      const analysisData = await runAnalysis(framework, {
+        companyName,
+        companyDescription: [pitchSummary, keyMetrics, teamInfo, productDescription].filter(Boolean).join('\n\n'),
+        submittedTexts: [pitchSummary, keyMetrics, teamInfo, productDescription].filter(Boolean),
+        activeModules: TRIAGE_MODULES
+          .filter(m => selectedModules.includes(m.id))
+          .map(m => ({ module_id: m.id, weight: m.weight, is_enabled: true })),
+      });
       clearInterval(progressTimer);
       setGenerationProgress(100);
       setGenerationStatus('Triage complete!');

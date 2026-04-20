@@ -312,6 +312,7 @@ export default function ReportConfigurationPage() {
     const ssdMandatoryFields = startupSteroidMandatoryFields;
     const [showPreview, setShowPreview] = useState(false);
     const [previewLoading, setPreviewLoading] = useState(false);
+    const [previewDataOverride, setPreviewDataOverride] = useState<null | typeof rawSampleData>(null);
 
     const { toast } = useToast();
 
@@ -400,7 +401,7 @@ export default function ReportConfigurationPage() {
     };
 
     // Expanded sample data for comprehensive 10-page report preview
-    const sampleReportData = {
+    const rawSampleData = {
         companyName: 'TechVenture AI Inc.',
         industry: 'Technology / AI',
         stage: 'Series A',
@@ -477,10 +478,43 @@ export default function ReportConfigurationPage() {
         },
     };
 
+    // Use real analysis data for preview if available, otherwise fall back to sample data
+    const sampleReportData = previewDataOverride ?? rawSampleData;
+
     // Generate sample report and log
     const generateSampleReport = async () => {
         setPreviewLoading(true);
         try {
+            // Try to load real analysis data from localStorage
+            try {
+                const storedAnalysis = localStorage.getItem('analysisResult');
+                const storedCompanyName = localStorage.getItem('analysisCompanyName');
+                if (storedAnalysis) {
+                    const analysis = JSON.parse(storedAnalysis);
+                    const tcaScore = typeof analysis?.tcaData?.overallScore === 'number'
+                        ? analysis.tcaData.overallScore : rawSampleData.tcaScore;
+                    const riskScore = typeof analysis?.riskData?.overallRiskScore === 'number'
+                        ? analysis.riskData.overallRiskScore : rawSampleData.riskScore;
+                    const categories = Array.isArray(analysis?.tcaData?.categories) && analysis.tcaData.categories.length > 0
+                        ? analysis.tcaData.categories : rawSampleData.categories;
+                    const recommendation: 'PROCEED' | 'CONDITIONAL' | 'PASS' =
+                        tcaScore >= 7 ? 'PROCEED' : tcaScore >= 5.5 ? 'CONDITIONAL' : 'PASS';
+                    setPreviewDataOverride({
+                        ...rawSampleData,
+                        companyName: storedCompanyName || rawSampleData.companyName,
+                        tcaScore: Math.round(tcaScore * 10) / 10,
+                        riskScore: Math.round(riskScore * 10) / 10,
+                        recommendation,
+                        categories,
+                        aiInterpretation: analysis?.tcaData?.aiInterpretation || rawSampleData.aiInterpretation,
+                        strengths: Array.isArray(analysis?.tcaData?.strengths) ? analysis.tcaData.strengths : rawSampleData.strengths,
+                        concerns: Array.isArray(analysis?.tcaData?.concerns) ? analysis.tcaData.concerns : rawSampleData.concerns,
+                    });
+                }
+            } catch {
+                // Keep rawSampleData fallback if localStorage read fails
+            }
+
             const reportLog = {
                 timestamp: new Date().toISOString(),
                 type: 'sample_report_preview',
