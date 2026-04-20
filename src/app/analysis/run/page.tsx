@@ -36,8 +36,8 @@ import { cn } from '@/lib/utils';
 import { settingsApi, ModuleSetting } from '@/lib/settings-api';
 import { generateEvaluationId, generateAnalysisId, generateReportId } from '@/lib/unified-record-tracking';
 
-// Module definitions with versions and descriptions (8 Core Modules)
-// Default all modules to active=true, but this will be overridden by settings
+// Module definitions — all 17 modules matching MODULE_DEFINITIONS in settings-api.ts
+// Default all modules to active=true, but this will be overridden by settings / module-deck-config
 const ALL_MODULES = [
     {
         id: 'tca-scorecard',
@@ -46,47 +46,37 @@ const ALL_MODULES = [
         version: 'v2.1',
         description: 'Central evaluation across 12 fundamental categories.',
         icon: Target,
-        weight: 15,
+        weight: 20,
         active: true
     },
     {
         id: 'risk-assessment',
         apiId: 'risk',
-        name: 'Risk Assessment',
+        name: 'Risk Flags',
         version: 'v1.8',
-        description: 'Comprehensive risk analysis across 14 domains.',
+        description: 'Risk analysis across 14 domains.',
         icon: Shield,
-        weight: 13,
+        weight: 15,
         active: true
     },
     {
         id: 'macro-trends',
         apiId: 'macro',
-        name: 'Macro Trends',
-        version: 'v1.5',
-        description: 'PESTEL analysis and market trend alignment.',
+        name: 'Macro Trend Alignment',
+        version: 'v1.2',
+        description: 'PESTEL analysis and trend scores.',
         icon: TrendingUp,
-        weight: 12,
-        active: true
-    },
-    {
-        id: 'team-analysis',
-        apiId: 'team',
-        name: 'Team Analysis',
-        version: 'v1.4',
-        description: 'Founder profile and team strength assessment.',
-        icon: Users,
-        weight: 13,
+        weight: 10,
         active: true
     },
     {
         id: 'benchmark',
         apiId: 'benchmark',
-        name: 'Benchmark',
+        name: 'Benchmark Comparison',
         version: 'v1.5',
-        description: 'Performance comparison vs. sector averages.',
+        description: 'Performance vs. sector averages.',
         icon: BarChart3,
-        weight: 12,
+        weight: 10,
         active: true
     },
     {
@@ -94,9 +84,9 @@ const ALL_MODULES = [
         apiId: 'growth',
         name: 'Growth Classifier',
         version: 'v3.1',
-        description: 'Predict growth potential and trajectory.',
+        description: 'Predict growth potential.',
         icon: TrendingUp,
-        weight: 12,
+        weight: 10,
         active: true
     },
     {
@@ -104,19 +94,119 @@ const ALL_MODULES = [
         apiId: 'gap',
         name: 'Gap Analysis',
         version: 'v2.0',
-        description: 'Identify performance gaps and opportunities.',
+        description: 'Identify performance gaps.',
         icon: Layers,
-        weight: 11,
+        weight: 10,
         active: true
     },
     {
-        id: 'simulation',
-        apiId: 'sim',
-        name: 'Simulation',
-        version: 'v1.2',
-        description: 'What-if scenario modeling and projections.',
+        id: 'founder-fit',
+        apiId: 'founderFit',
+        name: 'Founder Fit Analysis',
+        version: 'v1.0',
+        description: 'Investor matching & readiness.',
+        icon: Users,
+        weight: 10,
+        active: true
+    },
+    {
+        id: 'team-analysis',
+        apiId: 'team',
+        name: 'Team Assessment',
+        version: 'v1.4',
+        description: 'Analyze founder and team strength.',
+        icon: Users,
+        weight: 10,
+        active: true
+    },
+    {
+        id: 'strategic-fit',
+        apiId: 'strategicFit',
+        name: 'Strategic Fit Matrix',
+        version: 'v1.1',
+        description: 'Align with strategic pathways.',
         icon: Compass,
-        weight: 12,
+        weight: 5,
+        active: true
+    },
+    {
+        id: 'financial',
+        apiId: 'financial',
+        name: 'Financial Analysis',
+        version: 'v1.0',
+        description: 'Revenue model, burn rate, and financial health.',
+        icon: Database,
+        weight: 8,
+        active: true
+    },
+    {
+        id: 'economic',
+        apiId: 'economic',
+        name: 'Economic Analysis',
+        version: 'v1.0',
+        description: 'Market size, pricing, and economic viability.',
+        icon: TrendingUp,
+        weight: 8,
+        active: true
+    },
+    {
+        id: 'social',
+        apiId: 'social',
+        name: 'Social Impact Analysis',
+        version: 'v1.0',
+        description: 'ESG factors and social impact metrics.',
+        icon: Users,
+        weight: 5,
+        active: true
+    },
+    {
+        id: 'marketing',
+        apiId: 'marketing',
+        name: 'Marketing Analysis',
+        version: 'v1.0',
+        description: 'GTM strategy, brand positioning, and channels.',
+        icon: Target,
+        weight: 5,
+        active: true
+    },
+    {
+        id: 'environmental',
+        apiId: 'environmental',
+        name: 'Environmental Analysis',
+        version: 'v1.0',
+        description: 'Environmental compliance and sustainability.',
+        icon: Shield,
+        weight: 5,
+        active: true
+    },
+    {
+        id: 'funder',
+        apiId: 'funder',
+        name: 'Funder Fit Analysis',
+        version: 'v1.0',
+        description: 'Investor alignment and funding readiness.',
+        icon: Database,
+        weight: 8,
+        active: true
+    },
+    {
+        id: 'strategic',
+        apiId: 'strategic',
+        name: 'Strategic Analysis',
+        version: 'v1.0',
+        description: 'Competitive positioning and strategic roadmap.',
+        icon: Compass,
+        weight: 5,
+        active: true
+    },
+    {
+        id: 'analyst',
+        apiId: 'analyst',
+        name: 'Analyst Review',
+        version: 'v1.0',
+        description: 'Manual analyst input, NLP analysis, and AI deviation review.',
+        icon: FileText,
+        weight: 5,
         active: true
     },
 ];
@@ -177,25 +267,55 @@ export default function AnalysisRunPage() {
     const [totalTime, setTotalTime] = useState<string>('0.0s');
     const [storedTrackingParams, setStoredTrackingParams] = useState<string>('');
 
-    // Load active module settings from API
+    // Load active module settings — merges backend settings API + localStorage module-deck-config
+    // Priority: module-deck-config (local toggle state) > backend settings API > ALL_MODULES defaults
     useEffect(() => {
         const loadModuleSettings = async () => {
             try {
-                const activeVersion = await settingsApi.getActiveVersion();
-                if (activeVersion?.module_settings) {
-                    // Update modules with active status from settings
-                    const updatedModules = ALL_MODULES.map(module => {
-                        const setting = activeVersion.module_settings?.find(
-                            ms => ms.module_id === module.apiId
-                        );
-                        return {
-                            ...module,
-                            active: setting ? setting.is_enabled : module.active,
-                            weight: setting ? setting.weight : module.weight
-                        };
-                    });
-                    setModules(updatedModules);
+                // Start with defaults
+                let updatedModules = [...ALL_MODULES];
+
+                // 1. Try to load from backend settings API (weights + enable/disable)
+                try {
+                    const activeVersion = await settingsApi.getActiveVersion();
+                    if (activeVersion?.module_settings) {
+                        updatedModules = ALL_MODULES.map(module => {
+                            const setting = activeVersion.module_settings?.find(
+                                ms => ms.module_id === module.apiId
+                            );
+                            return {
+                                ...module,
+                                active: setting ? setting.is_enabled : module.active,
+                                weight: setting ? setting.weight : module.weight
+                            };
+                        });
+                    }
+                } catch {
+                    console.warn('Could not load backend module settings, using defaults');
                 }
+
+                // 2. Override active state from module-deck-config (localStorage toggle from evaluation/modules page)
+                try {
+                    const deckConfigRaw = localStorage.getItem('module-deck-config');
+                    if (deckConfigRaw) {
+                        const deckConfig: Array<{ id: string; status: string }> = JSON.parse(deckConfigRaw);
+                        const deckStatusMap: Record<string, boolean> = {};
+                        deckConfig.forEach(m => {
+                            deckStatusMap[m.id] = m.status === 'active';
+                        });
+                        updatedModules = updatedModules.map(module => {
+                            // module-deck-config uses the same IDs as ALL_MODULES apiId
+                            if (module.apiId in deckStatusMap) {
+                                return { ...module, active: deckStatusMap[module.apiId] };
+                            }
+                            return module;
+                        });
+                    }
+                } catch {
+                    console.warn('Could not read module-deck-config from localStorage');
+                }
+
+                setModules(updatedModules);
             } catch (error) {
                 console.warn('Could not load module settings, using defaults:', error);
             } finally {
@@ -329,7 +449,7 @@ export default function AnalysisRunPage() {
             });
 
             // Get user data from localStorage
-            let userData = {};
+            let userData: Record<string, any> = {};
             try {
                 const companyDataStr = localStorage.getItem('companyData');
                 if (companyDataStr) {
@@ -337,6 +457,34 @@ export default function AnalysisRunPage() {
                 }
             } catch (e) {
                 console.warn('Could not parse company data');
+            }
+
+            // Collect saved module configs from module-config-service and active module list
+            // These allow the backend to use formula/threshold settings saved by analysts
+            try {
+                const moduleConfigs: Record<string, any> = {};
+                const moduleKeys = ['tca', 'risk', 'macro', 'benchmark', 'growth', 'gap', 'founderFit', 'team', 'strategicFit',
+                    'financial', 'economic', 'social', 'marketing', 'environmental', 'funder', 'strategic', 'analyst'];
+                moduleKeys.forEach(key => {
+                    const raw = localStorage.getItem(`module-config-versions-${key}`);
+                    if (raw) {
+                        const versions = JSON.parse(raw);
+                        if (versions.length > 0) {
+                            moduleConfigs[key] = versions[0].config; // Use latest saved config
+                        }
+                    }
+                });
+                if (Object.keys(moduleConfigs).length > 0) {
+                    userData.moduleConfigs = moduleConfigs;
+                }
+                // Pass active modules list and their weights so backend knows which to run
+                userData.activeModules = activeModules.map(m => ({
+                    module_id: m.apiId,
+                    weight: m.weight,
+                    is_enabled: true
+                }));
+            } catch (e) {
+                console.warn('Could not collect module configs');
             }
 
             // Run actual analysis API call
