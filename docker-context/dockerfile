@@ -4,6 +4,12 @@ FROM python:3.11-slim
 # Set working directory
 WORKDIR /app
 
+# Install system packages for legacy document extraction
+RUN apt-get update && apt-get install -y \
+    antiword \
+    catdoc \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy app files
 COPY . .
 

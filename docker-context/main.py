@@ -5980,33 +5980,61 @@ async def create_analysis_session_v1(data: dict = Body(...)):
 
 @app.post("/api/v1/analysis/extract-text-from-file")
 async def extract_text_from_file(data: dict = Body(...)):
-    """Extract text content from PDF, Word documents, or other file types"""
+    """Extract text and images from PDF, Word, PowerPoint, Excel, RTF, ODT and plain text files (max 30 MB)."""
     import base64
     import io
+    import os
+    import re
+    import subprocess
+    import tempfile
+
+    MAX_SIZE = 30 * 1024 * 1024  # 30 MB
+
+    content = data.get('content', '')
+    filename = data.get('filename', 'unknown')
+    do_images = data.get('extract_images', True)
+
+    if not content:
+        return {"success": False, "text_content": "", "error": "No content provided"}
 
     try:
-        content = data.get('content', '')
-        filename = data.get('filename', 'unknown')
-        text_content = ""
+        file_bytes = base64.b64decode(content)
+    except Exception as e:
+        logger.warning(f"Base64 decode failed for {filename}: {e}")
+        return {"success": False, "text_content": "", "error": "Invalid base64 content"}
 
-        if not content:
-            return {"success": False, "text_content": "", "error": "No content provided"}
+    if len(file_bytes) > MAX_SIZE:
+        mb = len(file_bytes) // (1024 * 1024)
+        return {"success": False, "text_content": "",
+                "error": f"File too large ({mb} MB). Maximum allowed size is 30 MB."}
 
-        # Decode base64 to raw bytes
-        try:
-            file_bytes = base64.b64decode(content)
-        except Exception as e:
-            logger.warning(f"Base64 decode failed for {filename}: {e}")
-            return {"success": False, "text_content": "", "error": "Invalid base64 content"}
+    text_content = ""
+    images = []          # list of {"data": base64str, "format": "png"|"jpeg", "description": str}
+    ext = filename.lower()
 
-        ext = filename.lower()
-
+    try:
+        # ------------------------------------------------------------------ PDF
         if ext.endswith('.pdf'):
-            # Use PyMuPDF (fitz) for accurate PDF text extraction
             try:
                 import fitz  # PyMuPDF
                 pdf_doc = fitz.open(stream=file_bytes, filetype="pdf")
-                parts = [pdf_doc.load_page(i).get_text() for i in range(len(pdf_doc))]
+                parts = []
+                for page_num in range(len(pdf_doc)):
+                    page = pdf_doc.load_page(page_num)
+                    parts.append(page.get_text())
+                    if do_images:
+                        for img_info in page.get_images(full=True):
+                            xref = img_info[0]
+                            try:
+                                base_img = pdf_doc.extract_image(xref)
+                                img_b64 = base64.b64encode(base_img["image"]).decode('utf-8')
+                                images.append({
+                                    "data": img_b64,
+                                    "format": base_img.get("ext", "png"),
+                                    "description": f"Image from page {page_num + 1}"
+                                })
+                            except Exception:
+                                pass
                 pdf_doc.close()
                 text_content = "\n".join(parts)
             except ImportError:
@@ -6015,23 +6043,82 @@ async def extract_text_from_file(data: dict = Body(...)):
                     with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
                         parts = [p.extract_text() for p in pdf.pages if p.extract_text()]
                     text_content = "\n".join(parts)
-                except ImportError:
-                    text_content = f"[PDF extraction requires PyMuPDF or pdfplumber: {filename}]"
-                except Exception as e:
-                    text_content = f"[PDF extraction failed: {e}]"
+                except Exception as e2:
+                    text_content = f"[PDF extraction failed: {e2}]"
             except Exception as e:
                 text_content = f"[PDF extraction failed: {e}]"
 
-        elif ext.endswith('.docx') or ext.endswith('.doc'):
+        # ---------------------------------------------------------------- DOCX
+        elif ext.endswith('.docx'):
             try:
                 import docx
                 doc = docx.Document(io.BytesIO(file_bytes))
-                text_content = "\n".join(p.text for p in doc.paragraphs)
+                parts = []
+                for para in doc.paragraphs:
+                    if para.text.strip():
+                        parts.append(para.text)
+                for table in doc.tables:
+                    for row in table.rows:
+                        row_text = "\t".join(cell.text for cell in row.cells)
+                        if row_text.strip():
+                            parts.append(row_text)
+                text_content = "\n".join(parts)
+                if do_images:
+                    for rel in doc.part.rels.values():
+                        if "image" in rel.reltype:
+                            try:
+                                blob = rel.target_part.blob
+                                fmt = ("jpeg" if blob[:3] == b'\xff\xd8\xff'
+                                       else "gif" if blob[:6] in (b'GIF87a', b'GIF89a')
+                                       else "png")
+                                images.append({
+                                    "data": base64.b64encode(blob).decode('utf-8'),
+                                    "format": fmt,
+                                    "description": "Embedded image in document"
+                                })
+                            except Exception:
+                                pass
             except ImportError:
-                text_content = f"[DOCX extraction requires python-docx: {filename}]"
+                text_content = "[DOCX extraction requires python-docx]"
             except Exception as e:
                 text_content = f"[DOCX extraction failed: {e}]"
 
+        # --------------------------------------------------------- DOC (legacy)
+        elif ext.endswith('.doc'):
+            extracted = False
+            try:
+                with tempfile.NamedTemporaryFile(suffix='.doc', delete=False) as tmp:
+                    tmp.write(file_bytes)
+                    tmp_path = tmp.name
+                result = subprocess.run(
+                    ['antiword', tmp_path],
+                    capture_output=True, text=True, timeout=30
+                )
+                os.unlink(tmp_path)
+                if result.returncode == 0 and result.stdout.strip():
+                    text_content = result.stdout
+                    extracted = True
+            except Exception:
+                pass
+
+            if not extracted:
+                try:
+                    import olefile
+                    ole = olefile.OleFileIO(io.BytesIO(file_bytes))
+                    if ole.exists('WordDocument'):
+                        stream = ole.openstream('WordDocument').read()
+                        raw = stream.decode('latin-1', errors='ignore')
+                        cleaned = ''.join(c for c in raw if c.isprintable() or c in '\n\r\t ')
+                        text_content = re.sub(r'[^\x20-\x7E\n\r\t]{3,}', ' ', cleaned).strip()
+                    ole.close()
+                    if not text_content:
+                        text_content = f"[DOC text could not be fully extracted: {filename}]"
+                except ImportError:
+                    text_content = f"[DOC extraction: antiword unavailable and olefile not installed for {filename}]"
+                except Exception as e:
+                    text_content = f"[DOC extraction failed: {e}]"
+
+        # ---------------------------------------------------------------- PPTX
         elif ext.endswith('.pptx'):
             try:
                 from pptx import Presentation
@@ -6039,14 +6126,68 @@ async def extract_text_from_file(data: dict = Body(...)):
                 parts = []
                 for i, slide in enumerate(prs.slides, 1):
                     parts.append(f"=== Slide {i} ===")
-                    parts.extend(shape.text for shape in slide.shapes if hasattr(shape, "text") and shape.text)
+                    for shape in slide.shapes:
+                        if hasattr(shape, "text") and shape.text.strip():
+                            parts.append(shape.text)
+                        # shape_type 13 = MSO_SHAPE_TYPE.PICTURE
+                        if do_images and shape.shape_type == 13:
+                            try:
+                                blob = shape.image.blob
+                                fmt = shape.image.ext.lstrip('.')
+                                images.append({
+                                    "data": base64.b64encode(blob).decode('utf-8'),
+                                    "format": fmt or "png",
+                                    "description": f"Image in slide {i}"
+                                })
+                            except Exception:
+                                pass
                 text_content = "\n".join(parts)
             except ImportError:
-                text_content = f"[PPTX extraction requires python-pptx: {filename}]"
+                text_content = "[PPTX extraction requires python-pptx]"
             except Exception as e:
                 text_content = f"[PPTX extraction failed: {e}]"
 
-        elif ext.endswith('.xlsx') or ext.endswith('.xls'):
+        # --------------------------------------------------------- PPT (legacy)
+        elif ext.endswith('.ppt'):
+            extracted = False
+            try:
+                with tempfile.NamedTemporaryFile(suffix='.ppt', delete=False) as tmp:
+                    tmp.write(file_bytes)
+                    tmp_path = tmp.name
+                result = subprocess.run(
+                    ['catppt', tmp_path],
+                    capture_output=True, text=True, timeout=30
+                )
+                os.unlink(tmp_path)
+                if result.returncode == 0 and result.stdout.strip():
+                    text_content = result.stdout
+                    extracted = True
+            except Exception:
+                pass
+
+            if not extracted:
+                try:
+                    import olefile
+                    ole = olefile.OleFileIO(io.BytesIO(file_bytes))
+                    parts = []
+                    for entry in ole.listdir():
+                        try:
+                            stream = ole.openstream(entry).read()
+                            text = stream.decode('utf-16-le', errors='ignore')
+                            cleaned = ''.join(c for c in text if c.isprintable() or c in '\n\r\t')
+                            if len(cleaned.strip()) > 10:
+                                parts.append(cleaned)
+                        except Exception:
+                            pass
+                    ole.close()
+                    text_content = "\n".join(parts) if parts else f"[PPT text could not be extracted: {filename}]"
+                except ImportError:
+                    text_content = f"[PPT extraction: catppt (catdoc) unavailable and olefile not installed for {filename}]"
+                except Exception as e:
+                    text_content = f"[PPT extraction failed: {e}]"
+
+        # --------------------------------------------------------------- XLSX
+        elif ext.endswith('.xlsx'):
             try:
                 import openpyxl
                 wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
@@ -6059,34 +6200,78 @@ async def extract_text_from_file(data: dict = Body(...)):
                             parts.append(row_text)
                 text_content = "\n".join(parts)
             except ImportError:
-                text_content = f"[Excel extraction requires openpyxl: {filename}]"
+                text_content = "[XLSX extraction requires openpyxl]"
             except Exception as e:
-                text_content = f"[Excel extraction failed: {e}]"
+                text_content = f"[XLSX extraction failed: {e}]"
 
-        elif ext.endswith('.txt') or ext.endswith('.csv') or ext.endswith('.json'):
+        # --------------------------------------------------------- XLS (legacy)
+        elif ext.endswith('.xls'):
+            try:
+                import xlrd
+                wb = xlrd.open_workbook(file_contents=file_bytes)
+                parts = []
+                for sheet in wb.sheets():
+                    parts.append(f"=== Sheet: {sheet.name} ===")
+                    for row_idx in range(sheet.nrows):
+                        row_text = "\t".join(str(sheet.cell_value(row_idx, c)) for c in range(sheet.ncols))
+                        if row_text.strip():
+                            parts.append(row_text)
+                text_content = "\n".join(parts)
+            except ImportError:
+                text_content = "[XLS extraction requires xlrd]"
+            except Exception as e:
+                text_content = f"[XLS extraction failed: {e}]"
+
+        # ----------------------------------------------------------------- RTF
+        elif ext.endswith('.rtf'):
+            try:
+                from striprtf.striprtf import rtf_to_text
+                text_content = rtf_to_text(file_bytes.decode('utf-8', errors='ignore'))
+            except ImportError:
+                text_content = "[RTF extraction requires striprtf]"
+            except Exception as e:
+                text_content = f"[RTF extraction failed: {e}]"
+
+        # ----------------------------------------------------------------- ODT
+        elif ext.endswith('.odt'):
+            try:
+                from odf.opendocument import load as odf_load
+                from odf import text as odf_text, teletype
+                doc = odf_load(io.BytesIO(file_bytes))
+                parts = [
+                    teletype.extractText(elem)
+                    for elem in doc.body.getElementsByType(odf_text.P)
+                ]
+                text_content = "\n".join(p for p in parts if p.strip())
+            except ImportError:
+                text_content = "[ODT extraction requires odfpy]"
+            except Exception as e:
+                text_content = f"[ODT extraction failed: {e}]"
+
+        # -------------------------------------------------- Plain text formats
+        elif ext.endswith(('.txt', '.csv', '.json')):
             text_content = file_bytes.decode('utf-8', errors='replace')
 
+        # ------------------------------------------------------------ Fallback
         else:
-            # Unknown type: attempt utf-8, strip non-printable chars
             raw = file_bytes.decode('utf-8', errors='ignore')
             text_content = ''.join(c for c in raw if c.isprintable() or c in '\n\r\t ')
             if len(text_content.strip()) < 20:
                 text_content = f"[Unsupported file type: {filename}]"
 
-        return {
-            "success": True,
-            "text_content": text_content,
-            "filename": filename,
-            "char_count": len(text_content),
-            "timestamp": datetime.utcnow().isoformat()
-        }
     except Exception as e:
-        logger.error(f"Error extracting text from {data.get('filename', 'unknown')}: {e}")
-        return {
-            "success": False,
-            "text_content": "",
-            "error": str(e)
-        }
+        logger.error(f"Unhandled error extracting {filename}: {e}")
+        return {"success": False, "text_content": "", "error": str(e)}
+
+    return {
+        "success": True,
+        "text_content": text_content,
+        "images": images,
+        "image_count": len(images),
+        "filename": filename,
+        "char_count": len(text_content),
+        "timestamp": datetime.utcnow().isoformat()
+    }
 
 
 @app.post("/api/v1/analysis/extract-company-info")
