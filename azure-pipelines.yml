@@ -1,11 +1,9 @@
 # Azure DevOps Pipeline for TCA-IRR Full Deployment
 # Deploys:
-#   - Backend: Docker image to ACR → Azure Container App Service restart
+#   - Backend: Python zip deploy → Azure Web App (tcairrapiccontainer)
 #   - Frontend: Next.js standalone build → Azure Web App (tca-irr)
 #
 # Required Pipeline Variables (Pipelines > Variables — mark passwords as secret):
-#   ACR_USERNAME          = tcairrresgistry
-#   ACR_PASSWORD          = [ACR admin password]
 #   BACKEND_PUBLISH_USER  = $tcairrapiccontainer
 #   BACKEND_PUBLISH_PASS  = [backend Kudu publishing password]
 #   FRONTEND_PUBLISH_USER = $TCA-IRR
@@ -20,8 +18,6 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  ACR_REGISTRY: 'tcairrresgistry-a4bahwbpegfve2gq.azurecr.io'
-  BACKEND_IMAGE: 'tcairrresgistry-a4bahwbpegfve2gq.azurecr.io/tcairrapi:latest'
   BACKEND_APP: 'tcairrapiccontainer'
   FRONTEND_APP: 'tca-irr'
   NODE_VERSION: '20.x'
@@ -29,63 +25,75 @@ variables:
 stages:
 
   # ─────────────────────────────────────────────────────────
-  # STAGE 1: Build & Push Backend Docker Image to ACR
+  # STAGE 1: Build Backend (zip the backend/ directory)
   # ─────────────────────────────────────────────────────────
-  - stage: BackendDocker
-    displayName: 'Backend: Docker Build & Push'
+  - stage: BackendBuild
+    displayName: 'Backend: Package Python App'
     jobs:
-      - job: DockerBuildPush
-        displayName: 'Build and push Docker image to ACR'
+      - job: BuildBackend
+        displayName: 'Zip backend/ for deployment'
         steps:
           - script: |
-              echo "Logging into ACR: $(ACR_REGISTRY)"
-              echo "$(ACR_PASSWORD)" | docker login $(ACR_REGISTRY) -u $(ACR_USERNAME) --password-stdin
+              echo "Packaging backend Python app..."
+              cd backend
+              zip -r ../backend_deploy.zip . \
+                -x "**/__pycache__/*" \
+                -x "**/*.pyc" \
+                -x "**/.git*" \
+                -x "**/node_modules/*" \
+                -x "**/.pytest_cache/*" \
+                -x "**/tests/*"
+              cd ..
+              echo "Package size: $(du -sh backend_deploy.zip)"
+            displayName: 'Zip backend directory'
 
-              echo "Building Docker image from backend/..."
-              docker build -t $(BACKEND_IMAGE) ./backend
-
-              echo "Pushing image to ACR..."
-              docker push $(BACKEND_IMAGE)
-              echo "Push complete — ACR CD webhook will trigger container restart."
-            displayName: 'Docker login, build, push'
-            env:
-              ACR_PASSWORD: $(ACR_PASSWORD)
-              ACR_USERNAME: $(ACR_USERNAME)
+          - publish: backend_deploy.zip
+            artifact: backend
+            displayName: 'Publish backend artifact'
 
   # ─────────────────────────────────────────────────────────
-  # STAGE 2: Restart Backend Container via Kudu webhook
+  # STAGE 2: Deploy Backend via Kudu ZIP deploy
   # ─────────────────────────────────────────────────────────
-  - stage: BackendRestart
-    displayName: 'Backend: Restart Container'
-    dependsOn: BackendDocker
+  - stage: BackendDeploy
+    displayName: 'Backend: Deploy to Azure Web App'
+    dependsOn: BackendBuild
     condition: succeeded()
     jobs:
-      - job: RestartContainer
-        displayName: 'Trigger container restart'
+      - job: DeployBackend
+        displayName: 'Deploy via Kudu ZIP deploy'
         steps:
-          - script: |
-              echo "Triggering container restart via Kudu docker hook..."
-              STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
-                -u "$(BACKEND_PUBLISH_USER):$(BACKEND_PUBLISH_PASS)" \
-                "https://$(BACKEND_APP).scm.azurewebsites.net/docker/hook" \
-                -H "Content-Type: application/json" \
-                -d '{"push_data":{"tag":"latest"},"repository":{"repo_name":"tcairrapi"}}')
-              echo "Webhook response: $STATUS"
+          - download: current
+            artifact: backend
 
-              echo "Waiting 90s for container to pull and restart..."
-              sleep 90
+          - script: |
+              echo "Deploying backend to https://$(BACKEND_APP).azurewebsites.net ..."
+              HTTP_STATUS=$(curl -s -o /tmp/deploy_response.txt -w "%{http_code}" \
+                -X POST \
+                -u "$(BACKEND_PUBLISH_USER):$(BACKEND_PUBLISH_PASS)" \
+                -T "$(Pipeline.Workspace)/backend/backend_deploy.zip" \
+                "https://$(BACKEND_APP).scm.azurewebsites.net/api/zipdeploy?isAsync=true")
+              echo "Kudu response: $HTTP_STATUS"
+              cat /tmp/deploy_response.txt || true
+
+              if [ "$HTTP_STATUS" = "202" ] || [ "$HTTP_STATUS" = "200" ]; then
+                echo "Deployment accepted. Waiting 60s for startup..."
+                sleep 60
+              else
+                echo "##[error]Deployment failed with HTTP $HTTP_STATUS"
+                exit 1
+              fi
 
               echo "Checking backend health..."
               HEALTH=$(curl -s -o /dev/null -w "%{http_code}" \
-                https://$(BACKEND_APP).azurewebsites.net/api/health)
+                https://$(BACKEND_APP).azurewebsites.net/api/v1/health)
               echo "Health check: $HEALTH"
 
               if [ "$HEALTH" = "200" ]; then
-                echo "##[section]Backend is healthy!"
+                echo "##[section]Backend deployed and healthy!"
               else
-                echo "##[warning]Backend returned $HEALTH — may still be starting"
+                echo "##[warning]Backend returned $HEALTH — may still be starting up"
               fi
-            displayName: 'Restart and verify backend'
+            displayName: 'ZIP deploy and verify backend'
             env:
               BACKEND_PUBLISH_USER: $(BACKEND_PUBLISH_USER)
               BACKEND_PUBLISH_PASS: $(BACKEND_PUBLISH_PASS)
