@@ -189,13 +189,13 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
                                     <SidebarMenuSubItem>
                                         <SidebarMenuSubButton href="/analysis/modules/risk" isActive={pathname === '/analysis/modules/risk'}>
                                             <Shield className="size-4" />
-                                            <span>Risk Flags</span>
+                                            <span>Risk Assessment</span>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
                                     <SidebarMenuSubItem>
                                         <SidebarMenuSubButton href="/analysis/modules/macro" isActive={pathname === '/analysis/modules/macro'}>
                                             <TrendingUp className="size-4" />
-                                            <span>Macro Trend Alignment</span>
+                                            <span>Macro Trend Analysis</span>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
                                     <SidebarMenuSubItem>
@@ -225,7 +225,7 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
                                     <SidebarMenuSubItem>
                                         <SidebarMenuSubButton href="/analysis/modules/funderFit" isActive={pathname === '/analysis/modules/funderFit'}>
                                             <UserIcon className="size-4" />
-                                            <span>Funder Fit Analysis</span>
+                                            <span>Founder Fit Analysis</span>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
                                     <SidebarMenuSubItem>
