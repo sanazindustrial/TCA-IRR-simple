@@ -502,24 +502,18 @@ export default function SimulationPage() {
           console.log('No valid TCA data found, fetching fresh analysis...');
 
           try {
-            // Use default company data or fetch from session storage
+            // Use company data from session storage — never fall back to fake/hardcoded data
             const companySessionData = sessionStorage.getItem('companyData');
-            const userData = companySessionData ? JSON.parse(companySessionData) : {
-              companyName: 'TechCorp Solutions',
-              companyDescription: 'SaaS technology startup with proven revenue model',
-              sector: 'technology',
-              team_size: 12,
-              monthly_revenue: 85000,
-              monthly_burn: 65000,
-              cash_balance: 800000,
-              market_size: 5000000000,
-              founder_experience: true,
-              technical_team: true,
-              customer_validation: true,
-              revenue_traction: true,
-              patents: false,
-              technical_innovation: true
-            };
+            if (!companySessionData) {
+              toast({
+                title: 'Company Data Required',
+                description: 'No company data found. Please run a new analysis from the evaluation page.',
+                variant: 'destructive'
+              });
+              router.push('/dashboard/evaluation');
+              return;
+            }
+            const userData = JSON.parse(companySessionData);
 
             console.log('Fetching fresh analysis with data:', userData);
             data = await runAnalysis('general', userData);

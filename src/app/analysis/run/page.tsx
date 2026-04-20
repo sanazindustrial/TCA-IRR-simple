@@ -267,8 +267,8 @@ export default function AnalysisRunPage() {
         }
     }, []);
 
-    // Simulate module progress
-    const simulateModuleProgress = useCallback((moduleId: string, duration: number): Promise<number> => {
+    // Simulate module progress (animation only — no fake score returned)
+    const simulateModuleProgress = useCallback((moduleId: string, duration: number): Promise<number | undefined> => {
         return new Promise((resolve) => {
             const startMs = Date.now();
             const interval = setInterval(() => {
@@ -288,7 +288,7 @@ export default function AnalysisRunPage() {
 
                 if (elapsed >= duration) {
                     clearInterval(interval);
-                    resolve(Math.random() * 3 + 7); // Random score between 7-10
+                    resolve(undefined); // No fake score — real scores come from the API result
                 }
             }, 100);
         });
@@ -364,11 +364,17 @@ export default function AnalysisRunPage() {
                 moduleScores['risk'] = Math.max(3, 10 - (redCount * 2) - (yellowCount * 0.5));
             }
             if (apiResult.benchmarkData) {
-                moduleScores['benchmark'] = 7.5;
+                // Calculate average from real benchmark values
+                const benchmarkValues = Object.values(apiResult.benchmarkData).filter((v): v is number => typeof v === 'number');
+                if (benchmarkValues.length > 0) {
+                    moduleScores['benchmark'] = benchmarkValues.reduce((sum, v) => sum + v, 0) / benchmarkValues.length;
+                }
             }
             if (apiResult.macroData) {
                 // Use trend overlay score if available
-                moduleScores['macro'] = apiResult.macroData.trendOverlayScore || 7;
+                if (typeof apiResult.macroData.trendOverlayScore === 'number') {
+                    moduleScores['macro'] = apiResult.macroData.trendOverlayScore;
+                }
             }
             if (apiResult.gapData) {
                 // Calculate gap score from heatmap entries
@@ -377,8 +383,6 @@ export default function AnalysisRunPage() {
                     // Lower gaps are better - average gap, invert to score (10 - avgGap)
                     const avgGap = heatmap.reduce((s, h) => s + (h.gap || 0), 0) / heatmap.length;
                     moduleScores['gap'] = Math.max(3, Math.min(10, 10 - avgGap));
-                } else {
-                    moduleScores['gap'] = 7;
                 }
             }
             if (apiResult.growthData) {
@@ -388,15 +392,26 @@ export default function AnalysisRunPage() {
                 moduleScores['growth'] = Math.min(10, (tier * 2) + (confidence * 4));
             }
             if (apiResult.founderFitData) {
-                // Use readiness score for founder fit
-                moduleScores['founderFit'] = apiResult.founderFitData.readinessScore || 7;
+                // Use readiness score for founder fit (only real data)
+                if (typeof apiResult.founderFitData.readinessScore === 'number') {
+                    moduleScores['founderFit'] = apiResult.founderFitData.readinessScore;
+                }
             }
             if (apiResult.teamData) {
-                // Use team score if available
-                moduleScores['team'] = apiResult.teamData.teamScore || 7;
+                // Use team score if available (only real data)
+                if (typeof (apiResult.teamData as any).teamScore === 'number') {
+                    moduleScores['team'] = (apiResult.teamData as any).teamScore;
+                }
             }
             if (apiResult.strategicFitData) {
-                moduleScores['strategicFit'] = 7;
+                // Extract score from strategicFitData if available
+                const sfd = apiResult.strategicFitData as any;
+                if (typeof sfd.score === 'number') {
+                    moduleScores['strategicFit'] = sfd.score;
+                } else if (typeof sfd.alignmentScore === 'number') {
+                    moduleScores['strategicFit'] = sfd.alignmentScore;
+                }
+                // No fallback — only show real scores
             }
 
             // Update all active modules to success with scores

@@ -526,7 +526,7 @@ export default function AnalysisResultPage({
                 }
 
                 const storedAnalysis = localStorage.getItem('analysisResult');
-                if (storedAnalysis && !isPreview) {
+                if (storedAnalysis) {
                     try {
                         const parsedAnalysis = JSON.parse(storedAnalysis);
 
@@ -574,20 +574,32 @@ export default function AnalysisResultPage({
                         // If backend was unreachable, actions.ts marks the result with _isFallbackData.
                         // Never display fallback/sample data — redirect the user to run a real analysis.
                         if ((parsedAnalysis as any)._isFallbackData) {
-                            setIsLoading(false);
-                            redirectToRunAnalysis('The analysis could not reach the backend and returned no real data. Please run a new analysis with your company details.');
-                            return;
+                            if (!isPreview) {
+                                setIsLoading(false);
+                                redirectToRunAnalysis('The analysis could not reach the backend and returned no real data. Please run a new analysis with your company details.');
+                                return;
+                            }
+                            // In preview mode with fallback data, show sample data with warning
+                            setIsUsingSampleData(true);
+                        } else {
+                            setIsUsingSampleData(false);
                         }
-                        setIsUsingSampleData(false);
                         console.log('Loaded analysis data with composite score:', parsedAnalysis.tcaData?.compositeScore);
                     } catch (e) {
                         console.error('Failed to parse analysis data:', e);
-                        redirectToRunAnalysis('Stored analysis data is invalid. Please run the analysis again.');
-                        return;
+                        if (!isPreview) {
+                            redirectToRunAnalysis('Stored analysis data is invalid. Please run the analysis again.');
+                            return;
+                        }
+                        // Preview mode with invalid data — show sample data with warning
+                        setIsUsingSampleData(true);
                     }
                 } else if (!isPreview) {
                     redirectToRunAnalysis('No real analysis results were found. Please run analysis first.');
                     return;
+                } else {
+                    // Preview mode with no real data — display sample data but flag it clearly
+                    setIsUsingSampleData(true);
                 }
 
                 // Load analyst wizard computed results (persisted by analyst wizard page)
@@ -1037,7 +1049,7 @@ export default function AnalysisResultPage({
             <main className="bg-background text-foreground min-h-screen">
                 <div className="container mx-auto p-4 md:p-8">
                     {/* Sample Data Warning Banner */}
-                    {isUsingSampleData && !isPreview && (
+                    {isUsingSampleData && (
                         <Card className="mb-6 border-amber-500 bg-amber-50/50 dark:bg-amber-900/20">
                             <CardContent className="py-4">
                                 <div className="flex items-center gap-3">

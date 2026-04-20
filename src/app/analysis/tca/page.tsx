@@ -24,6 +24,8 @@ import {
     Info
 } from 'lucide-react';
 import TCADetailedAnalysis from '@/components/evaluation/tca-detailed-analysis';
+import { runAnalysis as runBackendAnalysis } from '@/app/analysis/actions';
+import { useToast } from '@/hooks/use-toast';
 
 interface TCAConfiguration {
     framework: 'general' | 'medtech' | 'fintech' | 'biotech' | 'saas';
@@ -77,39 +79,18 @@ const defaultConfiguration: TCAConfiguration = {
     customWeights: false
 };
 
-const mockAnalysisResults: TCAAnalysisResult[] = [
-    {
-        id: '1',
-        companyName: 'TechCorp Inc.',
-        compositeScore: 7.8,
-        confidenceScore: 0.89,
-        benchmarkPercentile: 78,
-        framework: 'general',
-        categories: [],
-        timestamp: '2024-12-26T10:30:00Z',
-        status: 'completed'
-    },
-    {
-        id: '2',
-        companyName: 'MedDevice Solutions',
-        compositeScore: 8.2,
-        confidenceScore: 0.92,
-        benchmarkPercentile: 85,
-        framework: 'medtech',
-        categories: [],
-        timestamp: '2024-12-25T15:45:00Z',
-        status: 'completed'
-    }
-];
+const mockAnalysisResults: TCAAnalysisResult[] = [];
+
 
 export default function TCAAnalysisPage() {
     const [activeTab, setActiveTab] = useState('dashboard');
     const [configuration, setConfiguration] = useState<TCAConfiguration>(defaultConfiguration);
-    const [analysisResults, setAnalysisResults] = useState<TCAAnalysisResult[]>(mockAnalysisResults);
+    const [analysisResults, setAnalysisResults] = useState<TCAAnalysisResult[]>([]);
     const [selectedAnalysis, setSelectedAnalysis] = useState<string | null>(null);
     const [isRunning, setIsRunning] = useState(false);
     const [companyInput, setCompanyInput] = useState('');
     const [isMounted, setIsMounted] = useState(false);
+    const { toast } = useToast();
 
     // Hydration-safe date formatter
     const formatDate = useCallback((dateString: string) => {
@@ -168,25 +149,51 @@ export default function TCAAnalysisPage() {
 
         setIsRunning(true);
 
-        // Simulate analysis process
-        setTimeout(() => {
+        try {
+            const framework = (['general', 'medtech'].includes(configuration.framework)
+                ? configuration.framework
+                : 'general') as 'general' | 'medtech';
+
+            const result = await runBackendAnalysis(framework, {
+                companyName: companyInput,
+                companyDescription: companyInput,
+            });
+
+            // Extract TCA composite score (0-10 scale)
+            let compositeScore = result.tcaData?.compositeScore ?? 0;
+            if (compositeScore > 10) compositeScore /= 10;
+
+            // Calculate confidence from categories if available
+            const categories = result.tcaData?.categories ?? [];
+            const avgConfidence = categories.length > 0
+                ? categories.reduce((sum, c) => sum + (c.confidenceScore ?? 0.8), 0) / categories.length
+                : 0.8;
+
             const newResult: TCAAnalysisResult = {
                 id: Date.now().toString(),
                 companyName: companyInput,
-                compositeScore: Math.random() * 3 + 7, // 7-10 range
-                confidenceScore: Math.random() * 0.3 + 0.7, // 0.7-1.0 range
-                benchmarkPercentile: Math.floor(Math.random() * 40 + 60), // 60-100 range
+                compositeScore,
+                confidenceScore: Math.min(1, Math.max(0, avgConfidence)),
+                benchmarkPercentile: result.tcaData?.benchmarkPercentile ?? 0,
                 framework: configuration.framework,
-                categories: [],
+                categories,
                 timestamp: new Date().toISOString(),
                 status: 'completed'
             };
 
             setAnalysisResults(prev => [newResult, ...prev]);
             setSelectedAnalysis(newResult.id);
-            setIsRunning(false);
             setActiveTab('results');
-        }, 3000);
+        } catch (error) {
+            console.error('TCA analysis failed:', error);
+            toast({
+                variant: 'destructive',
+                title: 'Analysis Failed',
+                description: 'Unable to run analysis. Please ensure you are connected and try again.',
+            });
+        } finally {
+            setIsRunning(false);
+        }
     };
 
     const totalWeight = Object.values(configuration.categories)
