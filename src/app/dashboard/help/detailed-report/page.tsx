@@ -150,6 +150,13 @@ const sampleAnalysisData: ComprehensiveAnalysisOutput = {
     founderFitData: sampleFounderFitData,
     teamData: sampleTeamData,
     strategicFitData: sampleStrategicFitData,
+    financialData: null,
+    economicData: null,
+    socialData: null,
+    marketingData: null,
+    environmentalData: null,
+    funderData: null,
+    strategicData: null,
 };
 // --- End of Sample Data ---
 
