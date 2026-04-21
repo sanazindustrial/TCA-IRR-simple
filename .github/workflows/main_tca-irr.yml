@@ -67,8 +67,40 @@ jobs:
 
           echo "=== Creating package.json ==="
           cat > deploy-package/package.json << 'EOF'
-          {"name":"tca-irr","version":"1.0.0","scripts":{"start":"node server.js"}}
+          {"name":"tca-irr","version":"1.0.0","scripts":{"start":"node server.js"},"engines":{"node":">=20.0.0"}}
           EOF
+
+          echo "=== Creating web.config for IIS (Windows App Service) ==="
+          cat > deploy-package/web.config << 'WEBEOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <configuration>
+            <system.webServer>
+              <webSocket enabled="false" />
+              <handlers>
+                <add name="iisnode" path="server.js" verb="*" modules="iisnode"/>
+              </handlers>
+              <rewrite>
+                <rules>
+                  <rule name="NodeApp" patternSyntax="ECMAScript" stopProcessing="true">
+                    <match url=".*" />
+                    <conditions logicalGrouping="MatchAll">
+                      <add input="{REQUEST_FILENAME}" matchType="IsFile" negate="True" />
+                    </conditions>
+                    <action type="Rewrite" url="server.js" />
+                  </rule>
+                </rules>
+              </rewrite>
+              <httpErrors existingResponse="PassThrough" />
+              <security>
+                <requestFiltering>
+                  <hiddenSegments>
+                    <remove segment="bin" />
+                  </hiddenSegments>
+                </requestFiltering>
+              </security>
+            </system.webServer>
+          </configuration>
+          WEBEOF
 
           echo "=== Final Structure ==="
           find deploy-package -maxdepth 2 -type f | head -20
