@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
     Card,
     CardContent,
@@ -66,6 +66,7 @@ import {
     Link as LinkIcon,
     Globe,
     Lock,
+    UploadCloud,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
@@ -228,6 +229,55 @@ export default function SsdAuditLogPage() {
     const [testEmail, setTestEmail] = useState('test@example.com');
     const [testCallbackUrl, setTestCallbackUrl] = useState('');
     const [activeTab, setActiveTab] = useState('overview');
+
+    // Test request file extraction
+    const testFileInputRef = useRef<HTMLInputElement>(null);
+    const [isExtractingTest, setIsExtractingTest] = useState(false);
+    const [testFieldsExtracted, setTestFieldsExtracted] = useState(0);
+
+    const extractFromTestFile = useCallback(async (file: File) => {
+        setIsExtractingTest(true);
+        setTestFieldsExtracted(0);
+        try {
+            const fd = new FormData();
+            fd.append('file', file);
+            const res = await fetch('/api/extract', { method: 'POST', body: fd });
+            if (!res.ok) return;
+            const d = await res.json();
+            const textContent: string = d.text_content || '';
+            if (textContent.trim().length > 20) {
+                const token = typeof window !== 'undefined' ? (localStorage.getItem('authToken') ?? '') : '';
+                const aiRes = await fetch('/api/ai-autofill', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: textContent, token }),
+                });
+                if (aiRes.ok) {
+                    const aiJson = await aiRes.json();
+                    const aiData = (aiJson.data as Record<string, unknown>) ?? {};
+                    const pick = (v: unknown) => typeof v === 'string' && v.trim() ? v.trim() : '';
+                    let count = 0;
+                    const companyName = pick(aiData.company_name);
+                    if (companyName) { setTestCompany(companyName); count++; }
+                    // Try to extract email from raw text
+                    const emailMatch = textContent.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/);
+                    if (emailMatch) { setTestEmail(emailMatch[0]); count++; }
+                    setTestFieldsExtracted(count);
+                    if (count > 0) {
+                        toast({ title: 'Auto-filled from document', description: `${count} field${count > 1 ? 's' : ''} extracted — verify before sending.` });
+                    } else {
+                        toast({ variant: 'destructive', title: 'No data extracted', description: 'Could not find company name or email in the document.' });
+                    }
+                }
+            } else {
+                toast({ variant: 'destructive', title: 'Document too short', description: 'Not enough content to extract from this file.' });
+            }
+        } catch {
+            toast({ variant: 'destructive', title: 'Extraction failed', description: 'Could not process the file.' });
+        } finally {
+            setIsExtractingTest(false);
+        }
+    }, [toast]);
 
     // Run connection test
     const runConnectionTest = useCallback(async () => {
@@ -453,7 +503,7 @@ export default function SsdAuditLogPage() {
                                 </CardDescription>
                             </div>
                         </div>
-                        <Dialog open={sendTestOpen} onOpenChange={setSendTestOpen}>
+                        <Dialog open={sendTestOpen} onOpenChange={(open) => { setSendTestOpen(open); if (!open) { setTestFieldsExtracted(0); if (testFileInputRef.current) testFileInputRef.current.value = ''; } }}>
                             <DialogTrigger asChild>
                                 <Button variant="outline" size="sm">
                                     <Play className="size-4 mr-2" />
@@ -468,6 +518,37 @@ export default function SsdAuditLogPage() {
                                     </DialogDescription>
                                 </DialogHeader>
                                 <div className="space-y-4 py-4">
+                                    {/* File extraction strip */}
+                                    <div className="rounded-lg border border-dashed p-3 bg-muted/40">
+                                        <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                                            <UploadCloud className="size-3" />
+                                            Upload a pitch deck, PDF or document to auto-fill fields
+                                        </p>
+                                        <input
+                                            ref={testFileInputRef}
+                                            type="file"
+                                            className="hidden"
+                                            title="Upload document for extraction"
+                                            accept=".pdf,.pptx,.ppt,.docx,.doc,.xlsx,.xls,.csv,.txt,.json,.rtf,.html,.htm,.jpg,.jpeg,.png,.gif,.webp,.bmp,.tiff"
+                                            onChange={(e) => { const f = e.target.files?.[0]; if (f) extractFromTestFile(f); }}
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            className="w-full"
+                                            disabled={isExtractingTest}
+                                            onClick={() => testFileInputRef.current?.click()}
+                                        >
+                                            {isExtractingTest ? (
+                                                <><Loader2 className="size-3 mr-2 animate-spin" />Extracting…</>
+                                            ) : testFieldsExtracted > 0 ? (
+                                                <><CheckCircle2 className="size-3 mr-2 text-green-600" />{testFieldsExtracted} field{testFieldsExtracted > 1 ? 's' : ''} extracted — choose another file</>
+                                            ) : (
+                                                <><UploadCloud className="size-3 mr-2" />Choose file to extract…</>
+                                            )}
+                                        </Button>
+                                    </div>
                                     <div>
                                         <Label htmlFor="test-company">Test Company Name</Label>
                                         <Input id="test-company" value={testCompany} onChange={(e) => setTestCompany(e.target.value)} placeholder="Test Company" />
