@@ -257,6 +257,7 @@ export default function UserManagementPage() {
   const [editingRoleConfig, setEditingRoleConfig] = useState<EditableRoleConfig | null>(null);
   const [isSavingRoleConfig, setIsSavingRoleConfig] = useState(false);
   const [isLoadingRoles, setIsLoadingRoles] = useState(false);
+  const [reportUsage, setReportUsage] = useState<Record<string, { triage: number; dd: number }>>({});
   const { toast } = useToast();
   const { currentUser } = useAuth();
 
@@ -441,6 +442,14 @@ export default function UserManagementPage() {
   useEffect(() => {
     loadRoleConfigurations();
   }, [loadRoleConfigurations]);
+
+  // Load report usage counts from localStorage
+  useEffect(() => {
+    try {
+      const data = localStorage.getItem('reportUsage');
+      if (data) setReportUsage(JSON.parse(data));
+    } catch { /* ignore */ }
+  }, []);
 
   // Open role config editor
   const openRoleConfigEditor = (roleKey: 'admin' | 'analyst' | 'user') => {
@@ -1179,7 +1188,7 @@ export default function UserManagementPage() {
                     <TableHead className="font-semibold">User</TableHead>
                     <TableHead className="font-semibold">Role</TableHead>
                     <TableHead className="font-semibold">Permissions</TableHead>
-                    <TableHead className="font-semibold">Report Limits</TableHead>
+                    <TableHead className="font-semibold">Reports (Used / Limit)</TableHead>
                     <TableHead className="font-semibold">AI Cost</TableHead>
                     <TableHead className="font-semibold">Status</TableHead>
                     <TableHead className="font-semibold">Last Active</TableHead>
@@ -1244,12 +1253,17 @@ export default function UserManagementPage() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <div className="text-sm">
-                              <span className="text-muted-foreground">Triage:</span>{' '}
-                              <span className="font-medium">{userLimits.triageReports}</span>
-                              <br />
-                              <span className="text-muted-foreground">DD:</span>{' '}
-                              <span className="font-medium">{userLimits.ddReports}</span>
+                            <div className="text-sm space-y-0.5">
+                              <div>
+                                <span className="text-muted-foreground">Triage: </span>
+                                <span className="font-semibold text-primary">{reportUsage[user.backendId.toString()]?.triage ?? 0}</span>
+                                <span className="text-muted-foreground"> / {userLimits.triageReports}</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">DD: </span>
+                                <span className="font-semibold text-primary">{reportUsage[user.backendId.toString()]?.dd ?? 0}</span>
+                                <span className="text-muted-foreground"> / {userLimits.ddReports}</span>
+                              </div>
                             </div>
                           </TableCell>
                           <TableCell>
