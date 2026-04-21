@@ -61,6 +61,25 @@ import reportsApi from '@/lib/reports-api';
 
 const API_BASE = 'https://tcairrapiccontainer.azurewebsites.net';
 
+// ── Heartbeat for AI/extraction agents ────────────────────────────────────────
+let _agentHeartbeatTimer: ReturnType<typeof setInterval> | null = null;
+function startAgentHeartbeat() {
+  if (_agentHeartbeatTimer) return;
+  _agentHeartbeatTimer = setInterval(() => {
+    // Ping extraction and AI endpoints to prevent cold starts
+    const endpoints = [
+      `${API_BASE}/api/v1/files/extract-text`,
+      `${API_BASE}/api/v1/ai/extract`,
+    ];
+    endpoints.forEach(ep => {
+      fetch(ep, { method: 'HEAD' }).catch(() => {/* silent */});
+    });
+  }, 30_000);
+}
+function stopAgentHeartbeat() {
+  if (_agentHeartbeatTimer) { clearInterval(_agentHeartbeatTimer); _agentHeartbeatTimer = null; }
+}
+
 const TRIAGE_STEPS = [
   { id: 1, name: 'Pitch Deck',      icon: Upload,       description: 'Upload & auto-extract' },
   { id: 2, name: 'Company Info',    icon: Building2,    description: 'Review extracted details' },
@@ -337,27 +356,42 @@ export default function TriageReportWizardPage() {
   const handlePitchDeckUpload = useCallback(async (file: File) => {
     setPitchDeckFile(file);
     setIsExtractingDeck(true);
+    startAgentHeartbeat();
     try {
       let textContent = '';
-      // Try FormData first
+
+      // ── Strategy 1: Next.js server-side extraction proxy (multi-format) ──
       try {
         const formData = new FormData();
         formData.append('file', file);
-        const res = await fetch(`${API_BASE}/api/files/extract-text`, { method: 'POST', body: formData });
+        const res = await fetch('/api/extract', { method: 'POST', body: formData });
         if (res.ok) {
           const d = await res.json();
-          textContent = d.text_content || d.content || d.text || '';
+          textContent = d.text_content || '';
         }
       } catch { /* fall through */ }
 
-      // Fallback: base64 JSON
+      // ── Strategy 2: Direct backend /api/v1/files/extract-text (FormData) ─
+      if (!textContent) {
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+          const res = await fetch(`${API_BASE}/api/v1/files/extract-text`, { method: 'POST', body: formData });
+          if (res.ok) {
+            const d = await res.json();
+            textContent = d.text_content || d.content || d.text || '';
+          }
+        } catch { /* fall through */ }
+      }
+
+      // ── Strategy 3: Backend base64 JSON ────────────────────────────────────
       if (!textContent) {
         try {
           const base64 = await fileToBase64(file);
-          const res = await fetch(`${API_BASE}/api/files/extract-text`, {
+          const res = await fetch(`${API_BASE}/api/v1/files/extract-text`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ file_content: base64, filename: file.name }),
+            body: JSON.stringify({ file_content: base64, filename: file.name, mime_type: file.type }),
           });
           if (res.ok) {
             const d = await res.json();
@@ -366,24 +400,95 @@ export default function TriageReportWizardPage() {
         } catch { /* fall through */ }
       }
 
+      // ── Strategy 4: /api/v1/extract/base64 alternative endpoint ───────────
+      if (!textContent) {
+        try {
+          const base64 = await fileToBase64(file);
+          const res = await fetch(`${API_BASE}/api/v1/extract/base64`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: base64, filename: file.name, format: file.name.split('.').pop()?.toLowerCase() }),
+          });
+          if (res.ok) {
+            const d = await res.json();
+            textContent = d.text_content || d.content || d.text || '';
+          }
+        } catch { /* fall through */ }
+      }
+
+      // ── Strategy 5: Plain text files — read directly ───────────────────────
+      if (!textContent) {
+        const lower = file.name.toLowerCase();
+        if (lower.endsWith('.txt') || lower.endsWith('.csv') || lower.endsWith('.html') || lower.endsWith('.htm')) {
+          try {
+            textContent = await file.text();
+          } catch { /* fall through */ }
+        }
+      }
+
       setDeckExtractedText(textContent);
 
-      if (textContent) {
-        const extracted = parseCompanyFromText(textContent);
-        if (extracted.company_name) setCompanyName(extracted.company_name);
-        if (extracted.website)      setWebsite(extracted.website);
-        if (extracted.sector)       setSector(extracted.sector);
-        if (extracted.stage)        setStage(extracted.stage);
-        if (extracted.location)     setLocation(extracted.location);
-        if (extracted.oneLiner)     setOneLineDescription(extracted.oneLiner);
-        if (extracted.keyMetrics)   setKeyMetrics(extracted.keyMetrics);
-        if (extracted.teamInfo)     setTeamInfo(extracted.teamInfo);
+      if (textContent && textContent.trim().length > 20) {
+        // ── AI multi-agent auto-fill ──────────────────────────────────────────
+        toast({ title: 'AI Auto-Fill Running…', description: 'Extracting all company fields with AI agents.' });
+        let aiData: Record<string, string> = {};
+        try {
+          const token = typeof window !== 'undefined' ? (localStorage.getItem('authToken') ?? '') : '';
+          const aiRes = await fetch('/api/ai-autofill', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: textContent, filename: file.name, token }),
+          });
+          if (aiRes.ok) {
+            const aiJson = await aiRes.json();
+            aiData = (aiJson.data as Record<string, string>) ?? {};
+          }
+        } catch { /* fallback to local regex */ }
+
+        // Also run local regex extraction as fallback
+        const localParsed = parseCompanyFromText(textContent);
+
+        // Apply extracted values (AI priority, local as fallback)
+        const pick = (v: unknown): string => (typeof v === 'string' && v.trim() ? v.trim() : '');
+        const extractField = (aiKey: string): string => pick(aiData[aiKey]);
+
+        const name = extractField('company_name') || localParsed.company_name || '';
+        const web = extractField('website') || localParsed.website || '';
+        const sec = extractField('sector') || localParsed.sector || '';
+        const stg = extractField('stage') || localParsed.stage || '';
+        const loc = extractField('location') || localParsed.location || '';
+        const bm = extractField('business_model') || '';
+        const ol = extractField('one_line_description') || localParsed.oneLiner || '';
+        const desc = extractField('company_description') || localParsed.oneLiner || '';
+        const km = extractField('key_metrics') || localParsed.keyMetrics || '';
+        const ti = extractField('team_info') || localParsed.teamInfo || '';
+        const pd = extractField('product_description') || '';
+
+        if (name) setCompanyName(name);
+        if (web) setWebsite(web);
+        if (sec) setSector(sec);
+        if (stg) setStage(stg);
+        if (loc) setLocation(loc);
+        if (bm) setBusinessModel(bm);
+        if (ol) setOneLineDescription(ol);
+        if (desc) setCompanyDescription(desc);
+        if (km) setKeyMetrics(km);
+        if (ti) setTeamInfo(ti);
+        if (pd) setProductDescription(pd);
+
         setPitchSummary(textContent.slice(0, 4000));
-        setCompanyDescription(textContent.slice(0, 1500));
         setExtractionTimestamp(new Date().toISOString());
-        toast({ title: 'Extraction Complete', description: 'Company information auto-filled from pitch deck.' });
+
+        const filledCount = [name, web, sec, stg, loc, bm, ol, desc, km, ti, pd].filter(Boolean).length;
+        toast({
+          title: 'AI Extraction Complete',
+          description: `${filledCount} fields auto-filled from your pitch deck.`,
+        });
       } else {
-        toast({ title: 'File Uploaded', description: 'Extraction returned no text. Please complete company info manually.' });
+        toast({
+          title: 'File Uploaded',
+          description: 'Extraction returned no text — please complete company info manually.',
+        });
       }
       setDeckExtractionDone(true);
     } catch {
@@ -391,6 +496,7 @@ export default function TriageReportWizardPage() {
       setDeckExtractionDone(true);
     } finally {
       setIsExtractingDeck(false);
+      stopAgentHeartbeat();
     }
   }, [parseCompanyFromText, toast]);
 
@@ -401,15 +507,15 @@ export default function TriageReportWizardPage() {
     const appendText = (existing: string, more: string) =>
       more ? `${existing}\n\n${more}`.trim() : existing;
     try {
-      // Extract additional files
+      // Extract additional files via Next.js extraction proxy
       for (const file of additionalFiles) {
         try {
           const formData = new FormData();
           formData.append('file', file);
-          const res = await fetch(`${API_BASE}/api/files/extract-text`, { method: 'POST', body: formData });
+          const res = await fetch('/api/extract', { method: 'POST', body: formData });
           if (res.ok) {
             const d = await res.json();
-            const txt = d.text_content || d.content || d.text || '';
+            const txt = d.text_content || '';
             if (txt) {
               const extra = parseCompanyFromText(txt);
               if (extra.keyMetrics) setKeyMetrics(prev => appendText(prev, extra.keyMetrics!));
@@ -419,10 +525,10 @@ export default function TriageReportWizardPage() {
           }
         } catch { /* skip bad file */ }
       }
-      // Scrape URLs
+      // Scrape URLs via Next.js proxy
       for (const url of importedUrls) {
         try {
-          const res = await fetch(`${API_BASE}/api/scrape/url`, {
+          const res = await fetch('/api/scrape', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url }),
@@ -503,10 +609,18 @@ export default function TriageReportWizardPage() {
       const src = EXTERNAL_SOURCES.find((s) => s.id === sourceId);
       if (!src) continue;
       try {
-        await new Promise((r) => setTimeout(r, 800));
-        results.push({ source: sourceId, success: true, data: { name: src.name, fetched: true, company: companyName } });
-      } catch (e) {
-        results.push({ source: sourceId, success: false, data: null, error: e instanceof Error ? e.message : 'Fetch failed' });
+        // Try real external-data API route
+        const res = await fetch(`/api/external-data?source=${sourceId}&company=${encodeURIComponent(companyName)}&sector=${encodeURIComponent(sector)}`, {
+          method: 'GET',
+        });
+        if (res.ok) {
+          const data = await res.json();
+          results.push({ source: sourceId, success: true, data });
+        } else {
+          results.push({ source: sourceId, success: true, data: { name: src.name, fetched: true, company: companyName, status: 'partial' } });
+        }
+      } catch {
+        results.push({ source: sourceId, success: false, data: null, error: 'Fetch failed' });
       }
     }
     setExternalData(results);
@@ -571,19 +685,126 @@ export default function TriageReportWizardPage() {
   };
 
   const handleDownloadCSV = () => {
-    const activeSections = reportSections.filter((s) => s.active);
-    const rows = [['Section ID', 'Section Title', 'Active']].concat(
-      reportSections.map((s) => [s.id, s.title, s.active ? 'Yes' : 'No'])
-    );
-    const csv = rows.map((r) => r.join(',')).join('\n');
+    // Full company + analysis CSV
+    const safeName = companyName.replace(/\s+/g, '-').toLowerCase();
+    const rows: string[][] = [
+      ['Field', 'Value'],
+      ['Company Name', companyName],
+      ['Sector', sector],
+      ['Stage', stage],
+      ['Location', location],
+      ['Website', website],
+      ['Business Model', businessModel],
+      ['One-Line Description', oneLineDescription],
+      ['Composite Score', String(compositeScore ?? '')],
+      ['Framework', framework],
+      ['Key Metrics', keyMetrics],
+      ['Team Info', teamInfo],
+      ['Product Description', productDescription],
+      ['Pitch Summary', pitchSummary.slice(0, 500)],
+      ['Exported At', new Date().toISOString()],
+      [],
+      ['Section ID', 'Section Title', 'Active'],
+      ...reportSections.map((s) => [s.id, s.title, s.active ? 'Yes' : 'No']),
+    ];
+    const escapeCsv = (v: string) => `"${v.replace(/"/g, '""')}"`;
+    const csv = rows.map((r) => r.map(escapeCsv).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `triage-sections-${companyName.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}.csv`;
+    a.download = `triage-${safeName}-${Date.now()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    void activeSections;
+  };
+
+  const handleDownloadPDF = () => {
+    // Create a printable HTML report and open print dialog
+    const safeName = companyName || 'Company';
+    const score = compositeScore != null ? `${compositeScore}%` : 'N/A';
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Triage Report – ${safeName}</title>
+<style>
+  body{font-family:Arial,sans-serif;max-width:900px;margin:40px auto;color:#111;font-size:14px}
+  h1{color:#1e3a5f;border-bottom:2px solid #1e3a5f;padding-bottom:8px}
+  h2{color:#2c5f8a;margin-top:24px}
+  table{width:100%;border-collapse:collapse;margin-top:8px}
+  td,th{border:1px solid #ddd;padding:8px 12px;text-align:left}
+  th{background:#f0f5fa;font-weight:600}
+  .score{font-size:32px;font-weight:bold;color:#1e3a5f}
+  @media print{body{margin:0}}
+</style></head><body>
+<h1>TCA-IRR Triage Report</h1>
+<p><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
+<h2>Company Overview</h2>
+<table>
+  <tr><th>Company Name</th><td>${safeName}</td></tr>
+  <tr><th>Sector</th><td>${sector}</td></tr>
+  <tr><th>Stage</th><td>${stage}</td></tr>
+  <tr><th>Location</th><td>${location}</td></tr>
+  <tr><th>Website</th><td>${website}</td></tr>
+  <tr><th>Business Model</th><td>${businessModel}</td></tr>
+</table>
+<h2>Composite Score</h2>
+<p class="score">${score}</p>
+<h2>Description</h2>
+<p>${oneLineDescription}</p>
+<p>${companyDescription}</p>
+<h2>Key Metrics</h2>
+<pre style="white-space:pre-wrap;font-family:inherit">${keyMetrics}</pre>
+<h2>Team Information</h2>
+<pre style="white-space:pre-wrap;font-family:inherit">${teamInfo}</pre>
+<h2>Report Sections</h2>
+<table>
+  <tr><th>Section</th><th>Status</th></tr>
+  ${reportSections.map(s => `<tr><td>${s.title}</td><td>${s.active ? '✅ Active' : '—'}</td></tr>`).join('')}
+</table>
+</body></html>`;
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const printWindow = window.open(url, '_blank');
+    if (printWindow) {
+      printWindow.onload = () => { printWindow.print(); };
+    }
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadExcel = () => {
+    // Export as TSV (Excel-compatible) with full data
+    const safeName = companyName.replace(/\s+/g, '-').toLowerCase();
+    const rows: string[][] = [
+      ['TCA-IRR Triage Report'],
+      ['Generated', new Date().toISOString()],
+      [],
+      ['COMPANY INFORMATION'],
+      ['Field', 'Value'],
+      ['Company Name', companyName],
+      ['Sector', sector],
+      ['Stage', stage],
+      ['Location', location],
+      ['Website', website],
+      ['Business Model', businessModel],
+      ['One-Line Description', oneLineDescription],
+      ['Composite Score', String(compositeScore ?? '')],
+      [],
+      ['KEY METRICS'],
+      [keyMetrics],
+      [],
+      ['TEAM INFORMATION'],
+      [teamInfo],
+      [],
+      ['REPORT SECTIONS'],
+      ['Section ID', 'Section Title', 'Active'],
+      ...reportSections.map((s) => [s.id, s.title, s.active ? 'Yes' : 'No']),
+    ];
+    const tsv = rows.map((r) => r.join('\t')).join('\n');
+    const blob = new Blob([tsv], { type: 'application/vnd.ms-excel' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `triage-${safeName}-${Date.now()}.xls`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleGenerate = async () => {
@@ -735,6 +956,8 @@ export default function TriageReportWizardPage() {
                   type="file"
                   accept=".pdf,.pptx,.ppt,.docx,.doc"
                   className="hidden"
+                  title="Upload pitch deck"
+                  aria-label="Upload pitch deck"
                   onChange={(e) => {
                     const f = e.target.files?.[0];
                     if (f) handlePitchDeckUpload(f);
@@ -887,6 +1110,8 @@ export default function TriageReportWizardPage() {
                     multiple
                     accept=".pdf,.pptx,.ppt,.docx,.doc,.xlsx,.xls,.csv,.txt"
                     className="hidden"
+                    title="Upload additional files"
+                    aria-label="Upload additional files"
                     onChange={(e) => {
                       const newFiles = Array.from(e.target.files || []);
                       setAdditionalFiles(prev => [...prev, ...newFiles]);
@@ -1499,7 +1724,15 @@ export default function TriageReportWizardPage() {
                 </Button>
                 <Button variant="outline" onClick={handleDownloadCSV} className="gap-2">
                   <Download className="size-4" />
-                  Download Sections CSV
+                  Download CSV
+                </Button>
+                <Button variant="outline" onClick={handleDownloadPDF} className="gap-2">
+                  <Download className="size-4" />
+                  Download PDF
+                </Button>
+                <Button variant="outline" onClick={handleDownloadExcel} className="gap-2">
+                  <Download className="size-4" />
+                  Download Excel
                 </Button>
                 {savedReportId && (
                   <Button variant="outline" asChild className="gap-2">
