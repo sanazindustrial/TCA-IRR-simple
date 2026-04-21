@@ -1,0 +1,36 @@
+a8071153 chore: add deployment utility scripts
+a22168c0 ci: trigger rebuild to include SSD report page
+e3f7e5af fix: use azure/webapps-deploy@v3 with publish profile instead of Kudu curl
+057db4bf fix: replace webapps-deploy action with curl-based Kudu OneDeploy
+be3daf5e fix: remove orphaned closing div in cost page (was </EvaluationProvider>) - fixes build failure
+35d4d40b fix: pass real userData to runAnalysis in triage/DD wizards; fix DD framework detection; wire real analysis data to configure preview
+987cd2f1 feat: add all 17 modules to run pipeline, wire module-deck-config + saved module configs to analysis
+4476dcf1 fix: eliminate all fake/random data from analysis pages
+568a77fb fix: eliminate all fake/mock data from analysis pipeline; add real TCA calculation helpers; fix company name extraction; add module pages and sidebar fixes
+49789355 fix: sidebar module names - Risk Assessment, Macro Trend Analysis, Founder Fit Analysis
+8ad1480c fix: cost page dashboard error, evaluation/modules list, analyst redirect, profile picture save
+34c6115f fix: persist wizard analysisData + wire Gap Analysis, Analyst Comments, AI Deviation to result page
+9d9e0721 fix: analyst wizard step 4 card, nav buttons, score wiring + result page auto-save dedup
+1ec02907 fix: add full_name migration and backend support for profile name save
+f88bdb14 fix: resolve TypeScript errors, Badge variants, profile save, SSD/triage/DD wizards
+190cb14f Fix syntax error: remove leading dot from middleware.ts import
+32c096b7 Fix CSRF skip for SSD API; wire live backend API to settings, profile, request, my-requests, user-requests, analyst, system-health pages
+b60198d9 Fix all JSON parsing for settings, thresholds, and factors fields
+c25196ee Fix React #301 infinite loop and settings JSON parsing
+ae4f71fc Fix cost API auth token retrieval
+3dc5744c Check ALL
+63a5ca54 8
+8c00ac88 9ygb
+42b21485 M
+156d7342 B
+3411e032 ,
+295b9d36 fix: static files in deploy package
+ec4d6ecf fix: include .next/static files in deploy package for CSS/JS
+fce7f8f4 fix: deployment with Unix-compatible paths - site now live
+22bb3d11 feat: Add auto-deploy script and protect sensitive files
+55d2fdca feat: Add automated Azure deployment script
+299b1c28 fix: Update workflow to use Azure publish profile for deployment
+31fa4990 feat: Improve user signup flow and management
+a42518be Fix users API: add suspend/activate/reset-password endpoints and fix route ordering
+a8aed6a3 feat: Update 9 modules with correct names/versions and add SSD report type
+b2a21288 Fresh main with unique report tracking IDs - cleaned history
