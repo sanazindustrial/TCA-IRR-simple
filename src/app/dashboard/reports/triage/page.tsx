@@ -416,13 +416,18 @@ export default function TriageReportWizardPage() {
         } catch { /* fall through */ }
       }
 
-      // ── Strategy 5: Plain text files — read directly ───────────────────────
+      // ── Strategy 5: Plain text / JSON files — read directly ─────────────
       if (!textContent) {
         const lower = file.name.toLowerCase();
-        if (lower.endsWith('.txt') || lower.endsWith('.csv') || lower.endsWith('.html') || lower.endsWith('.htm')) {
+        if (lower.endsWith('.txt') || lower.endsWith('.csv') || lower.endsWith('.html') || lower.endsWith('.htm') || lower.endsWith('.rtf')) {
+          try { textContent = await file.text(); } catch { /* fall through */ }
+        }
+        if (!textContent && lower.endsWith('.json')) {
           try {
-            textContent = await file.text();
-          } catch { /* fall through */ }
+            const raw = await file.text();
+            const parsed = JSON.parse(raw);
+            textContent = `JSON Data from ${file.name}:\n\n${JSON.stringify(parsed, null, 2)}`;
+          } catch { try { textContent = await file.text(); } catch { /* fall through */ } }
         }
       }
 
@@ -460,9 +465,39 @@ export default function TriageReportWizardPage() {
         const bm = extractField('business_model') || '';
         const ol = extractField('one_line_description') || localParsed.oneLiner || '';
         const desc = extractField('company_description') || localParsed.oneLiner || '';
-        const km = extractField('key_metrics') || localParsed.keyMetrics || '';
-        const ti = extractField('team_info') || localParsed.teamInfo || '';
         const pd = extractField('product_description') || '';
+
+        // Assemble enriched key-metrics block covering all 17 analysis modules
+        const baseKm = extractField('key_metrics') || localParsed.keyMetrics || '';
+        const extraKmLines: string[] = [];
+        const nf = (k: string) => aiData[k] !== undefined ? String(aiData[k]) : '';
+        if (nf('tam')) extraKmLines.push(`TAM: $${Number(aiData.tam).toLocaleString()}`);
+        if (nf('sam')) extraKmLines.push(`SAM: $${Number(aiData.sam).toLocaleString()}`);
+        if (nf('som')) extraKmLines.push(`SOM: $${Number(aiData.som).toLocaleString()}`);
+        if (nf('market_growth_rate')) extraKmLines.push(`Market CAGR: ${aiData.market_growth_rate}%`);
+        if (nf('gross_margin')) extraKmLines.push(`Gross Margin: ${aiData.gross_margin}%`);
+        if (nf('cac')) extraKmLines.push(`CAC: $${Number(aiData.cac).toLocaleString()}`);
+        if (nf('ltv')) extraKmLines.push(`LTV: $${Number(aiData.ltv).toLocaleString()}`);
+        if (nf('revenue_growth_rate')) extraKmLines.push(`Revenue Growth: ${aiData.revenue_growth_rate}%`);
+        if (nf('patents_filed')) extraKmLines.push(`Patents Filed: ${aiData.patents_filed}`);
+        if (nf('competitors')) extraKmLines.push(`Competitors: ${aiData.competitors}`);
+        const km = [baseKm, ...extraKmLines].filter(Boolean).join('\n');
+
+        // Assemble enriched team info
+        const baseTi = extractField('team_info') || localParsed.teamInfo || '';
+        const extraTiLines: string[] = [];
+        if (nf('founder_names')) extraTiLines.push(`Founders: ${aiData.founder_names}`);
+        if (nf('team_size')) extraTiLines.push(`Team Size: ${aiData.team_size}`);
+        const ti = [baseTi, ...extraTiLines].filter(Boolean).join('\n');
+
+        // Extra narrative fields for deeper module analysis
+        const extraNarrative: string[] = [];
+        if (nf('key_risks')) extraNarrative.push(`Key Risks: ${aiData.key_risks}`);
+        if (nf('exit_strategy')) extraNarrative.push(`Exit Strategy: ${aiData.exit_strategy}`);
+        if (nf('esg_notes')) extraNarrative.push(`ESG: ${aiData.esg_notes}`);
+        if (nf('gtm_strategy')) extraNarrative.push(`Go-to-Market: ${aiData.gtm_strategy}`);
+        if (nf('ip_strategy')) extraNarrative.push(`IP Strategy: ${aiData.ip_strategy}`);
+        if (nf('unique_value_proposition')) extraNarrative.push(`Value Proposition: ${aiData.unique_value_proposition}`);
 
         if (name) setCompanyName(name);
         if (web) setWebsite(web);
@@ -476,13 +511,15 @@ export default function TriageReportWizardPage() {
         if (ti) setTeamInfo(ti);
         if (pd) setProductDescription(pd);
 
-        setPitchSummary(textContent.slice(0, 4000));
+        // Embed extra narrative into pitch summary so all 17 modules get context
+        const fullSummary = [textContent.slice(0, 3500), ...extraNarrative].filter(Boolean).join('\n\n');
+        setPitchSummary(fullSummary.slice(0, 4000));
         setExtractionTimestamp(new Date().toISOString());
 
         const filledCount = [name, web, sec, stg, loc, bm, ol, desc, km, ti, pd].filter(Boolean).length;
         toast({
           title: 'AI Extraction Complete',
-          description: `${filledCount} fields auto-filled from your pitch deck.`,
+          description: `${filledCount} fields auto-filled — review & verify before running analysis.`,
         });
       } else {
         toast({
@@ -1108,8 +1145,8 @@ export default function TriageReportWizardPage() {
                 Upload Pitch Deck
               </CardTitle>
               <CardDescription>
-                Upload a single pitch deck (PDF, PPTX, or DOCX). Company information will be
-                auto-extracted immediately after upload — no manual extraction needed.
+                Upload a pitch deck or any company document (PDF, PPTX, DOCX, images, XLSX, JSON and more).
+                Company information will be auto-extracted immediately — no manual extraction needed.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -1126,7 +1163,7 @@ export default function TriageReportWizardPage() {
                 <input
                   ref={pitchDeckInputRef}
                   type="file"
-                  accept=".pdf,.pptx,.ppt,.docx,.doc"
+                  accept=".pdf,.pptx,.ppt,.docx,.doc,.xlsx,.xls,.csv,.txt,.json,.jpg,.jpeg,.png,.gif,.webp,.bmp,.tiff,.rtf,.odt,.odp,.ods,.htm,.html"
                   className="hidden"
                   title="Upload pitch deck"
                   aria-label="Upload pitch deck"
@@ -1174,7 +1211,7 @@ export default function TriageReportWizardPage() {
                     <Upload className="size-12 text-muted-foreground mb-3" />
                     <p className="font-semibold text-lg">Drop your pitch deck here</p>
                     <p className="text-sm text-muted-foreground mt-1">
-                      or click to browse — PDF, PPTX, DOCX accepted
+                      or click to browse — PDF, PPTX, DOCX, XLSX, images, JSON &amp; more
                     </p>
                   </>
                 )}
@@ -1280,7 +1317,7 @@ export default function TriageReportWizardPage() {
                     ref={additionalFilesInputRef}
                     type="file"
                     multiple
-                    accept=".pdf,.pptx,.ppt,.docx,.doc,.xlsx,.xls,.csv,.txt"
+                    accept=".pdf,.pptx,.ppt,.docx,.doc,.xlsx,.xls,.csv,.txt,.json,.jpg,.jpeg,.png,.gif,.webp,.bmp,.tiff,.rtf,.odt,.odp,.ods,.htm,.html"
                     className="hidden"
                     title="Upload additional files"
                     aria-label="Upload additional files"

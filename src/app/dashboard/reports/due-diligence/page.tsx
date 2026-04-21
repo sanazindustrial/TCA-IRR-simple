@@ -200,6 +200,10 @@ export default function DueDiligenceWorkflowPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<unknown>(null);
 
+  // Extraction
+  const [isExtractingDD, setIsExtractingDD] = useState(false);
+  const [ddFieldsExtracted, setDdFieldsExtracted] = useState(0);
+
   // Evaluation metadata
   const [evaluationId] = useState<string>(
     () => `EVL-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
@@ -216,14 +220,60 @@ export default function DueDiligenceWorkflowPage() {
   const progress = Math.round((completedSteps.length / WORKFLOW_STEPS.length) * 100);
 
   // File handling
+  const extractFromFilesAndAutoFill = useCallback(async (files: File[]) => {
+    if (files.length === 0) return;
+    setIsExtractingDD(true);
+    try {
+      let combinedText = '';
+      for (const file of files) {
+        try {
+          const fd = new FormData();
+          fd.append('file', file);
+          const res = await fetch('/api/extract', { method: 'POST', body: fd });
+          if (res.ok) {
+            const d = await res.json();
+            if (d.text_content) combinedText += '\n\n' + d.text_content;
+          }
+        } catch { /* ignore individual failures */ }
+      }
+      if (combinedText.trim().length > 20) {
+        const token = typeof window !== 'undefined' ? (localStorage.getItem('authToken') ?? '') : '';
+        const aiRes = await fetch('/api/ai-autofill', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: combinedText, token }),
+        });
+        if (aiRes.ok) {
+          const aiJson = await aiRes.json();
+          const aiData = (aiJson.data as Record<string, unknown>) ?? {};
+          const pick = (v: unknown) => typeof v === 'string' && v.trim() ? v.trim() : '';
+          const name = pick(aiData.company_name);
+          const desc = pick(aiData.company_description);
+          const industry = pick(aiData.sector);
+          if (name) setCompanyName(prev => prev || name);
+          if (desc) setCompanyDescription(prev => prev || desc);
+          if (industry) setCompanyIndustry(prev => prev || industry);
+          const fieldsN = [name, desc, industry].filter(Boolean).length;
+          setDdFieldsExtracted(fieldsN);
+          if (fieldsN > 0) {
+            toast({ title: 'AI Auto-Fill Complete', description: `${fieldsN} company field${fieldsN > 1 ? 's' : ''} filled — verify before proceeding.` });
+          }
+        }
+      }
+    } catch { /* ignore */ }
+    finally { setIsExtractingDD(false); }
+  }, [toast]);
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
-      const newFiles = Array.from(event.target.files).map((file) => ({
+      const files = Array.from(event.target.files);
+      const newFiles = files.map((file) => ({
         name: file.name,
         size: file.size,
       }));
       setUploadedFiles((prev) => [...prev, ...newFiles]);
-      toast({ title: 'Files uploaded', description: `${newFiles.length} file(s) added successfully.` });
+      toast({ title: 'Files added', description: `${newFiles.length} file(s) added. Running AI extraction…` });
+      extractFromFilesAndAutoFill(files);
     }
   };
 
@@ -872,9 +922,20 @@ export default function DueDiligenceWorkflowPage() {
                     onClick={() => fileInputRef.current?.click()}
                   >
                     <UploadCloud className="h-10 w-10 text-muted-foreground" />
-                    <h3 className="mt-3 text-lg font-semibold">Drop files here or click to browse</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">PDF, DOCX, XLSX, TXT (Max 50MB each)</p>
-                    <Input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} multiple accept=".pdf,.docx,.xlsx,.txt,.csv" />
+                    <h3 className="mt-3 text-lg font-semibold">
+                      {isExtractingDD ? 'Extracting data with AI…' : 'Drop files here or click to browse'}
+                    </h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {isExtractingDD
+                        ? 'Analysing documents and auto-filling company fields…'
+                        : 'PDF, DOCX, PPTX, XLSX, images, JSON, TXT — all formats supported'}
+                    </p>
+                    {ddFieldsExtracted > 0 && !isExtractingDD && (
+                      <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                        ✓ {ddFieldsExtracted} field{ddFieldsExtracted > 1 ? 's' : ''} auto-filled by AI
+                      </span>
+                    )}
+                    <Input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} multiple accept=".pdf,.pptx,.ppt,.docx,.doc,.xlsx,.xls,.csv,.txt,.json,.jpg,.jpeg,.png,.gif,.webp,.bmp,.tiff,.rtf,.odt,.odp,.ods,.htm,.html" />
                   </div>
 
                   {uploadedFiles.length > 0 && (

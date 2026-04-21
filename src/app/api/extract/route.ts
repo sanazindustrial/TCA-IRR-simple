@@ -2,9 +2,13 @@
  * Server-side File Extraction API Route
  *
  * Proxies file extraction requests to the FastAPI backend with multiple
- * fallback strategies and proper multi-format support.
+ * fallback strategies and full multi-format support.
  *
- * Supported formats: PDF, DOCX, PPTX, XLSX, CSV, TXT, HTML
+ * Supported formats:
+ *   Documents : PDF, DOCX, DOC, PPTX, PPT, XLSX, XLS, CSV, TXT, RTF, ODT, ODP, ODS, HTML
+ *   Images    : JPG, JPEG, PNG, GIF, WEBP, BMP, TIFF  (AI vision / OCR)
+ *   Data      : JSON (parsed directly)
+ *   Google    : docs.google.com, slides, sheets, drive.google.com URLs
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -95,12 +99,56 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      // Strategy 1f: client-side text extraction for plain text files
+      // Strategy 1f: client-side text extraction for plain/data files
       if (!text) {
         const lower = filename.toLowerCase();
-        if (lower.endsWith('.txt') || lower.endsWith('.csv') || lower.endsWith('.html') || lower.endsWith('.htm')) {
+        // Plain text formats — read directly
+        if (lower.endsWith('.txt') || lower.endsWith('.csv') || lower.endsWith('.html') || lower.endsWith('.htm') || lower.endsWith('.rtf')) {
           const buf = await file.arrayBuffer();
           text = Buffer.from(buf).toString('utf-8');
+        }
+        // JSON — parse and return human-readable text
+        if (!text && lower.endsWith('.json')) {
+          try {
+            const buf = await file.arrayBuffer();
+            const raw = Buffer.from(buf).toString('utf-8');
+            const parsed = JSON.parse(raw);
+            text = `JSON Data from ${filename}:\n\n${JSON.stringify(parsed, null, 2)}`;
+          } catch {
+            const buf = await file.arrayBuffer();
+            text = Buffer.from(buf).toString('utf-8');
+          }
+        }
+      }
+
+      // Strategy 1g: image files — try backend AI vision / OCR endpoints
+      if (!text) {
+        const lower = filename.toLowerCase();
+        const isImage = /\.(jpe?g|png|gif|webp|bmp|tiff?|heic|heif)$/i.test(lower);
+        if (isImage) {
+          // Try AI vision endpoints
+          const arrayBuffer = await file.arrayBuffer();
+          const base64 = Buffer.from(arrayBuffer).toString('base64');
+          const mimeType = file.type || 'image/jpeg';
+
+          const visionEndpoints = [
+            { url: `${BACKEND}/api/v1/ai/vision`, body: { image_base64: base64, mime_type: mimeType, filename } },
+            { url: `${BACKEND}/api/v1/files/extract-text`, body: { file_content: base64, filename, mime_type: mimeType } },
+            { url: `${BACKEND}/api/v1/extract/image`, body: { content: base64, filename, format: lower.split('.').pop() } },
+            { url: `${BACKEND}/api/v1/ocr`, body: { image: base64, mime_type: mimeType } },
+          ];
+          for (const ep of visionEndpoints) {
+            if (text) break;
+            text = await tryEndpoint(ep.url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(ep.body),
+            });
+          }
+          // If no OCR result, provide a descriptor so downstream AI at least knows an image was provided
+          if (!text) {
+            text = `[Image file: ${filename}. Please describe or analyze this image for the investor report.]`;
+          }
         }
       }
 
@@ -119,18 +167,46 @@ export async function POST(req: NextRequest) {
       if (body.text) {
         text = body.text;
       } else if (body.file_url) {
-        // Fetch from URL and extract
+        const fileUrl = body.file_url;
+
+        // Detect Google Drive/Docs/Slides/Sheets URLs — convert to export URL then scrape
+        const isGoogleUrl = /docs\.google\.com|drive\.google\.com/i.test(fileUrl);
+        let fetchUrl = fileUrl;
+        if (isGoogleUrl) {
+          // Convert to plain-text or HTML export where possible
+          const docMatch = fileUrl.match(/docs\.google\.com\/document\/d\/([\w-]+)/);
+          const slideMatch = fileUrl.match(/docs\.google\.com\/presentation\/d\/([\w-]+)/);
+          const sheetMatch = fileUrl.match(/docs\.google\.com\/spreadsheets\/d\/([\w-]+)/);
+          const driveMatch = fileUrl.match(/drive\.google\.com\/file\/d\/([\w-]+)/);
+          if (docMatch) fetchUrl = `https://docs.google.com/document/d/${docMatch[1]}/export?format=txt`;
+          else if (slideMatch) fetchUrl = `https://docs.google.com/presentation/d/${slideMatch[1]}/export?format=txt`;
+          else if (sheetMatch) fetchUrl = `https://docs.google.com/spreadsheets/d/${sheetMatch[1]}/export?format=csv`;
+          else if (driveMatch) fetchUrl = `https://drive.google.com/uc?export=download&id=${driveMatch[1]}`;
+        }
+
+        // Try backend extraction with the (possibly converted) URL
         text = await tryEndpoint(`${BACKEND}/api/v1/files/extract-text`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ file_url: body.file_url }),
+          body: JSON.stringify({ file_url: fetchUrl }),
         });
+        // Scrape fallback
         if (!text) {
           text = await tryEndpoint(`${BACKEND}/api/v1/scrape/url`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url: body.file_url }),
+            body: JSON.stringify({ url: fetchUrl }),
           });
+        }
+        // For Google export URLs, also try fetching the text directly
+        if (!text && isGoogleUrl) {
+          try {
+            const controller = new AbortController();
+            const tid = setTimeout(() => controller.abort(), 20_000);
+            const res = await fetch(fetchUrl, { signal: controller.signal });
+            clearTimeout(tid);
+            if (res.ok) text = await res.text();
+          } catch { /* ignore */ }
         }
       } else if (body.file_content ?? body.content) {
         const b64 = body.file_content ?? body.content ?? '';

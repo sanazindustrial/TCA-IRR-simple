@@ -152,6 +152,91 @@ function localExtract(text: string): Record<string, unknown> {
   const prodMatch = text.match(/(?:product|platform|solution|service)[:\s]+([^\n.]{20,300})/i);
   if (prodMatch?.[1]) result.product_description = prodMatch[1].trim();
 
+  // Founder names (lines with CEO/Founder/Co-Founder followed by a name)
+  const founderMatches = text.match(/(?:ceo|cto|coo|cfo|founder|co-founder|cofounder)[:\s,–-]*([A-Z][a-z]+(?:\s[A-Z][a-z]+){1,3})/gi);
+  if (founderMatches) {
+    result.founder_names = founderMatches.map(m => m.replace(/(?:ceo|cto|coo|cfo|founder|co-founder|cofounder)[:\s,–-]*/gi, '').trim()).slice(0, 6).join(', ');
+    result.founder_count = founderMatches.filter(m => /founder/i.test(m)).length || 1;
+  }
+
+  // Team size
+  const teamSizeMatch = text.match(/(?:team\s+of|employees?|headcount|staff(?:\s+of)?)[:\s]*(\d+)/i);
+  if (teamSizeMatch) result.team_size = parseInt(teamSizeMatch[1]);
+
+  // Market size — TAM/SAM/SOM
+  const tamMatch = text.match(/\bTAM[:\s]*\$?([\d,.]+)\s*(billion|million|b|m|B|M)/i);
+  if (tamMatch) {
+    let v = parseFloat(tamMatch[1].replace(/,/g, ''));
+    const u = tamMatch[2].toLowerCase();
+    if (u === 'billion' || u === 'b') v *= 1e9;
+    else if (u === 'million' || u === 'm') v *= 1e6;
+    result.tam = v;
+  }
+  const samMatch = text.match(/\bSAM[:\s]*\$?([\d,.]+)\s*(billion|million|b|m|B|M)/i);
+  if (samMatch) {
+    let v = parseFloat(samMatch[1].replace(/,/g, ''));
+    const u = samMatch[2].toLowerCase();
+    if (u === 'billion' || u === 'b') v *= 1e9;
+    else if (u === 'million' || u === 'm') v *= 1e6;
+    result.sam = v;
+  }
+  const somMatch = text.match(/\bSOM[:\s]*\$?([\d,.]+)\s*(billion|million|b|m|B|M)/i);
+  if (somMatch) {
+    let v = parseFloat(somMatch[1].replace(/,/g, ''));
+    const u = somMatch[2].toLowerCase();
+    if (u === 'billion' || u === 'b') v *= 1e9;
+    else if (u === 'million' || u === 'm') v *= 1e6;
+    result.som = v;
+  }
+
+  // Market growth rate
+  const mgrMatch = text.match(/(?:market\s+growth|CAGR)[:\s]*(\d+(?:\.\d+)?)\s*%/i);
+  if (mgrMatch) result.market_growth_rate = parseFloat(mgrMatch[1]);
+
+  // Competitors
+  const competitorMatch = text.match(/(?:competitors?|competing\s+with|vs\.?)[:\s]+([A-Za-z0-9\s,&.]+?)(?:\.|$|\n)/im);
+  if (competitorMatch?.[1]) result.competitors = competitorMatch[1].trim();
+
+  // Gross margin
+  const gmMatch = text.match(/gross\s+margin[:\s]*(\d+(?:\.\d+)?)\s*%/i);
+  if (gmMatch) result.gross_margin = parseFloat(gmMatch[1]);
+
+  // CAC and LTV
+  const cacMatch = text.match(/(?:CAC|customer\s+acquisition\s+cost)[:\s]*\$?([\d,.]+)/i);
+  if (cacMatch) result.cac = parseFloat(cacMatch[1].replace(/,/g, ''));
+  const ltvMatch = text.match(/(?:LTV|lifetime\s+value)[:\s]*\$?([\d,.]+)/i);
+  if (ltvMatch) result.ltv = parseFloat(ltvMatch[1].replace(/,/g, ''));
+
+  // Revenue growth rate
+  const rgrMatch = text.match(/(?:revenue\s+growth|growing\s+at)[:\s]*(\d+(?:\.\d+)?)\s*%/i);
+  if (rgrMatch) result.revenue_growth_rate = parseFloat(rgrMatch[1]);
+
+  // Patents filed
+  const patentMatch = text.match(/(\d+)\s+patents?(?:\s+filed)?/i);
+  if (patentMatch) result.patents_filed = parseInt(patentMatch[1]);
+  const ipMatch = text.match(/(?:IP|intellectual\s+property)[:\s]+([^\n.]{10,200})/i);
+  if (ipMatch?.[1]) result.ip_strategy = ipMatch[1].trim();
+
+  // Key risks
+  const riskMatch = text.match(/(?:key\s+risks?|main\s+risks?|regulatory\s+risk)[:\s]+([^\n]{10,300})/i);
+  if (riskMatch?.[1]) result.key_risks = riskMatch[1].trim();
+
+  // Exit strategy
+  const exitMatch = text.match(/(?:exit\s+strategy|exit\s+options?|IPO|acquisition)[:\s]*([^\n.]{5,200})/i);
+  if (exitMatch?.[1]) result.exit_strategy = exitMatch[1].trim();
+
+  // ESG / sustainability
+  const esgMatch = text.match(/(?:ESG|sustainability|social\s+impact|environmental)[:\s]+([^\n.]{10,200})/i);
+  if (esgMatch?.[1]) result.esg_notes = esgMatch[1].trim();
+
+  // GTM strategy
+  const gtmMatch = text.match(/(?:go-to-market|GTM\s+strategy|marketing\s+strategy)[:\s]+([^\n.]{10,300})/i);
+  if (gtmMatch?.[1]) result.gtm_strategy = gtmMatch[1].trim();
+
+  // USP / value proposition
+  const uspMatch = text.match(/(?:unique\s+value|value\s+proposition|USP|differentiator)[:\s]+([^\n.]{10,300})/i);
+  if (uspMatch?.[1]) result.unique_value_proposition = uspMatch[1].trim();
+
   // Pitch summary — first 4000 chars
   result.pitch_summary = text.slice(0, 4000).trim();
 
