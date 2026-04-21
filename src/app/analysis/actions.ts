@@ -31,6 +31,11 @@ export async function runAnalysis(
     companyDescription?: string;
     moduleConfigs?: Record<string, any>;
     activeModules?: Array<{ module_id: string; weight: number; is_enabled: boolean }>;
+    stage?: string;
+    website?: string;
+    location?: string;
+    evaluationId?: string;
+    companyId?: string;
   }
 ): Promise<ComprehensiveAnalysisOutput> {
   try {
@@ -80,9 +85,13 @@ export async function runAnalysis(
         name: userData?.companyName || '',
         description: userData?.companyDescription ||
           (processedTexts[0] ? (typeof processedTexts[0] === 'string' ? processedTexts[0] : String(processedTexts[0])) : '').slice(0, 200) || '',
-        stage: 'seed',
+        stage: userData?.stage || 'seed',
         sector: backendSectorMap[framework],
         framework: framework,
+        website: userData?.website || '',
+        location: userData?.location || '',
+        evaluation_id: userData?.evaluationId || '',
+        company_id: userData?.companyId || '',
         processed_data: {
           files: processedFiles,
           urls: processedUrls,
@@ -119,7 +128,7 @@ export async function runAnalysis(
       // Benchmark Input structure (preserved from original)
       benchmarkInput: {
         sector: sectorMap[framework],
-        stage: 'seed',
+        stage: userData?.stage || 'seed',
         businessModel: 'saas',
         metrics: {
           revenueGrowthRate: 1.2,

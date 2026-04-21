@@ -3,7 +3,7 @@
  * Manage role permissions and limits dynamically
  */
 
-import { ApiClient, API_CONFIG } from './api';
+import { api } from './api';
 
 // Types matching backend models
 export interface RolePermission {
@@ -104,10 +104,10 @@ export const RolesApi = {
      */
     async getConfigurations(): Promise<RoleConfigurationsResponse> {
         try {
-            const response = await ApiClient.get<RoleConfigurationsResponse>(
-                `${API_CONFIG.BASE_URL}/roles/configurations`
+            const response = await api.get<RoleConfigurationsResponse>(
+                '/api/v1/roles/configurations'
             );
-            return response;
+            return (response.data || response) as RoleConfigurationsResponse;
         } catch (error) {
             console.warn('Failed to fetch role configurations, using defaults:', error);
             return {
@@ -124,30 +124,33 @@ export const RolesApi = {
         roleKey: 'admin' | 'analyst' | 'user',
         update: RoleConfigUpdate
     ): Promise<{ success: boolean; message: string }> {
-        return ApiClient.put(
-            `${API_CONFIG.BASE_URL}/roles/configurations/${roleKey}`,
+        const response = await api.put(
+            `/api/v1/roles/configurations/${roleKey}`,
             update
         );
+        return (response.data || response) as { success: boolean; message: string };
     },
 
     /**
      * Reset all role configurations to defaults
      */
     async resetConfigurations(): Promise<{ success: boolean; message: string }> {
-        return ApiClient.post(
-            `${API_CONFIG.BASE_URL}/roles/configurations/reset`,
+        const response = await api.post(
+            '/api/v1/roles/configurations/reset',
             {}
         );
+        return (response.data || response) as { success: boolean; message: string };
     },
 
     /**
      * Initialize role tables (run migration)
      */
     async initializeConfigurations(): Promise<{ success: boolean; message: string }> {
-        return ApiClient.post(
-            `${API_CONFIG.BASE_URL}/roles/configurations/initialize`,
+        const response = await api.post(
+            '/api/v1/roles/configurations/initialize',
             {}
         );
+        return (response.data || response) as { success: boolean; message: string };
     }
 };
 
