@@ -93,40 +93,11 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: node-app
-
-      - name: Create deployment zip
-        run: |
-          echo "=== Creating deployment zip ==="
-          ls -la
-          zip -r deploy.zip . -x "*.git*"
-          ls -la deploy.zip
+          path: .
 
       - name: Deploy to Azure Web App
-        env:
-          KUDU_PASS: ${{ secrets.AZURE_KUDU_PASS }}
-        run: |
-          echo "=== Deploying via Kudu OneDeploy ==="
-          HTTP_STATUS=$(curl -s -o /tmp/deploy_response.txt -w "%{http_code}" \
-            -X POST \
-            -u "\$TCA-IRR:${KUDU_PASS}" \
-            --data-binary "@deploy.zip" \
-            -H "Content-Type: application/zip" \
-            "https://tca-irr.scm.azurewebsites.net/api/publish?type=zip")
-          echo "HTTP Status: $HTTP_STATUS"
-          cat /tmp/deploy_response.txt || true
-          if [[ "$HTTP_STATUS" != "200" && "$HTTP_STATUS" != "202" && "$HTTP_STATUS" != "204" ]]; then
-            echo "Deployment failed with status $HTTP_STATUS"
-            exit 1
-          fi
-          echo "Deployment triggered successfully"
-
-      - name: Verify deployment
-        run: |
-          sleep 30
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://tca-irr.azurewebsites.net)
-          echo "App status: $STATUS"
-          if [ "$STATUS" != "200" ]; then
-            echo "Warning: App returned $STATUS instead of 200"
-          fi
-
-# Last deployed: 2026-04-13 (fixed: use Azure publish profile)
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: tca-irr
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: .
