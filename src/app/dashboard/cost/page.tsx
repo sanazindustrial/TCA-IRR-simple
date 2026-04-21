@@ -398,7 +398,6 @@ export default function CostManagementPage() {
           </div>
         </div>
       </div>
-    </div>
   );
 }
 
