@@ -7,7 +7,9 @@ import {
 } from '@/components/ui/sidebar';
 import { Avatar } from '@/components/ui/avatar';
 import { Compass } from 'lucide-react';
+import Link from 'next/link';
 import { SidebarMenuClient } from '@/components/dashboard/sidebar/sidebar-menu-client';
+import { ServiceHealthIndicator } from '@/components/service-health-indicator';
 
 export default function AnalysisLayout({
     children,
@@ -18,7 +20,7 @@ export default function AnalysisLayout({
         <SidebarProvider>
             <Sidebar>
                 <SidebarHeader>
-                    <div className="flex items-center gap-2">
+                    <Link href="/dashboard" className="flex items-center gap-2">
                         <Avatar className="size-8 bg-primary/20 text-primary">
                             <Compass className="m-1.5" />
                         </Avatar>
@@ -27,12 +29,13 @@ export default function AnalysisLayout({
                                 Startup Compass
                             </span>
                         </div>
-                    </div>
+                    </Link>
                 </SidebarHeader>
 
                 <SidebarMenuClient />
 
                 <SidebarFooter>
+                    <ServiceHealthIndicator />
                     <SidebarMenuClient isFooter={true} />
                 </SidebarFooter>
             </Sidebar>

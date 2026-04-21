@@ -28,7 +28,7 @@ export default function DashboardLayout({
     <SidebarProvider>
       <Sidebar>
         <SidebarHeader>
-             <div className="flex items-center gap-2">
+             <Link href="/dashboard" className="flex items-center gap-2">
               <Avatar className="size-8 bg-primary/20 text-primary">
                 <Compass className="m-1.5"/>
               </Avatar>
@@ -37,7 +37,7 @@ export default function DashboardLayout({
                   Startup Compass
                 </span>
               </div>
-            </div>
+            </Link>
         </SidebarHeader>
 
         <SidebarMenuClient />
