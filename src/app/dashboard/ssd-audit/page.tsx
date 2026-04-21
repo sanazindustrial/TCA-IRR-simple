@@ -99,6 +99,11 @@ interface ConnectionTestResponse {
 }
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
+const SSD_API_KEY = process.env.NEXT_PUBLIC_SSD_API_KEY || 'ssd-tca-58ceb369539c4a098b9ac49c';
+const SSD_HEADERS = {
+    'Content-Type': 'application/json',
+    'X-API-Key': SSD_API_KEY,
+};
 
 interface AuditLogEvent {
     event_type: string;
@@ -279,10 +284,11 @@ export default function SsdAuditLogPage() {
     const fetchLogs = async () => {
         try {
             const statusParam = filterStatus !== 'all' ? `?status=${filterStatus}` : '';
-            const response = await fetch(`${API_BASE}/api/v1/ssd/audit/logs${statusParam}`);
+            const response = await fetch(`${API_BASE}/api/v1/ssd/audit/logs${statusParam}`, {
+                headers: { 'Accept': 'application/json', 'X-API-Key': SSD_API_KEY },
+            });
             if (!response.ok) {
                 if (response.status === 404) {
-                    // Endpoint not deployed yet
                     console.warn('Startup Steroid audit endpoint not available (404)');
                     setApiAvailable(false);
                     setLogs([]);
@@ -292,7 +298,8 @@ export default function SsdAuditLogPage() {
             }
             setApiAvailable(true);
             const data = await response.json();
-            setLogs(data.logs || []);
+            // API may return array directly or wrapped in { logs: [] }
+            setLogs(Array.isArray(data) ? data : (data.logs ?? []));
         } catch (error) {
             console.error('Failed to fetch audit logs:', error);
             toast({
@@ -305,7 +312,9 @@ export default function SsdAuditLogPage() {
 
     const fetchStats = async () => {
         try {
-            const response = await fetch(`${API_BASE}/api/v1/ssd/audit/stats`);
+            const response = await fetch(`${API_BASE}/api/v1/ssd/audit/stats`, {
+                headers: { 'Accept': 'application/json', 'X-API-Key': SSD_API_KEY },
+            });
             if (!response.ok) {
                 if (response.status === 404) {
                     console.warn('Startup Steroid stats endpoint not available (404)');
@@ -322,7 +331,9 @@ export default function SsdAuditLogPage() {
 
     const fetchLogDetails = async (trackingId: string) => {
         try {
-            const response = await fetch(`${API_BASE}/api/v1/ssd/audit/logs/${trackingId}`);
+            const response = await fetch(`${API_BASE}/api/v1/ssd/audit/logs/${trackingId}`, {
+                headers: { 'Accept': 'application/json', 'X-API-Key': SSD_API_KEY },
+            });
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
@@ -348,7 +359,10 @@ export default function SsdAuditLogPage() {
     const handleDelete = async (trackingId: string) => {
         if (!confirm('Are you sure you want to delete this audit log and associated report?')) return;
         try {
-            await fetch(`${API_BASE}/api/v1/ssd/audit/logs/${trackingId}`, { method: 'DELETE' });
+            await fetch(`${API_BASE}/api/v1/ssd/audit/logs/${trackingId}`, {
+                method: 'DELETE',
+                headers: { 'X-API-Key': SSD_API_KEY },
+            });
             toast({ title: 'Deleted', description: 'Audit log deleted successfully' });
             await fetchLogs();
         } catch (error) {
@@ -363,14 +377,20 @@ export default function SsdAuditLogPage() {
 
     const downloadReport = async (trackingId: string) => {
         try {
-            const response = await fetch(`${API_BASE}/api/v1/ssd/audit/logs/${trackingId}/report`);
+            const response = await fetch(`${API_BASE}/api/v1/ssd/audit/logs/${trackingId}/report`, {
+                headers: { 'Accept': 'application/json', 'X-API-Key': SSD_API_KEY },
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
-            const blob = new Blob([JSON.stringify(data.report, null, 2)], { type: 'application/json' });
+            // API returns the report as the root object (not nested under .report)
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `tirr_report_${trackingId}.json`;
+            a.download = `ssd-report-${trackingId}.json`;
+            document.body.appendChild(a);
             a.click();
+            document.body.removeChild(a);
             URL.revokeObjectURL(url);
         } catch (error) {
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to download report' });
