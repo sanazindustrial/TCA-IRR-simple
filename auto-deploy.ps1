@@ -1,132 +1,165 @@
 <#
 .SYNOPSIS
-    Auto-deploy TCA-IRR frontend to Azure Web App
+    Auto-deploy TCA-IRR frontend to Azure App Service via Kudu OneDeploy.
 .DESCRIPTION
-    Builds Next.js app, creates deployment package, and deploys to Azure
+    Builds the Next.js app (standalone mode), packages it into a zip, and pushes
+    directly to Azure using the Kudu publish API. Does NOT require az CLI, GitHub
+    Actions, or a GitHub PAT.
+
+    NOTE: api/zipdeploy is BLOCKED (HTTP 400) because ScmType=GitHubAction.
+          This script uses api/publish?type=zip (OneDeploy) which works correctly.
+
+.PARAMETER SkipBuild
+    Skip the npm build step and use existing .next/standalone output.
+
+.PARAMETER ZipOnly
+    Create the deploy zip but do not upload it.
+
 .EXAMPLE
     .\auto-deploy.ps1
     .\auto-deploy.ps1 -SkipBuild
+    .\auto-deploy.ps1 -ZipOnly
 #>
 param(
     [switch]$SkipBuild,
-    [switch]$UpdateGitHubSecret
+    [switch]$ZipOnly
 )
 
+Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+
+# ── Configuration ─────────────────────────────────────────────────────────────
+$KUDU_USER  = '$TCA-IRR'
+$KUDU_PASS  = 'DTeorydMXQoeBsvodiuZo1SFQAGSy04FiMgBw7aZ6imsypxYj9zpxnGgnvTQ'
+$DEPLOY_URL = 'https://tca-irr.scm.azurewebsites.net/api/publish?type=zip'
+$SITE_URL   = 'https://tca-irr.azurewebsites.net'
+$API_URL    = 'https://tcairrapiccontainer.azurewebsites.net'
 $ProjectRoot = $PSScriptRoot
+$ZIP_PATH   = Join-Path $ProjectRoot 'deploy-now.zip'
+$STANDALONE = Join-Path $ProjectRoot '.next\standalone'
+# ─────────────────────────────────────────────────────────────────────────────
+
+function Write-Step([string]$msg) { Write-Host "`n=== $msg ===" -ForegroundColor Cyan }
+function Write-OK([string]$msg)   { Write-Host "[OK] $msg"   -ForegroundColor Green }
+function Write-Warn([string]$msg) { Write-Host "[WARN] $msg" -ForegroundColor Yellow }
+function Write-Fail([string]$msg) { Write-Host "[FAIL] $msg" -ForegroundColor Red }
 
 Write-Host "======================================" -ForegroundColor Cyan
 Write-Host "  TCA-IRR Auto Deploy Script" -ForegroundColor Cyan
 Write-Host "======================================" -ForegroundColor Cyan
 
-# Configuration
-$AppName = "TCA-IRR"
-$ResourceGroup = "DEV"
-$DeployPkg = "$ProjectRoot\deploy-pkg"
-$DeployZip = "$ProjectRoot\deploy.zip"
-
-# Step 1: Build (optional)
+# ── Step 1: Build ─────────────────────────────────────────────────────────────
 if (-not $SkipBuild) {
-    Write-Host "`n[1/5] Building Next.js application..." -ForegroundColor Yellow
+    Write-Step "1/5 - Building Next.js app"
     Push-Location $ProjectRoot
     try {
+        $env:NEXT_PUBLIC_API_URL = $API_URL
         npm run build
-        if ($LASTEXITCODE -ne 0) { throw "Build failed" }
+        if ($LASTEXITCODE -ne 0) { throw "npm run build failed (exit $LASTEXITCODE)" }
+        Write-OK "Build complete"
     } finally {
         Pop-Location
     }
 } else {
-    Write-Host "`n[1/5] Skipping build..." -ForegroundColor Gray
+    Write-Warn "1/5 - Skipping build (using existing .next/standalone)"
 }
 
-# Step 2: Prepare deployment package
-Write-Host "`n[2/5] Preparing deployment package..." -ForegroundColor Yellow
-if (Test-Path $DeployPkg) { Remove-Item -Path $DeployPkg -Recurse -Force }
-if (Test-Path $DeployZip) { Remove-Item -Path $DeployZip -Force }
+# ── Step 2: Verify standalone output ─────────────────────────────────────────
+Write-Step "2/5 - Verifying build output"
+if (-not (Test-Path $STANDALONE))                           { throw "Standalone dir not found: $STANDALONE" }
+if (-not (Test-Path (Join-Path $STANDALONE 'server.js'))) { throw "server.js missing from standalone output" }
+Write-OK "Standalone output verified"
 
-New-Item -ItemType Directory -Path $DeployPkg -Force | Out-Null
+# ── Step 3: Package ───────────────────────────────────────────────────────────
+Write-Step "3/5 - Creating deployment package"
 
-# Copy standalone output
-if (Test-Path "$ProjectRoot\.next\standalone") {
-    Copy-Item -Path "$ProjectRoot\.next\standalone\*" -Destination $DeployPkg -Recurse -Force
-} else {
-    throw ".next/standalone not found. Run build first."
+# Ensure .next/static is inside standalone
+$staticSrc = Join-Path $ProjectRoot '.next\static'
+$staticDst = Join-Path $STANDALONE '.next\static'
+if (Test-Path $staticSrc) {
+    if (-not (Test-Path $staticDst)) { New-Item -ItemType Directory -Path $staticDst -Force | Out-Null }
+    Copy-Item "$staticSrc\*" -Destination $staticDst -Recurse -Force
+    Write-OK "Copied .next/static"
 }
 
-# Copy static assets
-if (Test-Path "$ProjectRoot\.next\static") {
-    New-Item -ItemType Directory -Path "$DeployPkg\.next\static" -Force | Out-Null
-    Copy-Item -Path "$ProjectRoot\.next\static\*" -Destination "$DeployPkg\.next\static" -Recurse -Force
+# Ensure public/ is inside standalone
+$publicSrc = Join-Path $ProjectRoot 'public'
+$publicDst = Join-Path $STANDALONE 'public'
+if (Test-Path $publicSrc) {
+    if (-not (Test-Path $publicDst)) { New-Item -ItemType Directory -Path $publicDst -Force | Out-Null }
+    Copy-Item "$publicSrc\*" -Destination $publicDst -Recurse -Force
+    Write-OK "Copied public/"
 }
 
-# Copy public folder
-if (Test-Path "$ProjectRoot\public") {
-    Copy-Item -Path "$ProjectRoot\public" -Destination "$DeployPkg\public" -Recurse -Force
+if (Test-Path $ZIP_PATH) { Remove-Item $ZIP_PATH -Force }
+
+Push-Location $STANDALONE
+try {
+    Compress-Archive -Path ".\*" -DestinationPath $ZIP_PATH -Force
+} finally {
+    Pop-Location
 }
 
-# Create package.json
-Set-Content -Path "$DeployPkg\package.json" -Value '{"name":"tca-irr","scripts":{"start":"node server.js"}}'
+$zipMB = [math]::Round((Get-Item $ZIP_PATH).Length / 1MB, 2)
+Write-OK "Created deploy-now.zip ($zipMB MB)"
 
-# Step 3: Create zip
-Write-Host "`n[3/5] Creating deployment zip..." -ForegroundColor Yellow
-Compress-Archive -Path "$DeployPkg\*" -DestinationPath $DeployZip -Force
-$zipSize = (Get-Item $DeployZip).Length / 1MB
-Write-Host "  Created: deploy.zip ($([math]::Round($zipSize, 2)) MB)" -ForegroundColor Green
-
-# Step 4: Get Kudu credentials and deploy
-Write-Host "`n[4/5] Deploying to Azure Web App..." -ForegroundColor Yellow
-$creds = az webapp deployment list-publishing-credentials --name $AppName --resource-group $ResourceGroup --query "{user:publishingUserName,pwd:publishingPassword}" -o json | ConvertFrom-Json
-
-if (-not $creds.user -or -not $creds.pwd) {
-    throw "Failed to get publishing credentials. Run: az login"
+if ($ZipOnly) {
+    Write-Warn "Zip-only mode. Deploy skipped."
+    Write-Host "Zip: $ZIP_PATH"
+    exit 0
 }
 
-$user = $creds.user
-$pass = $creds.pwd
-$kuduUrl = "https://$AppName.scm.azurewebsites.net/api/zipdeploy?isAsync=false"
+# ── Step 4: Deploy ────────────────────────────────────────────────────────────
+Write-Step "4/5 - Deploying to Azure"
+Write-Host "  URL : $DEPLOY_URL"
+Write-Host "  File: $zipMB MB"
 
-Write-Host "  Uploading to Kudu..." -ForegroundColor Gray
-$response = curl.exe -s -w "%{http_code}" -X POST -u "${user}:${pass}" `
-    --data-binary "@$DeployZip" `
-    -H "Content-Type: application/zip" `
-    $kuduUrl 2>&1
+$credBytes = [System.Text.Encoding]::ASCII.GetBytes("${KUDU_USER}:${KUDU_PASS}")
+$b64       = [Convert]::ToBase64String($credBytes)
 
-$statusCode = $response[-3..-1] -join ""
-if ($statusCode -eq "200") {
-    Write-Host "  Deployment successful! (HTTP 200)" -ForegroundColor Green
-} else {
-    Write-Host "  Deployment response: $response" -ForegroundColor Yellow
-    Write-Host "  Status code: $statusCode" -ForegroundColor Yellow
+try {
+    $resp = Invoke-WebRequest `
+        -Uri     $DEPLOY_URL `
+        -Method  POST `
+        -InFile  $ZIP_PATH `
+        -Headers @{ Authorization = "Basic $b64"; "Content-Type" = "application/zip" } `
+        -TimeoutSec 300 `
+        -UseBasicParsing
+
+    $code = $resp.StatusCode
+    if ($code -in 200, 202, 204) {
+        Write-OK "Deployment accepted (HTTP $code)"
+    } else {
+        Write-Fail "Unexpected HTTP $code"
+        Write-Host $resp.Content
+        exit 1
+    }
+} catch {
+    $code = $_.Exception.Response?.StatusCode.value__
+    Write-Fail "Request failed: $_"
+    if ($code) { Write-Host "HTTP: $code" }
+    exit 1
 }
 
-# Step 5: Verify
-Write-Host "`n[5/5] Verifying deployment..." -ForegroundColor Yellow
-Start-Sleep -Seconds 5
-$appUrl = "https://tca-irr.azurewebsites.net"
-$status = curl.exe -s -o NUL -w "%{http_code}" $appUrl
-Write-Host "  App status: HTTP $status" -ForegroundColor $(if ($status -eq "200") { "Green" } else { "Yellow" })
+# ── Step 5: Verify ────────────────────────────────────────────────────────────
+Write-Step "5/5 - Verifying live site"
+Write-Host "Waiting 20s for app to restart..."
+Start-Sleep -Seconds 20
 
-# Optional: Update GitHub Secret
-if ($UpdateGitHubSecret) {
-    Write-Host "`n[BONUS] Updating GitHub Secret..." -ForegroundColor Cyan
-    $publishProfile = az webapp deployment list-publishing-profiles --name $AppName --resource-group $ResourceGroup --xml
-    Write-Host @"
-
-To update GitHub secret manually:
-1. Go to: https://github.com/sanazindustrial/TCA-IRR-simple/settings/secrets/actions
-2. Click 'New repository secret' or update existing
-3. Name: AZURE_WEBAPP_PUBLISH_PROFILE
-4. Value: (paste the XML content from publish.xml)
-
-Publish profile saved to: $ProjectRoot\publish.xml
-"@ -ForegroundColor Yellow
-    $publishProfile | Out-File -FilePath "$ProjectRoot\publish.xml" -Encoding utf8
+$maxWait = 120; $elapsed = 0
+while ($elapsed -lt $maxWait) {
+    try {
+        $check = Invoke-WebRequest -Uri $SITE_URL -TimeoutSec 15 -UseBasicParsing
+        if ($check.StatusCode -eq 200) { Write-OK "Site is live (HTTP 200)"; break }
+    } catch { }
+    Write-Warn "Still waiting... (${elapsed}s / ${maxWait}s)"
+    Start-Sleep -Seconds 10
+    $elapsed += 10
 }
+if ($elapsed -ge $maxWait) { Write-Warn "Timed out waiting. Check $SITE_URL manually." }
 
-Write-Host "`n======================================" -ForegroundColor Cyan
-Write-Host "  Deployment Complete!" -ForegroundColor Green
-Write-Host "  URL: $appUrl" -ForegroundColor Cyan
+Write-Host ""
 Write-Host "======================================" -ForegroundColor Cyan
-
-# Cleanup
-Remove-Item -Path $DeployPkg -Recurse -Force -ErrorAction SilentlyContinue
+Write-Host "  Done!  $SITE_URL" -ForegroundColor Green
+Write-Host "  $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -ForegroundColor Gray
+Write-Host "======================================" -ForegroundColor Cyan
