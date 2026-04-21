@@ -32,6 +32,7 @@ export async function runAnalysis(
     moduleConfigs?: Record<string, any>;
     activeModules?: Array<{ module_id: string; weight: number; is_enabled: boolean }>;
     stage?: string;
+    sector?: string;
     website?: string;
     location?: string;
     evaluationId?: string;

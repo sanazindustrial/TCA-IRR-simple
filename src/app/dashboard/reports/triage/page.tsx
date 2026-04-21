@@ -241,6 +241,13 @@ export default function TriageReportWizardPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  // ── Evaluation Metadata ────────────────────────────────────────────────────
+  const [createdByName, setCreatedByName] = useState<string>('Unknown');
+  const [sessionStartedAt] = useState<string>(() => new Date().toISOString());
+  const [extractionTimestamp, setExtractionTimestamp] = useState<string | null>(null);
+  const [dbFetchTimestamp, setDbFetchTimestamp] = useState<string | null>(null);
+  const [recordedTimestamp, setRecordedTimestamp] = useState<string | null>(null);
+
   useEffect(() => {
     try {
       const role = (localStorage.getItem('userRole') || 'standard') as 'admin' | 'analyst' | 'standard';
@@ -249,6 +256,14 @@ export default function TriageReportWizardPage() {
       const configKey = isPrivileged ? 'report-config-triage-admin' : 'report-config-triage-standard';
       const saved = localStorage.getItem(configKey);
       setReportSections(saved ? JSON.parse(saved) : isPrivileged ? DEFAULT_ADMIN_SECTIONS : DEFAULT_STANDARD_SECTIONS);
+      // Load user identity
+      try {
+        const loggedInUser = localStorage.getItem('loggedInUser');
+        if (loggedInUser) {
+          const user = JSON.parse(loggedInUser);
+          setCreatedByName(user.name || user.email || 'Unknown');
+        }
+      } catch { /* ignore */ }
     } catch {
       setReportSections(DEFAULT_STANDARD_SECTIONS);
     }
@@ -365,6 +380,7 @@ export default function TriageReportWizardPage() {
         if (extracted.teamInfo)     setTeamInfo(extracted.teamInfo);
         setPitchSummary(textContent.slice(0, 4000));
         setCompanyDescription(textContent.slice(0, 1500));
+        setExtractionTimestamp(new Date().toISOString());
         toast({ title: 'Extraction Complete', description: 'Company information auto-filled from pitch deck.' });
       } else {
         toast({ title: 'File Uploaded', description: 'Extraction returned no text. Please complete company info manually.' });
@@ -495,6 +511,7 @@ export default function TriageReportWizardPage() {
     }
     setExternalData(results);
     setFetchingData(false);
+    setDbFetchTimestamp(new Date().toISOString());
     toast({ title: 'External data fetched', description: `${results.filter((r) => r.success).length}/${results.length} sources fetched.` });
   };
 
@@ -518,6 +535,15 @@ export default function TriageReportWizardPage() {
         missing_sections: reportSections.filter((s) => !s.active).map((s) => s.id),
       });
       setSavedReportId(saved.id);
+      setRecordedTimestamp(new Date().toISOString());
+      // Track report usage per user
+      try {
+        const lu = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
+        const uid = String(lu.id || 'unknown');
+        const usage = JSON.parse(localStorage.getItem('reportUsage') || '{}');
+        usage[uid] = { triage: (usage[uid]?.triage || 0) + 1, dd: usage[uid]?.dd || 0 };
+        localStorage.setItem('reportUsage', JSON.stringify(usage));
+      } catch { /* ignore */ }
       toast({ title: 'Report saved', description: `Report #${saved.id} saved for ${companyName}.` });
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Failed to save report.';
@@ -828,10 +854,7 @@ export default function TriageReportWizardPage() {
                 <Label htmlFor="companyDescription">Company Description</Label>
                 <Textarea id="companyDescription" placeholder="Brief overview of the company, product, and market opportunity…" rows={4} value={companyDescription} onChange={(e) => setCompanyDescription(e.target.value)} />
               </div>
-              <div className="rounded-md border bg-muted/20 p-3 text-xs text-muted-foreground flex items-start gap-2">
-                <AlertCircle className="size-4 shrink-0 mt-0.5" />
-                Evaluation ID: <span className="font-mono">{evaluationId}</span>
-              </div>
+
             </CardContent>
           </Card>
         );
@@ -1516,6 +1539,17 @@ export default function TriageReportWizardPage() {
         <Badge variant="secondary" className="text-sm">
           Step {currentStep} of {TRIAGE_STEPS.length}
         </Badge>
+      </div>
+
+      {/* ── Evaluation Metadata Banner ──────────────────────────────────── */}
+      <div className="rounded-lg border bg-muted/30 px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-muted-foreground">
+        <span><span className="font-semibold text-foreground">Evaluation ID:</span> <span className="font-mono text-primary">{evaluationId}</span></span>
+        {companyName && <span><span className="font-semibold text-foreground">Company:</span> {companyName}</span>}
+        <span><span className="font-semibold text-foreground">Created by:</span> {createdByName}</span>
+        <span><span className="font-semibold text-foreground">Session started:</span> {new Date(sessionStartedAt).toLocaleString()}</span>
+        {extractionTimestamp && <span><span className="font-semibold text-foreground">Extracted:</span> {new Date(extractionTimestamp).toLocaleString()}</span>}
+        {dbFetchTimestamp && <span><span className="font-semibold text-foreground">DB fetched:</span> {new Date(dbFetchTimestamp).toLocaleString()}</span>}
+        {recordedTimestamp && <span className="text-green-600 dark:text-green-400"><span className="font-semibold">Recorded:</span> {new Date(recordedTimestamp).toLocaleString()}</span>}
       </div>
 
       <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-9 gap-2">

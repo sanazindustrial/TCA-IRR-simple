@@ -395,6 +395,14 @@ export default function DueDiligenceWorkflowPage() {
         missing_sections: reportSections.filter((s) => !s.active).map((s) => s.id),
       });
       setSavedReportId(savedReport.id);
+      // Track report usage per user
+      try {
+        const lu = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
+        const uid = String(lu.id || 'unknown');
+        const usage = JSON.parse(localStorage.getItem('reportUsage') || '{}');
+        usage[uid] = { triage: usage[uid]?.triage || 0, dd: (usage[uid]?.dd || 0) + 1 };
+        localStorage.setItem('reportUsage', JSON.stringify(usage));
+      } catch { /* ignore */ }
 
       if (!completedSteps.includes(6)) setCompletedSteps((prev) => [...prev, 6]);
       setCurrentStep(7);
