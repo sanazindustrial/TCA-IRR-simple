@@ -16,6 +16,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import Link from 'next/link';
 import { User, Settings, LogOut, Compass } from 'lucide-react';
 import { SidebarMenuClient } from '@/components/dashboard/sidebar/sidebar-menu-client';
+import { ServiceHealthIndicator } from '@/components/service-health-indicator';
 
 export default function DashboardLayout({
   children,
@@ -42,6 +43,7 @@ export default function DashboardLayout({
         <SidebarMenuClient />
         
         <SidebarFooter>
+            <ServiceHealthIndicator />
             <SidebarMenuClient isFooter={true} />
         </SidebarFooter>
       </Sidebar>
