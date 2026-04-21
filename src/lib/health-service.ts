@@ -35,6 +35,8 @@ export interface ServiceDef {
     path: string;
     /** Some endpoints only make sense when the user is authenticated */
     requiresAuth?: boolean;
+    /** Optional/non-critical endpoints: 404 returns 'checking' rather than 'degraded' */
+    optional?: boolean;
 }
 
 export interface ServiceResult {
@@ -137,27 +139,27 @@ const SERVICES: ServiceDef[] = [
 
     // ── Admin / config ──
     { id: 'cost-svc',      label: 'Cost Service',     group: 'admin', path: '/api/v1/cost/summary/public' },
-    { id: 'settings-svc',  label: 'Settings/Config',  group: 'admin', path: '/api/v1/settings/versions', requiresAuth: true },
+    { id: 'settings-svc',  label: 'Settings/Config',  group: 'admin', path: '/api/v1/settings/versions', requiresAuth: true, optional: true },
     { id: 'users-svc',     label: 'Users',            group: 'admin', path: '/api/v1/users',              requiresAuth: true },
     { id: 'roles-svc',     label: 'Roles',            group: 'admin', path: '/api/v1/roles',              requiresAuth: true },
     { id: 'dashboard-svc', label: 'Dashboard Stats',  group: 'admin', path: '/api/v1/dashboard/stats' },
 
-    // ── Communication ──
-    { id: 'notifications-svc', label: 'Notifications',   group: 'communication', path: '/api/v1/notifications',       requiresAuth: true },
-    { id: 'email-svc',         label: 'Email Service',   group: 'communication', path: '/api/v1/email/status',         requiresAuth: true },
-    { id: 'send-svc',          label: 'Send / Receive',  group: 'communication', path: '/api/v1/notifications/unread', requiresAuth: true },
+    // ── Communication (optional – endpoints may not exist) ──
+    { id: 'notifications-svc', label: 'Notifications',   group: 'communication', path: '/api/v1/notifications',       requiresAuth: true, optional: true },
+    { id: 'email-svc',         label: 'Email Service',   group: 'communication', path: '/api/v1/email/status',         requiresAuth: true, optional: true },
+    { id: 'send-svc',          label: 'Send / Receive',  group: 'communication', path: '/api/v1/notifications/unread', requiresAuth: true, optional: true },
 
-    // ── Extraction services ──
-    { id: 'extraction-svc',    label: 'File Extraction',     group: 'extraction', path: '/api/v1/files/extract-text' },
-    { id: 'extract-alt-svc',   label: 'Extract (v2)',         group: 'extraction', path: '/api/v1/extract/file' },
-    { id: 'scrape-svc',        label: 'URL Scraper',          group: 'extraction', path: '/api/v1/scrape/url' },
-    { id: 'storage-svc',       label: 'Cloud Storage',        group: 'extraction', path: '/api/v1/storage/health' },
+    // ── Extraction services (POST-only endpoints; GET returns 404 – mark optional) ──
+    { id: 'extraction-svc',    label: 'File Extraction',     group: 'extraction', path: '/api/v1/files/extract-text', optional: true },
+    { id: 'extract-alt-svc',   label: 'Extract (v2)',         group: 'extraction', path: '/api/v1/extract/file',       optional: true },
+    { id: 'scrape-svc',        label: 'URL Scraper',          group: 'extraction', path: '/api/v1/scrape/url',         optional: true },
+    { id: 'storage-svc',       label: 'Cloud Storage',        group: 'extraction', path: '/api/v1/storage/health',     optional: true },
 
-    // ── AI Agent services ──
-    { id: 'ai-extract-svc',    label: 'AI Extraction Agent',  group: 'ai', path: '/api/v1/ai/extract' },
-    { id: 'ai-autofill-svc',   label: 'AI Auto-Fill Agent',   group: 'ai', path: '/api/v1/ai/autofill' },
-    { id: 'ai-analysis-svc',   label: 'AI Analysis Agent',    group: 'ai', path: '/api/v1/analysis/ai-extract', requiresAuth: true },
-    { id: 'export-svc',        label: 'Export Service',       group: 'ai', path: '/api/v1/export/health' },
+    // ── AI Agent services (optional – may not be deployed) ──
+    { id: 'ai-extract-svc',    label: 'AI Extraction Agent',  group: 'ai', path: '/api/v1/ai/extract',          optional: true },
+    { id: 'ai-autofill-svc',   label: 'AI Auto-Fill Agent',   group: 'ai', path: '/api/v1/ai/autofill',         optional: true },
+    { id: 'ai-analysis-svc',   label: 'AI Analysis Agent',    group: 'ai', path: '/api/v1/analysis/ai-extract', requiresAuth: true, optional: true },
+    { id: 'export-svc',        label: 'Export Service',       group: 'ai', path: '/api/v1/export/health',       optional: true },
 ];
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -258,8 +260,9 @@ class HealthService {
             clearTimeout(timeoutId);
             const latencyMs = Date.now() - t0;
 
-            // 200-299 and 401/403 (auth issues) all mean the service is UP
-            // Only 404 (not found), 500+ or network errors mean DOWN/DEGRADED
+            // 200-399 → healthy; 401/403 → service alive (needs auth); 500+ → down
+            // 404 on optional endpoints → 'checking' (not deployed/available yet)
+            // 404 on required endpoints → 'degraded'
             let status: ServiceStatus;
             if (res.status >= 200 && res.status < 400) {
                 status = 'healthy';
@@ -268,8 +271,10 @@ class HealthService {
                 status = 'healthy';
             } else if (res.status >= 500) {
                 status = 'down';
+            } else if (res.status === 404 && def.optional) {
+                // Optional endpoint not yet deployed – treat as not-available, not degraded
+                status = 'checking';
             } else {
-                // 404 for optional endpoints (email, notifications etc.) → degraded
                 status = 'degraded';
             }
 
@@ -375,7 +380,15 @@ class HealthService {
                         checkedAt: now,
                     };
                 }
-                // No data from system-status – fallback to individual ping
+                // No data from system-status – return 'checking' rather than pinging
+                // individual module endpoints that likely return 404
+                return {
+                    def,
+                    status: 'checking' as ServiceStatus,
+                    code: 0,
+                    latencyMs: 0,
+                    checkedAt: now,
+                };
             }
             return this.pingService(def);
         });
@@ -387,9 +400,11 @@ class HealthService {
 
     private aggregate(statuses: ServiceStatus[]): ServiceStatus {
         if (statuses.length === 0) return 'checking';
-        if (statuses.every((s) => s === 'checking')) return 'checking';
-        if (statuses.some((s) => s === 'down')) return 'down';
-        if (statuses.some((s) => s === 'degraded' || s === 'checking')) return 'degraded';
+        // Filter out 'checking' (unavailable/optional) – only judge based on definite results
+        const real = statuses.filter((s) => s !== 'checking');
+        if (real.length === 0) return 'checking';
+        if (real.some((s) => s === 'down')) return 'down';
+        if (real.some((s) => s === 'degraded')) return 'degraded';
         return 'healthy';
     }
 
