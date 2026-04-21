@@ -106,16 +106,16 @@ interface ReportSection {
 }
 
 const DEFAULT_SSD_SECTIONS: ReportSection[] = [
-  { id: 'ss-page-1', title: 'Market Opportunity', description: 'Market size, trends, and opportunity assessment', active: true },
-  { id: 'ss-page-2', title: 'Product & Technology', description: 'Product maturity, tech stack, and IP', active: true },
-  { id: 'ss-page-3', title: 'Team & Founders', description: 'Founder backgrounds and team composition', active: true },
-  { id: 'ss-page-4', title: 'Business Model', description: 'Revenue model, pricing, and unit economics', active: true },
-  { id: 'ss-page-5', title: 'Traction & Metrics', description: 'Growth metrics, revenue, and KPIs', active: true },
-  { id: 'ss-page-6', title: 'Competitive Analysis', description: 'Competitive landscape and differentiation', active: true },
-  { id: 'ss-page-7', title: 'Go-to-Market Strategy', description: 'Customer acquisition and distribution', active: true },
-  { id: 'ss-page-8', title: 'Financial Overview', description: 'Funding history, burn rate, and projections', active: true },
-  { id: 'ss-page-9', title: 'Risk Assessment', description: 'Key risks and mitigation strategies', active: true },
-  { id: 'ss-page-10', title: 'Investment Recommendation', description: 'Final score and investment thesis', active: true },
+  { id: 'ss-page-1', title: 'Page 1: Executive Summary', description: 'Overall score, investment recommendation, analysis completeness, company snapshot', active: true },
+  { id: 'ss-page-2', title: 'Page 2: TCA Scorecard', description: 'Composite score, category breakdown, top strengths, areas of concern', active: true },
+  { id: 'ss-page-3', title: 'Page 3: TCA AI Interpretation', description: 'AI-powered analysis insights and interpretation of key metrics', active: true },
+  { id: 'ss-page-4', title: 'Page 4: Weighted Score Breakdown', description: 'Detailed breakdown of weighted scores by evaluation category', active: true },
+  { id: 'ss-page-5', title: 'Page 5: Risk Assessment', description: 'Risk score, flags count, severity levels, risk domains', active: true },
+  { id: 'ss-page-6', title: 'Page 6: Flag Analysis Narrative', description: 'In-depth narrative analysis of identified risk flags', active: true },
+  { id: 'ss-page-7', title: 'Page 7: Market & Team', description: 'Market score, TAM/SAM/SOM, team score, founders, gaps', active: true },
+  { id: 'ss-page-8', title: 'Page 8: Financials & Technology', description: 'Financial score, revenue, burn rate, runway, technology score, IP', active: true },
+  { id: 'ss-page-9', title: 'Page 9: CEO Questions', description: 'Strategic questions for CEO and leadership team', active: true },
+  { id: 'ss-page-10', title: 'Page 10: Final Recommendation', description: 'Final decision, funding recommendation, next steps', active: true },
 ];
 
 const SSD_WIZARD_STEPS = [
@@ -189,7 +189,16 @@ export default function SSDReportPage() {
   const [savedDbReportId, setSavedDbReportId] = useState<number | null>(null);
   const [pollingStatus, setPollingStatus] = useState<'idle' | 'polling' | 'done' | 'failed'>('idle');
   const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const elapsedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const ssdFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Workflow elapsed time
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  // Add new section form
+  const [newSectionTitle, setNewSectionTitle] = useState('');
+  const [newSectionDesc, setNewSectionDesc] = useState('');
+  const [addSectionOpen, setAddSectionOpen] = useState(false);
 
   // SSD document-based extraction
   const [isExtractingSSD, setIsExtractingSSD] = useState(false);
@@ -243,6 +252,25 @@ export default function SSDReportPage() {
   const [createdByName, setCreatedByName] = useState<string>('Unknown');
   const [sessionStartedAt] = useState<string>(() => new Date().toISOString());
 
+  const stopElapsedTimer = useCallback(() => {
+    if (elapsedTimerRef.current !== null) {
+      clearInterval(elapsedTimerRef.current);
+      elapsedTimerRef.current = null;
+    }
+  }, []);
+
+  const startElapsedTimer = useCallback(() => {
+    if (elapsedTimerRef.current !== null) clearInterval(elapsedTimerRef.current);
+    setElapsedSeconds(0);
+    elapsedTimerRef.current = setInterval(() => setElapsedSeconds((s) => s + 1), 1000);
+  }, []);
+
+  const formatElapsed = (sec: number): string => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return m > 0 ? `${m}m ${s}s` : `${s}s`;
+  };
+
   const stopPolling = useCallback(() => {
     if (pollingIntervalRef.current !== null) {
       clearInterval(pollingIntervalRef.current);
@@ -250,7 +278,7 @@ export default function SSDReportPage() {
     }
   }, []);
 
-  const startPolling = useCallback((tid: string) => {
+  const startPolling = useCallback((tid: string, shouldDownload: boolean) => {
     stopPolling();
     setPollingStatus('polling');
     pollingIntervalRef.current = setInterval(async () => {
@@ -262,32 +290,41 @@ export default function SSDReportPage() {
         const entry = allLogs.find((l) => l.tracking_id === tid);
         if (entry?.status === 'completed') {
           stopPolling();
+          // Stop elapsed timer via stable ref (no closure capture needed)
+          if (elapsedTimerRef.current !== null) {
+            clearInterval(elapsedTimerRef.current);
+            elapsedTimerRef.current = null;
+          }
           setPollingStatus('done');
-          // Refresh the audit table
           fetchLogs();
           fetchStats();
-          // Auto-download the report if requested
-          try {
-            const reportRes = await fetch(`${API_BASE}/api/v1/ssd/audit/logs/${tid}/report`, {
-              headers: SSD_HEADERS,
-            });
-            if (reportRes.ok) {
-              const reportData = await reportRes.json();
-              const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = `ssd-report-${tid}.json`;
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
-              URL.revokeObjectURL(url);
+          if (shouldDownload) {
+            try {
+              const reportRes = await fetch(`${API_BASE}/api/v1/ssd/audit/logs/${tid}/report`, {
+                headers: SSD_HEADERS,
+              });
+              if (reportRes.ok) {
+                const reportData = await reportRes.json();
+                const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `ssd-report-${tid}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+              }
+            } catch {
+              // download failed silently
             }
-          } catch {
-            // download failed silently
           }
         } else if (entry?.status === 'failed') {
           stopPolling();
+          if (elapsedTimerRef.current !== null) {
+            clearInterval(elapsedTimerRef.current);
+            elapsedTimerRef.current = null;
+          }
           setPollingStatus('failed');
           fetchLogs();
           fetchStats();
@@ -298,10 +335,10 @@ export default function SSDReportPage() {
     }, 10_000);
   }, [stopPolling]);
 
-  // Clean up polling on unmount
+  // Clean up polling and elapsed timer on unmount
   useEffect(() => {
-    return () => stopPolling();
-  }, [stopPolling]);
+    return () => { stopPolling(); stopElapsedTimer(); };
+  }, [stopPolling, stopElapsedTimer]);
 
   const fetchStats = useCallback(async () => {
     setIsLoadingStats(true);
@@ -358,11 +395,44 @@ export default function SSDReportPage() {
   }, [submitOpen]);
 
   const toggleSsdSection = (id: string) => {
-    setSsdSections((prev) => prev.map((s) => (s.id === id ? { ...s, active: !s.active } : s)));
+    setSsdSections((prev) => {
+      const updated = prev.map((s) => (s.id === id ? { ...s, active: !s.active } : s));
+      localStorage.setItem('report-config-ssd-sections', JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const toggleAllSsdSections = (active: boolean) => {
-    setSsdSections((prev) => prev.map((s) => ({ ...s, active })));
+    setSsdSections((prev) => {
+      const updated = prev.map((s) => ({ ...s, active }));
+      localStorage.setItem('report-config-ssd-sections', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const resetSsdSections = () => {
+    setSsdSections(DEFAULT_SSD_SECTIONS);
+    localStorage.removeItem('report-config-ssd-sections');
+    toast({ title: 'Reset to default', description: '10-page TCA TIRR format restored.' });
+  };
+
+  const addCustomSection = () => {
+    if (!newSectionTitle.trim()) return;
+    const newSection: ReportSection = {
+      id: `custom-page-${Date.now()}`,
+      title: newSectionTitle.trim(),
+      description: newSectionDesc.trim() || 'Custom section',
+      active: true,
+    };
+    setSsdSections((prev) => {
+      const updated = [...prev, newSection];
+      localStorage.setItem('report-config-ssd-sections', JSON.stringify(updated));
+      return updated;
+    });
+    setNewSectionTitle('');
+    setNewSectionDesc('');
+    setAddSectionOpen(false);
+    toast({ title: 'Section added', description: `"${newSection.title}" added to the report.` });
   };
 
   const wizardCanProceed = () => {
@@ -425,7 +495,8 @@ export default function SSDReportPage() {
         body.callback_url = submitForm.callback_url;
       }
       const activeSectionIds = ssdSections.filter((s) => s.active).map((s) => s.id);
-      if (activeSectionIds.length > 0 && activeSectionIds.length < ssdSections.length) {
+      // Always send active section IDs to the backend
+      if (activeSectionIds.length > 0) {
         body.pages = activeSectionIds.join(',');
       }
       const res = await fetch(`${API_BASE}/api/v1/ssd/evaluate`, {
@@ -477,9 +548,10 @@ export default function SSDReportPage() {
         }
       }
 
-      // Start polling for completion and auto-download if requested
-      if (downloadAfterSubmit && tid) {
-        startPolling(tid);
+      // Always start polling to track status; pass download flag through
+      if (tid) {
+        startPolling(tid, downloadAfterSubmit);
+        startElapsedTimer();
       }
     } catch (err) {
       toast({
@@ -537,11 +609,17 @@ export default function SSDReportPage() {
               setSubmitOpen(open);
               if (!open) {
                 stopPolling();
+                stopElapsedTimer();
+                setElapsedSeconds(0);
                 setWizardStep(1);
                 setTrackingId(null);
                 setSavedDbReportId(null);
                 setPollingStatus('idle');
                 setSubmitForm({ company_name: '', founder_email: '', callback_url: '' });
+                setSsdFieldsExtracted(0);
+                setAddSectionOpen(false);
+                setNewSectionTitle('');
+                setNewSectionDesc('');
               }
             }}
           >
@@ -682,29 +760,17 @@ export default function SSDReportPage() {
 
                 {wizardStep === 2 && (
                   <div className="space-y-3 py-2">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
                       <p className="text-sm font-medium">
-                        {ssdSections.filter((s) => s.active).length} / {ssdSections.length} pages
-                        active
+                        {ssdSections.filter((s) => s.active).length} / {ssdSections.length} pages active
                       </p>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => toggleAllSsdSections(true)}
-                        >
-                          Enable All
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => toggleAllSsdSections(false)}
-                        >
-                          Disable All
-                        </Button>
+                      <div className="flex gap-2 flex-wrap">
+                        <Button variant="outline" size="sm" onClick={() => toggleAllSsdSections(true)}>Enable All</Button>
+                        <Button variant="outline" size="sm" onClick={() => toggleAllSsdSections(false)}>Disable All</Button>
+                        <Button variant="outline" size="sm" onClick={resetSsdSections}>Reset to Default</Button>
                       </div>
                     </div>
-                    <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
+                    <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
                       {ssdSections.map((section) => (
                         <div
                           key={section.id}
@@ -721,6 +787,42 @@ export default function SSDReportPage() {
                         </div>
                       ))}
                     </div>
+                    {/* Add New Section */}
+                    {addSectionOpen ? (
+                      <div className="rounded-lg border border-dashed p-3 space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Add New Section</p>
+                        <div className="space-y-1">
+                          <Label htmlFor="new-sec-title" className="text-xs">Section Title</Label>
+                          <Input
+                            id="new-sec-title"
+                            placeholder="Section Title"
+                            value={newSectionTitle}
+                            onChange={(e) => setNewSectionTitle(e.target.value)}
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="new-sec-desc" className="text-xs">Section Description</Label>
+                          <Input
+                            id="new-sec-desc"
+                            placeholder="Section Description"
+                            value={newSectionDesc}
+                            onChange={(e) => setNewSectionDesc(e.target.value)}
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <Button size="sm" onClick={addCustomSection} disabled={!newSectionTitle.trim()}>
+                            <Plus className="size-3 mr-1" />Add Section
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => { setAddSectionOpen(false); setNewSectionTitle(''); setNewSectionDesc(''); }}>Cancel</Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <Button variant="outline" size="sm" className="w-full gap-1" onClick={() => setAddSectionOpen(true)}>
+                        <Plus className="size-3" />Add New Section
+                      </Button>
+                    )}
                   </div>
                 )}
 
@@ -811,20 +913,45 @@ export default function SSDReportPage() {
                           </div>
                         )}
                         {pollingStatus === 'polling' && (
-                          <div className="rounded-lg border bg-muted/40 p-3 flex items-center gap-2 text-sm">
-                            <Loader2 className="size-4 animate-spin text-primary shrink-0" />
-                            <span className="text-muted-foreground">Waiting for evaluation to complete — will auto-download when ready&hellip;</span>
+                          <div className="rounded-lg border bg-muted/40 p-3 flex items-center justify-between gap-2 text-sm">
+                            <div className="flex items-center gap-2">
+                              <Loader2 className="size-4 animate-spin text-primary shrink-0" />
+                              <span className="text-muted-foreground">
+                                {downloadAfterSubmit ? 'Waiting for completion — will auto-download when ready…' : 'Monitoring evaluation status…'}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1 text-xs font-mono text-muted-foreground shrink-0">
+                              <Timer className="size-3" />
+                              {formatElapsed(elapsedSeconds)}
+                            </div>
                           </div>
                         )}
                         {pollingStatus === 'done' && (
-                          <div className="rounded-lg border border-green-300 bg-green-50/40 p-3 flex items-center gap-2 text-sm">
-                            <CheckCircle2 className="size-4 text-green-600 shrink-0" />
-                            <span className="text-green-800">Report completed and downloaded successfully.</span>
+                          <div className="rounded-lg border border-green-300 bg-green-50/40 p-3 flex items-center justify-between gap-2 text-sm">
+                            <div className="flex items-center gap-2">
+                              <CheckCircle2 className="size-4 text-green-600 shrink-0" />
+                              <span className="text-green-800">
+                                {downloadAfterSubmit ? 'Report completed and downloaded successfully.' : 'Evaluation completed successfully.'}
+                              </span>
+                            </div>
+                            {elapsedSeconds > 0 && (
+                              <span className="text-xs font-mono text-green-700 shrink-0 flex items-center gap-1">
+                                <Timer className="size-3" />{formatElapsed(elapsedSeconds)}
+                              </span>
+                            )}
                           </div>
                         )}
                         {pollingStatus === 'failed' && (
-                          <div className="rounded-lg border border-red-300 bg-red-50/40 p-3 text-sm text-red-700">
-                            Evaluation failed — no report available for download.
+                          <div className="rounded-lg border border-red-300 bg-red-50/40 p-3 flex items-center justify-between gap-2 text-sm">
+                            <div className="flex items-center gap-2 text-red-700">
+                              <XCircle className="size-4 shrink-0" />
+                              Evaluation failed — no report available for download.
+                            </div>
+                            {elapsedSeconds > 0 && (
+                              <span className="text-xs font-mono text-red-600 shrink-0 flex items-center gap-1">
+                                <Timer className="size-3" />{formatElapsed(elapsedSeconds)}
+                              </span>
+                            )}
                           </div>
                         )}
                         <p className="text-sm text-muted-foreground">
