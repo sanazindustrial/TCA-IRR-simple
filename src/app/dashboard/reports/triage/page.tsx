@@ -1509,6 +1509,12 @@ export default function TriageReportWizardPage() {
                     </Link>
                   </Button>
                 )}
+                <Button variant="outline" asChild className="gap-2">
+                  <Link href="/analysis/what-if">
+                    <BrainCircuit className="size-4" />
+                    Run Simulation
+                  </Link>
+                </Button>
               </div>
             </CardContent>
           </Card>

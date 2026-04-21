@@ -200,6 +200,14 @@ export default function DueDiligenceWorkflowPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<unknown>(null);
 
+  // Evaluation metadata
+  const [evaluationId] = useState<string>(
+    () => `EVL-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
+  );
+  const [createdByName, setCreatedByName] = useState<string>('Unknown');
+  const [sessionStartedAt] = useState<string>(() => new Date().toISOString());
+  const [recordedTimestamp, setRecordedTimestamp] = useState<string | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const router = useRouter();
@@ -462,6 +470,7 @@ export default function DueDiligenceWorkflowPage() {
         missing_sections: reportSections.filter((s) => !s.active).map((s) => s.id),
       });
       setSavedReportId(saved.id);
+      setRecordedTimestamp(new Date().toISOString());
       toast({ title: 'Report saved', description: `Report #${saved.id} saved successfully.` });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to save report.';
@@ -502,6 +511,13 @@ export default function DueDiligenceWorkflowPage() {
     setUserRole(role);
     const saved = localStorage.getItem('report-config-dd');
     setReportSections(saved ? JSON.parse(saved) : DEFAULT_DD_SECTIONS);
+    try {
+      const lu = localStorage.getItem('loggedInUser');
+      if (lu) {
+        const u = JSON.parse(lu);
+        setCreatedByName(u.name || u.email || 'Unknown');
+      }
+    } catch { /* ignore */ }
   }, []);
 
   // Load draft on mount
@@ -1368,6 +1384,18 @@ export default function DueDiligenceWorkflowPage() {
           </div>
         </div>
       </header>
+
+      {/* Evaluation metadata banner */}
+      <div className="rounded-lg border bg-muted/30 px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-muted-foreground mb-6">
+        <span><span className="font-semibold text-foreground">Evaluation ID:</span> <span className="font-mono text-primary">{evaluationId}</span></span>
+        <span><span className="font-semibold text-foreground">Created by:</span> {createdByName}</span>
+        <span><span className="font-semibold text-foreground">Session started:</span> {new Date(sessionStartedAt).toLocaleString()}</span>
+        {recordedTimestamp && (
+          <span className="text-green-600 dark:text-green-400">
+            <span className="font-semibold">Recorded:</span> {new Date(recordedTimestamp).toLocaleString()}
+          </span>
+        )}
+      </div>
 
       {/* Step indicator */}
       <div className="mb-8 overflow-x-auto">

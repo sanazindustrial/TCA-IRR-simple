@@ -84,10 +84,8 @@ export default function AnalystAnalysisPage() {
       if (role !== 'admin' && role !== 'analyst') {
         router.push('/unauthorized');
       }
-    } else {
-      // If no user is logged in, redirect to login
-      router.push('/login');
     }
+    // Login redirect is handled by SidebarMenuClient in the analysis layout
     // Restore saved draft
     try {
       const draft = localStorage.getItem('analyst-review-draft');
