@@ -263,7 +263,10 @@ export default function SSDReportPage() {
         if (entry?.status === 'completed') {
           stopPolling();
           setPollingStatus('done');
-          // Auto-download the report
+          // Refresh the audit table
+          fetchLogs();
+          fetchStats();
+          // Auto-download the report if requested
           try {
             const reportRes = await fetch(`${API_BASE}/api/v1/ssd/audit/logs/${tid}/report`, {
               headers: SSD_HEADERS,
@@ -286,6 +289,8 @@ export default function SSDReportPage() {
         } else if (entry?.status === 'failed') {
           stopPolling();
           setPollingStatus('failed');
+          fetchLogs();
+          fetchStats();
         }
       } catch {
         // ignore transient poll errors
