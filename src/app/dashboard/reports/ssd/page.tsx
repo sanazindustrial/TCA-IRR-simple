@@ -54,6 +54,7 @@ import {
   Building2,
   Settings,
   Download,
+  UploadCloud,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
@@ -188,6 +189,52 @@ export default function SSDReportPage() {
   const [savedDbReportId, setSavedDbReportId] = useState<number | null>(null);
   const [pollingStatus, setPollingStatus] = useState<'idle' | 'polling' | 'done' | 'failed'>('idle');
   const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const ssdFileInputRef = useRef<HTMLInputElement>(null);
+
+  // SSD document-based extraction
+  const [isExtractingSSD, setIsExtractingSSD] = useState(false);
+  const [ssdFieldsExtracted, setSsdFieldsExtracted] = useState(0);
+
+  const extractSSDFromFile = useCallback(async (file: File) => {
+    setIsExtractingSSD(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/extract', { method: 'POST', body: fd });
+      if (!res.ok) return;
+      const d = await res.json();
+      const textContent: string = d.text_content || '';
+      if (textContent.trim().length > 20) {
+        const token = typeof window !== 'undefined' ? (localStorage.getItem('authToken') ?? '') : '';
+        const aiRes = await fetch('/api/ai-autofill', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: textContent, token }),
+        });
+        if (aiRes.ok) {
+          const aiJson = await aiRes.json();
+          const aiData = (aiJson.data as Record<string, unknown>) ?? {};
+          const pick = (v: unknown) => typeof v === 'string' && v.trim() ? v.trim() : '';
+          const companyName = pick(aiData.company_name);
+          const founderEmail = pick(aiData.website); // best proxy if email not directly found
+          let count = 0;
+          if (companyName) {
+            setSubmitForm((f) => ({ ...f, company_name: f.company_name || companyName }));
+            count++;
+          }
+          // Try to find an email in the extracted text
+          const emailMatch = textContent.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/);
+          if (emailMatch && !submitForm.founder_email) {
+            setSubmitForm((f) => ({ ...f, founder_email: f.founder_email || emailMatch[0] }));
+            count++;
+          }
+          setSsdFieldsExtracted(count);
+          if (count > 0) toast({ title: 'Auto-filled from document', description: `${count} field${count > 1 ? 's' : ''} filled — verify before submitting.` });
+        }
+      }
+    } catch { /* ignore */ }
+    finally { setIsExtractingSSD(false); }
+  }, [submitForm.founder_email, toast]);
 
   // Evaluation metadata
   const [evaluationId] = useState<string>(
@@ -552,6 +599,41 @@ export default function SSDReportPage() {
               <div className="min-h-[240px]">
                 {wizardStep === 1 && (
                   <div className="space-y-4 py-2">
+                    {/* Optional: prefill from document */}
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Optional: Auto-fill from document</p>
+                      <div
+                        className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-muted-foreground/30 bg-muted/10 px-4 py-3 transition-colors hover:border-primary/50 hover:bg-muted/20"
+                        onClick={() => ssdFileInputRef.current?.click()}
+                      >
+                        {isExtractingSSD ? (
+                          <Loader2 className="size-5 animate-spin text-primary" />
+                        ) : (
+                          <UploadCloud className="size-5 text-muted-foreground" />
+                        )}
+                        <span className="text-sm text-muted-foreground">
+                          {isExtractingSSD
+                            ? 'Extracting…'
+                            : ssdFieldsExtracted > 0
+                              ? `✓ ${ssdFieldsExtracted} field${ssdFieldsExtracted > 1 ? 's' : ''} auto-filled — edit below if needed`
+                              : 'Upload pitch deck or any document to auto-fill company name'}
+                        </span>
+                        <input
+                          ref={ssdFileInputRef}
+                          type="file"
+                          className="hidden"
+                          title="Upload document to auto-fill company name"
+                          aria-label="Upload document to auto-fill company name"
+                          accept=".pdf,.pptx,.ppt,.docx,.doc,.xlsx,.xls,.csv,.txt,.json,.jpg,.jpeg,.png,.gif,.webp,.bmp,.tiff,.rtf,.odt,.odp,.ods"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) extractSSDFromFile(f);
+                            if (ssdFileInputRef.current) ssdFileInputRef.current.value = '';
+                          }}
+                        />
+                      </div>
+                    </div>
+
                     <div className="space-y-2">
                       <Label htmlFor="ssd-company">
                         Company Name <span className="text-destructive">*</span>
