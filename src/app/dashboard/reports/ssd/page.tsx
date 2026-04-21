@@ -189,6 +189,13 @@ export default function SSDReportPage() {
   const [pollingStatus, setPollingStatus] = useState<'idle' | 'polling' | 'done' | 'failed'>('idle');
   const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Evaluation metadata
+  const [evaluationId] = useState<string>(
+    () => `EVL-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
+  );
+  const [createdByName, setCreatedByName] = useState<string>('Unknown');
+  const [sessionStartedAt] = useState<string>(() => new Date().toISOString());
+
   const stopPolling = useCallback(() => {
     if (pollingIntervalRef.current !== null) {
       clearInterval(pollingIntervalRef.current);
@@ -278,6 +285,17 @@ export default function SSDReportPage() {
     fetchStats();
     fetchLogs();
   }, [fetchStats, fetchLogs]);
+
+  // Load user metadata on mount
+  useEffect(() => {
+    try {
+      const lu = localStorage.getItem('loggedInUser');
+      if (lu) {
+        const u = JSON.parse(lu);
+        setCreatedByName(u.name || u.email || 'Unknown');
+      }
+    } catch { /* ignore */ }
+  }, []);
 
   // Load SSD section config when dialog opens
   useEffect(() => {
@@ -769,6 +787,13 @@ export default function SSDReportPage() {
             </DialogContent>
           </Dialog>
         </div>
+      </div>
+
+      {/* Evaluation metadata banner */}
+      <div className="rounded-lg border bg-muted/30 px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-muted-foreground">
+        <span><span className="font-semibold text-foreground">Evaluation ID:</span> <span className="font-mono text-primary">{evaluationId}</span></span>
+        <span><span className="font-semibold text-foreground">Created by:</span> {createdByName}</span>
+        <span><span className="font-semibold text-foreground">Session started:</span> {new Date(sessionStartedAt).toLocaleString()}</span>
       </div>
 
       {/* Stats Cards */}
