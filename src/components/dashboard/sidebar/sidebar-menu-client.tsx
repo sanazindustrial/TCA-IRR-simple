@@ -186,7 +186,7 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
                                     </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
                                 <SidebarMenuSubItem>
-                                    <SidebarMenuSubButton href="/dashboard/reports/dd" isActive={pathname === '/dashboard/reports/dd'}>
+                                    <SidebarMenuSubButton href="/dashboard/reports/due-diligence" isActive={pathname === '/dashboard/reports/due-diligence'}>
                                         <BarChart3 className="size-4" />
                                         <span>Due Diligence</span>
                                     </SidebarMenuSubButton>
