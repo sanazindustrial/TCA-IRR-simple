@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
@@ -28,10 +28,7 @@ import {
   ClipboardList,
   Layers,
   Database,
-  RefreshCw,
   Globe,
-  AlertTriangle,
-  Check,
   DollarSign,
   Activity,
   Briefcase,
@@ -43,6 +40,9 @@ import {
   Eye,
   Settings,
   AlertCircle,
+  Upload,
+  X,
+  Plus,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
@@ -59,14 +59,18 @@ import { cn } from '@/lib/utils';
 import { runAnalysis } from '@/app/analysis/actions';
 import reportsApi from '@/lib/reports-api';
 
+const API_BASE = 'https://tcairrapiccontainer.azurewebsites.net';
+
 const TRIAGE_STEPS = [
-  { id: 1, name: 'Company Info', icon: Building2, description: 'Basic company details' },
-  { id: 2, name: 'Data Input', icon: ClipboardList, description: 'Pitch summary & key metrics' },
-  { id: 3, name: 'External Data', icon: Database, description: 'Fetch external sources' },
-  { id: 4, name: 'Modules', icon: Layers, description: 'Select analysis modules' },
-  { id: 5, name: 'Report Sections', icon: Settings, description: 'Configure report sections' },
-  { id: 6, name: 'Generate', icon: BrainCircuit, description: 'Run triage analysis' },
-  { id: 7, name: 'Storage & Export', icon: Download, description: 'Save & download report' },
+  { id: 1, name: 'Pitch Deck',      icon: Upload,       description: 'Upload & auto-extract' },
+  { id: 2, name: 'Company Info',    icon: Building2,    description: 'Review extracted details' },
+  { id: 3, name: 'More Docs',       icon: ClipboardList,description: 'Additional files & URLs' },
+  { id: 4, name: 'Data Review',     icon: FileSearch,   description: 'Review all data' },
+  { id: 5, name: 'External Data',   icon: Database,     description: 'Fetch live sources' },
+  { id: 6, name: 'Modules',         icon: Layers,       description: 'Select modules' },
+  { id: 7, name: 'Report Sections', icon: Settings,     description: 'Configure sections' },
+  { id: 8, name: 'Generate',        icon: BrainCircuit, description: 'Run triage analysis' },
+  { id: 9, name: 'Export',          icon: Download,     description: 'Save & export' },
 ];
 
 const EXTERNAL_SOURCES = [
@@ -169,38 +173,70 @@ export default function TriageReportWizardPage() {
   const router = useRouter();
   const { toast } = useToast();
 
+  // ── Tracking IDs (unique per evaluation session) ──────────────────────────
+  const [evaluationId] = useState<string>(
+    () => `EVL-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
+  );
+  const [companyUUID] = useState<string>(
+    () => `COMP-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
+  );
+
   const [currentStep, setCurrentStep] = useState(1);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
 
+  // ── Step 1: Pitch Deck ────────────────────────────────────────────────────
+  const [pitchDeckFile, setPitchDeckFile] = useState<File | null>(null);
+  const [isExtractingDeck, setIsExtractingDeck] = useState(false);
+  const [deckExtractionDone, setDeckExtractionDone] = useState(false);
+  const [deckExtractedText, setDeckExtractedText] = useState('');
+  const pitchDeckInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Step 2: Company Info ──────────────────────────────────────────────────
   const [companyName, setCompanyName] = useState('');
   const [sector, setSector] = useState('');
   const [stage, setStage] = useState('');
   const [website, setWebsite] = useState('');
   const [location, setLocation] = useState('');
+  const [businessModel, setBusinessModel] = useState('');
+  const [oneLineDescription, setOneLineDescription] = useState('');
+  const [companyDescription, setCompanyDescription] = useState('');
 
+  // ── Step 3: More Documents ────────────────────────────────────────────────
+  const [additionalFiles, setAdditionalFiles] = useState<File[]>([]);
+  const [importedUrls, setImportedUrls] = useState<string[]>([]);
+  const [additionalTexts, setAdditionalTexts] = useState<string[]>([]);
+  const [urlInput, setUrlInput] = useState('');
+  const [textInput, setTextInput] = useState('');
+  const [isExtractingAdditional, setIsExtractingAdditional] = useState(false);
+  const additionalFilesInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Step 4: Data Review ───────────────────────────────────────────────────
   const [pitchSummary, setPitchSummary] = useState('');
   const [keyMetrics, setKeyMetrics] = useState('');
   const [teamInfo, setTeamInfo] = useState('');
   const [productDescription, setProductDescription] = useState('');
 
+  // ── Step 6: Modules ───────────────────────────────────────────────────────
   const [framework, setFramework] = useState<Framework>('general');
   const [selectedModules, setSelectedModules] = useState<string[]>(['tca', 'risk', 'growth', 'macro']);
 
+  // ── Step 5: External Data ─────────────────────────────────────────────────
   const [selectedSources, setSelectedSources] = useState<string[]>(['news']);
   const [externalData, setExternalData] = useState<Array<{ source: string; success: boolean; data: unknown; error?: string }>>([]);
   const [fetchingData, setFetchingData] = useState(false);
 
+  // ── Step 8: Generate ──────────────────────────────────────────────────────
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [generationStatus, setGenerationStatus] = useState('');
   const [analysisResult, setAnalysisResult] = useState<unknown>(null);
   const [compositeScore, setCompositeScore] = useState<number>(0);
 
-  // Role-based
+  // ── Role-based ────────────────────────────────────────────────────────────
   const [userRole, setUserRole] = useState<'admin' | 'analyst' | 'standard'>('standard');
   const [reportSections, setReportSections] = useState<ReportSection[]>([]);
 
-  // Storage & Export
+  // ── Step 9: Storage & Export ──────────────────────────────────────────────
   const [savedReportId, setSavedReportId] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -220,28 +256,205 @@ export default function TriageReportWizardPage() {
 
   const isAdminOrAnalyst = userRole === 'admin' || userRole === 'analyst';
 
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  const fileToBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve((reader.result as string).split(',')[1] ?? '');
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  const parseCompanyFromText = useCallback((text: string) => {
+    const lower = text.toLowerCase();
+    const result: Record<string, string> = {};
+
+    // Company name — first line heuristic or "Company: X"
+    const nameMatch = text.match(/^([A-Z][A-Za-z0-9\s&.,'-]{2,60})[\r\n]/m)
+      || text.match(/company[:\s]+([A-Za-z0-9\s&.,'-]{2,60})/i);
+    if (nameMatch) result.company_name = nameMatch[1].trim();
+
+    // Website
+    const urlMatch = text.match(/https?:\/\/[^\s"'<>()]+\.[a-z]{2,}/i);
+    if (urlMatch) result.website = urlMatch[0];
+
+    // Stage
+    for (const s of ['pre-seed', 'seed', 'series a', 'series b', 'series c', 'growth']) {
+      if (lower.includes(s)) { result.stage = s.replace(/\b\w/g, c => c.toUpperCase()); break; }
+    }
+
+    // Sector
+    const sectorMap: Record<string, string> = {
+      'saas': 'Technology / SaaS', 'software': 'Technology / SaaS',
+      'medtech': 'Healthcare / MedTech', 'healthcare': 'Healthcare / MedTech', 'medical': 'Healthcare / MedTech',
+      'biotech': 'Biotechnology', 'biotechnology': 'Biotechnology', 'pharma': 'Biotechnology',
+      'fintech': 'FinTech', 'financial': 'FinTech',
+      'cleantech': 'CleanTech / Energy', 'energy': 'CleanTech / Energy', 'climate': 'CleanTech / Energy',
+      'ecommerce': 'E-commerce / Retail', 'retail': 'E-commerce / Retail',
+      'manufacturing': 'Manufacturing',
+      'ai': 'AI / Deep Tech', 'machine learning': 'AI / Deep Tech', 'deep tech': 'AI / Deep Tech',
+    };
+    for (const [key, val] of Object.entries(sectorMap)) {
+      if (lower.includes(key)) { result.sector = val; break; }
+    }
+
+    // Location
+    const locMatch = text.match(/(?:headquartered|based|located)\s+(?:in\s+)?([A-Za-z\s,]+(?:CA|NY|TX|FL|WA|MA|IL|GA|CO|UK|US|USA)?)/i)
+      || text.match(/([A-Za-z]+,\s*(?:CA|NY|TX|FL|WA|MA|IL|GA|CO|UK))/);
+    if (locMatch) result.location = locMatch[1].trim();
+
+    // One-liner — first short sentence that sounds like a description
+    const sentences = text.split(/[.!?\n]/).map(s => s.trim()).filter(s => s.length > 20 && s.length < 200);
+    if (sentences[0]) result.oneLiner = sentences[0];
+
+    // Key metrics — look for numbers with units
+    const metricsMatch = text.match(/(?:ARR|MRR|revenue|customers?|users?|growth|burn|runway)[^\n.]{0,120}/gi);
+    if (metricsMatch) result.keyMetrics = metricsMatch.slice(0, 5).join('\n');
+
+    // Team info
+    const teamMatch = text.match(/(?:team|founder|ceo|cto|co-founder)[^\n.]{0,200}/gi);
+    if (teamMatch) result.teamInfo = teamMatch.slice(0, 3).join('\n');
+
+    return result;
+  }, []);
+
+  // ── Step 1: Pitch Deck Auto-Extraction ────────────────────────────────────
+  const handlePitchDeckUpload = useCallback(async (file: File) => {
+    setPitchDeckFile(file);
+    setIsExtractingDeck(true);
+    try {
+      let textContent = '';
+      // Try FormData first
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const res = await fetch(`${API_BASE}/api/files/extract-text`, { method: 'POST', body: formData });
+        if (res.ok) {
+          const d = await res.json();
+          textContent = d.text_content || d.content || d.text || '';
+        }
+      } catch { /* fall through */ }
+
+      // Fallback: base64 JSON
+      if (!textContent) {
+        try {
+          const base64 = await fileToBase64(file);
+          const res = await fetch(`${API_BASE}/api/files/extract-text`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ file_content: base64, filename: file.name }),
+          });
+          if (res.ok) {
+            const d = await res.json();
+            textContent = d.text_content || d.content || d.text || '';
+          }
+        } catch { /* fall through */ }
+      }
+
+      setDeckExtractedText(textContent);
+
+      if (textContent) {
+        const extracted = parseCompanyFromText(textContent);
+        if (extracted.company_name) setCompanyName(extracted.company_name);
+        if (extracted.website)      setWebsite(extracted.website);
+        if (extracted.sector)       setSector(extracted.sector);
+        if (extracted.stage)        setStage(extracted.stage);
+        if (extracted.location)     setLocation(extracted.location);
+        if (extracted.oneLiner)     setOneLineDescription(extracted.oneLiner);
+        if (extracted.keyMetrics)   setKeyMetrics(extracted.keyMetrics);
+        if (extracted.teamInfo)     setTeamInfo(extracted.teamInfo);
+        setPitchSummary(textContent.slice(0, 4000));
+        setCompanyDescription(textContent.slice(0, 1500));
+        toast({ title: 'Extraction Complete', description: 'Company information auto-filled from pitch deck.' });
+      } else {
+        toast({ title: 'File Uploaded', description: 'Extraction returned no text. Please complete company info manually.' });
+      }
+      setDeckExtractionDone(true);
+    } catch {
+      toast({ variant: 'destructive', title: 'Extraction Failed', description: 'Could not extract text. Please fill in company details manually.' });
+      setDeckExtractionDone(true);
+    } finally {
+      setIsExtractingDeck(false);
+    }
+  }, [parseCompanyFromText, toast]);
+
+  // ── Step 3: Additional Documents Extraction ───────────────────────────────
+  const handleAdditionalExtract = useCallback(async () => {
+    if (additionalFiles.length === 0 && importedUrls.length === 0) return;
+    setIsExtractingAdditional(true);
+    const appendText = (existing: string, more: string) =>
+      more ? `${existing}\n\n${more}`.trim() : existing;
+    try {
+      // Extract additional files
+      for (const file of additionalFiles) {
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+          const res = await fetch(`${API_BASE}/api/files/extract-text`, { method: 'POST', body: formData });
+          if (res.ok) {
+            const d = await res.json();
+            const txt = d.text_content || d.content || d.text || '';
+            if (txt) {
+              const extra = parseCompanyFromText(txt);
+              if (extra.keyMetrics) setKeyMetrics(prev => appendText(prev, extra.keyMetrics!));
+              if (extra.teamInfo)   setTeamInfo(prev => appendText(prev, extra.teamInfo!));
+              setPitchSummary(prev => appendText(prev, txt.slice(0, 2000)));
+            }
+          }
+        } catch { /* skip bad file */ }
+      }
+      // Scrape URLs
+      for (const url of importedUrls) {
+        try {
+          const res = await fetch(`${API_BASE}/api/scrape/url`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url }),
+          });
+          if (res.ok) {
+            const d = await res.json();
+            const txt = d.text_content || d.content || d.text || '';
+            if (txt) setPitchSummary(prev => appendText(prev, txt.slice(0, 2000)));
+          }
+        } catch { /* skip bad url */ }
+      }
+      // Merge manual additional texts
+      if (additionalTexts.length > 0) {
+        setPitchSummary(prev => appendText(prev, additionalTexts.join('\n\n')));
+      }
+      toast({ title: 'Additional Data Processed', description: 'Extra documents and URLs merged into your data.' });
+    } finally {
+      setIsExtractingAdditional(false);
+    }
+  }, [additionalFiles, importedUrls, additionalTexts, parseCompanyFromText, toast]);
+
   const canAdvanceFrom = (step: number): boolean => {
-    if (step === 1) return companyName.trim().length > 0 && sector.length > 0 && stage.length > 0;
-    if (step === 2) return pitchSummary.trim().length > 0;
-    if (step === 3) return true;
-    if (step === 4) return selectedModules.length > 0;
-    if (step === 5) return reportSections.filter((s) => s.active).length > 0;
+    if (step === 1) return pitchDeckFile !== null && !isExtractingDeck;
+    if (step === 2) return companyName.trim().length > 0 && sector.length > 0 && stage.length > 0;
+    if (step === 3) return true; // optional step
+    if (step === 4) return pitchSummary.trim().length > 0;
+    if (step === 5) return true; // external data optional
+    if (step === 6) return selectedModules.length > 0;
+    if (step === 7) return reportSections.filter((s) => s.active).length > 0;
     return true;
   };
 
-  const goToNext = () => {
+  const goToNext = async () => {
     if (!canAdvanceFrom(currentStep)) {
       toast({
         variant: 'destructive',
         title: 'Required fields missing',
         description:
-          currentStep === 1
-            ? 'Please enter company name, sector, and stage.'
-            : currentStep === 2
-            ? 'Please enter a pitch summary.'
-            : 'Please select at least one module.',
+          currentStep === 1 ? 'Please upload a pitch deck first.' :
+          currentStep === 2 ? 'Please enter company name, sector, and stage.' :
+          currentStep === 4 ? 'Please enter a pitch summary.' :
+          'Please select at least one module.',
       });
       return;
+    }
+    // Auto-extract additional docs when leaving Step 3
+    if (currentStep === 3 && (additionalFiles.length > 0 || importedUrls.length > 0 || additionalTexts.length > 0)) {
+      await handleAdditionalExtract();
     }
     setCompletedSteps((prev) => [...new Set([...prev, currentStep])]);
     setCurrentStep((s) => Math.min(s + 1, TRIAGE_STEPS.length));
@@ -296,8 +509,12 @@ export default function TriageReportWizardPage() {
         overall_score: compositeScore,
         tca_score: compositeScore,
         recommendation,
-        analysis_data: analysisResult as Record<string, unknown>,
-        module_scores: { modules: selectedModules, framework } as Record<string, unknown>,
+        analysis_data: {
+          ...(analysisResult as Record<string, unknown>),
+          evaluation_id: evaluationId,
+          company_id: companyUUID,
+        },
+        module_scores: { modules: selectedModules, framework, evaluation_id: evaluationId } as Record<string, unknown>,
         missing_sections: reportSections.filter((s) => !s.active).map((s) => s.id),
       });
       setSavedReportId(saved.id);
@@ -348,14 +565,32 @@ export default function TriageReportWizardPage() {
     setGenerationProgress(0);
     setGenerationStatus('Preparing triage analysis...');
 
+    const allTextContent = [
+      deckExtractedText,
+      pitchSummary,
+      keyMetrics,
+      teamInfo,
+      productDescription,
+      companyDescription,
+      ...additionalTexts,
+    ].filter(Boolean).join('\n\n');
+
     const triageContext = {
+      evaluationId, companyId: companyUUID,
       companyName, sector, stage, website, location,
+      businessModel, oneLineDescription, companyDescription,
       pitchSummary, keyMetrics, teamInfo, productDescription,
+      additionalTexts, importedUrls,
+      uploadedFiles: [
+        ...(pitchDeckFile ? [{ name: pitchDeckFile.name, size: pitchDeckFile.size }] : []),
+        ...additionalFiles.map(f => ({ name: f.name, size: f.size })),
+      ],
       framework, selectedModules, reportType: 'triage',
       createdAt: new Date().toISOString(),
     };
+    localStorage.setItem(`triageContext-${evaluationId}`, JSON.stringify(triageContext));
     localStorage.setItem('triageContext', JSON.stringify(triageContext));
-    localStorage.setItem('activeCompanyData', JSON.stringify({ companyName, sector, stage }));
+    localStorage.setItem('activeCompanyData', JSON.stringify({ companyName, sector, stage, evaluationId }));
 
     const progressSteps = [
       { pct: 8,  msg: 'Initializing TCA framework...' },
@@ -384,9 +619,20 @@ export default function TriageReportWizardPage() {
 
     try {
       const analysisData = await runAnalysis(framework, {
+        evaluationId,
+        companyId: companyUUID,
         companyName,
-        companyDescription: [pitchSummary, keyMetrics, teamInfo, productDescription].filter(Boolean).join('\n\n'),
-        submittedTexts: [pitchSummary, keyMetrics, teamInfo, productDescription].filter(Boolean),
+        sector,
+        stage,
+        website,
+        location,
+        companyDescription: allTextContent,
+        submittedTexts: [deckExtractedText, pitchSummary, keyMetrics, teamInfo, productDescription, ...additionalTexts].filter(Boolean),
+        uploadedFiles: [
+          ...(pitchDeckFile ? [{ name: pitchDeckFile.name, size: pitchDeckFile.size }] : []),
+          ...additionalFiles.map(f => ({ name: f.name, size: f.size })),
+        ],
+        importedUrls,
         activeModules: TRIAGE_MODULES
           .filter(m => selectedModules.includes(m.id))
           .map(m => ({ module_id: m.id, weight: m.weight, is_enabled: true })),
@@ -395,6 +641,7 @@ export default function TriageReportWizardPage() {
       setGenerationProgress(100);
       setGenerationStatus('Triage complete!');
 
+      localStorage.setItem(`analysisResult-${evaluationId}`, JSON.stringify(analysisData));
       localStorage.setItem('analysisResult', JSON.stringify(analysisData));
       localStorage.setItem('analysisFramework', framework);
 
@@ -402,9 +649,9 @@ export default function TriageReportWizardPage() {
       setCompositeScore(score);
       setAnalysisResult(analysisData);
 
-      const reportId = `triage-${Date.now()}`;
+      const reportId = `triage-${evaluationId}`;
       const triageReport = {
-        reportId, reportType: 'triage', companyName, framework,
+        reportId, reportType: 'triage', companyName, framework, evaluationId, companyId: companyUUID,
         metadata: { compositeScore: score, sector, stage },
         createdAt: new Date().toISOString(), data: analysisData,
       };
@@ -413,8 +660,8 @@ export default function TriageReportWizardPage() {
       localStorage.setItem('tca_reports', JSON.stringify(existingReports.slice(0, 50)));
 
       toast({ title: 'Triage Complete', description: `${companyName} triage analysis finished. Proceed to save.` });
-      setCompletedSteps((prev) => [...new Set([...prev, 6])]);
-      setCurrentStep(7);
+      setCompletedSteps((prev) => [...new Set([...prev, 8])]);
+      setCurrentStep(9);
     } catch (error) {
       clearInterval(progressTimer);
       console.error('Triage generation failed:', error);
@@ -431,7 +678,98 @@ export default function TriageReportWizardPage() {
 
   const renderStepContent = () => {
     switch (currentStep) {
+
+      // ── STEP 1: Pitch Deck Upload ─────────────────────────────────────────
       case 1:
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Upload className="size-5" />
+                Upload Pitch Deck
+              </CardTitle>
+              <CardDescription>
+                Upload a single pitch deck (PDF, PPTX, or DOCX). Company information will be
+                auto-extracted immediately after upload — no manual extraction needed.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Drop zone */}
+              <div
+                onClick={() => !pitchDeckFile && pitchDeckInputRef.current?.click()}
+                className={cn(
+                  'relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-10 text-center transition-all',
+                  pitchDeckFile
+                    ? 'border-green-400 bg-green-50/30 cursor-default'
+                    : 'border-border hover:border-primary/60 cursor-pointer bg-muted/10 hover:bg-muted/20'
+                )}
+              >
+                <input
+                  ref={pitchDeckInputRef}
+                  type="file"
+                  accept=".pdf,.pptx,.ppt,.docx,.doc"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handlePitchDeckUpload(f);
+                  }}
+                />
+                {isExtractingDeck ? (
+                  <>
+                    <Loader2 className="size-12 animate-spin text-primary mb-3" />
+                    <p className="font-semibold text-lg">Extracting company data…</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Analysing your pitch deck with AI extraction
+                    </p>
+                  </>
+                ) : pitchDeckFile ? (
+                  <>
+                    <CheckCircle2 className="size-12 text-green-500 mb-3" />
+                    <p className="font-semibold text-lg text-green-700">{pitchDeckFile.name}</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {deckExtractionDone
+                        ? deckExtractedText
+                          ? '✓ Company info auto-filled — review on next step'
+                          : '✓ File ready — fill company info manually on next step'
+                        : 'Processing…'}
+                    </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="mt-3 text-destructive"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPitchDeckFile(null);
+                        setDeckExtractionDone(false);
+                        setDeckExtractedText('');
+                        if (pitchDeckInputRef.current) pitchDeckInputRef.current.value = '';
+                      }}
+                    >
+                      <X className="size-4 mr-1" /> Remove & re-upload
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="size-12 text-muted-foreground mb-3" />
+                    <p className="font-semibold text-lg">Drop your pitch deck here</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      or click to browse — PDF, PPTX, DOCX accepted
+                    </p>
+                  </>
+                )}
+              </div>
+              {deckExtractionDone && deckExtractedText && (
+                <div className="rounded-lg border border-green-200 bg-green-50/40 p-4 space-y-2">
+                  <p className="text-sm font-semibold text-green-800">Extracted preview</p>
+                  <p className="text-xs text-green-700 line-clamp-4">{deckExtractedText.slice(0, 400)}…</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+
+      // ── STEP 2: Company Info (pre-filled from extraction) ─────────────────
+      case 2:
         return (
           <Card>
             <CardHeader>
@@ -440,103 +778,226 @@ export default function TriageReportWizardPage() {
                 Company Information
               </CardTitle>
               <CardDescription>
-                Basic details about the company being screened for investment consideration.
+                {deckExtractionDone && deckExtractedText
+                  ? 'Auto-filled from your pitch deck — review and correct as needed.'
+                  : 'Enter the basic company details for this evaluation.'}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="companyName">
-                    Company Name <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="companyName"
-                    placeholder="e.g., QuantumLeap AI"
-                    value={companyName}
-                    onChange={(e) => setCompanyName(e.target.value)}
-                  />
+                  <Label htmlFor="companyName">Company Name <span className="text-destructive">*</span></Label>
+                  <Input id="companyName" placeholder="e.g., QuantumLeap AI" value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="website">Website</Label>
-                  <Input
-                    id="website"
-                    placeholder="https://example.com"
-                    value={website}
-                    onChange={(e) => setWebsite(e.target.value)}
-                  />
+                  <Input id="website" placeholder="https://example.com" value={website} onChange={(e) => setWebsite(e.target.value)} />
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="sector">
-                    Sector <span className="text-destructive">*</span>
-                  </Label>
+                  <Label htmlFor="sector">Sector <span className="text-destructive">*</span></Label>
                   <Select value={sector} onValueChange={setSector}>
-                    <SelectTrigger id="sector">
-                      <SelectValue placeholder="Select sector" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {SECTORS.map((s) => (
-                        <SelectItem key={s} value={s}>
-                          {s}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
+                    <SelectTrigger id="sector"><SelectValue placeholder="Select sector" /></SelectTrigger>
+                    <SelectContent>{SECTORS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="stage">
-                    Stage <span className="text-destructive">*</span>
-                  </Label>
+                  <Label htmlFor="stage">Stage <span className="text-destructive">*</span></Label>
                   <Select value={stage} onValueChange={setStage}>
-                    <SelectTrigger id="stage">
-                      <SelectValue placeholder="Select stage" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STAGES.map((s) => (
-                        <SelectItem key={s} value={s}>
-                          {s}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
+                    <SelectTrigger id="stage"><SelectValue placeholder="Select stage" /></SelectTrigger>
+                    <SelectContent>{STAGES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
               </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="location">Location / HQ</Label>
+                  <Input id="location" placeholder="e.g., San Francisco, CA" value={location} onChange={(e) => setLocation(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="businessModel">Business Model</Label>
+                  <Input id="businessModel" placeholder="e.g., B2B SaaS, Marketplace, D2C" value={businessModel} onChange={(e) => setBusinessModel(e.target.value)} />
+                </div>
+              </div>
               <div className="space-y-2">
-                <Label htmlFor="location">Location / HQ</Label>
-                <Input
-                  id="location"
-                  placeholder="e.g., San Francisco, CA"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                />
+                <Label htmlFor="oneLineDescription">One-Line Description</Label>
+                <Input id="oneLineDescription" placeholder="e.g., AI-powered supply chain optimisation for mid-market manufacturers" value={oneLineDescription} onChange={(e) => setOneLineDescription(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="companyDescription">Company Description</Label>
+                <Textarea id="companyDescription" placeholder="Brief overview of the company, product, and market opportunity…" rows={4} value={companyDescription} onChange={(e) => setCompanyDescription(e.target.value)} />
+              </div>
+              <div className="rounded-md border bg-muted/20 p-3 text-xs text-muted-foreground flex items-start gap-2">
+                <AlertCircle className="size-4 shrink-0 mt-0.5" />
+                Evaluation ID: <span className="font-mono">{evaluationId}</span>
               </div>
             </CardContent>
           </Card>
         );
 
-      case 2:
+      // ── STEP 3: More Documents ────────────────────────────────────────────
+      case 3:
         return (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ClipboardList className="size-5" />
-                Quick Data Input
+                Additional Documents & Sources
               </CardTitle>
               <CardDescription>
-                Paste the pitch summary and any available metrics. More context improves triage
-                accuracy.
+                Optionally upload more files, paste URLs, or add extra text. All sources will be
+                merged into the analysis. This step is optional — click Next to skip.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Additional file upload */}
+              <div className="space-y-3">
+                <Label className="text-sm font-semibold">Upload More Files</Label>
+                <div
+                  onClick={() => additionalFilesInputRef.current?.click()}
+                  className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border hover:border-primary/50 p-6 cursor-pointer bg-muted/10 hover:bg-muted/20 transition-all"
+                >
+                  <input
+                    ref={additionalFilesInputRef}
+                    type="file"
+                    multiple
+                    accept=".pdf,.pptx,.ppt,.docx,.doc,.xlsx,.xls,.csv,.txt"
+                    className="hidden"
+                    onChange={(e) => {
+                      const newFiles = Array.from(e.target.files || []);
+                      setAdditionalFiles(prev => [...prev, ...newFiles]);
+                      if (additionalFilesInputRef.current) additionalFilesInputRef.current.value = '';
+                    }}
+                  />
+                  <Plus className="size-6 text-muted-foreground mb-2" />
+                  <p className="text-sm text-muted-foreground">Click to add files (PDF, DOCX, XLSX, CSV, TXT…)</p>
+                </div>
+                {additionalFiles.length > 0 && (
+                  <div className="space-y-2">
+                    {additionalFiles.map((f, i) => (
+                      <div key={i} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm bg-muted/10">
+                        <span className="truncate">{f.name}</span>
+                        <Button variant="ghost" size="sm" className="text-destructive shrink-0 ml-2" onClick={() => setAdditionalFiles(prev => prev.filter((_, idx) => idx !== i))}>
+                          <X className="size-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <Separator />
+
+              {/* URL import */}
+              <div className="space-y-3">
+                <Label className="text-sm font-semibold">Import from URLs</Label>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="https://company-website.com/about"
+                    value={urlInput}
+                    onChange={(e) => setUrlInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && urlInput.trim()) {
+                        setImportedUrls(prev => [...prev, urlInput.trim()]);
+                        setUrlInput('');
+                      }
+                    }}
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (urlInput.trim()) {
+                        setImportedUrls(prev => [...prev, urlInput.trim()]);
+                        setUrlInput('');
+                      }
+                    }}
+                  >
+                    <Plus className="size-4" />
+                  </Button>
+                </div>
+                {importedUrls.length > 0 && (
+                  <div className="space-y-2">
+                    {importedUrls.map((url, i) => (
+                      <div key={i} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm bg-muted/10">
+                        <span className="truncate text-primary">{url}</span>
+                        <Button variant="ghost" size="sm" className="text-destructive shrink-0 ml-2" onClick={() => setImportedUrls(prev => prev.filter((_, idx) => idx !== i))}>
+                          <X className="size-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <Separator />
+
+              {/* Text paste */}
+              <div className="space-y-3">
+                <Label className="text-sm font-semibold">Paste Additional Text</Label>
+                <Textarea
+                  placeholder="Paste any additional information — financial statements, press releases, investor memos…"
+                  rows={4}
+                  value={textInput}
+                  onChange={(e) => setTextInput(e.target.value)}
+                />
+                <Button
+                  variant="outline"
+                  disabled={!textInput.trim()}
+                  onClick={() => {
+                    if (textInput.trim()) {
+                      setAdditionalTexts(prev => [...prev, textInput.trim()]);
+                      setTextInput('');
+                    }
+                  }}
+                >
+                  <Plus className="size-4 mr-2" /> Add Text
+                </Button>
+                {additionalTexts.length > 0 && (
+                  <div className="space-y-2">
+                    {additionalTexts.map((t, i) => (
+                      <div key={i} className="flex items-start justify-between rounded-md border px-3 py-2 text-sm bg-muted/10">
+                        <span className="line-clamp-2 text-muted-foreground">{t.slice(0, 100)}…</span>
+                        <Button variant="ghost" size="sm" className="text-destructive shrink-0 ml-2" onClick={() => setAdditionalTexts(prev => prev.filter((_, idx) => idx !== i))}>
+                          <X className="size-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {isExtractingAdditional && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="size-4 animate-spin" /> Extracting additional documents…
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+
+      // ── STEP 4: Data Review ───────────────────────────────────────────────
+      case 4:
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileSearch className="size-5" />
+                Review & Complete Data
+              </CardTitle>
+              <CardDescription>
+                All fields below have been pre-filled from your uploaded documents. Edit and
+                enrich as needed before running the analysis.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="space-y-2">
                 <Label htmlFor="pitchSummary">
-                  Pitch Summary / Executive Overview{' '}
-                  <span className="text-destructive">*</span>
+                  Pitch Summary / Executive Overview <span className="text-destructive">*</span>
                 </Label>
                 <Textarea
                   id="pitchSummary"
-                  placeholder="Paste the company pitch deck content, executive summary, or any description of the business, market opportunity, and value proposition..."
+                  placeholder="Paste the company pitch deck content, executive summary, or any description of the business, market opportunity, and value proposition…"
                   rows={6}
                   value={pitchSummary}
                   onChange={(e) => setPitchSummary(e.target.value)}
@@ -548,7 +1009,7 @@ export default function TriageReportWizardPage() {
                 <Label htmlFor="keyMetrics">Key Metrics (optional)</Label>
                 <Textarea
                   id="keyMetrics"
-                  placeholder="ARR, MRR, growth rate, CAC, LTV, burn rate, runway, team size, number of customers..."
+                  placeholder="ARR, MRR, growth rate, CAC, LTV, burn rate, runway, team size, number of customers…"
                   rows={4}
                   value={keyMetrics}
                   onChange={(e) => setKeyMetrics(e.target.value)}
@@ -559,7 +1020,7 @@ export default function TriageReportWizardPage() {
                   <Label htmlFor="teamInfo">Team Background (optional)</Label>
                   <Textarea
                     id="teamInfo"
-                    placeholder="Founder backgrounds, key team members, advisors..."
+                    placeholder="Founder backgrounds, key team members, advisors…"
                     rows={3}
                     value={teamInfo}
                     onChange={(e) => setTeamInfo(e.target.value)}
@@ -569,18 +1030,29 @@ export default function TriageReportWizardPage() {
                   <Label htmlFor="productDescription">Product / Technology (optional)</Label>
                   <Textarea
                     id="productDescription"
-                    placeholder="Product description, tech stack, IP, differentiators..."
+                    placeholder="Product description, tech stack, IP, differentiators…"
                     rows={3}
                     value={productDescription}
                     onChange={(e) => setProductDescription(e.target.value)}
                   />
                 </div>
               </div>
+              {/* Summary of sources */}
+              <div className="rounded-lg border bg-muted/20 p-4 space-y-2 text-sm">
+                <p className="font-semibold">Data sources collected</p>
+                <ul className="space-y-1 text-muted-foreground">
+                  {pitchDeckFile && <li className="flex items-center gap-2"><CheckCircle2 className="size-4 text-green-500" /> Pitch deck: {pitchDeckFile.name}</li>}
+                  {additionalFiles.map((f, i) => <li key={i} className="flex items-center gap-2"><CheckCircle2 className="size-4 text-green-500" /> {f.name}</li>)}
+                  {importedUrls.map((u, i) => <li key={i} className="flex items-center gap-2"><CheckCircle2 className="size-4 text-green-500" /> {u}</li>)}
+                  {additionalTexts.length > 0 && <li className="flex items-center gap-2"><CheckCircle2 className="size-4 text-green-500" /> {additionalTexts.length} additional text snippet(s)</li>}
+                </ul>
+              </div>
             </CardContent>
           </Card>
         );
 
-      case 3:
+      // ── STEP 5: External Data (old Step 3) ────────────────────────────────
+      case 5:
         return (
           <Card>
             <CardHeader>
@@ -681,7 +1153,7 @@ export default function TriageReportWizardPage() {
           </Card>
         );
 
-      case 4:
+      case 6:
         return (
           <Card>
             <CardHeader>
@@ -784,7 +1256,7 @@ export default function TriageReportWizardPage() {
           </Card>
         );
 
-      case 5:
+      case 7:
         return (
           <Card>
             <CardHeader>
@@ -833,7 +1305,7 @@ export default function TriageReportWizardPage() {
           </Card>
         );
 
-      case 6:
+      case 8:
         return (
           <Card>
             <CardHeader>
@@ -932,7 +1404,7 @@ export default function TriageReportWizardPage() {
           </Card>
         );
 
-      case 7:
+      case 9:
         return (
           <Card>
             <CardHeader>
@@ -1046,7 +1518,7 @@ export default function TriageReportWizardPage() {
         </Badge>
       </div>
 
-      <div className="grid grid-cols-4 md:grid-cols-7 gap-2">
+      <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-9 gap-2">
         {TRIAGE_STEPS.map((step) => {
           const Icon = step.icon;
           const isCompleted = completedSteps.includes(step.id);
@@ -1092,13 +1564,13 @@ export default function TriageReportWizardPage() {
 
       {renderStepContent()}
 
-      {!(currentStep === 6 && isGenerating) && (
+      {!(currentStep === 8 && isGenerating) && (
         <div className="flex justify-between">
           <Button variant="outline" onClick={goToPrev} disabled={currentStep === 1}>
             <ArrowLeft className="mr-2 size-4" />
             Previous
           </Button>
-          {currentStep < TRIAGE_STEPS.length && currentStep !== 6 && (
+          {currentStep < TRIAGE_STEPS.length && currentStep !== 8 && (
             <Button onClick={goToNext} disabled={!canAdvanceFrom(currentStep)}>
               Next
               <ArrowRight className="ml-2 size-4" />

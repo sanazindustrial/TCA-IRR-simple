@@ -49,6 +49,7 @@ import {
     Building2,
     Compass,
     Globe,
+    FileSearch,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -223,6 +224,12 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
                                         <SidebarMenuSubButton href="/analysis/modules/tca" isActive={pathname === '/analysis/modules/tca'}>
                                             <BarChart3 className="size-4" />
                                             <span>TCA Scorecard</span>
+                                        </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                    <SidebarMenuSubItem>
+                                        <SidebarMenuSubButton href="/analysis/modules/analyst" isActive={pathname === '/analysis/modules/analyst'}>
+                                            <FileSearch className="size-4" />
+                                            <span>Analyst Analysis</span>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
                                     <SidebarMenuSubItem>

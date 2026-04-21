@@ -186,7 +186,7 @@ export function middleware(request: NextRequest) {
                 status: 200,
                 headers: {
                     'Access-Control-Allow-Origin': process.env.NODE_ENV === 'production'
-                        ? 'https://your-domain.com'
+                        ? 'https://tca-irr.azurewebsites.net'
                         : 'http://localhost:3000',
                     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
                     'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-CSRF-Token',
