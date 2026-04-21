@@ -23,7 +23,9 @@ export type ServiceGroupId =
     | 'modules'
     | 'data'
     | 'admin'
-    | 'communication';
+    | 'communication'
+    | 'extraction'
+    | 'ai';
 
 export interface ServiceDef {
     id: string;
@@ -99,6 +101,8 @@ const GROUP_LABELS: Record<ServiceGroupId, string> = {
     data:          'Data Services',
     admin:         'Admin Services',
     communication: 'Communication',
+    extraction:    'File Extraction',
+    ai:            'AI Agents',
 };
 
 // ─── Service definitions ─────────────────────────────────────────────────────
@@ -142,6 +146,18 @@ const SERVICES: ServiceDef[] = [
     { id: 'notifications-svc', label: 'Notifications',   group: 'communication', path: '/api/v1/notifications',       requiresAuth: true },
     { id: 'email-svc',         label: 'Email Service',   group: 'communication', path: '/api/v1/email/status',         requiresAuth: true },
     { id: 'send-svc',          label: 'Send / Receive',  group: 'communication', path: '/api/v1/notifications/unread', requiresAuth: true },
+
+    // ── Extraction services ──
+    { id: 'extraction-svc',    label: 'File Extraction',     group: 'extraction', path: '/api/v1/files/extract-text' },
+    { id: 'extract-alt-svc',   label: 'Extract (v2)',         group: 'extraction', path: '/api/v1/extract/file' },
+    { id: 'scrape-svc',        label: 'URL Scraper',          group: 'extraction', path: '/api/v1/scrape/url' },
+    { id: 'storage-svc',       label: 'Cloud Storage',        group: 'extraction', path: '/api/v1/storage/health' },
+
+    // ── AI Agent services ──
+    { id: 'ai-extract-svc',    label: 'AI Extraction Agent',  group: 'ai', path: '/api/v1/ai/extract' },
+    { id: 'ai-autofill-svc',   label: 'AI Auto-Fill Agent',   group: 'ai', path: '/api/v1/ai/autofill' },
+    { id: 'ai-analysis-svc',   label: 'AI Analysis Agent',    group: 'ai', path: '/api/v1/analysis/ai-extract', requiresAuth: true },
+    { id: 'export-svc',        label: 'Export Service',       group: 'ai', path: '/api/v1/export/health' },
 ];
 
 // ─── Constants ───────────────────────────────────────────────────────────────

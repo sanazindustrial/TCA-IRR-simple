@@ -182,7 +182,7 @@ async function processUploadedFiles(
 
             // If file has URL (uploaded to storage), fetch content
             if (file.url && !content) {
-                const response = await fetch(`${API_BASE_URL}/files/extract-text`, {
+                const response = await fetch(`${API_BASE_URL}/api/v1/files/extract-text`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ file_url: file.url }),
@@ -215,7 +215,7 @@ async function processUrls(urls: string[]): Promise<DocumentContent[]> {
 
     for (const url of urls) {
         try {
-            const response = await fetch(`${API_BASE_URL}/scrape/url`, {
+            const response = await fetch(`${API_BASE_URL}/api/v1/scrape/url`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ url }),
