@@ -258,6 +258,12 @@ export default function UserManagementPage() {
   const [isSavingRoleConfig, setIsSavingRoleConfig] = useState(false);
   const [isLoadingRoles, setIsLoadingRoles] = useState(false);
   const [reportUsage, setReportUsage] = useState<Record<string, { triage: number; dd: number }>>({});
+  const [editUserName, setEditUserName] = useState('');
+  const [editUserTriageLimit, setEditUserTriageLimit] = useState<string>('');
+  const [editUserDDLimit, setEditUserDDLimit] = useState<string>('');
+  const [editUserPermissions, setEditUserPermissions] = useState<{name: string; description: string; enabled: boolean}[]>([]);
+  const [editUserTab, setEditUserTab] = useState('profile');
+  const [isSavingUser, setIsSavingUser] = useState(false);
   const { toast } = useToast();
   const { currentUser } = useAuth();
 
@@ -787,29 +793,72 @@ export default function UserManagementPage() {
   };
 
   // Change user role handler
-  const handleChangeRole = async (user: User, newRole: string) => {
-    const token = getAuthToken();
-    if (!token) return;
-
+  const handleOpenEditUser = (user: User) => {
+    setSelectedUser(user);
+    setEditRole(user.role);
+    setEditUserName(user.name);
     try {
-      const response = await fetch(`${backendUrl}/api/v1/users/${user.backendId}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({ role: newRole }),
-      });
+      const overrides = JSON.parse(localStorage.getItem('userOverrides') || '{}');
+      const userOv = overrides[user.backendId] || {};
+      const roleLim = roleLimits[user.role];
+      setEditUserTriageLimit(String(userOv.triageLimit ?? roleLim.triageReports));
+      setEditUserDDLimit(String(userOv.ddLimit ?? roleLim.ddReports));
+      setEditUserPermissions(
+        userOv.permissions
+          ? [...userOv.permissions]
+          : rolePermissions[user.role].permissions.map(p => ({ ...p }))
+      );
+    } catch {
+      const roleLim = roleLimits[user.role];
+      setEditUserTriageLimit(String(roleLim.triageReports));
+      setEditUserDDLimit(String(roleLim.ddReports));
+      setEditUserPermissions(rolePermissions[user.role].permissions.map(p => ({ ...p })));
+    }
+    setEditUserTab('profile');
+    setEditDialogOpen(true);
+  };
 
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.detail || 'Failed to change role');
+  const handleSaveUserEdit = async () => {
+    if (!selectedUser) return;
+    setIsSavingUser(true);
+    try {
+      const token = getAuthToken();
+      if (token) {
+        const response = await fetch(`${backendUrl}/api/v1/users/${selectedUser.backendId}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify({
+            role: editRole,
+            full_name: editUserName || undefined,
+          }),
+        });
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.detail || 'Failed to update user');
+        }
       }
+      // Save per-user overrides (limits + permissions) to localStorage
+      const overrides = JSON.parse(localStorage.getItem('userOverrides') || '{}');
+      const triageVal = editUserTriageLimit.toLowerCase() === 'unlimited'
+        ? 'Unlimited'
+        : (parseInt(editUserTriageLimit) || 0);
+      const ddVal = editUserDDLimit.toLowerCase() === 'unlimited'
+        ? 'Unlimited'
+        : (parseInt(editUserDDLimit) || 0);
+      overrides[selectedUser.backendId] = {
+        triageLimit: triageVal,
+        ddLimit: ddVal,
+        permissions: editUserPermissions,
+      };
+      localStorage.setItem('userOverrides', JSON.stringify(overrides));
 
       toast({
-        title: '👤 Role Updated',
-        description: `${user.name}'s role has been changed to ${newRole}.`
+        title: '✅ User Updated',
+        description: `${selectedUser.name} has been successfully updated.`
       });
       setEditDialogOpen(false);
       setSelectedUser(null);
@@ -818,8 +867,10 @@ export default function UserManagementPage() {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to change role.'
+        description: error instanceof Error ? error.message : 'Failed to update user.'
       });
+    } finally {
+      setIsSavingUser(false);
     }
   };
 
@@ -878,24 +929,25 @@ export default function UserManagementPage() {
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* Edit Role Dialog */}
+        {/* Edit User Dialog */}
         <Dialog open={isEditDialogOpen} onOpenChange={setEditDialogOpen}>
-          <DialogContent>
+          <DialogContent className="sm:max-w-2xl">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <UserCog className="h-5 w-5" />
-                Change User Role
+                Edit User
               </DialogTitle>
               <DialogDescription>
-                Update the role for <strong>{selectedUser?.name}</strong>. This will change their permissions immediately.
+                Update profile, role, report limits, and permissions for <strong>{selectedUser?.name}</strong>.
               </DialogDescription>
             </DialogHeader>
             {selectedUser && (
-              <div className="space-y-6 py-4">
-                <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+              <div className="py-2">
+                {/* User info bar */}
+                <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg mb-4">
                   <Avatar className="h-10 w-10">
-                    <AvatarFallback className={rolePermissions[selectedUser.role].bgColor}>
-                      {selectedUser.name.charAt(0).toUpperCase()}
+                    <AvatarFallback className={rolePermissions[selectedUser.role]?.bgColor || 'bg-gray-100'}>
+                      {(editUserName || selectedUser.name).charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   <div>
@@ -903,51 +955,135 @@ export default function UserManagementPage() {
                     <p className="text-sm text-muted-foreground">{selectedUser.email}</p>
                   </div>
                 </div>
+                <Tabs value={editUserTab} onValueChange={setEditUserTab}>
+                  <TabsList className="grid grid-cols-3 mb-4">
+                    <TabsTrigger value="profile">Profile &amp; Role</TabsTrigger>
+                    <TabsTrigger value="limits">Report Limits</TabsTrigger>
+                    <TabsTrigger value="permissions">Permissions</TabsTrigger>
+                  </TabsList>
 
-                <div className="space-y-3">
-                  <Label>Select New Role</Label>
-                  <div className="grid gap-3">
-                    {Object.entries(rolePermissions).map(([role, config]) => {
-                      const Icon = config.icon;
-                      return (
-                        <div
-                          key={role}
-                          onClick={() => setEditRole(role)}
-                          className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${editRole === role
-                            ? `${config.borderColor} ${config.bgColor}`
-                            : 'border-border hover:border-muted-foreground/50'
-                            }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className={`p-2 rounded-lg ${config.bgColor}`}>
-                              <Icon className={`h-5 w-5 ${config.color}`} />
+                  {/* Tab 1: Profile & Role */}
+                  <TabsContent value="profile" className="space-y-4 max-h-[50vh] overflow-y-auto pr-1">
+                    <div className="space-y-2">
+                      <Label>Display Name</Label>
+                      <Input
+                        value={editUserName}
+                        onChange={(e) => setEditUserName(e.target.value)}
+                        placeholder="Enter display name"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Role</Label>
+                      <div className="grid gap-2">
+                        {Object.entries(rolePermissions).map(([role, config]) => {
+                          const Icon = config.icon;
+                          return (
+                            <div
+                              key={role}
+                              onClick={() => {
+                                setEditRole(role);
+                                const roleLim = roleLimits[role as keyof typeof roleLimits];
+                                setEditUserTriageLimit(String(roleLim.triageReports));
+                                setEditUserDDLimit(String(roleLim.ddReports));
+                                setEditUserPermissions(rolePermissions[role as keyof typeof rolePermissions].permissions.map(p => ({ ...p })));
+                              }}
+                              className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${editRole === role
+                                ? `${config.borderColor} ${config.bgColor}`
+                                : 'border-border hover:border-muted-foreground/50'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className={`p-1.5 rounded-md ${config.bgColor}`}>
+                                  <Icon className={`h-4 w-4 ${config.color}`} />
+                                </div>
+                                <div className="flex-1">
+                                  <p className="font-medium text-sm">{config.label}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {role === 'admin' && 'Full system access'}
+                                    {role === 'analyst' && 'Analysis and reporting access'}
+                                    {role === 'user' && 'Basic access only'}
+                                  </p>
+                                </div>
+                                {editRole === role && (
+                                  <CheckCircle2 className={`h-4 w-4 ${config.color}`} />
+                                )}
+                              </div>
                             </div>
-                            <div className="flex-1">
-                              <p className="font-medium">{config.label}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {role === 'admin' && 'Full system access'}
-                                {role === 'analyst' && 'Analysis and reporting access'}
-                                {role === 'user' && 'Basic access only'}
-                              </p>
-                            </div>
-                            {editRole === role && (
-                              <CheckCircle2 className={`h-5 w-5 ${config.color}`} />
-                            )}
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </TabsContent>
+
+                  {/* Tab 2: Report Limits */}
+                  <TabsContent value="limits" className="space-y-4 max-h-[50vh] overflow-y-auto pr-1">
+                    <p className="text-sm text-muted-foreground">
+                      Override the default report limits for this user. Enter a number or &quot;Unlimited&quot;.
+                    </p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Triage Reports Limit</Label>
+                        <Input
+                          value={editUserTriageLimit}
+                          onChange={(e) => setEditUserTriageLimit(e.target.value)}
+                          placeholder="e.g. 10 or Unlimited"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Role default: {String(roleLimits[editRole as keyof typeof roleLimits]?.triageReports ?? 'N/A')}
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>DD Reports Limit</Label>
+                        <Input
+                          value={editUserDDLimit}
+                          onChange={(e) => setEditUserDDLimit(e.target.value)}
+                          placeholder="e.g. 5 or Unlimited"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Role default: {String(roleLimits[editRole as keyof typeof roleLimits]?.ddReports ?? 'N/A')}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground border-t pt-3">
+                      Per-user limits override the role-level defaults and are saved locally on this device.
+                    </p>
+                  </TabsContent>
+
+                  {/* Tab 3: Permissions */}
+                  <TabsContent value="permissions" className="max-h-[50vh] overflow-y-auto pr-1">
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Toggle individual permissions for this user. Changes are saved locally on this device.
+                    </p>
+                    <div className="space-y-2 border rounded-lg p-3">
+                      {editUserPermissions.map((perm, i) => (
+                        <div key={i} className="flex items-center justify-between py-2 border-b last:border-b-0">
+                          <div>
+                            <p className="font-medium text-sm">{perm.name}</p>
+                            <p className="text-xs text-muted-foreground">{perm.description}</p>
                           </div>
+                          <Switch
+                            checked={perm.enabled}
+                            onCheckedChange={(checked) => {
+                              setEditUserPermissions(prev =>
+                                prev.map((p, idx) => idx === i ? { ...p, enabled: checked } : p)
+                              );
+                            }}
+                          />
                         </div>
-                      );
-                    })}
-                  </div>
-                </div>
+                      ))}
+                    </div>
+                  </TabsContent>
+                </Tabs>
               </div>
             )}
             <DialogFooter>
               <Button variant="outline" onClick={() => setEditDialogOpen(false)}>Cancel</Button>
-              <Button
-                onClick={() => selectedUser && handleChangeRole(selectedUser, editRole)}
-                disabled={!editRole || editRole === selectedUser?.role}
-              >
-                Save Changes
+              <Button onClick={handleSaveUserEdit} disabled={isSavingUser || !editRole}>
+                {isSavingUser ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</>
+                ) : (
+                  <><Save className="mr-2 h-4 w-4" />Save Changes</>
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1208,7 +1344,13 @@ export default function UserManagementPage() {
                       const roleConfig = rolePermissions[user.role];
                       const RoleIcon = roleConfig.icon;
                       const userCost = getUserCost(user.name);
-                      const userLimits = roleLimits[user.role];
+                      // Per-user limit overrides stored in localStorage take precedence
+                      let userLimits = roleLimits[user.role];
+                      try {
+                        const overrides = JSON.parse(localStorage.getItem('userOverrides') || '{}');
+                        const ov = overrides[user.backendId];
+                        if (ov) userLimits = { triageReports: ov.triageLimit ?? userLimits.triageReports, ddReports: ov.ddLimit ?? userLimits.ddReports };
+                      } catch { /* ignore */ }
                       return (
                         <TableRow key={user.id} className="hover:bg-muted/50">
                           <TableCell>
@@ -1314,13 +1456,9 @@ export default function UserManagementPage() {
                               <DropdownMenuContent align="end" className="w-48">
                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => {
-                                  setSelectedUser(user);
-                                  setEditRole(user.role);
-                                  setEditDialogOpen(true);
-                                }}>
+                                <DropdownMenuItem onClick={() => handleOpenEditUser(user)}>
                                   <Edit className="mr-2 h-4 w-4" />
-                                  Change Role
+                                  Edit User
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => handleResetPassword(user)}>
                                   <Key className="mr-2 h-4 w-4" />

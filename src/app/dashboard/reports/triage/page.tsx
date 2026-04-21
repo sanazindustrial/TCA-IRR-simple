@@ -668,6 +668,178 @@ export default function TriageReportWizardPage() {
     }
   };
 
+  const handleDownloadTXT = () => {
+    const safeName = companyName.replace(/\s+/g, '-').toLowerCase();
+    const sep = '='.repeat(60);
+    const sub = '-'.repeat(40);
+    const lines = [
+      sep,
+      'TCA-IRR TRIAGE ANALYSIS REPORT',
+      sep,
+      `Generated: ${new Date().toLocaleString()}`,
+      '',
+      'COMPANY INFORMATION',
+      sub,
+      `Company Name:    ${companyName}`,
+      `Sector:          ${sector}`,
+      `Stage:           ${stage}`,
+      `Location:        ${location}`,
+      `Website:         ${website}`,
+      `Business Model:  ${businessModel}`,
+      `Framework:       ${framework}`,
+      `Composite Score: ${compositeScore != null ? `${compositeScore}%` : 'N/A'}`,
+      '',
+      'ONE-LINE DESCRIPTION',
+      sub,
+      oneLineDescription || 'N/A',
+      '',
+      'COMPANY DESCRIPTION',
+      sub,
+      companyDescription || 'N/A',
+      '',
+      'KEY METRICS',
+      sub,
+      keyMetrics || 'N/A',
+      '',
+      'TEAM INFORMATION',
+      sub,
+      teamInfo || 'N/A',
+      '',
+      'PRODUCT DESCRIPTION',
+      sub,
+      productDescription || 'N/A',
+      '',
+      'PITCH SUMMARY',
+      sub,
+      pitchSummary || 'N/A',
+      '',
+      'ACTIVE REPORT SECTIONS',
+      sub,
+      ...reportSections.filter(s => s.active).map(s => `  • ${s.title}`),
+      '',
+      sep,
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `triage-${safeName}-${Date.now()}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadXLSX = async () => {
+    const { utils, writeFile } = await import('xlsx');
+    const safeName = companyName.replace(/\s+/g, '-').toLowerCase();
+    const wb = utils.book_new();
+
+    // Sheet 1: Overview
+    const ws1 = utils.aoa_to_sheet([
+      ['TCA-IRR Triage Report'],
+      ['Generated', new Date().toLocaleString()],
+      [],
+      ['COMPANY INFORMATION'],
+      ['Field', 'Value'],
+      ['Company Name', companyName],
+      ['Sector', sector],
+      ['Stage', stage],
+      ['Location', location],
+      ['Website', website],
+      ['Business Model', businessModel],
+      ['One-Line Description', oneLineDescription],
+      ['Composite Score', compositeScore != null ? `${compositeScore}%` : 'N/A'],
+      ['Framework', framework],
+    ]);
+    utils.book_append_sheet(wb, ws1, 'Overview');
+
+    // Sheet 2: Content
+    const ws2 = utils.aoa_to_sheet([
+      ['KEY METRICS'],
+      [keyMetrics || 'N/A'],
+      [],
+      ['TEAM INFORMATION'],
+      [teamInfo || 'N/A'],
+      [],
+      ['PRODUCT DESCRIPTION'],
+      [productDescription || 'N/A'],
+      [],
+      ['PITCH SUMMARY'],
+      [pitchSummary || 'N/A'],
+    ]);
+    utils.book_append_sheet(wb, ws2, 'Content');
+
+    // Sheet 3: Sections
+    const ws3 = utils.aoa_to_sheet([
+      ['Section ID', 'Section Title', 'Active'],
+      ...reportSections.map(s => [s.id, s.title, s.active ? 'Yes' : 'No']),
+    ]);
+    utils.book_append_sheet(wb, ws3, 'Sections');
+
+    writeFile(wb, `triage-${safeName}-${Date.now()}.xlsx`);
+  };
+
+  const handleDownloadPPT = async () => {
+    const PptxGenJS = (await import('pptxgenjs')).default;
+    const pptx = new PptxGenJS();
+    (pptx as any).layout = 'LAYOUT_WIDE';
+
+    const titleColor = '1e3a5f';
+    const bodyColor = '333333';
+    const accentColor = '2c5f8a';
+
+    // Slide 1: Title
+    const s1 = pptx.addSlide();
+    s1.background = { color: titleColor };
+    s1.addText('TCA-IRR Triage Report', { x: 0.5, y: 1.4, w: 12, h: 1.2, fontSize: 38, bold: true, color: 'FFFFFF', align: 'center' });
+    s1.addText(companyName || 'Investment Analysis', { x: 0.5, y: 2.8, w: 12, h: 0.8, fontSize: 26, color: 'AADDFF', align: 'center' });
+    s1.addText(`Generated: ${new Date().toLocaleDateString()}`, { x: 0.5, y: 3.8, w: 12, h: 0.5, fontSize: 13, color: 'CCCCCC', align: 'center' });
+
+    // Slide 2: Company Overview
+    const s2 = pptx.addSlide();
+    s2.addText('Company Overview', { x: 0.5, y: 0.3, w: 12, h: 0.7, fontSize: 26, bold: true, color: titleColor });
+    const overviewRows: any[][] = [
+      [{ text: 'Field', options: { bold: true, fill: { color: 'E8F0FA' } } }, { text: 'Value', options: { bold: true, fill: { color: 'E8F0FA' } } }],
+      ['Company', companyName || 'N/A'],
+      ['Sector', sector || 'N/A'],
+      ['Stage', stage || 'N/A'],
+      ['Location', location || 'N/A'],
+      ['Website', website || 'N/A'],
+      ['Business Model', businessModel || 'N/A'],
+      ['Composite Score', compositeScore != null ? `${compositeScore}%` : 'N/A'],
+    ];
+    s2.addTable(overviewRows, { x: 0.5, y: 1.1, w: 12, colW: [3, 9], border: { type: 'solid', color: 'CCCCCC', pt: 0.5 }, fontSize: 11 });
+
+    // Slide 3: Description
+    const s3 = pptx.addSlide();
+    s3.addText('Company Description', { x: 0.5, y: 0.3, w: 12, h: 0.7, fontSize: 26, bold: true, color: titleColor });
+    s3.addText(oneLineDescription || 'No summary available.', { x: 0.5, y: 1.1, w: 12, h: 0.6, fontSize: 15, italic: true, color: accentColor });
+    s3.addText((companyDescription || 'No description provided.').substring(0, 800), { x: 0.5, y: 1.9, w: 12, h: 3, fontSize: 11, color: bodyColor, wrap: true });
+
+    // Slide 4: Metrics & Team (two columns)
+    const s4 = pptx.addSlide();
+    s4.addText('Key Metrics', { x: 0.5, y: 0.3, w: 5.8, h: 0.6, fontSize: 20, bold: true, color: titleColor });
+    s4.addText((keyMetrics || 'N/A').substring(0, 500), { x: 0.5, y: 1.0, w: 5.8, h: 4.0, fontSize: 10, color: bodyColor, wrap: true });
+    s4.addText('Team Information', { x: 6.7, y: 0.3, w: 5.8, h: 0.6, fontSize: 20, bold: true, color: titleColor });
+    s4.addText((teamInfo || 'N/A').substring(0, 500), { x: 6.7, y: 1.0, w: 5.8, h: 4.0, fontSize: 10, color: bodyColor, wrap: true });
+
+    // Slide 5: Active Sections
+    const activeSections = reportSections.filter(s => s.active);
+    const s5 = pptx.addSlide();
+    s5.addText('Active Report Sections', { x: 0.5, y: 0.3, w: 12, h: 0.7, fontSize: 26, bold: true, color: titleColor });
+    if (activeSections.length === 0) {
+      s5.addText('No sections selected.', { x: 0.5, y: 1.2, w: 12, h: 0.5, fontSize: 13, color: bodyColor });
+    } else {
+      activeSections.forEach((sec, i) => {
+        const col = i % 3;
+        const row = Math.floor(i / 3);
+        s5.addText(`\u2022 ${sec.title}`, { x: 0.5 + col * 4.2, y: 1.2 + row * 0.55, w: 4, h: 0.5, fontSize: 12, color: accentColor });
+      });
+    }
+
+    const safeName = companyName.replace(/\s+/g, '-').toLowerCase() || 'report';
+    await pptx.writeFile({ fileName: `triage-${safeName}-${Date.now()}.pptx` });
+  };
+
   const handleDownloadJSON = () => {
     const data = {
       company: companyName, sector, stage, framework,
@@ -1733,6 +1905,18 @@ export default function TriageReportWizardPage() {
                 <Button variant="outline" onClick={handleDownloadExcel} className="gap-2">
                   <Download className="size-4" />
                   Download Excel
+                </Button>
+                <Button variant="outline" onClick={handleDownloadXLSX} className="gap-2">
+                  <Download className="size-4" />
+                  Download XLSX
+                </Button>
+                <Button variant="outline" onClick={handleDownloadPPT} className="gap-2">
+                  <Download className="size-4" />
+                  Download PPT
+                </Button>
+                <Button variant="outline" onClick={handleDownloadTXT} className="gap-2">
+                  <Download className="size-4" />
+                  Download TXT
                 </Button>
                 {savedReportId && (
                   <Button variant="outline" asChild className="gap-2">
