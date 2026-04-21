@@ -111,34 +111,84 @@ export class BackendAPIClient {
     }
 
     async login(email: string, password: string) {
-        const response = await fetch(`${this.baseURL}/api/v1/auth/login`, {
+        // Try JSON body first (email + password)
+        let response = await fetch(`${this.baseURL}/api/v1/auth/login`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password }),
         });
 
+        // FastAPI OAuth2 standard form flow uses username field + form encoding
+        if (response.status === 422 || response.status === 404) {
+            const formBody = new URLSearchParams();
+            formBody.append('username', email);
+            formBody.append('password', password);
+            response = await fetch(`${this.baseURL}/api/v1/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: formBody.toString(),
+            });
+        }
+
         if (!response.ok) {
-            throw new Error(`Login failed: ${response.statusText}`);
+            // Parse FastAPI validation error detail if present
+            let detail = response.statusText;
+            try {
+                const errBody = await response.json();
+                if (errBody.detail) {
+                    detail = typeof errBody.detail === 'string'
+                        ? errBody.detail
+                        : JSON.stringify(errBody.detail);
+                } else if (errBody.message) {
+                    detail = errBody.message;
+                }
+            } catch { /* ignore parse errors */ }
+            throw new Error(`Login failed: ${detail}`);
         }
 
         const result = await response.json();
 
-        // Backend returns { access_token, refresh_token, user, ... } directly
-        if (result.access_token) {
-            this.storeTokens(result.access_token, result.refresh_token, result.expires_in);
-            // Normalize response for frontend consumption
-            return {
-                success: true,
-                access_token: result.access_token,
-                refresh_token: result.refresh_token,
-                user: result.user,
-                expires_in: result.expires_in
-            };
+        // Some backends return token inside a nested key
+        const accessToken =
+            result.access_token ||
+            result.token ||
+            result.data?.access_token;
+
+        if (!accessToken) {
+            return { success: false, error: 'Invalid response from server' };
         }
 
-        return { success: false, error: 'Invalid response from server' };
+        this.storeTokens(accessToken, result.refresh_token, result.expires_in);
+
+        // If backend didn't return a user object, fetch it from /auth/me
+        let user = result.user || result.data?.user || null;
+        if (!user) {
+            try {
+                const meRes = await fetch(`${this.baseURL}/api/v1/auth/me`, {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                });
+                if (meRes.ok) {
+                    const meData = await meRes.json();
+                    user = meData.user || meData;
+                }
+            } catch { /* fallback below */ }
+        }
+
+        // Construct a minimal user object from whatever we have
+        if (!user) {
+            user = { email };
+        }
+
+        return {
+            success: true,
+            access_token: accessToken,
+            refresh_token: result.refresh_token,
+            user,
+            expires_in: result.expires_in,
+        };
     }
 
     async runComprehensiveAnalysis(framework: 'general' | 'medtech', additionalData?: any) {
