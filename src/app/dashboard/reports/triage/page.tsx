@@ -375,11 +375,14 @@ export default function TriageReportWizardPage() {
     try {
       let textContent = '';
 
+      const authToken = typeof window !== 'undefined' ? (localStorage.getItem('authToken') ?? '') : '';
+      const authHeaders: Record<string, string> = authToken ? { Authorization: `Bearer ${authToken}` } : {};
+
       // ── Strategy 1: Next.js server-side extraction proxy (multi-format) ──
       try {
         const formData = new FormData();
         formData.append('file', file);
-        const res = await fetch('/api/extract', { method: 'POST', body: formData });
+        const res = await fetch('/api/extract', { method: 'POST', body: formData, headers: authHeaders });
         if (res.ok) {
           const d = await res.json();
           textContent = d.text_content || '';
@@ -391,7 +394,7 @@ export default function TriageReportWizardPage() {
         try {
           const formData = new FormData();
           formData.append('file', file);
-          const res = await fetch(`${API_BASE}/api/v1/files/extract-text`, { method: 'POST', body: formData });
+          const res = await fetch(`${API_BASE}/api/v1/files/extract-text`, { method: 'POST', body: formData, headers: authHeaders });
           if (res.ok) {
             const d = await res.json();
             textContent = d.text_content || d.content || d.text || '';
@@ -405,7 +408,7 @@ export default function TriageReportWizardPage() {
           const base64 = await fileToBase64(file);
           const res = await fetch(`${API_BASE}/api/v1/files/extract-text`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...authHeaders },
             body: JSON.stringify({ file_content: base64, filename: file.name, mime_type: file.type }),
           });
           if (res.ok) {
@@ -421,7 +424,7 @@ export default function TriageReportWizardPage() {
           const base64 = await fileToBase64(file);
           const res = await fetch(`${API_BASE}/api/v1/extract/base64`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...authHeaders },
             body: JSON.stringify({ content: base64, filename: file.name, format: file.name.split('.').pop()?.toLowerCase() }),
           });
           if (res.ok) {

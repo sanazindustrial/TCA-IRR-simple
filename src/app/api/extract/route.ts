@@ -26,7 +26,13 @@ export async function OPTIONS() {
 }
 
 /** Try an extraction endpoint, return text or null */
-async function tryEndpoint(url: string, init: RequestInit): Promise<string | null> {
+async function tryEndpoint(url: string, init: RequestInit, authHeader?: string): Promise<string | null> {
+  if (authHeader) {
+    init = {
+      ...init,
+      headers: { Authorization: authHeader, ...(init.headers as Record<string, string> ?? {}) },
+    };
+  }
   try {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), 25_000);
@@ -43,6 +49,7 @@ async function tryEndpoint(url: string, init: RequestInit): Promise<string | nul
 export async function POST(req: NextRequest) {
   try {
     const contentType = req.headers.get('content-type') ?? '';
+    const incomingAuth = req.headers.get('authorization') ?? '';
     let text: string | null = null;
     let filename = 'document';
 
@@ -60,21 +67,21 @@ export async function POST(req: NextRequest) {
       {
         const fd = new FormData();
         fd.append('file', file, filename);
-        text = await tryEndpoint(`${BACKEND}/api/v1/files/extract-text`, { method: 'POST', body: fd });
+        text = await tryEndpoint(`${BACKEND}/api/v1/files/extract-text`, { method: 'POST', body: fd }, incomingAuth);
       }
 
       // Strategy 1b: multipart to /api/v1/extract/file
       if (!text) {
         const fd = new FormData();
         fd.append('file', file, filename);
-        text = await tryEndpoint(`${BACKEND}/api/v1/extract/file`, { method: 'POST', body: fd });
+        text = await tryEndpoint(`${BACKEND}/api/v1/extract/file`, { method: 'POST', body: fd }, incomingAuth);
       }
 
       // Strategy 1c: multipart to /api/v1/upload/extract
       if (!text) {
         const fd = new FormData();
         fd.append('file', file, filename);
-        text = await tryEndpoint(`${BACKEND}/api/v1/upload/extract`, { method: 'POST', body: fd });
+        text = await tryEndpoint(`${BACKEND}/api/v1/upload/extract`, { method: 'POST', body: fd }, incomingAuth);
       }
 
       // Strategy 1d: base64 JSON to /api/v1/files/extract-text
@@ -85,7 +92,7 @@ export async function POST(req: NextRequest) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ file_content: base64, filename, mime_type: mimeType }),
-        });
+        }, incomingAuth);
       }
 
       // Strategy 1e: JSON to /api/v1/extract/base64
@@ -96,7 +103,7 @@ export async function POST(req: NextRequest) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ content: base64, filename, format: filename.split('.').pop()?.toLowerCase() }),
-        });
+        }, incomingAuth);
       }
 
       // Strategy 1f: client-side text extraction for plain/data files
@@ -143,7 +150,7 @@ export async function POST(req: NextRequest) {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(ep.body),
-            });
+            }, incomingAuth);
           }
           // If no OCR result, provide a descriptor so downstream AI at least knows an image was provided
           if (!text) {
@@ -238,14 +245,14 @@ export async function POST(req: NextRequest) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ file_url: fetchUrl }),
-        });
+        }, incomingAuth);
         // Scrape fallback
         if (!text) {
           text = await tryEndpoint(`${BACKEND}/api/v1/scrape/url`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url: fetchUrl }),
-          });
+          }, incomingAuth);
         }
         // For Google export URLs, also try fetching the text directly
         if (!text && isGoogleUrl) {
@@ -264,14 +271,14 @@ export async function POST(req: NextRequest) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ file_content: b64, filename }),
-        });
+        }, incomingAuth);
         // Strategy 2b
         if (!text) {
           text = await tryEndpoint(`${BACKEND}/api/v1/extract/base64`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ content: b64, filename, format: filename.split('.').pop()?.toLowerCase() }),
-          });
+          }, incomingAuth);
         }
         // Strategy 2c: try to decode as UTF-8 text directly for plain formats
         if (!text) {
