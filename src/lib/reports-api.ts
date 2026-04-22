@@ -7,6 +7,15 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
 const API_PREFIX = '/api/v1';
 
+/**
+ * Build Authorization headers from the stored auth token.
+ * Safe to call in both server and browser contexts.
+ */
+function getAuthHeaders(): HeadersInit {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export interface UserInfo {
     name: string;
     email: string;
@@ -143,7 +152,7 @@ export const reportsApi = {
             }
 
             const url = `${API_BASE_URL}${API_PREFIX}/reports${params.toString() ? `?${params.toString()}` : ''}`;
-            const response = await fetch(url);
+            const response = await fetch(url, { headers: getAuthHeaders() });
 
             if (!response.ok) {
                 throw new Error(`Failed to fetch reports: ${response.statusText}`);
@@ -179,7 +188,7 @@ export const reportsApi = {
                 ? `${API_BASE_URL}${API_PREFIX}/reports/stats?user_id=${userId}`
                 : `${API_BASE_URL}${API_PREFIX}/reports/stats`;
 
-            const response = await fetch(url);
+            const response = await fetch(url, { headers: getAuthHeaders() });
 
             if (!response.ok) {
                 throw new Error(`Failed to fetch stats: ${response.statusText}`);
@@ -197,7 +206,7 @@ export const reportsApi = {
      */
     async getReport(reportId: number): Promise<ReportData> {
         try {
-            const response = await fetch(`${API_BASE_URL}${API_PREFIX}/reports/${reportId}`);
+            const response = await fetch(`${API_BASE_URL}${API_PREFIX}/reports/${reportId}`, { headers: getAuthHeaders() });
 
             if (!response.ok) {
                 throw new Error(`Failed to fetch report: ${response.statusText}`);
@@ -220,6 +229,7 @@ export const reportsApi = {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    ...getAuthHeaders(),
                 },
                 body: JSON.stringify(report),
             });
@@ -245,6 +255,7 @@ export const reportsApi = {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
+                    ...getAuthHeaders(),
                 },
                 body: JSON.stringify(updates),
             });
@@ -266,7 +277,7 @@ export const reportsApi = {
      */
     async getReportVersions(reportId: number): Promise<ReportVersion[]> {
         try {
-            const response = await fetch(`${API_BASE_URL}${API_PREFIX}/reports/${reportId}/versions`);
+            const response = await fetch(`${API_BASE_URL}${API_PREFIX}/reports/${reportId}/versions`, { headers: getAuthHeaders() });
 
             if (!response.ok) {
                 throw new Error(`Failed to fetch versions: ${response.statusText}`);
@@ -286,6 +297,7 @@ export const reportsApi = {
         try {
             const response = await fetch(`${API_BASE_URL}${API_PREFIX}/reports/${reportId}`, {
                 method: 'DELETE',
+                headers: getAuthHeaders(),
             });
 
             if (!response.ok) {
