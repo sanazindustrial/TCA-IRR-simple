@@ -96,33 +96,6 @@ const nextConfig: NextConfig = {
     ],
   },
 
-  // Redirects for case-insensitive module URLs (Azure Linux is case-sensitive)
-  async redirects() {
-    return [
-      { source: '/analysis/modules/Analyst', destination: '/analysis/modules/analyst', permanent: true },
-      { source: '/analysis/modules/Benchmark', destination: '/analysis/modules/benchmark', permanent: true },
-      { source: '/analysis/modules/Risk', destination: '/analysis/modules/risk', permanent: true },
-      { source: '/analysis/modules/Tca', destination: '/analysis/modules/tca', permanent: true },
-      { source: '/analysis/modules/Macro', destination: '/analysis/modules/macro', permanent: true },
-      { source: '/analysis/modules/Gap', destination: '/analysis/modules/gap', permanent: true },
-      { source: '/analysis/modules/Growth', destination: '/analysis/modules/growth', permanent: true },
-      { source: '/analysis/modules/Team', destination: '/analysis/modules/team', permanent: true },
-      { source: '/analysis/modules/FounderFit', destination: '/analysis/modules/founderFit', permanent: true },
-      { source: '/analysis/modules/Founderfit', destination: '/analysis/modules/founderFit', permanent: true },
-      { source: '/analysis/modules/founderfit', destination: '/analysis/modules/founderFit', permanent: true },
-      { source: '/analysis/modules/StrategicFit', destination: '/analysis/modules/strategicFit', permanent: true },
-      { source: '/analysis/modules/Strategicfit', destination: '/analysis/modules/strategicFit', permanent: true },
-      { source: '/analysis/modules/strategicfit', destination: '/analysis/modules/strategicFit', permanent: true },
-      { source: '/analysis/modules/Financial', destination: '/analysis/modules/financial', permanent: true },
-      { source: '/analysis/modules/Economic', destination: '/analysis/modules/economic', permanent: true },
-      { source: '/analysis/modules/Social', destination: '/analysis/modules/social', permanent: true },
-      { source: '/analysis/modules/Marketing', destination: '/analysis/modules/marketing', permanent: true },
-      { source: '/analysis/modules/Environmental', destination: '/analysis/modules/environmental', permanent: true },
-      { source: '/analysis/modules/Funder', destination: '/analysis/modules/funder', permanent: true },
-      { source: '/analysis/modules/Strategic', destination: '/analysis/modules/strategic', permanent: true },
-    ];
-  },
-
   // Performance optimizations
   compress: true,
   poweredByHeader: false,
