@@ -53,6 +53,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -325,6 +326,14 @@ export default function ReportsPage() {
   const [selectedReportVersions, setSelectedReportVersions] = useState<ReportVersion[]>([]);
   const [selectedReportName, setSelectedReportName] = useState('');
   const [loadingVersions, setLoadingVersions] = useState(false);
+
+  // Upload report dialog state
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [uploadCompanyName, setUploadCompanyName] = useState('');
+  const [uploadReportType, setUploadReportType] = useState('triage');
+  const [uploadScore, setUploadScore] = useState('');
+  const [uploadRecommendation, setUploadRecommendation] = useState('Conditional');
+  const [isUploading, setIsUploading] = useState(false);
 
   // Function to get pending sync reports from localStorage
   const getPendingSyncReports = useCallback((): Report[] => {
@@ -752,6 +761,64 @@ export default function ReportsPage() {
     await loadReports();
   };
 
+  const handleFileSelect = useCallback((file: File) => {
+    if (!file.name.endsWith('.json')) {
+      toast({ variant: 'destructive', title: 'Invalid File', description: 'Please upload a JSON file.' });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target?.result as string);
+        setUploadCompanyName(data.company_name || data.company || data.companyName || '');
+        setUploadReportType(data.report_type || data.reportType || 'triage');
+        const score = data.overall_score ?? data.tca_score ?? data.score ?? data.compositeScore ?? '';
+        setUploadScore(String(score));
+        setUploadRecommendation(data.recommendation || 'Conditional');
+        toast({ title: 'File Parsed', description: 'Report data extracted. Review and confirm before uploading.' });
+      } catch {
+        toast({ variant: 'destructive', title: 'Parse Error', description: 'Could not read the JSON file. Check the file format.' });
+      }
+    };
+    reader.readAsText(file);
+  }, [toast]);
+
+  const handleUploadReport = useCallback(async () => {
+    if (!uploadCompanyName.trim()) {
+      toast({ variant: 'destructive', title: 'Validation Error', description: 'Company name is required.' });
+      return;
+    }
+    const score = parseFloat(uploadScore);
+    if (isNaN(score) || score < 0 || score > 10) {
+      toast({ variant: 'destructive', title: 'Validation Error', description: 'Score must be a number between 0 and 10.' });
+      return;
+    }
+    setIsUploading(true);
+    try {
+      const lu = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('loggedInUser') || '{}') : {};
+      const userId = Number(lu.backendId || lu.id || 1);
+      await reportsApi.createReport({
+        company_name: uploadCompanyName.trim(),
+        report_type: uploadReportType,
+        overall_score: score,
+        tca_score: score,
+        recommendation: uploadRecommendation,
+      }, userId);
+      toast({ title: 'Report Uploaded', description: `Report for "${uploadCompanyName}" has been saved.` });
+      setShowUploadDialog(false);
+      setUploadCompanyName('');
+      setUploadScore('');
+      setUploadReportType('triage');
+      setUploadRecommendation('Conditional');
+      await loadReports();
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Failed to upload report.';
+      toast({ variant: 'destructive', title: 'Upload Failed', description: msg });
+    } finally {
+      setIsUploading(false);
+    }
+  }, [uploadCompanyName, uploadReportType, uploadScore, uploadRecommendation, toast, loadReports]);
+
   // Get current user email from localStorage
   const currentUserEmail = typeof window !== 'undefined'
     ? (() => {
@@ -801,6 +868,7 @@ export default function ReportsPage() {
                 </div>
               )}
               {isPrivilegedUser && <Button variant="outline" onClick={handleRefresh}><RefreshCw className="mr-2 size-4" /> Refresh</Button>}
+              <Button variant="outline" onClick={() => setShowUploadDialog(true)}><FileUp className="mr-2 size-4" /> Upload Report</Button>
             </div>
           </div>
         </header>
@@ -1251,6 +1319,91 @@ export default function ReportsPage() {
               </div>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Upload Report Dialog */}
+      <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileUp className="size-5" />
+              Upload Report
+            </DialogTitle>
+            <DialogDescription>
+              Import a previously exported JSON report, or fill in the details manually to save a report to the backend.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Import from JSON file (optional)</Label>
+              <Input
+                type="file"
+                accept=".json"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleFileSelect(file);
+                }}
+              />
+              <p className="text-xs text-muted-foreground">Select a previously exported report JSON to auto-fill the fields below.</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="upload-company">Company Name *</Label>
+              <Input
+                id="upload-company"
+                placeholder="Enter company name"
+                value={uploadCompanyName}
+                onChange={(e) => setUploadCompanyName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="upload-type">Report Type</Label>
+              <Select value={uploadReportType} onValueChange={setUploadReportType}>
+                <SelectTrigger id="upload-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="triage">Triage</SelectItem>
+                  <SelectItem value="due-diligence">Due Diligence</SelectItem>
+                  <SelectItem value="ssd">SSD Report</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="upload-score">Overall Score (0–10)</Label>
+              <Input
+                id="upload-score"
+                type="number"
+                min="0"
+                max="10"
+                step="0.1"
+                placeholder="e.g. 7.5"
+                value={uploadScore}
+                onChange={(e) => setUploadScore(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="upload-rec">Recommendation</Label>
+              <Select value={uploadRecommendation} onValueChange={setUploadRecommendation}>
+                <SelectTrigger id="upload-rec">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Proceed">Proceed</SelectItem>
+                  <SelectItem value="Conditional">Conditional</SelectItem>
+                  <SelectItem value="Pass">Pass</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowUploadDialog(false)}>Cancel</Button>
+            <Button onClick={handleUploadReport} disabled={isUploading || !uploadCompanyName.trim()}>
+              {isUploading
+                ? <><Loader2 className="mr-2 size-4 animate-spin" />Uploading...</>
+                : <><FileUp className="mr-2 size-4" />Upload Report</>}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </main>
