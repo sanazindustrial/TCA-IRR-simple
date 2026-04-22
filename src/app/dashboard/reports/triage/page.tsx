@@ -389,12 +389,11 @@ export default function TriageReportWizardPage() {
         }
       } catch { /* fall through */ }
 
-      // ── Strategy 2: Direct backend /api/v1/files/extract-text (FormData) ─
+      // ── Strategy 2: Direct backend /api/v1/analysis/extract-text-from-file ─
       if (!textContent) {
         try {
-          const formData = new FormData();
-          formData.append('file', file);
-          const res = await fetch(`${API_BASE}/api/v1/files/extract-text`, { method: 'POST', body: formData, headers: authHeaders });
+          const base64 = await fileToBase64(file);
+          const res = await fetch(`${API_BASE}/api/v1/analysis/extract-text-from-file`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders }, body: JSON.stringify({ content: base64, filename: file.name, mime_type: file.type }) });
           if (res.ok) {
             const d = await res.json();
             textContent = d.text_content || d.content || d.text || '';
@@ -402,14 +401,14 @@ export default function TriageReportWizardPage() {
         } catch { /* fall through */ }
       }
 
-      // ── Strategy 3: Backend base64 JSON ────────────────────────────────────
+      // ── Strategy 3: Backend base64 JSON (extract-company-info) ─────────────────
       if (!textContent) {
         try {
           const base64 = await fileToBase64(file);
-          const res = await fetch(`${API_BASE}/api/v1/files/extract-text`, {
+          const res = await fetch(`${API_BASE}/api/v1/analysis/extract-company-info`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...authHeaders },
-            body: JSON.stringify({ file_content: base64, filename: file.name, mime_type: file.type }),
+            body: JSON.stringify({ content: base64, filename: file.name }),
           });
           if (res.ok) {
             const d = await res.json();
@@ -418,14 +417,15 @@ export default function TriageReportWizardPage() {
         } catch { /* fall through */ }
       }
 
-      // ── Strategy 4: /api/v1/extract/base64 alternative endpoint ───────────
+      // ── Strategy 4: multipart upload ──────────────────────────────────
       if (!textContent) {
         try {
-          const base64 = await fileToBase64(file);
-          const res = await fetch(`${API_BASE}/api/v1/extract/base64`, {
+          const formData = new FormData();
+          formData.append('file', file);
+          const res = await fetch(`${API_BASE}/api/v1/files/upload`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...authHeaders },
-            body: JSON.stringify({ content: base64, filename: file.name, format: file.name.split('.').pop()?.toLowerCase() }),
+            headers: authHeaders,
+            body: formData,
           });
           if (res.ok) {
             const d = await res.json();

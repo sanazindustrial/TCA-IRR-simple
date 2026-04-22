@@ -63,47 +63,22 @@ export async function POST(req: NextRequest) {
       filename = file.name;
       const mimeType = file.type;
 
-      // Strategy 1a: multipart/form-data to /api/v1/files/extract-text
+      // Strategy 1a: base64 JSON to /api/v1/analysis/extract-text-from-file (real endpoint)
       {
-        const fd = new FormData();
-        fd.append('file', file, filename);
-        text = await tryEndpoint(`${BACKEND}/api/v1/files/extract-text`, { method: 'POST', body: fd }, incomingAuth);
-      }
-
-      // Strategy 1b: multipart to /api/v1/extract/file
-      if (!text) {
-        const fd = new FormData();
-        fd.append('file', file, filename);
-        text = await tryEndpoint(`${BACKEND}/api/v1/extract/file`, { method: 'POST', body: fd }, incomingAuth);
-      }
-
-      // Strategy 1c: multipart to /api/v1/upload/extract
-      if (!text) {
-        const fd = new FormData();
-        fd.append('file', file, filename);
-        text = await tryEndpoint(`${BACKEND}/api/v1/upload/extract`, { method: 'POST', body: fd }, incomingAuth);
-      }
-
-      // Strategy 1d: base64 JSON to /api/v1/files/extract-text
-      if (!text) {
         const arrayBuffer = await file.arrayBuffer();
         const base64 = Buffer.from(arrayBuffer).toString('base64');
-        text = await tryEndpoint(`${BACKEND}/api/v1/files/extract-text`, {
+        text = await tryEndpoint(`${BACKEND}/api/v1/analysis/extract-text-from-file`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ file_content: base64, filename, mime_type: mimeType }),
+          body: JSON.stringify({ content: base64, filename, mime_type: mimeType }),
         }, incomingAuth);
       }
 
-      // Strategy 1e: JSON to /api/v1/extract/base64
-      if (!text) {
-        const arrayBuffer = await file.arrayBuffer();
-        const base64 = Buffer.from(arrayBuffer).toString('base64');
-        text = await tryEndpoint(`${BACKEND}/api/v1/extract/base64`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content: base64, filename, format: filename.split('.').pop()?.toLowerCase() }),
-        }, incomingAuth);
+      // Strategy 1b: multipart to /api/v1/files/upload (requires auth)
+      if (!text && incomingAuth) {
+        const fd = new FormData();
+        fd.append('file', file, filename);
+        text = await tryEndpoint(`${BACKEND}/api/v1/files/upload`, { method: 'POST', body: fd }, incomingAuth);
       }
 
       // Strategy 1f: client-side text extraction for plain/data files
@@ -139,9 +114,8 @@ export async function POST(req: NextRequest) {
           const mimeType = file.type || 'image/jpeg';
 
           const visionEndpoints = [
+            { url: `${BACKEND}/api/v1/analysis/extract-text-from-file`, body: { content: base64, filename, mime_type: mimeType } },
             { url: `${BACKEND}/api/v1/ai/vision`, body: { image_base64: base64, mime_type: mimeType, filename } },
-            { url: `${BACKEND}/api/v1/files/extract-text`, body: { file_content: base64, filename, mime_type: mimeType } },
-            { url: `${BACKEND}/api/v1/extract/image`, body: { content: base64, filename, format: lower.split('.').pop() } },
             { url: `${BACKEND}/api/v1/ocr`, body: { image: base64, mime_type: mimeType } },
           ];
           for (const ep of visionEndpoints) {
@@ -241,7 +215,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Try backend extraction with the (possibly converted) URL
-        text = await tryEndpoint(`${BACKEND}/api/v1/files/extract-text`, {
+        text = await tryEndpoint(`${BACKEND}/api/v1/analysis/extract-text-from-file`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ file_url: fetchUrl }),
@@ -266,21 +240,13 @@ export async function POST(req: NextRequest) {
         }
       } else if (body.file_content ?? body.content) {
         const b64 = body.file_content ?? body.content ?? '';
-        // Strategy 2a
-        text = await tryEndpoint(`${BACKEND}/api/v1/files/extract-text`, {
+        // Strategy 2a: real extraction endpoint
+        text = await tryEndpoint(`${BACKEND}/api/v1/analysis/extract-text-from-file`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ file_content: b64, filename }),
+          body: JSON.stringify({ content: b64, filename }),
         }, incomingAuth);
-        // Strategy 2b
-        if (!text) {
-          text = await tryEndpoint(`${BACKEND}/api/v1/extract/base64`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content: b64, filename, format: filename.split('.').pop()?.toLowerCase() }),
-          }, incomingAuth);
-        }
-        // Strategy 2c: try to decode as UTF-8 text directly for plain formats
+        // Strategy 2b: try to decode as UTF-8 text directly for plain formats
         if (!text) {
           const lower = filename.toLowerCase();
           if (lower.endsWith('.txt') || lower.endsWith('.csv')) {
