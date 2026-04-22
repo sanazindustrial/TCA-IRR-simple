@@ -686,6 +686,8 @@ export default function TriageReportWizardPage() {
     setSaveError(null);
     try {
       const recommendation = compositeScore >= 7 ? 'Proceed' : compositeScore >= 5.5 ? 'Conditional' : 'Pass';
+      const lu = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
+      const userId = Number(lu.backendId || lu.id || 1);
       const saved = await reportsApi.createReport({
         company_name: companyName,
         report_type: 'triage',
@@ -699,7 +701,7 @@ export default function TriageReportWizardPage() {
         },
         module_scores: { modules: selectedModules, framework, evaluation_id: evaluationId } as Record<string, unknown>,
         missing_sections: reportSections.filter((s) => !s.active).map((s) => s.id),
-      });
+      }, userId);
       setSavedReportId(saved.id);
       setRecordedTimestamp(new Date().toISOString());
       // Track report usage per user
