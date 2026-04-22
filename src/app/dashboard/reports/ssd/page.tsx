@@ -43,7 +43,6 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  TrendingUp,
   FileDown,
   Plus,
   Eye,
@@ -245,12 +244,11 @@ export default function SSDReportPage() {
     finally { setIsExtractingSSD(false); }
   }, [submitForm.founder_email, toast]);
 
-  // Evaluation metadata
-  const [evaluationId] = useState<string>(
-    () => `EVL-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
-  );
+  // Evaluation metadata (populated client-side only to avoid hydration mismatch)
+  const [mounted, setMounted] = useState(false);
+  const [evaluationId, setEvaluationId] = useState<string>('');
   const [createdByName, setCreatedByName] = useState<string>('Unknown');
-  const [sessionStartedAt] = useState<string>(() => new Date().toISOString());
+  const [sessionStartedAt, setSessionStartedAt] = useState<string>('');
 
   const stopElapsedTimer = useCallback(() => {
     if (elapsedTimerRef.current !== null) {
@@ -375,8 +373,11 @@ export default function SSDReportPage() {
     fetchLogs();
   }, [fetchStats, fetchLogs]);
 
-  // Load user metadata on mount
+  // Load user metadata on mount (client-only: avoids hydration mismatch with time-dependent values)
   useEffect(() => {
+    setEvaluationId(`EVL-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`);
+    setSessionStartedAt(new Date().toISOString());
+    setMounted(true);
     try {
       const lu = localStorage.getItem('loggedInUser');
       if (lu) {
@@ -1003,12 +1004,14 @@ export default function SSDReportPage() {
         </div>
       </div>
 
-      {/* Evaluation metadata banner */}
-      <div className="rounded-lg border bg-muted/30 px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-muted-foreground">
-        <span><span className="font-semibold text-foreground">Evaluation ID:</span> <span className="font-mono text-primary">{evaluationId}</span></span>
-        <span><span className="font-semibold text-foreground">Created by:</span> {createdByName}</span>
-        <span><span className="font-semibold text-foreground">Session started:</span> {new Date(sessionStartedAt).toLocaleString()}</span>
-      </div>
+      {/* Evaluation metadata banner — rendered client-side only to prevent hydration mismatch */}
+      {mounted && (
+        <div className="rounded-lg border bg-muted/30 px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-muted-foreground">
+          <span><span className="font-semibold text-foreground">Evaluation ID:</span> <span className="font-mono text-primary">{evaluationId}</span></span>
+          <span><span className="font-semibold text-foreground">Created by:</span> {createdByName}</span>
+          <span><span className="font-semibold text-foreground">Session started:</span> {new Date(sessionStartedAt).toLocaleString()}</span>
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
