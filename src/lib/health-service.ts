@@ -117,11 +117,11 @@ const SERVICES: ServiceDef[] = [
     // ── Auth ──
     { id: 'auth-me',       label: 'Auth / Session',   group: 'auth', path: '/api/v1/auth/me',      requiresAuth: true },
 
-    // ── Analysis engine ──
-    { id: 'analysis-svc',  label: 'Analysis Service', group: 'analysis', path: '/api/v1/analysis/comprehensive', requiresAuth: true },
-    { id: 'tca-quick',     label: 'TCA Quick',        group: 'analysis', path: '/api/v1/tca/quick',              requiresAuth: true },
-    { id: 'tca-sector',    label: 'TCA Sector',       group: 'analysis', path: '/api/v1/tca/sector-analysis',    requiresAuth: true },
-    { id: 'tca-batch',     label: 'TCA Batch',        group: 'analysis', path: '/api/v1/tca/batch',              requiresAuth: true },
+    // ── Analysis engine (POST-only endpoints – GET returns 404/405, mark optional) ──
+    { id: 'analysis-svc',  label: 'Analysis Service', group: 'analysis', path: '/api/v1/analysis/comprehensive', requiresAuth: true, optional: true },
+    { id: 'tca-quick',     label: 'TCA Quick',        group: 'analysis', path: '/api/v1/tca/quick',              requiresAuth: true, optional: true },
+    { id: 'tca-sector',    label: 'TCA Sector',       group: 'analysis', path: '/api/v1/tca/sector-analysis',    requiresAuth: true, optional: true },
+    { id: 'tca-batch',     label: 'TCA Batch',        group: 'analysis', path: '/api/v1/tca/batch',              requiresAuth: true, optional: true },
 
     // ── 17 modules (status derived from /api/v1/tca/system-status in sweep) ──
     ...MODULE_IDS.map((mod) => ({
@@ -138,11 +138,11 @@ const SERVICES: ServiceDef[] = [
     { id: 'evaluations-svc',  label: 'Evaluations',  group: 'data', path: '/api/v1/evaluations', requiresAuth: true },
 
     // ── Admin / config ──
-    { id: 'cost-svc',      label: 'Cost Service',     group: 'admin', path: '/api/v1/cost/summary/public' },
-    { id: 'settings-svc',  label: 'Settings/Config',  group: 'admin', path: '/api/v1/settings/versions', requiresAuth: true, optional: true },
-    { id: 'users-svc',     label: 'Users',            group: 'admin', path: '/api/v1/users',              requiresAuth: true },
-    { id: 'roles-svc',     label: 'Roles',            group: 'admin', path: '/api/v1/roles',              requiresAuth: true },
-    { id: 'dashboard-svc', label: 'Dashboard Stats',  group: 'admin', path: '/api/v1/dashboard/stats' },
+    { id: 'cost-svc',      label: 'Cost Service',     group: 'admin', path: '/api/v1/cost/summary/public',   optional: true },
+    { id: 'settings-svc',  label: 'Settings/Config',  group: 'admin', path: '/api/v1/settings/versions',     requiresAuth: true, optional: true },
+    { id: 'users-svc',     label: 'Users',            group: 'admin', path: '/api/v1/users',                 requiresAuth: true },
+    { id: 'roles-svc',     label: 'Roles',            group: 'admin', path: '/api/v1/roles',                 requiresAuth: true },
+    { id: 'dashboard-svc', label: 'Dashboard Stats',  group: 'admin', path: '/api/v1/dashboard/stats',       optional: true },
 
     // ── Communication (optional – endpoints may not exist) ──
     { id: 'notifications-svc', label: 'Notifications',   group: 'communication', path: '/api/v1/notifications',       requiresAuth: true, optional: true },
@@ -261,7 +261,8 @@ class HealthService {
             const latencyMs = Date.now() - t0;
 
             // 200-399 → healthy; 401/403 → service alive (needs auth); 500+ → down
-            // 404 on optional endpoints → 'checking' (not deployed/available yet)
+            // 404/405 on optional endpoints → 'checking' (not deployed/available yet)
+            // 405 on any endpoint → 'healthy' (service is up, just wrong HTTP method for ping)
             // 404 on required endpoints → 'degraded'
             let status: ServiceStatus;
             if (res.status >= 200 && res.status < 400) {
@@ -269,13 +270,19 @@ class HealthService {
             } else if (res.status === 401 || res.status === 403) {
                 // Service is alive, just needs fresh auth
                 status = 'healthy';
+            } else if (res.status === 405) {
+                // Method Not Allowed – service is alive, endpoint is POST-only
+                status = 'healthy';
             } else if (res.status >= 500) {
                 status = 'down';
-            } else if (res.status === 404 && def.optional) {
+            } else if ((res.status === 404 || res.status === 422) && def.optional) {
                 // Optional endpoint not yet deployed – treat as not-available, not degraded
                 status = 'checking';
-            } else {
+            } else if (res.status === 404 && !def.optional) {
                 status = 'degraded';
+            } else {
+                // Other 4xx on optional endpoints → checking; required → degraded
+                status = def.optional ? 'checking' : 'degraded';
             }
 
             return { def, status, code: res.status, latencyMs, checkedAt: new Date().toISOString() };
@@ -374,7 +381,9 @@ class HealthService {
                 if (flag !== undefined) {
                     return {
                         def,
-                        status: (flag ? 'healthy' : 'degraded') as ServiceStatus,
+                        // A module being inactive/disabled means unavailable ('checking'),
+                        // not broken ('degraded'). Only healthy when explicitly active.
+                        status: (flag ? 'healthy' : 'checking') as ServiceStatus,
                         code: 200,
                         latencyMs: 0,
                         checkedAt: now,
