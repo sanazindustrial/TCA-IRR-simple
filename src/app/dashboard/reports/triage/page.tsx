@@ -192,6 +192,21 @@ export default function TriageReportWizardPage() {
   const router = useRouter();
   const { toast } = useToast();
 
+  // ── Access control ─────────────────────────────────────────────────────────
+  const [accessDenied, setAccessDenied] = useState(false);
+  useEffect(() => {
+    try {
+      const lu = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
+      const userId = lu.id || lu.backendId;
+      if (!userId) return;
+      const overrides = JSON.parse(localStorage.getItem('userOverrides') || '{}');
+      const userPerms: Array<{ name: string; enabled: boolean }> | undefined = overrides[userId]?.permissions;
+      if (!userPerms) return; // no overrides = role defaults = allow
+      const triagePerm = userPerms.find(p => p.name === 'Triage Reports');
+      if (triagePerm && !triagePerm.enabled) setAccessDenied(true);
+    } catch { /* ignore */ }
+  }, []);
+
   // ── Tracking IDs (unique per evaluation session) ──────────────────────────
   const [evaluationId] = useState<string>(
     () => `EVL-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
@@ -1975,6 +1990,34 @@ export default function TriageReportWizardPage() {
         );
     }
   };
+
+  if (accessDenied) {
+    return (
+      <div className="flex flex-col gap-6 p-4 md:p-6">
+        <div>
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/dashboard/reports">
+              <ArrowLeft className="mr-1 size-4" />
+              Reports
+            </Link>
+          </Button>
+        </div>
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardContent className="pt-6 pb-10 text-center space-y-4">
+            <Shield className="mx-auto h-12 w-12 text-destructive/60" />
+            <h2 className="text-xl font-semibold">Access Restricted</h2>
+            <p className="text-muted-foreground max-w-sm mx-auto">
+              You do not have permission to access Triage Reports.
+              Please contact your administrator to enable access.
+            </p>
+            <Button asChild variant="outline">
+              <Link href="/dashboard/reports">Back to Reports</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6">

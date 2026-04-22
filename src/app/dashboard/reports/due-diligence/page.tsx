@@ -216,6 +216,21 @@ export default function DueDiligenceWorkflowPage() {
   const { toast } = useToast();
   const router = useRouter();
 
+  // ── Access control ─────────────────────────────────────────────────────────
+  const [accessDenied, setAccessDenied] = useState(false);
+  useEffect(() => {
+    try {
+      const lu = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
+      const userId = lu.id || lu.backendId;
+      if (!userId) return;
+      const overrides = JSON.parse(localStorage.getItem('userOverrides') || '{}');
+      const userPerms: Array<{ name: string; enabled: boolean }> | undefined = overrides[userId]?.permissions;
+      if (!userPerms) return; // no overrides = role defaults = allow
+      const ddPerm = userPerms.find(p => p.name === 'Due Diligence Reports');
+      if (ddPerm && !ddPerm.enabled) setAccessDenied(true);
+    } catch { /* ignore */ }
+  }, []);
+
   // Calculate progress
   const progress = Math.round((completedSteps.length / WORKFLOW_STEPS.length) * 100);
 
@@ -1417,6 +1432,32 @@ export default function DueDiligenceWorkflowPage() {
         return null;
     }
   };
+
+  if (accessDenied) {
+    return (
+      <div className="container mx-auto p-4 md:p-8 max-w-6xl">
+        <Link
+          href="/dashboard/reports"
+          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary mb-6"
+        >
+          <ArrowLeft className="size-4" /> Back to Reports
+        </Link>
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardContent className="pt-6 pb-10 text-center space-y-4">
+            <Shield className="mx-auto h-12 w-12 text-destructive/60" />
+            <h2 className="text-xl font-semibold">Access Restricted</h2>
+            <p className="text-muted-foreground max-w-sm mx-auto">
+              You do not have permission to access Due Diligence Reports.
+              Please contact your administrator to enable access.
+            </p>
+            <Button asChild variant="outline">
+              <Link href="/dashboard/reports">Back to Reports</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto p-4 md:p-8 max-w-6xl">

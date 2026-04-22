@@ -111,6 +111,8 @@ const INITIAL_ROLE_PERMISSIONS = {
       { name: 'Billing & Costs', description: 'View and manage costs', enabled: true },
       { name: 'API Access', description: 'Full API access', enabled: true },
       { name: 'Audit Logs', description: 'View system audit logs', enabled: true },
+      { name: 'Triage Reports', description: 'Access and submit triage reports', enabled: true },
+      { name: 'Due Diligence Reports', description: 'Access and submit due diligence reports', enabled: true },
     ],
     limits: { triageReports: 'Unlimited' as string | number, ddReports: 'Unlimited' as string | number },
   },
@@ -128,6 +130,8 @@ const INITIAL_ROLE_PERMISSIONS = {
       { name: 'Billing & Costs', description: 'View and manage costs', enabled: false },
       { name: 'API Access', description: 'Limited API access', enabled: true },
       { name: 'Audit Logs', description: 'View system audit logs', enabled: false },
+      { name: 'Triage Reports', description: 'Access and submit triage reports', enabled: true },
+      { name: 'Due Diligence Reports', description: 'Access and submit due diligence reports', enabled: true },
     ],
     limits: { triageReports: 25 as string | number, ddReports: 5 as string | number },
   },
@@ -145,6 +149,8 @@ const INITIAL_ROLE_PERMISSIONS = {
       { name: 'Billing & Costs', description: 'View and manage costs', enabled: false },
       { name: 'API Access', description: 'No API access', enabled: false },
       { name: 'Audit Logs', description: 'View system audit logs', enabled: false },
+      { name: 'Triage Reports', description: 'Access and submit triage reports', enabled: false },
+      { name: 'Due Diligence Reports', description: 'Access and submit due diligence reports', enabled: false },
     ],
     limits: { triageReports: 10 as string | number, ddReports: 2 as string | number },
   },
@@ -1447,6 +1453,11 @@ export default function UserManagementPage() {
                             </div>
                           </TableCell>
                           <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1">
+                            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => handleOpenEditUser(user)}>
+                              <Edit className="h-3.5 w-3.5" />
+                              Edit
+                            </Button>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
@@ -1487,6 +1498,7 @@ export default function UserManagementPage() {
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
