@@ -21,26 +21,29 @@ import { Badge } from '@/components/ui/badge';
 import {
   Database,
   Search,
-  Users,
-  TrendingUp,
-  BarChart,
-  Cpu,
-  DollarSign,
-  Smile,
   FileCode2,
-  Download,
   Play,
   Eye,
-  Clock,
   AlertTriangle,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
 } from 'lucide-react';
 import * as Lucide from 'lucide-react';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ExportButtons } from '@/components/evaluation/export-buttons';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { EvaluationProvider } from '@/components/evaluation/evaluation-provider';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 const queries = [
   {
@@ -123,9 +126,18 @@ const complexityColors: { [key: string]: string } = {
     Complex: 'text-destructive',
 };
 
-const SqlEditorDialog = ({ query, open, onOpenChange, onExecute }: { query?: (typeof queries)[0] | { title: string, sql: string } | null, open: boolean, onOpenChange: (open: boolean) => void, onExecute: (sql: string) => void }) => {
+type QueryResult = { columns: string[]; rows: Record<string, unknown>[] };
+
+const SqlEditorDialog = ({
+    query, open, onOpenChange, onExecute,
+}: {
+    query?: (typeof queries)[0] | { title: string; sql: string } | null;
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    onExecute: (sql: string) => void;
+}) => {
     const [sql, setSql] = useState(query?.sql || "SELECT * FROM evaluations WHERE created_at >= NOW() - INTERVAL '1 month';");
-    
+
     React.useEffect(() => {
         setSql(query?.sql || "SELECT * FROM evaluations WHERE created_at >= NOW() - INTERVAL '1 month';");
     }, [query]);
@@ -137,35 +149,37 @@ const SqlEditorDialog = ({ query, open, onOpenChange, onExecute }: { query?: (ty
                     <DialogTitle>{query?.title || 'SQL Query Editor'}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
-                    <Textarea 
-                        placeholder="SELECT * FROM evaluations..." 
-                        rows={10} 
+                    <Textarea
+                        placeholder="SELECT * FROM evaluations..."
+                        rows={10}
                         className="font-mono"
                         value={sql}
                         onChange={(e) => setSql(e.target.value)}
                     />
                     <Alert variant="default" className="bg-warning/10 border-warning/50 text-warning-foreground">
                         <AlertTriangle className="h-4 w-4 !text-warning" />
-                        <CardTitle className="text-base text-warning">Cost Optimization Tips:</CardTitle>
+                        <AlertTitle className="text-warning">Cost Optimization Tips:</AlertTitle>
                         <AlertDescription className="text-warning/80">
                             <ul className="list-disc list-inside text-xs space-y-1 mt-2">
-                            <li>Use LIMIT clauses to reduce result set size</li>
-                            <li>Add WHERE conditions to filter data early</li>
-                            <li>Use indexes on frequently queried columns</li>
-                            <li>Avoid SELECT * in production queries</li>
+                                <li>Use LIMIT clauses to reduce result set size</li>
+                                <li>Add WHERE conditions to filter data early</li>
+                                <li>Use indexes on frequently queried columns</li>
+                                <li>Avoid SELECT * in production queries</li>
                             </ul>
                         </AlertDescription>
                     </Alert>
-                    <p className="text-sm text-muted-foreground">Estimated cost: $0.05 | Estimated time: 2-5 seconds</p>
+                    <p className="text-sm text-muted-foreground">Only SELECT queries are permitted.</p>
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-                    <Button onClick={() => onExecute(sql)}><Play className="mr-2" /> Execute Query</Button>
+                    <Button onClick={() => { onExecute(sql); onOpenChange(false); }}>
+                        <Play className="mr-2" /> Execute Query
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
-    )
-}
+    );
+};
 
 const QueryCard = ({ query, onExecute, onViewSql }: { query: (typeof queries)[0], onExecute: (q: any) => void, onViewSql: (q: any) => void }) => {
   const Icon = (Lucide as any)[query.icon] || Database;
@@ -222,27 +236,74 @@ export default function DatabaseSearchPage() {
   const [category, setCategory] = useState('all');
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [selectedQuery, setSelectedQuery] = useState<(typeof queries)[0] | { title: string, sql: string } | null>(null);
+  const [result, setResult] = useState<QueryResult | null>(null);
+  const [queryError, setQueryError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [execLabel, setExecLabel] = useState<string | null>(null);
+  const [execTime, setExecTime] = useState<number | null>(null);
   const { toast } = useToast();
 
-  const handleExecute = (query: { title: string }) => {
-      toast({
-          title: "Executing Query",
-          description: `Running "${query.title}"...`
+  const runQuery = async (sql: string, label: string) => {
+    setLoading(true);
+    setResult(null);
+    setQueryError(null);
+    setExecLabel(label);
+    setExecTime(null);
+
+    const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+    const t0 = performance.now();
+
+    try {
+      const res = await fetch('/api/database/query', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ query: sql }),
       });
-  }
-  
-  const handleViewSql = (query: (typeof queries)[0]) => {
-      setSelectedQuery(query);
-      setDialogOpen(true);
-  }
+
+      const elapsed = Math.round(performance.now() - t0);
+      setExecTime(elapsed);
+      const data = await res.json();
+
+      if (!res.ok) {
+        setQueryError(data.error || `Server returned ${res.status}`);
+        toast({ title: 'Query Failed', description: data.error || `Error ${res.status}`, variant: 'destructive' });
+        return;
+      }
+
+      setResult(data);
+      toast({ title: 'Query Completed', description: `${data.rows?.length ?? 0} row(s) returned in ${elapsed} ms.` });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      setQueryError(msg);
+      toast({ title: 'Query Error', description: msg, variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExecute = (q: { title: string; sql: string }) => {
+    runQuery(q.sql, q.title);
+  };
+
+  const handleViewSql = (q: (typeof queries)[0]) => {
+    setSelectedQuery(q);
+    setDialogOpen(true);
+  };
 
   const handleExecuteCustom = (sql: string) => {
-      toast({
-          title: "Executing Custom Query",
-          description: `Running your custom SQL command.`
-      });
-      setDialogOpen(false);
-  }
+    runQuery(sql, 'Custom Query');
+  };
+
+  const handleCopyResult = () => {
+    if (!result) return;
+    const header = result.columns.join('\t');
+    const rows = result.rows.map(r => result.columns.map(c => String(r[c] ?? '')).join('\t')).join('\n');
+    navigator.clipboard.writeText(`${header}\n${rows}`);
+    toast({ title: 'Copied', description: 'Result copied to clipboard as TSV.' });
+  };
 
   const filteredQueries = queries.filter((q) => {
     const searchMatch =
@@ -266,7 +327,7 @@ export default function DatabaseSearchPage() {
             <div>
             <h1 className="text-2xl font-semibold flex items-center gap-2">
                 <Database className="text-primary" />
-                Database Search & Data Mining
+                Database Search &amp; Data Mining
             </h1>
             <p className="text-muted-foreground">
                 Advanced SQL queries and data analysis with cost optimization
@@ -276,7 +337,6 @@ export default function DatabaseSearchPage() {
             <Button variant="outline" onClick={() => { setSelectedQuery({title: "SQL Query Editor", sql: "SELECT * FROM evaluations WHERE created_at >= NOW() - INTERVAL '1 month';"}); setDialogOpen(true); }}>
                     <FileCode2 className="mr-2" /> SQL Editor
             </Button>
-            <ExportButtons />
             </div>
         </header>
 
@@ -299,7 +359,7 @@ export default function DatabaseSearchPage() {
                 <SelectItem value="User Metrics">User Metrics</SelectItem>
                 <SelectItem value="AI/ML Analysis">AI/ML Analysis</SelectItem>
                 <SelectItem value="Cost & Performance">
-                Cost & Performance
+                Cost &amp; Performance
                 </SelectItem>
             </SelectContent>
             </Select>
@@ -317,6 +377,77 @@ export default function DatabaseSearchPage() {
                     <p>Try adjusting your search or filter criteria.</p>
                 </div>
             )}
+
+        {/* ===== RESULTS SECTION ===== */}
+        {loading && (
+          <Card className="mt-8">
+            <CardContent className="flex items-center justify-center gap-3 py-12">
+              <Loader2 className="size-6 animate-spin text-primary" />
+              <span className="text-sm text-muted-foreground">Running <strong>{execLabel}</strong>…</span>
+            </CardContent>
+          </Card>
+        )}
+
+        {queryError && !loading && (
+          <Alert variant="destructive" className="mt-8">
+            <AlertCircle className="size-4" />
+            <AlertTitle>Query Error</AlertTitle>
+            <AlertDescription className="font-mono text-sm">{queryError}</AlertDescription>
+          </Alert>
+        )}
+
+        {result && !loading && (
+          <Card className="mt-8">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <CheckCircle2 className="size-4 text-green-500 shrink-0" />
+                <CardTitle className="text-sm">{execLabel} — Results</CardTitle>
+                <Badge variant="secondary" className="ml-auto">
+                  {result.rows.length} row{result.rows.length !== 1 ? 's' : ''}
+                </Badge>
+                {execTime !== null && (
+                  <span className="text-xs text-muted-foreground">{execTime} ms</span>
+                )}
+                <Button variant="ghost" size="sm" onClick={handleCopyResult}>
+                  Copy as TSV
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {result.columns.length === 0 ? (
+                <p className="px-6 py-4 text-sm text-muted-foreground">Query returned no rows.</p>
+              ) : (
+                <ScrollArea className="w-full">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        {result.columns.map((col) => (
+                          <TableHead key={col} className="whitespace-nowrap text-xs font-semibold">
+                            {col}
+                          </TableHead>
+                        ))}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {result.rows.map((row, i) => (
+                        <TableRow key={i}>
+                          {result.columns.map((col) => (
+                            <TableCell key={col} className="whitespace-nowrap text-xs font-mono max-w-[240px] truncate">
+                              {row[col] === null || row[col] === undefined
+                                ? <span className="text-muted-foreground italic">NULL</span>
+                                : String(row[col])}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  <ScrollBar orientation="horizontal" />
+                </ScrollArea>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
       <SqlEditorDialog 
         query={selectedQuery}
