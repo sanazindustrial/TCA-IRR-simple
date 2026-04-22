@@ -152,6 +152,55 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // Strategy 1h: Server-side Office extraction (PPTX, DOCX, XLSX) — pure Node.js, no backend needed
+      if (!text) {
+        const lower = filename.toLowerCase();
+        try {
+          if (lower.endsWith('.pptx') || lower.endsWith('.ppt')) {
+            // PPTX is a ZIP — extract text from ppt/slides/slide*.xml
+            const AdmZip = (await import('adm-zip')).default;
+            const buf = Buffer.from(await file.arrayBuffer());
+            const zip = new AdmZip(buf);
+            const slideEntries = zip.getEntries()
+              .filter(e => /^ppt\/slides\/slide\d+\.xml$/.test(e.entryName))
+              .sort((a, b) => a.entryName.localeCompare(b.entryName));
+            const parts: string[] = [];
+            for (const entry of slideEntries) {
+              const xml = entry.getData().toString('utf-8');
+              const matches = xml.match(/<a:t[^>]*>([^<]+)<\/a:t>/g) ?? [];
+              const txt = matches.map(m => m.replace(/<[^>]+>/g, '')).filter(Boolean).join(' ');
+              if (txt.trim()) parts.push(txt.trim());
+            }
+            text = parts.join('\n\n') || null;
+          } else if (lower.endsWith('.docx') || lower.endsWith('.doc')) {
+            // DOCX is a ZIP — extract text from word/document.xml
+            const AdmZip = (await import('adm-zip')).default;
+            const buf = Buffer.from(await file.arrayBuffer());
+            const zip = new AdmZip(buf);
+            const docEntry = zip.getEntry('word/document.xml');
+            if (docEntry) {
+              const xml = docEntry.getData().toString('utf-8');
+              const matches = xml.match(/<w:t[^>]*>([^<]*)<\/w:t>/g) ?? [];
+              const joined = matches.map(m => m.replace(/<[^>]+>/g, '')).filter(Boolean).join(' ');
+              text = joined || null;
+            }
+          } else if (lower.endsWith('.xlsx') || lower.endsWith('.xls')) {
+            // XLSX — use the xlsx package
+            const XLSX = await import('xlsx');
+            const buf = Buffer.from(await file.arrayBuffer());
+            const wb = XLSX.read(buf, { type: 'buffer' });
+            const parts: string[] = [];
+            for (const name of wb.SheetNames) {
+              const csv = XLSX.utils.sheet_to_csv(wb.Sheets[name]);
+              if (csv.trim()) parts.push(`Sheet: ${name}\n${csv}`);
+            }
+            text = parts.join('\n\n') || null;
+          }
+        } catch {
+          // ignore — fall through to empty result
+        }
+      }
+
     } else if (contentType.includes('application/json')) {
       // ── Strategy 2: JSON body (base64 or text) ────────────────────────────
       const body = await req.json() as {
