@@ -1,9 +1,21 @@
 """API v1 router initialization"""
 
+import logging
+
 from fastapi import APIRouter
 from .endpoints import (auth, users, companies, analysis, investments, admin,
                         tca, dashboard, ssd, settings, creports, cost,
-                        external_sources, api_routes, roles, ml)
+                        external_sources, api_routes, roles)
+
+_logger = logging.getLogger(__name__)
+
+# ML router is optional – import failures must not crash the whole backend
+try:
+    from .endpoints import ml as _ml_module
+    _ml_router = _ml_module.router
+except Exception as _ml_err:  # pragma: no cover
+    _ml_router = None
+    _logger.warning("ML endpoints could not be loaded: %s", _ml_err)
 
 api_router = APIRouter()
 
@@ -73,4 +85,5 @@ api_router.include_router(api_routes.records_router,
                           prefix="/records",
                           tags=["Records"])
 api_router.include_router(api_routes.api_health_router, tags=["API Health"])
-api_router.include_router(ml.router, prefix="/ml", tags=["Machine Learning"])
+if _ml_router is not None:
+    api_router.include_router(_ml_router, prefix="/ml", tags=["Machine Learning"])
