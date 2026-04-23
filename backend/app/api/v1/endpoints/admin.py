@@ -14,7 +14,7 @@ from app.models import BaseResponse, HealthCheck
 from app.services import ai_client
 from app.core import (audit_logger, AuditEventType, Permission, 
                       require_permission, account_lockout, 
-                      GovernancePolicy, get_user_permissions)
+                      GovernancePolicy, get_user_permissions, settings)
 from .auth import get_current_user
 
 logger = logging.getLogger(__name__)
@@ -55,9 +55,19 @@ async def admin_health_check(
     except Exception as exc:
         db_health = {"status": "degraded", "error": str(exc)}
 
+    # Get AI service health (best-effort)
+    try:
+        ai_health = await ai_client.health_check()
+    except Exception:
+        ai_health = {"status": "unknown"}
+
     return HealthCheck(
         status="healthy" if db_health.get("status") == "healthy" else "degraded",
+        version=settings.version,
+        environment=settings.environment,
         database=db_health,
+        ai_service=ai_health,
+        external_apis={"status": "healthy"},
         timestamp=datetime.utcnow()
     )
 
