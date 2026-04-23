@@ -1,6 +1,13 @@
 
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import {
+  saveConfigVersion,
+  getLatestConfig,
+  getVersionHistory,
+  type ConfigVersion,
+} from '@/lib/module-config-service';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -12,7 +19,9 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Lock, SlidersHorizontal, Info, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Lock, SlidersHorizontal, Info, RotateCcw, Save } from 'lucide-react';
+
+const MODULE_KEY = 'growth';
 import Link from 'next/link';
 import {
   Table,
@@ -103,6 +112,37 @@ export default function GrowthClassifierConfigPage() {
     const [tier2Threshold, setTier2Threshold] = useState(40);
     const [factorScores, setFactorScores] = useState(initialFactorScores);
     const [alpha, setAlpha] = useState(0.7);
+    const [versionHistory, setVersionHistory] = useState<ConfigVersion[]>([]);
+    const [currentVersion, setCurrentVersion] = useState<number | null>(null);
+    const { toast } = useToast();
+
+    useEffect(() => {
+        const saved = getLatestConfig<{ isActive: boolean; tier1Threshold: number; tier2Threshold: number; factorScores: typeof initialFactorScores; alpha: number }>(MODULE_KEY);
+        if (saved) {
+            if (saved.isActive !== undefined) setIsActive(saved.isActive);
+            if (saved.tier1Threshold !== undefined) setTier1Threshold(saved.tier1Threshold);
+            if (saved.tier2Threshold !== undefined) setTier2Threshold(saved.tier2Threshold);
+            if (saved.factorScores) setFactorScores(saved.factorScores);
+            if (saved.alpha !== undefined) setAlpha(saved.alpha);
+        }
+        const history = getVersionHistory(MODULE_KEY);
+        setVersionHistory(history);
+        if (history.length > 0) setCurrentVersion(history[0].version);
+    }, []);
+
+    const handleSaveConfig = () => {
+        const config = { isActive, tier1Threshold, tier2Threshold, factorScores, alpha };
+        const storedUser = typeof window !== 'undefined' ? localStorage.getItem('loggedInUser') : null;
+        const userEmail = storedUser ? JSON.parse(storedUser).email : undefined;
+        const ver = saveConfigVersion(MODULE_KEY, config, {
+            label: `v${versionHistory.length + 1} - Manual Save`,
+            savedBy: userEmail,
+        });
+        const history = getVersionHistory(MODULE_KEY);
+        setVersionHistory(history);
+        setCurrentVersion(ver);
+        toast({ title: 'Configuration Saved', description: `Version ${ver} saved successfully.` });
+    };
 
     const handleFactorScoreChange = (modelId: string, factorId: string, value: string) => {
         const newScores = { ...factorScores };
@@ -286,7 +326,7 @@ export default function GrowthClassifierConfigPage() {
 
             <Card className="mt-8">
                 <CardFooter className="p-4 flex justify-end">
-                    <Button>Save Configuration</Button>
+                    <Button onClick={handleSaveConfig} className="gap-2"><Save className="size-4" /> Save Configuration</Button>
                 </CardFooter>
             </Card>
         </div>

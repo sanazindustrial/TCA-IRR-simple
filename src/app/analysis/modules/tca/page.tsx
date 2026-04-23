@@ -1,6 +1,14 @@
 
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import {
+  saveConfigVersion,
+  getLatestConfig,
+  getVersionHistory,
+  clearConfigVersions,
+  type ConfigVersion,
+} from '@/lib/module-config-service';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -19,7 +27,9 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { ArrowLeft, Plus, RotateCcw, Trash2, Calculator } from 'lucide-react';
+import { ArrowLeft, Plus, RotateCcw, Trash2, Calculator, Save } from 'lucide-react';
+
+const MODULE_KEY = 'tca';
 import Link from 'next/link';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -89,6 +99,36 @@ export default function TcaConfigPage() {
     const [newCategoryName, setNewCategoryName] = useState('');
     const [formula, setFormula] = useState(initialFormula);
     const [example, setExample] = useState(initialExample);
+    const [versionHistory, setVersionHistory] = useState<ConfigVersion[]>([]);
+    const [currentVersion, setCurrentVersion] = useState<number | null>(null);
+    const { toast } = useToast();
+
+    useEffect(() => {
+        const saved = getLatestConfig<{ categories: Category[]; scoringLogic: typeof initialScoringLogic; formula: string; example: string }>(MODULE_KEY);
+        if (saved) {
+            if (saved.categories) setCategories(saved.categories);
+            if (saved.scoringLogic) setScoringLogic(saved.scoringLogic);
+            if (saved.formula) setFormula(saved.formula);
+            if (saved.example) setExample(saved.example);
+        }
+        const history = getVersionHistory(MODULE_KEY);
+        setVersionHistory(history);
+        if (history.length > 0) setCurrentVersion(history[0].version);
+    }, []);
+
+    const handleSaveConfig = () => {
+        const config = { categories, scoringLogic, formula, example };
+        const storedUser = typeof window !== 'undefined' ? localStorage.getItem('loggedInUser') : null;
+        const userEmail = storedUser ? JSON.parse(storedUser).email : undefined;
+        const ver = saveConfigVersion(MODULE_KEY, config, {
+            label: `v${versionHistory.length + 1} - Manual Save`,
+            savedBy: userEmail,
+        });
+        const history = getVersionHistory(MODULE_KEY);
+        setVersionHistory(history);
+        setCurrentVersion(ver);
+        toast({ title: 'Configuration Saved', description: `Version ${ver} saved successfully.` });
+    };
 
     const handleWeightChange = (id: string, value: string, type: 'general' | 'medtech') => {
         const numValue = parseFloat(value) || 0;
@@ -346,7 +386,7 @@ export default function TcaConfigPage() {
             </div>
             <Card className="mt-8">
                 <CardFooter className="p-4 flex justify-end">
-                    <Button>Save Configuration</Button>
+                    <Button onClick={handleSaveConfig} className="gap-2"><Save className="size-4" /> Save Configuration</Button>
                 </CardFooter>
             </Card>
         </div>

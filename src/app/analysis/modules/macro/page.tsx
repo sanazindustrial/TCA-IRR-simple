@@ -4,9 +4,18 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Plus, Trash2, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, RotateCcw, Save } from 'lucide-react';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import {
+  saveConfigVersion,
+  getLatestConfig,
+  getVersionHistory,
+  type ConfigVersion,
+} from '@/lib/module-config-service';
+
+const MODULE_KEY = 'macro';
 import {
   Select,
   SelectContent,
@@ -61,6 +70,36 @@ export default function MacroTrendConfigPage() {
   const [overlayWeight, setOverlayWeight] = useState(5);
   const [sectorWeights, setSectorWeights] = useState(initialSectorWeights);
   const [evidenceRequired, setEvidenceRequired] = useState(true);
+  const [versionHistory, setVersionHistory] = useState<ConfigVersion[]>([]);
+  const [currentVersion, setCurrentVersion] = useState<number | null>(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const saved = getLatestConfig<{ pestelSources: typeof initialPestelSources; overlayWeight: number; sectorWeights: typeof initialSectorWeights; evidenceRequired: boolean }>(MODULE_KEY);
+    if (saved) {
+      if (saved.pestelSources) setPestelSources(saved.pestelSources);
+      if (saved.overlayWeight !== undefined) setOverlayWeight(saved.overlayWeight);
+      if (saved.sectorWeights) setSectorWeights(saved.sectorWeights);
+      if (saved.evidenceRequired !== undefined) setEvidenceRequired(saved.evidenceRequired);
+    }
+    const history = getVersionHistory(MODULE_KEY);
+    setVersionHistory(history);
+    if (history.length > 0) setCurrentVersion(history[0].version);
+  }, []);
+
+  const handleSaveConfig = () => {
+    const config = { pestelSources, overlayWeight, sectorWeights, evidenceRequired };
+    const storedUser = typeof window !== 'undefined' ? localStorage.getItem('loggedInUser') : null;
+    const userEmail = storedUser ? JSON.parse(storedUser).email : undefined;
+    const ver = saveConfigVersion(MODULE_KEY, config, {
+      label: `v${versionHistory.length + 1} - Manual Save`,
+      savedBy: userEmail,
+    });
+    const history = getVersionHistory(MODULE_KEY);
+    setVersionHistory(history);
+    setCurrentVersion(ver);
+    toast({ title: 'Configuration Saved', description: `Version ${ver} saved successfully.` });
+  };
 
   const currentJsonConfig = generateJsonConfig({
     overlayWeight,
@@ -243,7 +282,7 @@ export default function MacroTrendConfigPage() {
       </div>
       <Card className="mt-8">
         <CardFooter className="p-4 flex justify-end">
-            <Button>Save Configuration</Button>
+            <Button onClick={handleSaveConfig} className="gap-2"><Save className="size-4" /> Save Configuration</Button>
         </CardFooter>
       </Card>
     </div>

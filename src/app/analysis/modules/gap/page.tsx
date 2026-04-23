@@ -1,6 +1,6 @@
 
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -22,8 +22,17 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Edit, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Edit, RotateCcw, Save } from 'lucide-react';
 import Link from 'next/link';
+import { useToast } from '@/hooks/use-toast';
+import {
+  saveConfigVersion,
+  getLatestConfig,
+  getVersionHistory,
+  type ConfigVersion,
+} from '@/lib/module-config-service';
+
+const MODULE_KEY = 'gap';
 
 const initialTargets = {
     tech: {
@@ -111,6 +120,38 @@ export default function GapAnalysisConfigPage() {
     const [readinessRules, setReadinessRules] = useState(initialReadinessRules);
     const [showMinorGaps, setShowMinorGaps] = useState(true);
     const [requireMitigation, setRequireMitigation] = useState(true);
+    const [versionHistory, setVersionHistory] = useState<ConfigVersion[]>([]);
+    const [currentVersion, setCurrentVersion] = useState<number | null>(null);
+    const { toast } = useToast();
+
+    useEffect(() => {
+        const saved = getLatestConfig<{ targets: typeof initialTargets; weights: typeof initialWeights; severityThresholds: typeof initialSeverityThresholds; readinessRules: typeof initialReadinessRules; showMinorGaps: boolean; requireMitigation: boolean }>(MODULE_KEY);
+        if (saved) {
+            if (saved.targets) setTargets(saved.targets);
+            if (saved.weights) setWeights(saved.weights);
+            if (saved.severityThresholds) setSeverityThresholds(saved.severityThresholds);
+            if (saved.readinessRules) setReadinessRules(saved.readinessRules);
+            if (saved.showMinorGaps !== undefined) setShowMinorGaps(saved.showMinorGaps);
+            if (saved.requireMitigation !== undefined) setRequireMitigation(saved.requireMitigation);
+        }
+        const history = getVersionHistory(MODULE_KEY);
+        setVersionHistory(history);
+        if (history.length > 0) setCurrentVersion(history[0].version);
+    }, []);
+
+    const handleSaveConfig = () => {
+        const config = { targets, weights, severityThresholds, readinessRules, showMinorGaps, requireMitigation };
+        const storedUser = typeof window !== 'undefined' ? localStorage.getItem('loggedInUser') : null;
+        const userEmail = storedUser ? JSON.parse(storedUser).email : undefined;
+        const ver = saveConfigVersion(MODULE_KEY, config, {
+            label: `v${versionHistory.length + 1} - Manual Save`,
+            savedBy: userEmail,
+        });
+        const history = getVersionHistory(MODULE_KEY);
+        setVersionHistory(history);
+        setCurrentVersion(ver);
+        toast({ title: 'Configuration Saved', description: `Version ${ver} saved successfully.` });
+    };
 
     const handleTargetChange = (sector: 'tech' | 'med_life', category: string, value: string) => {
         const newTargets = { ...targets };
@@ -301,7 +342,7 @@ export default function GapAnalysisConfigPage() {
             </div>
             <Card className="mt-8">
                 <CardFooter className="p-4 flex justify-end">
-                    <Button>Save Configuration</Button>
+                    <Button onClick={handleSaveConfig} className="gap-2"><Save className="size-4" /> Save Configuration</Button>
                 </CardFooter>
             </Card>
         </div>

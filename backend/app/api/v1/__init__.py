@@ -12,7 +12,7 @@ api_router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 api_router.include_router(users.router, prefix="/users", tags=["Users"])
 api_router.include_router(roles.router, tags=["Role Configuration"])
 api_router.include_router(settings.router, tags=["Settings"])
-api_router.include_router(reports.router, tags=["Reports"])
+api_router.include_router(creports.router, tags=["Reports"])
 api_router.include_router(companies.router,
                           prefix="/companies",
                           tags=["Companies"])

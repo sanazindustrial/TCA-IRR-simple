@@ -32,23 +32,29 @@ def require_admin(current_user: dict = Depends(get_current_user)):
 @router.get("/health", response_model=HealthCheck)
 async def admin_health_check(
     request: Request,
-    current_user: dict = Depends(require_admin),
-    db: asyncpg.Connection = Depends(get_db)
+    current_user: dict = Depends(require_admin)
 ):
     """Detailed health check for administrators"""
-    # Log admin action
-    await audit_logger.log(
-        AuditEventType.ADMIN_ACTION,
-        user_id=current_user.get('id'),
-        username=current_user['username'],
-        ip_address=request.client.host if request.client else None,
-        action_details={"action": "health_check"},
-        db=db
-    )
-    
-    # Get database health
-    db_health = await db_manager.health_check()
-    
+    # Log admin action (best-effort — don't fail if DB is down)
+    try:
+        async with db_manager.acquire() as db:
+            await audit_logger.log(
+                AuditEventType.ADMIN_ACTION,
+                user_id=current_user.get('id'),
+                username=current_user['username'],
+                ip_address=request.client.host if request.client else None,
+                action_details={"action": "health_check"},
+                db=db
+            )
+    except Exception:
+        pass
+
+    # Get database health (best-effort)
+    try:
+        db_health = await db_manager.health_check()
+    except Exception as exc:
+        db_health = {"status": "degraded", "error": str(exc)}
+
     return HealthCheck(
         status="healthy" if db_health.get("status") == "healthy" else "degraded",
         database=db_health,

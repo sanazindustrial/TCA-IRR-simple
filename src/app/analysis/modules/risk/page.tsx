@@ -1,6 +1,13 @@
 
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import {
+  saveConfigVersion,
+  getLatestConfig,
+  getVersionHistory,
+  type ConfigVersion,
+} from '@/lib/module-config-service';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -20,7 +27,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ArrowLeft, AlertTriangle, RotateCcw, Plus, Trash2, GripVertical } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, RotateCcw, Plus, Trash2, GripVertical, Save } from 'lucide-react';
+
+const MODULE_KEY = 'risk';
 import Link from 'next/link';
 
 const initialRiskDomains = [
@@ -50,6 +59,34 @@ export default function RiskFlagsConfigPage() {
   const [domains, setDomains] = useState(initialRiskDomains);
   const [penalties, setPenalties] = useState(initialPenalties);
   const [newDomainName, setNewDomainName] = useState('');
+  const [versionHistory, setVersionHistory] = useState<ConfigVersion[]>([]);
+  const [currentVersion, setCurrentVersion] = useState<number | null>(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const saved = getLatestConfig<{ domains: typeof initialRiskDomains; penalties: typeof initialPenalties }>(MODULE_KEY);
+    if (saved) {
+      if (saved.domains) setDomains(saved.domains);
+      if (saved.penalties) setPenalties(saved.penalties);
+    }
+    const history = getVersionHistory(MODULE_KEY);
+    setVersionHistory(history);
+    if (history.length > 0) setCurrentVersion(history[0].version);
+  }, []);
+
+  const handleSaveConfig = () => {
+    const config = { domains, penalties };
+    const storedUser = typeof window !== 'undefined' ? localStorage.getItem('loggedInUser') : null;
+    const userEmail = storedUser ? JSON.parse(storedUser).email : undefined;
+    const ver = saveConfigVersion(MODULE_KEY, config, {
+      label: `v${versionHistory.length + 1} - Manual Save`,
+      savedBy: userEmail,
+    });
+    const history = getVersionHistory(MODULE_KEY);
+    setVersionHistory(history);
+    setCurrentVersion(ver);
+    toast({ title: 'Configuration Saved', description: `Version ${ver} saved successfully.` });
+  };
 
   const totalTechWeight = domains.reduce((sum, d) => sum + d.techWeight, 0);
   const totalMedWeight = domains.reduce((sum, d) => sum + d.medWeight, 0);
@@ -233,7 +270,7 @@ export default function RiskFlagsConfigPage() {
                             <Button variant="outline" size="sm" onClick={() => handleNormalize('med')} disabled={totalMedWeight === 100}>Normalize</Button>
                         </div>
                     </div>
-                    <Button>Save Configuration</Button>
+                    <Button onClick={handleSaveConfig} className="gap-2"><Save className="size-4" /> Save Configuration</Button>
                 </CardFooter>
             </Card>
         </div>
