@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -18,6 +18,9 @@ import {
   Trash2,
   Pause,
   Clock,
+  RefreshCw,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 import {
   Table,
@@ -102,7 +105,46 @@ export default function BackupPage() {
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [newJobName, setNewJobName] = useState('');
   const [newJobSchedule, setNewJobSchedule] = useState('Daily at 2:00 AM');
+  const [isLoading, setIsLoading] = useState(true);
+  const [backendAvailable, setBackendAvailable] = useState<boolean | null>(null);
+  const [lastChecked, setLastChecked] = useState<string>('');
   const { toast } = useToast();
+
+  const fetchBackupStatus = async () => {
+    setIsLoading(true);
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+      const res = await fetch('/api/backup', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        cache: 'no-store',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.source === 'backend' && Array.isArray(data.jobs) && data.jobs.length > 0) {
+          setJobs(data.jobs);
+          setBackendAvailable(true);
+        } else {
+          // Endpoint responded but no jobs yet or fallback – keep static jobs as baseline
+          setBackendAvailable(data.dbHealthy ?? false);
+        }
+        setLastChecked(new Date().toLocaleTimeString());
+      } else {
+        setBackendAvailable(false);
+      }
+    } catch {
+      setBackendAvailable(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBackupStatus();
+    // Refresh every 60 seconds to catch status changes
+    const interval = setInterval(fetchBackupStatus, 60_000);
+    return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleCreateJob = () => {
     if (newJobName.trim()) {
@@ -130,36 +172,43 @@ export default function BackupPage() {
     }
   };
 
-  const handleAction = (
+  const handleAction = async (
     jobId: string,
     action: 'run' | 'pause' | 'delete'
   ) => {
+    // Optimistic local update first
     if (action === 'delete') {
       setJobs((prev) => prev.filter((j) => j.id !== jobId));
-      toast({
-        variant: 'destructive',
-        title: 'Job Deleted',
-        description: 'The backup job has been removed.',
-      });
+      toast({ variant: 'destructive', title: 'Job Deleted', description: 'The backup job has been removed.' });
     } else {
       setJobs((prev) =>
         prev.map((j) => {
           if (j.id === jobId) {
             const newStatus =
-              action === 'run'
-                ? 'Running'
-                : j.status === 'Paused'
-                ? 'Completed'
-                : 'Paused';
-            toast({
-              title: `Job ${newStatus}`,
-              description: `Job "${j.name}" is now ${newStatus.toLowerCase()}.`,
-            });
+              action === 'run' ? 'Running' : j.status === 'Paused' ? 'Completed' : 'Paused';
+            toast({ title: `Job ${newStatus}`, description: `Job "${j.name}" is now ${newStatus.toLowerCase()}.` });
             return { ...j, status: newStatus };
           }
           return j;
         })
       );
+    }
+
+    // Attempt to sync with backend (best-effort, non-blocking)
+    if (backendAvailable) {
+      try {
+        const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+        await fetch('/api/backup', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ jobId, action }),
+        });
+      } catch {
+        // Ignore – local state is already updated
+      }
     }
   };
 
@@ -174,8 +223,22 @@ export default function BackupPage() {
           <p className="text-muted-foreground">
             Manage automated backups and data consistency.
           </p>
+          <div className="flex items-center gap-2 mt-1">
+            {backendAvailable === null ? (
+              <Badge variant="secondary" className="text-xs gap-1"><Clock className="size-3"/> Connecting...</Badge>
+            ) : backendAvailable ? (
+              <Badge variant="success" className="text-xs gap-1"><Wifi className="size-3"/> Backend Connected</Badge>
+            ) : (
+              <Badge variant="destructive" className="text-xs gap-1"><WifiOff className="size-3"/> Backend Offline — showing cached data</Badge>
+            )}
+            {lastChecked && <span className="text-xs text-muted-foreground">Last checked: {lastChecked}</span>}
+          </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={fetchBackupStatus} disabled={isLoading}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
           <Button variant="outline">
             <Upload className="mr-2" /> Import
           </Button>

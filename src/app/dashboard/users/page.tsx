@@ -390,7 +390,16 @@ export default function UserManagementPage() {
   const loadRoleConfigurations = useCallback(async () => {
     setIsLoadingRoles(true);
     try {
-      const data = await RolesApi.getConfigurations();
+      let data = await RolesApi.getConfigurations();
+      // If the DB tables don't exist yet, initialize them (admin only) and reload
+      if (data.fromDefaults && isAdmin) {
+        try {
+          await RolesApi.initializeConfigurations();
+          data = await RolesApi.getConfigurations();
+        } catch (initError) {
+          console.warn('Could not auto-initialize role configuration tables:', initError);
+        }
+      }
       if (data.roles) {
         // Helper to convert API permissions to local format
         const convertPermissions = (perms: { name: string; description?: string; enabled: boolean }[]) =>
@@ -448,7 +457,7 @@ export default function UserManagementPage() {
     } finally {
       setIsLoadingRoles(false);
     }
-  }, []);
+  }, [isAdmin]);
 
   // Load role configurations on mount
   useEffect(() => {

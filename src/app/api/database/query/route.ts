@@ -37,13 +37,42 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // Forward cookies so the backend CSRF middleware can validate the token.
+        // Many Python backends (FastAPI-CSRF-Protect, Django, Flask-WTF) use the
+        // "double-submit cookie" pattern: the token stored in the cookie must also
+        // be present in an X-CSRFToken (or similar) request header.
+        const cookieHeader = request.headers.get('cookie') ?? '';
+
+        const extractCsrfToken = (cookies: string): string => {
+            const patterns = [
+                /fastapi-csrf-token=([^;]+)/i,
+                /csrf[-_]token=([^;]+)/i,
+                /csrftoken=([^;]+)/i,
+                /x-csrf-token=([^;]+)/i,
+            ];
+            for (const pattern of patterns) {
+                const m = cookies.match(pattern);
+                if (m) return decodeURIComponent(m[1]);
+            }
+            return '';
+        };
+        const csrfToken = extractCsrfToken(cookieHeader);
+
+        const backendHeaders: Record<string, string> = {
+            'Content-Type': 'application/json',
+            'Authorization': authHeader,
+            'X-Requested-With': 'XMLHttpRequest',
+        };
+        if (cookieHeader) backendHeaders['Cookie'] = cookieHeader;
+        if (csrfToken) {
+            backendHeaders['X-CSRFToken'] = csrfToken;
+            backendHeaders['X-CSRF-Token'] = csrfToken;
+        }
+
         // Proxy to backend
         const backendResponse = await fetch(`${BACKEND_URL}/api/v1/admin/database/query`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': authHeader,
-            },
+            headers: backendHeaders,
             body: JSON.stringify({ query }),
             signal: AbortSignal.timeout(30000),
         });

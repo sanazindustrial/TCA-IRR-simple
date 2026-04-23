@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 from .endpoints import (auth, users, companies, analysis, investments, admin,
-                        tca, dashboard, ssd, settings, reports, cost,
+                        tca, dashboard, ssd, settings, creports, cost,
                         external_sources, api_routes, roles)
 
 api_router = APIRouter()

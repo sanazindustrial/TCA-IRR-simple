@@ -44,8 +44,14 @@ import {
     Play,
     History,
     Layers,
-    SlidersHorizontal
+    SlidersHorizontal,
+    ExternalLink,
+    FlaskConical,
+    Loader2,
+    Info,
 } from 'lucide-react';
+import Link from 'next/link';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
     settingsApi,
     SettingsVersion,
@@ -68,6 +74,11 @@ export default function ModuleSettingsPage() {
     const [editingModule, setEditingModule] = useState<string | null>(null);
     const [editingCategory, setEditingCategory] = useState<number | null>(null);
     const [isMounted, setIsMounted] = useState(false);
+    const [showWhatIfDialog, setShowWhatIfDialog] = useState(false);
+    const [whatIfCompany, setWhatIfCompany] = useState('');
+    const [whatIfScores, setWhatIfScores] = useState<Record<string, number>>({});
+    const [whatIfResult, setWhatIfResult] = useState<{ tca_score: number; module_scores: Record<string, number> } | null>(null);
+    const [isRunningSimulation, setIsRunningSimulation] = useState(false);
 
     const { toast } = useToast();
 
@@ -339,7 +350,29 @@ export default function ModuleSettingsPage() {
         }
     };
 
-    // Calculate totals
+    const handleRunWhatIf = async () => {
+        if (!selectedVersion) return;
+        setIsRunningSimulation(true);
+        setWhatIfResult(null);
+        try {
+            const result = await settingsApi.runSimulation({
+                settings_version_id: selectedVersion.id,
+                company_name: whatIfCompany || undefined,
+                adjusted_scores: whatIfScores,
+            });
+            if (result) {
+                setWhatIfResult({ tca_score: result.tca_score, module_scores: result.module_scores });
+                await loadSimulationHistory();
+                toast({ title: 'Simulation Complete', description: `TCA Score: ${result.tca_score?.toFixed(2)}/10` });
+            }
+        } catch {
+            toast({ title: 'Simulation Failed', description: 'Could not run simulation. Check backend connectivity.', variant: 'destructive' });
+        } finally {
+            setIsRunningSimulation(false);
+        }
+    };
+
+    // Calculate totals (kept for informational display)
     const totalModuleWeight = selectedVersion?.module_settings
         ?.filter(m => m.is_enabled)
         .reduce((sum, m) => sum + m.weight, 0) || 0;
@@ -365,21 +398,96 @@ export default function ModuleSettingsPage() {
                 <div>
                     <h1 className="text-3xl font-bold flex items-center gap-3">
                         <Settings className="h-8 w-8" />
-                        Module Settings
+                        Module Version Control
                     </h1>
                     <p className="text-muted-foreground mt-2">
-                        Configure module weights and TCA categories for simulation analysis. Changes are versioned and tracked.
+                        Save, track, and manage configuration versions for all 17 analysis modules. Use <Link href="/dashboard/evaluation/modules" className="underline text-primary">Module Configuration</Link> to edit weights and enable/disable modules.
                     </p>
                 </div>
-                <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-                    <DialogTrigger asChild>
-                        <Button>
-                            <Plus className="mr-2 h-4 w-4" />
-                            New Version
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent>
+                <div className="flex items-center gap-2">
+                    <Button onClick={() => setShowWhatIfDialog(true)} disabled={!selectedVersion}>
+                        <FlaskConical className="mr-2 h-4 w-4" />
+                        What-if Analysis
+                    </Button>
+                    {/* What-if Analysis Dialog — rendered via portal, placed here for colocation */}
+                    <Dialog open={showWhatIfDialog} onOpenChange={(open) => { setShowWhatIfDialog(open); if (!open) setWhatIfResult(null); }}>
+                    <DialogContent className="max-w-2xl">
                         <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2">
+                                <FlaskConical className="h-5 w-5" />
+                                What-if Analysis Wizard
+                            </DialogTitle>
+                            <DialogDescription>
+                                Run a simulation using the selected settings version ({selectedVersion?.version_name}). Adjust module scores to explore different scenarios.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-2 max-h-[60vh] overflow-y-auto">
+                            <div className="space-y-2">
+                                <Label htmlFor="whatif-company">Company Name (optional)</Label>
+                                <Input
+                                    id="whatif-company"
+                                    value={whatIfCompany}
+                                    onChange={(e) => setWhatIfCompany(e.target.value)}
+                                    placeholder="e.g., Acme Corp"
+                                />
+                            </div>
+                            <div>
+                                <Label className="text-sm font-medium mb-2 block">Adjust Module Scores (0–10)</Label>
+                                <p className="text-xs text-muted-foreground mb-3">Leave blank to use default weights. Adjusted values simulate alternative scoring scenarios.</p>
+                                <div className="grid grid-cols-2 gap-3">
+                                    {selectedVersion?.module_settings?.map(m => (
+                                        <div key={m.module_id} className="flex items-center gap-2">
+                                            <Label className="text-xs w-28 shrink-0">{m.module_name}</Label>
+                                            <Input
+                                                type="number"
+                                                min={0}
+                                                max={10}
+                                                step={0.1}
+                                                placeholder={`${(m.weight / 10).toFixed(1)}`}
+                                                value={whatIfScores[m.module_id] ?? ''}
+                                                onChange={(e) => setWhatIfScores(prev => ({
+                                                    ...prev,
+                                                    [m.module_id]: parseFloat(e.target.value) || 0,
+                                                }))}
+                                                className="h-8 text-sm"
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            {whatIfResult && (
+                                <div className="p-4 rounded-lg bg-green-950/30 border border-green-500/30 space-y-2">
+                                    <p className="font-semibold text-green-400">Simulation Result</p>
+                                    <p className="text-2xl font-bold">{whatIfResult.tca_score?.toFixed(2)}<span className="text-sm font-normal text-muted-foreground">/10</span></p>
+                                    <div className="grid grid-cols-3 gap-2 text-xs">
+                                        {Object.entries(whatIfResult.module_scores || {}).map(([id, score]) => (
+                                            <div key={id} className="flex justify-between bg-muted/40 rounded px-2 py-1">
+                                                <span className="text-muted-foreground">{MODULE_DEFINITIONS[id as keyof typeof MODULE_DEFINITIONS]?.name || id}</span>
+                                                <span className="font-mono font-medium">{typeof score === 'number' ? score.toFixed(1) : score}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setShowWhatIfDialog(false)}>Close</Button>
+                            <Button onClick={handleRunWhatIf} disabled={isRunningSimulation || !selectedVersion}>
+                                {isRunningSimulation ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Running…</> : <><Play className="mr-2 h-4 w-4" />Run Simulation</>}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                    <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+                        <DialogTrigger asChild>
+                            <Button variant="outline">
+                                <Plus className="mr-2 h-4 w-4" />
+                                New Version
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
                             <DialogTitle>Create New Settings Version</DialogTitle>
                             <DialogDescription>
                                 Create a new version of module settings. You can copy from an existing version or start fresh.
@@ -433,7 +541,8 @@ export default function ModuleSettingsPage() {
                             </Button>
                         </DialogFooter>
                     </DialogContent>
-                </Dialog>
+                    </Dialog>
+                </div>
             </div>
 
             <div className="grid grid-cols-12 gap-6">
@@ -525,7 +634,7 @@ export default function ModuleSettingsPage() {
                             <TabsList className="mb-4">
                                 <TabsTrigger value="modules" className="flex items-center gap-2">
                                     <SlidersHorizontal className="h-4 w-4" />
-                                    Modules (9)
+                                    Module Versions (17)
                                 </TabsTrigger>
                                 <TabsTrigger value="tca" className="flex items-center gap-2">
                                     <Layers className="h-4 w-4" />
@@ -539,35 +648,33 @@ export default function ModuleSettingsPage() {
 
                             {/* Modules Tab */}
                             <TabsContent value="modules">
+                                <Alert className="mb-4 border-blue-500/30 bg-blue-950/30 text-blue-200">
+                                    <Info className="h-4 w-4 !text-blue-400" />
+                                    <AlertDescription className="text-blue-200/80">
+                                        This view shows the module snapshot saved in this version. To edit weights, enable/disable modules, or change thresholds, use the{' '}
+                                        <Link href="/dashboard/evaluation/modules" className="underline font-medium">Module Configuration page</Link>.
+                                    </AlertDescription>
+                                </Alert>
                                 <Card>
                                     <CardHeader>
-                                        <CardTitle>Module Configuration</CardTitle>
+                                        <CardTitle>Module Version Snapshot — All 17 Modules</CardTitle>
                                         <CardDescription>
-                                            Configure weights and enable/disable modules. Total weight of enabled modules:{' '}
-                                            <span className={totalModuleWeight === 100 ? 'text-green-600' : 'text-orange-600'}>
-                                                {totalModuleWeight.toFixed(1)}%
-                                            </span>
+                                            Saved in <strong>{selectedVersion.version_name}</strong> (v{selectedVersion.version_number}). Active weight total: <span className={totalModuleWeight === 100 ? 'text-green-600' : 'text-orange-500'}>{totalModuleWeight.toFixed(1)}%</span>
                                         </CardDescription>
                                     </CardHeader>
                                     <CardContent>
                                         <Table>
                                             <TableHeader>
                                                 <TableRow>
-                                                    <TableHead className="w-[50px]">Enabled</TableHead>
                                                     <TableHead>Module</TableHead>
-                                                    <TableHead className="w-[200px]">Weight (%)</TableHead>
-                                                    <TableHead className="w-[80px] text-right">Value</TableHead>
+                                                    <TableHead className="w-[100px] text-center">Status</TableHead>
+                                                    <TableHead className="w-[100px] text-right">Weight</TableHead>
+                                                    <TableHead className="w-[80px] text-right">Version</TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
                                                 {selectedVersion.module_settings?.map((module) => (
                                                     <TableRow key={module.module_id} className={!module.is_enabled ? 'opacity-50' : ''}>
-                                                        <TableCell>
-                                                            <Switch
-                                                                checked={module.is_enabled}
-                                                                onCheckedChange={(checked) => handleModuleToggle(module.module_id, checked)}
-                                                            />
-                                                        </TableCell>
                                                         <TableCell>
                                                             <div>
                                                                 <p className="font-medium">{module.module_name}</p>
@@ -576,18 +683,17 @@ export default function ModuleSettingsPage() {
                                                                 </p>
                                                             </div>
                                                         </TableCell>
-                                                        <TableCell>
-                                                            <Slider
-                                                                value={[module.weight]}
-                                                                onValueChange={([value]) => handleModuleWeightChange(module.module_id, value)}
-                                                                max={50}
-                                                                min={0}
-                                                                step={1}
-                                                                disabled={!module.is_enabled}
-                                                            />
+                                                        <TableCell className="text-center">
+                                                            <Badge variant={module.is_enabled ? 'default' : 'secondary'}
+                                                                className={module.is_enabled ? 'bg-green-100 text-green-700' : ''}>
+                                                                {module.is_enabled ? 'Active' : 'Inactive'}
+                                                            </Badge>
                                                         </TableCell>
                                                         <TableCell className="text-right font-mono">
                                                             {module.weight.toFixed(1)}%
+                                                        </TableCell>
+                                                        <TableCell className="text-right text-xs text-muted-foreground">
+                                                            v{MODULE_DEFINITIONS[module.module_id as keyof typeof MODULE_DEFINITIONS]?.version || '—'}
                                                         </TableCell>
                                                     </TableRow>
                                                 ))}
@@ -599,11 +705,17 @@ export default function ModuleSettingsPage() {
 
                             {/* TCA Categories Tab */}
                             <TabsContent value="tca">
+                                <Alert className="mb-4 border-blue-500/30 bg-blue-950/30 text-blue-200">
+                                    <Info className="h-4 w-4 !text-blue-400" />
+                                    <AlertDescription className="text-blue-200/80">
+                                        TCA category weights are configured in <Link href="/dashboard/evaluation/modules/tca" className="underline font-medium">TCA Scorecard Configuration</Link>. This view shows the saved snapshot for this version.
+                                    </AlertDescription>
+                                </Alert>
                                 <Card>
                                     <CardHeader>
-                                        <CardTitle>TCA Categories (12 Total)</CardTitle>
+                                        <CardTitle>TCA Categories Snapshot (12 Categories)</CardTitle>
                                         <CardDescription>
-                                            Configure weights for each TCA category. Total weight of active categories:{' '}
+                                            Saved in <strong>{selectedVersion.version_name}</strong>. Active weight total:{' '}
                                             <span className={Math.abs(totalCategoryWeight - 100) < 1 ? 'text-green-600' : 'text-orange-600'}>
                                                 {totalCategoryWeight.toFixed(1)}%
                                             </span>
@@ -613,21 +725,14 @@ export default function ModuleSettingsPage() {
                                         <Table>
                                             <TableHeader>
                                                 <TableRow>
-                                                    <TableHead className="w-[50px]">Active</TableHead>
                                                     <TableHead>Category</TableHead>
-                                                    <TableHead className="w-[200px]">Weight (%)</TableHead>
-                                                    <TableHead className="w-[80px] text-right">Value</TableHead>
+                                                    <TableHead className="w-[100px] text-center">Status</TableHead>
+                                                    <TableHead className="w-[100px] text-right">Weight</TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
                                                 {selectedVersion.tca_categories?.map((category) => (
-                                                    <TableRow key={category.id} className={!category.is_active ? 'opacity-50' : ''}>
-                                                        <TableCell>
-                                                            <Switch
-                                                                checked={category.is_active}
-                                                                onCheckedChange={(checked) => handleCategoryToggle(category.id!, checked)}
-                                                            />
-                                                        </TableCell>
+                                                    <TableRow key={category.id} className={category.is_active ? '' : 'opacity-50'}>
                                                         <TableCell>
                                                             <div>
                                                                 <p className="font-medium">{category.category_name}</p>
@@ -636,15 +741,11 @@ export default function ModuleSettingsPage() {
                                                                 )}
                                                             </div>
                                                         </TableCell>
-                                                        <TableCell>
-                                                            <Slider
-                                                                value={[category.weight]}
-                                                                onValueChange={([value]) => handleCategoryWeightChange(category.id!, value)}
-                                                                max={20}
-                                                                min={0}
-                                                                step={0.5}
-                                                                disabled={!category.is_active}
-                                                            />
+                                                        <TableCell className="text-center">
+                                                            <Badge variant={category.is_active ? 'default' : 'secondary'}
+                                                                className={category.is_active ? 'bg-green-100 text-green-700' : ''}>
+                                                                {category.is_active ? 'Active' : 'Inactive'}
+                                                            </Badge>
                                                         </TableCell>
                                                         <TableCell className="text-right font-mono">
                                                             {category.weight.toFixed(1)}%

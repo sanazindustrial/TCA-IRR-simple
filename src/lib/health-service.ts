@@ -21,6 +21,8 @@ export type ServiceGroupId =
     | 'auth'
     | 'analysis'
     | 'modules'
+    | 'reports'
+    | 'workflow'
     | 'data'
     | 'admin'
     | 'communication'
@@ -100,10 +102,12 @@ const GROUP_LABELS: Record<ServiceGroupId, string> = {
     auth:          'Auth Service',
     analysis:      'Analysis Engine',
     modules:       'Analysis Modules (17)',
+    reports:       'Report Services (Triage · DD · SSD)',
+    workflow:      'Reviewer & Analyst Workflow',
     data:          'Data Services',
     admin:         'Admin Services',
     communication: 'Communication',
-    extraction:    'File Extraction',
+    extraction:    'File & Text Extraction',
     ai:            'AI Agents',
 };
 
@@ -112,16 +116,24 @@ const GROUP_LABELS: Record<ServiceGroupId, string> = {
 const SERVICES: ServiceDef[] = [
     // ── Core ──
     { id: 'api-health',    label: 'Backend Health',    group: 'core', path: '/health' },
-    { id: 'tca-status',    label: 'TCA System Status', group: 'core', path: '/api/v1/tca/system-status' },
+    // tca/system-status requires auth – 401 is treated as 'healthy' (service alive)
+    { id: 'tca-status',    label: 'TCA System Status', group: 'core', path: '/api/v1/tca/system-status', requiresAuth: true },
 
     // ── Auth ──
-    { id: 'auth-me',       label: 'Auth / Session',   group: 'auth', path: '/api/v1/auth/me',      requiresAuth: true },
+    { id: 'auth-me',           label: 'Auth / Session',   group: 'auth', path: '/api/v1/auth/me',              requiresAuth: true },
+    { id: 'auth-refresh-svc',  label: 'Token Refresh',    group: 'auth', path: '/api/v1/auth/refresh',         requiresAuth: true, optional: true },
+    // POST-only; GET → 405 (service alive)
+    { id: 'auth-register-svc', label: 'Registration',     group: 'auth', path: '/api/v1/auth/register',        optional: true },
+    { id: 'auth-login-svc',    label: 'Login',            group: 'auth', path: '/api/v1/auth/login',           optional: true },
 
-    // ── Analysis engine (POST-only endpoints – GET returns 404/405, mark optional) ──
-    { id: 'analysis-svc',  label: 'Analysis Service', group: 'analysis', path: '/api/v1/analysis/comprehensive', requiresAuth: true, optional: true },
-    { id: 'tca-quick',     label: 'TCA Quick',        group: 'analysis', path: '/api/v1/tca/quick',              requiresAuth: true, optional: true },
-    { id: 'tca-sector',    label: 'TCA Sector',       group: 'analysis', path: '/api/v1/tca/sector-analysis',    requiresAuth: true, optional: true },
-    { id: 'tca-batch',     label: 'TCA Batch',        group: 'analysis', path: '/api/v1/tca/batch',              requiresAuth: true, optional: true },
+    // ── Analysis engine ──
+    // GET /api/v1/analysis/ lists analyses (auth required)
+    { id: 'analysis-list-svc', label: 'Analysis List',    group: 'analysis', path: '/api/v1/analysis/',              requiresAuth: true, optional: true },
+    // POST-only endpoints – GET returns 405 (service alive) or 401 (auth required); mark optional
+    { id: 'analysis-svc',      label: 'Analysis Engine',  group: 'analysis', path: '/api/v1/analysis/comprehensive', requiresAuth: true, optional: true },
+    { id: 'tca-quick',         label: 'TCA Quick',        group: 'analysis', path: '/api/v1/tca/quick',              requiresAuth: true, optional: true },
+    { id: 'tca-sector',        label: 'TCA Sector',       group: 'analysis', path: '/api/v1/tca/sector-analysis',    requiresAuth: true, optional: true },
+    { id: 'tca-batch',         label: 'TCA Batch',        group: 'analysis', path: '/api/v1/tca/batch',              requiresAuth: true, optional: true },
 
     // ── 17 modules (status derived from /api/v1/tca/system-status in sweep) ──
     ...MODULE_IDS.map((mod) => ({
@@ -133,33 +145,69 @@ const SERVICES: ServiceDef[] = [
     })),
 
     // ── Data services ──
-    { id: 'reports-svc',      label: 'Reports',      group: 'data', path: '/api/v1/reports',     requiresAuth: true },
-    { id: 'companies-svc',    label: 'Companies',    group: 'data', path: '/api/v1/companies',   requiresAuth: true },
-    { id: 'evaluations-svc',  label: 'Evaluations',  group: 'data', path: '/api/v1/evaluations', requiresAuth: true },
+    { id: 'reports-svc',      label: 'Reports',             group: 'data', path: '/api/v1/reports',                  requiresAuth: true },
+    // Use trailing slash to avoid a 307 redirect that Azure may not proxy cross-origin
+    { id: 'companies-svc',    label: 'Companies',           group: 'data', path: '/api/v1/companies/',               requiresAuth: true },
+    // GET /api/v1/evaluations has no handler (POST-only root) – mark optional
+    { id: 'evaluations-svc',  label: 'Evaluations',         group: 'data', path: '/api/v1/evaluations',              requiresAuth: true, optional: true },
+    { id: 'investments-svc',  label: 'Investments',         group: 'data', path: '/api/v1/investments/',             requiresAuth: true, optional: true },
+
+    // ── File & text extraction ──
+    // All POST-only; GET returns 405 (service alive) – mark optional
+    { id: 'extraction-validate-svc',   label: 'Extraction Validate',      group: 'extraction', path: '/api/v1/extraction/validate',               requiresAuth: true, optional: true },
+    { id: 'extraction-reprocess-svc',  label: 'Extraction Reprocess',     group: 'extraction', path: '/api/v1/extraction/reprocess',              requiresAuth: true, optional: true },
+    { id: 'extract-text-svc',          label: 'Text Extraction',          group: 'extraction', path: '/api/v1/analysis/extract-text-from-file',   requiresAuth: true, optional: true },
+    { id: 'extract-info-svc',          label: 'Company Info Extraction',  group: 'extraction', path: '/api/v1/analysis/extract-company-info',     requiresAuth: true, optional: true },
+    { id: 'files-upload-svc',          label: 'File Upload',              group: 'extraction', path: '/api/v1/files/upload',                      requiresAuth: true, optional: true },
+    { id: 'files-extract-text-svc',    label: 'Files Extract Text',       group: 'extraction', path: '/api/v1/files/extract-text',                requiresAuth: true, optional: true },
 
     // ── Admin / config ──
-    { id: 'cost-svc',      label: 'Cost Service',     group: 'admin', path: '/api/v1/cost/summary/public',   optional: true },
-    { id: 'settings-svc',  label: 'Settings/Config',  group: 'admin', path: '/api/v1/settings/versions',     requiresAuth: true, optional: true },
-    { id: 'users-svc',     label: 'Users',            group: 'admin', path: '/api/v1/users',                 requiresAuth: true },
-    { id: 'roles-svc',     label: 'Roles',            group: 'admin', path: '/api/v1/roles',                 requiresAuth: true },
-    { id: 'dashboard-svc', label: 'Dashboard Stats',  group: 'admin', path: '/api/v1/dashboard/stats',       optional: true },
+    // cost/summary/public is unauthenticated and available to all
+    { id: 'cost-public-svc',    label: 'Cost (Public)',        group: 'admin', path: '/api/v1/cost/summary/public'                              },
+    { id: 'cost-summary-svc',   label: 'Cost Summary',         group: 'admin', path: '/api/v1/cost/summary',          requiresAuth: true, optional: true },
+    { id: 'cost-usage-svc',     label: 'Cost Usage',           group: 'admin', path: '/api/v1/cost/usage',            requiresAuth: true, optional: true },
+    { id: 'cost-budget-svc',    label: 'Cost Budget',          group: 'admin', path: '/api/v1/cost/budget',           requiresAuth: true, optional: true },
+    { id: 'settings-svc',       label: 'Settings/Config',      group: 'admin', path: '/api/v1/settings/versions',     requiresAuth: true, optional: true },
+    // Trailing slash avoids 307 redirect that may not be proxied correctly on Azure
+    { id: 'users-svc',          label: 'Users',                group: 'admin', path: '/api/v1/users/',                requiresAuth: true },
+    { id: 'users-export-svc',   label: 'User Export',          group: 'admin', path: '/api/v1/users/export',          requiresAuth: true, optional: true },
+    // GET /roles has no handler – use /configurations sub-path
+    { id: 'roles-svc',          label: 'Role Configurations',  group: 'admin', path: '/api/v1/roles/configurations',  requiresAuth: true },
+    { id: 'dashboard-stats-svc',label: 'Dashboard Stats',      group: 'admin', path: '/api/v1/dashboard/stats',       requiresAuth: true, optional: true },
+    { id: 'dashboard-charts-svc', label: 'Dashboard Charts',    group: 'admin', path: '/api/v1/dashboard/charts',      requiresAuth: true, optional: true },
+    { id: 'dashboard-health-svc', label: 'Dashboard Health',    group: 'admin', path: '/api/v1/dashboard/health',      requiresAuth: true, optional: true },
+    // admin.py endpoints – all require admin role; 403 for non-admin → treated as 'healthy'
+    { id: 'admin-health-svc',       label: 'Admin Health',           group: 'admin', path: '/api/v1/admin/health',               requiresAuth: true },
+    { id: 'admin-status-svc',       label: 'Admin System Status',    group: 'admin', path: '/api/v1/admin/system-status',        requiresAuth: true, optional: true },
+    { id: 'admin-audit-svc',        label: 'Audit Logs',             group: 'admin', path: '/api/v1/admin/audit-logs',           requiresAuth: true, optional: true },
+    { id: 'admin-security-svc',     label: 'Security Events',        group: 'admin', path: '/api/v1/admin/security-events',      requiresAuth: true, optional: true },
+    { id: 'admin-governance-svc',   label: 'Governance Policies',    group: 'admin', path: '/api/v1/admin/governance-policies',  requiresAuth: true, optional: true },
+    { id: 'admin-logs-svc',         label: 'Admin Logs',             group: 'admin', path: '/api/v1/admin/logs',                 requiresAuth: true, optional: true },
 
-    // ── Communication (optional – endpoints may not exist) ──
-    { id: 'notifications-svc', label: 'Notifications',   group: 'communication', path: '/api/v1/notifications',       requiresAuth: true, optional: true },
-    { id: 'email-svc',         label: 'Email Service',   group: 'communication', path: '/api/v1/email/status',         requiresAuth: true, optional: true },
-    { id: 'send-svc',          label: 'Send / Receive',  group: 'communication', path: '/api/v1/notifications/unread', requiresAuth: true, optional: true },
+    // ── Report services – one entry per report type ──────────────────────────
+    // Triage uses extract-company-info; DD uses comprehensive; SSD has its own service
+    { id: 'report-triage-svc',     label: 'Triage Report Engine',          group: 'reports', path: '/api/v1/analysis/extract-company-info',     requiresAuth: true, optional: true },
+    { id: 'report-dd-svc',         label: 'Due Diligence Report Engine',   group: 'reports', path: '/api/v1/analysis/comprehensive',            requiresAuth: true, optional: true },
+    { id: 'report-ssd-svc',        label: 'SSD Report Engine',             group: 'reports', path: '/api/v1/ssd/evaluate',                     requiresAuth: true, optional: true },
+    // SSD audit endpoints (GET-capable)
+    { id: 'ssd-audit-logs-svc',    label: 'SSD Audit Logs',                group: 'reports', path: '/api/v1/ssd/audit/logs',                   requiresAuth: true, optional: true },
+    { id: 'ssd-audit-stats-svc',   label: 'SSD Audit Stats',               group: 'reports', path: '/api/v1/ssd/audit/stats',                  requiresAuth: true, optional: true },
 
-    // ── Extraction services (POST-only endpoints; GET returns 404 – mark optional) ──
-    { id: 'extraction-svc',    label: 'File Extraction',     group: 'extraction', path: '/api/v1/files/extract-text', optional: true },
-    { id: 'extract-alt-svc',   label: 'Extract (v2)',         group: 'extraction', path: '/api/v1/extract/file',       optional: true },
-    { id: 'scrape-svc',        label: 'URL Scraper',          group: 'extraction', path: '/api/v1/scrape/url',         optional: true },
-    { id: 'storage-svc',       label: 'Cloud Storage',        group: 'extraction', path: '/api/v1/storage/health',     optional: true },
+    // ── Reviewer & Analyst workflow ──────────────────────────────────────────
+    // /api/v1/requests handles analyst review & approval of user requests
+    { id: 'reviewer-svc',          label: 'Reviewer Service',              group: 'workflow', path: '/api/v1/requests',                         requiresAuth: true },
+    // Analyst workflow – list analyses produced by the analyst role
+    { id: 'analyst-workflow-svc',  label: 'Analyst Workflow',              group: 'workflow', path: '/api/v1/analysis/',                        requiresAuth: true, optional: true },
+    // Unified record tracking sync used across all report workflows
+    { id: 'records-sync-svc',      label: 'Records Sync',                  group: 'workflow', path: '/api/v1/records/sync',                    requiresAuth: true, optional: true },
+
+    // ── Communication ──
+    // /api/v1/auth/email/status lives under the /auth router
+    { id: 'email-svc',     label: 'Email Service',    group: 'communication', path: '/api/v1/auth/email/status', requiresAuth: true, optional: true },
 
     // ── AI Agent services (optional – may not be deployed) ──
-    { id: 'ai-extract-svc',    label: 'AI Extraction Agent',  group: 'ai', path: '/api/v1/ai/extract',          optional: true },
-    { id: 'ai-autofill-svc',   label: 'AI Auto-Fill Agent',   group: 'ai', path: '/api/v1/ai/autofill',         optional: true },
-    { id: 'ai-analysis-svc',   label: 'AI Analysis Agent',    group: 'ai', path: '/api/v1/analysis/ai-extract', requiresAuth: true, optional: true },
-    { id: 'export-svc',        label: 'Export Service',       group: 'ai', path: '/api/v1/export/health',       optional: true },
+    { id: 'ai-analysis-svc',       label: 'AI Analysis Agent',             group: 'ai', path: '/api/v1/analysis/ai-extract',            requiresAuth: true, optional: true },
+    { id: 'ai-multi-agent-svc',    label: 'Multi-Agent Orchestrator',      group: 'ai', path: '/api/v1/analysis/ai-orchestrate',        requiresAuth: true, optional: true },
 ];
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -344,9 +392,11 @@ class HealthService {
     /** Fetch TCA system status and return module-level flags (best-effort) */
     private async fetchTCASystemStatus(): Promise<Record<string, boolean>> {
         try {
+            const token = this.getToken();
+            // Skip the request when unauthenticated to avoid a 401 console error
+            if (!token) return {};
             const controller = new AbortController();
             setTimeout(() => controller.abort(), PING_TIMEOUT);
-            const token = this.getToken();
             const headers: Record<string, string> = {};
             if (token) headers['Authorization'] = `Bearer ${token}`;
             const res = await fetch(`${this.baseURL}/api/v1/tca/system-status`, {

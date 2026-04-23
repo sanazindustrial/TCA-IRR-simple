@@ -25,7 +25,6 @@ import {
     Bell,
     MessageSquare,
     HelpCircle,
-    Cpu,
     BrainCircuit,
     Link as LinkIcon,
     GitBranch,
@@ -186,18 +185,22 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
                                         <span>Triage Report</span>
                                     </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
-                                <SidebarMenuSubItem>
-                                    <SidebarMenuSubButton href="/dashboard/reports/due-diligence" isActive={pathname === '/dashboard/reports/due-diligence'}>
-                                        <BarChart3 className="size-4" />
-                                        <span>Due Diligence</span>
-                                    </SidebarMenuSubButton>
-                                </SidebarMenuSubItem>
-                                <SidebarMenuSubItem>
-                                    <SidebarMenuSubButton href="/dashboard/reports/ssd" isActive={pathname === '/dashboard/reports/ssd'}>
-                                        <Layers className="size-4" />
-                                        <span>SSD Report</span>
-                                    </SidebarMenuSubButton>
-                                </SidebarMenuSubItem>
+                                {isPrivilegedUser && (
+                                    <SidebarMenuSubItem>
+                                        <SidebarMenuSubButton href="/dashboard/reports/due-diligence" isActive={pathname === '/dashboard/reports/due-diligence'}>
+                                            <BarChart3 className="size-4" />
+                                            <span>Due Diligence</span>
+                                        </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                )}
+                                {isPrivilegedUser && (
+                                    <SidebarMenuSubItem>
+                                        <SidebarMenuSubButton href="/dashboard/reports/ssd" isActive={pathname === '/dashboard/reports/ssd'}>
+                                            <Layers className="size-4" />
+                                            <span>SSD Report</span>
+                                        </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                )}
                             </SidebarMenuSub>
                         </CollapsibleContent>
                     </SidebarMenuItem>

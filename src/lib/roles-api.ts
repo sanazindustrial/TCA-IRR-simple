@@ -60,6 +60,8 @@ export const DEFAULT_ROLE_CONFIGS: RoleConfigurationsResponse['roles'] = {
             { name: 'Export Data', description: 'Can export reports and data', enabled: true },
             { name: 'View Reports', description: 'Can view all reports', enabled: true },
             { name: 'Run Analysis', description: 'Can execute triage and DD analysis', enabled: true },
+            { name: 'View Due Diligence Reports', description: 'Can access Due Diligence report pages', enabled: true },
+            { name: 'View SSD Reports', description: 'Can access Startup Steroid Dashboard reports', enabled: true },
         ],
         limits: { triageReports: 'Unlimited', ddReports: 'Unlimited' }
     },
@@ -75,6 +77,8 @@ export const DEFAULT_ROLE_CONFIGS: RoleConfigurationsResponse['roles'] = {
             { name: 'Export Data', description: 'Can export own reports', enabled: true },
             { name: 'User Management', description: 'Can manage users', enabled: false },
             { name: 'Module Configuration', description: 'Can modify analysis modules', enabled: false },
+            { name: 'View Due Diligence Reports', description: 'Can access Due Diligence report pages', enabled: true },
+            { name: 'View SSD Reports', description: 'Can access Startup Steroid Dashboard reports', enabled: true },
         ],
         limits: { triageReports: 50, ddReports: 10 }
     },
@@ -90,6 +94,8 @@ export const DEFAULT_ROLE_CONFIGS: RoleConfigurationsResponse['roles'] = {
             { name: 'Export Data', description: 'Can export data', enabled: false },
             { name: 'User Management', description: 'Can manage users', enabled: false },
             { name: 'Module Configuration', description: 'Can modify analysis modules', enabled: false },
+            { name: 'View Due Diligence Reports', description: 'Can access Due Diligence report pages', enabled: false },
+            { name: 'View SSD Reports', description: 'Can access Startup Steroid Dashboard reports', enabled: false },
         ],
         limits: { triageReports: 10, ddReports: 0 }
     }
@@ -128,6 +134,9 @@ export const RolesApi = {
             `/api/v1/roles/configurations/${roleKey}`,
             update
         );
+        if (!response.success) {
+            throw new Error(response.error || 'Failed to update role configuration');
+        }
         return (response.data || response) as { success: boolean; message: string };
     },
 
@@ -139,6 +148,9 @@ export const RolesApi = {
             '/api/v1/roles/configurations/reset',
             {}
         );
+        if (!response.success) {
+            throw new Error(response.error || 'Failed to reset role configurations');
+        }
         return (response.data || response) as { success: boolean; message: string };
     },
 
@@ -150,6 +162,9 @@ export const RolesApi = {
             '/api/v1/roles/configurations/initialize',
             {}
         );
+        if (!response.success) {
+            throw new Error(response.error || 'Failed to initialize role configurations');
+        }
         return (response.data || response) as { success: boolean; message: string };
     }
 };

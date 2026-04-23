@@ -12,9 +12,13 @@ import {
  * for as long as this hook is mounted.
  */
 export function useServiceHealth() {
-    const [report, setReport] = useState<ServiceReport>(
-        healthService.getReport()
-    );
+    // Use a stable initial state (no dynamic timestamp) to avoid React
+    // hydration mismatch error #418 between SSR and client renders.
+    const [report, setReport] = useState<ServiceReport>(() => ({
+        overall: 'checking' as ServiceStatus,
+        groups: [],
+        checkedAt: '',
+    }));
 
     useEffect(() => {
         healthService.start();

@@ -62,17 +62,25 @@ interface ModuleConfig {
   weight?: number;
 }
 
-// Default module definitions (used as fallback)
+// All 17 module definitions — matches MODULE_DEFINITIONS in settings-api.ts
 const MODULE_DEFINITIONS: Record<string, { name: string; description: string; weight: number }> = {
-  tca: { name: 'TCA Scorecard', description: 'Core technology capability assessment', weight: 15 },
-  risk: { name: 'Risk Assessment', description: 'Risk factors and mitigation analysis', weight: 13 },
-  macro: { name: 'Macro Trend Analysis', description: 'PESTEL framework analysis', weight: 12 },
-  benchmark: { name: 'Benchmark Comparison', description: 'Industry benchmark overlay', weight: 12 },
-  growth: { name: 'Growth Classification', description: 'Growth trajectory analysis', weight: 12 },
-  gap: { name: 'Gap Analysis', description: 'Capability gap heatmap', weight: 11 },
-  founderFit: { name: 'Founder Fit Analysis', description: 'Funding readiness assessment', weight: 12 },
-  team: { name: 'Team Assessment', description: 'Team effectiveness evaluation', weight: 13 },
-  strategicFit: { name: 'Strategic Fit Matrix', description: 'Strategic alignment scoring', weight: 0 },
+  tca: { name: 'TCA Scorecard', description: 'Core technology capability assessment', weight: 20 },
+  risk: { name: 'Risk Flags', description: 'Risk factors and mitigation analysis', weight: 15 },
+  macro: { name: 'Macro Trend Alignment', description: 'PESTEL framework analysis', weight: 10 },
+  benchmark: { name: 'Benchmark Comparison', description: 'Industry benchmark overlay', weight: 10 },
+  growth: { name: 'Growth Classifier', description: 'Growth trajectory analysis', weight: 10 },
+  gap: { name: 'Gap Analysis', description: 'Capability gap heatmap', weight: 10 },
+  founderFit: { name: 'Founder Fit Analysis', description: 'Funding readiness assessment', weight: 10 },
+  team: { name: 'Team Assessment', description: 'Team effectiveness evaluation', weight: 10 },
+  strategicFit: { name: 'Strategic Fit Matrix', description: 'Strategic alignment scoring', weight: 5 },
+  financial: { name: 'Financial Analysis', description: 'Revenue model and financial health', weight: 8 },
+  economic: { name: 'Economic Analysis', description: 'Market size and economic viability', weight: 8 },
+  social: { name: 'Social Impact Analysis', description: 'ESG factors and social impact metrics', weight: 5 },
+  marketing: { name: 'Marketing Analysis', description: 'GTM strategy and brand positioning', weight: 5 },
+  environmental: { name: 'Environmental Analysis', description: 'Environmental compliance and sustainability', weight: 5 },
+  funder: { name: 'Funder Fit Analysis', description: 'Investor alignment and funding readiness', weight: 8 },
+  strategic: { name: 'Strategic Analysis', description: 'Competitive positioning and strategic roadmap', weight: 5 },
+  analyst: { name: 'Analyst Review', description: 'Manual analyst input and AI deviation review', weight: 5 },
 };
 
 const EditableScoreTable = ({
@@ -639,6 +647,70 @@ export default function SimulationPage() {
               { id: 'team-effectiveness', category: 'Team Assessment', score: teamScore }
             ];
           }
+
+          // New modules — derive from TCA composite score as base
+          const tcaBase = Math.min(data.tcaData?.compositeScore || 5, 10);
+
+          // Module: Financial Analysis
+          initialScores['financial'] = [
+            { id: 'revenue-model', category: 'Revenue Model', score: +(tcaBase * 0.95).toFixed(2) },
+            { id: 'burn-rate', category: 'Burn Rate', score: +(tcaBase * 0.90).toFixed(2) },
+            { id: 'financial-health', category: 'Financial Health', score: +(tcaBase * 1.00).toFixed(2) },
+          ];
+
+          // Module: Economic Analysis
+          initialScores['economic'] = [
+            { id: 'market-size', category: 'Market Size', score: +(tcaBase * 1.05).toFixed(2) },
+            { id: 'pricing-power', category: 'Pricing Power', score: +(tcaBase * 0.90).toFixed(2) },
+            { id: 'economic-viability', category: 'Economic Viability', score: +(tcaBase * 1.00).toFixed(2) },
+          ];
+
+          // Module: Social Impact Analysis
+          initialScores['social'] = [
+            { id: 'esg-score', category: 'ESG Score', score: +(tcaBase * 0.85).toFixed(2) },
+            { id: 'social-impact', category: 'Social Impact', score: +(tcaBase * 0.90).toFixed(2) },
+          ];
+
+          // Module: Marketing Analysis
+          initialScores['marketing'] = [
+            { id: 'gtm-strategy', category: 'GTM Strategy', score: +(tcaBase * 0.95).toFixed(2) },
+            { id: 'brand-positioning', category: 'Brand Positioning', score: +(tcaBase * 0.85).toFixed(2) },
+            { id: 'channel-effectiveness', category: 'Channel Effectiveness', score: +(tcaBase * 0.90).toFixed(2) },
+          ];
+
+          // Module: Environmental Analysis
+          initialScores['environmental'] = [
+            { id: 'environmental-compliance', category: 'Environmental Compliance', score: +(tcaBase * 0.90).toFixed(2) },
+            { id: 'sustainability', category: 'Sustainability', score: +(tcaBase * 0.85).toFixed(2) },
+          ];
+
+          // Module: Funder Fit Analysis
+          if (data.founderFitData?.readinessScore) {
+            const funderBase = data.founderFitData.readinessScore / 10;
+            initialScores['funder'] = [
+              { id: 'investor-alignment', category: 'Investor Alignment', score: +funderBase.toFixed(2) },
+              { id: 'funding-readiness', category: 'Funding Readiness', score: +(funderBase * 0.95).toFixed(2) },
+              { id: 'round-size-fit', category: 'Round Size Fit', score: +(funderBase * 0.90).toFixed(2) },
+            ];
+          } else {
+            initialScores['funder'] = [
+              { id: 'investor-alignment', category: 'Investor Alignment', score: +(tcaBase * 0.95).toFixed(2) },
+              { id: 'funding-readiness', category: 'Funding Readiness', score: +(tcaBase * 0.90).toFixed(2) },
+              { id: 'round-size-fit', category: 'Round Size Fit', score: +(tcaBase * 0.85).toFixed(2) },
+            ];
+          }
+
+          // Module: Strategic Analysis
+          initialScores['strategic'] = [
+            { id: 'competitive-positioning', category: 'Competitive Positioning', score: +(tcaBase * 1.00).toFixed(2) },
+            { id: 'strategic-roadmap', category: 'Strategic Roadmap', score: +(tcaBase * 0.95).toFixed(2) },
+          ];
+
+          // Module: Analyst Review
+          initialScores['analyst'] = [
+            { id: 'analyst-score', category: 'Analyst Score', score: +(tcaBase * 1.00).toFixed(2) },
+            { id: 'ai-deviation', category: 'AI Deviation Review', score: +(tcaBase * 0.95).toFixed(2) },
+          ];
 
           // Initialize module configs for all modules
           const configs: Record<string, ModuleConfig> = {};

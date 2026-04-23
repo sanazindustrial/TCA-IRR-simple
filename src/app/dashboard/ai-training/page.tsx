@@ -1,5 +1,6 @@
 
 'use client';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -53,8 +54,41 @@ const MetricCard = ({ title, value, target, unit, icon: Icon }: { title: string,
 
 export default function AiTrainingPage() {
   const { toast } = useToast();
+  const [lastUpdated, setLastUpdated] = useState<string>('');
+  const [moduleStatuses, setModuleStatuses] = useState<Record<string, boolean>>({});
+
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
+
+  const fetchModuleStatuses = async () => {
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+      const res = await fetch(`${API_BASE}/api/v1/tca/system-status`, {
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      // Backend returns e.g. { modules: { tca: true, irr: true, ssd: false, ... } }
+      if (data.modules && typeof data.modules === 'object') {
+        setModuleStatuses(data.modules);
+      } else if (data.status) {
+        // Flat status object
+        setModuleStatuses(data);
+      }
+      setLastUpdated(new Date().toLocaleString());
+    } catch {
+      // Silently keep previous statuses; do not crash the page
+    }
+  };
+
+  useEffect(() => {
+    fetchModuleStatuses();
+    const interval = setInterval(fetchModuleStatuses, 60000);
+    return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleRefresh = () => {
+    fetchModuleStatuses();
     toast({
       title: 'Refreshing Data',
       description: 'The AI performance metrics are being updated.',
@@ -71,6 +105,7 @@ export default function AiTrainingPage() {
           </h1>
           <p className="text-muted-foreground">
             Monitor AI performance, data quality, and operational health.
+            {lastUpdated && <span className="ml-2 text-xs">Last updated: {lastUpdated}</span>}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -88,6 +123,20 @@ export default function AiTrainingPage() {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
+          {Object.keys(moduleStatuses).length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Live Module Availability</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-wrap gap-2">
+                {Object.entries(moduleStatuses).map(([name, active]) => (
+                  <Badge key={name} variant={active ? 'success' : 'destructive'} className="capitalize">
+                    {name.replace(/_/g, ' ')}: {active ? 'Active' : 'Offline'}
+                  </Badge>
+                ))}
+              </CardContent>
+            </Card>
+          )}
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><Target/> ML Screening Quality</CardTitle>
