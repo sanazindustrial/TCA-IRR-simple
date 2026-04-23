@@ -10,7 +10,12 @@ from __future__ import annotations
 import logging
 from typing import List, Dict, Any, Optional
 
-import numpy as np
+try:
+    import numpy as np
+    _NUMPY_AVAILABLE = True
+except ImportError:
+    np = None  # type: ignore
+    _NUMPY_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -174,7 +179,12 @@ class TimeSeriesEngine:
         # Simple confidence interval: ±1 std of the three forecasts at each step
         lower, upper = [], []
         for a, x, l, b in zip(arima_fc, xgb_fc, lstm_fc, blended):
-            std = float(np.std([a, x, l]))
+            if _NUMPY_AVAILABLE:
+                std = float(np.std([a, x, l]))
+            else:
+                vals = [a, x, l]
+                mean = sum(vals) / 3
+                std = (sum((v - mean) ** 2 for v in vals) / 3) ** 0.5
             lower.append(round(b - std, 4))
             upper.append(round(b + std, 4))
 
