@@ -1,4 +1,4 @@
-s"""
+"""
 Additional API Routes for file uploads, extractions, modules, requests, and evaluations
 These routes are mounted at /api/* (without /v1 prefix) for backwards compatibility
 """
