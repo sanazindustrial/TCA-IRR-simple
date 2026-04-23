@@ -267,15 +267,16 @@ export default function AnalysisRunPage() {
     const [totalTime, setTotalTime] = useState<string>('0.0s');
     const [storedTrackingParams, setStoredTrackingParams] = useState<string>('');
 
-    // Load active module settings — merges backend settings API + localStorage module-deck-config
-    // Priority: module-deck-config (local toggle state) > backend settings API > ALL_MODULES defaults
+    // Load active module settings — backend is authoritative, localStorage is fallback only
+    // Priority: backend settings API > localStorage module-deck-config > ALL_MODULES defaults
     useEffect(() => {
         const loadModuleSettings = async () => {
             try {
                 // Start with defaults
                 let updatedModules = [...ALL_MODULES];
+                let backendSettingsLoaded = false;
 
-                // 1. Try to load from backend settings API (weights + enable/disable)
+                // 1. Try to load from backend settings API (weights + enable/disable) — AUTHORITATIVE SOURCE
                 try {
                     const activeVersion = await settingsApi.getActiveVersion();
                     if (activeVersion?.module_settings) {
@@ -289,30 +290,42 @@ export default function AnalysisRunPage() {
                                 weight: setting ? setting.weight : module.weight
                             };
                         });
+                        backendSettingsLoaded = true;
+                        // Sync localStorage with authoritative backend state so other pages stay consistent
+                        try {
+                            const deckConfig = updatedModules.map(m => ({
+                                id: m.apiId,
+                                status: m.active ? 'active' : 'inactive'
+                            }));
+                            localStorage.setItem('module-deck-config', JSON.stringify(deckConfig));
+                        } catch {
+                            // Non-critical — localStorage sync failure is acceptable
+                        }
                     }
                 } catch {
                     console.warn('Could not load backend module settings, using defaults');
                 }
 
-                // 2. Override active state from module-deck-config (localStorage toggle from evaluation/modules page)
-                try {
-                    const deckConfigRaw = localStorage.getItem('module-deck-config');
-                    if (deckConfigRaw) {
-                        const deckConfig: Array<{ id: string; status: string }> = JSON.parse(deckConfigRaw);
-                        const deckStatusMap: Record<string, boolean> = {};
-                        deckConfig.forEach(m => {
-                            deckStatusMap[m.id] = m.status === 'active';
-                        });
-                        updatedModules = updatedModules.map(module => {
-                            // module-deck-config uses the same IDs as ALL_MODULES apiId
-                            if (module.apiId in deckStatusMap) {
-                                return { ...module, active: deckStatusMap[module.apiId] };
-                            }
-                            return module;
-                        });
+                // 2. Only use localStorage as FALLBACK when backend settings failed to load
+                if (!backendSettingsLoaded) {
+                    try {
+                        const deckConfigRaw = localStorage.getItem('module-deck-config');
+                        if (deckConfigRaw) {
+                            const deckConfig: Array<{ id: string; status: string }> = JSON.parse(deckConfigRaw);
+                            const deckStatusMap: Record<string, boolean> = {};
+                            deckConfig.forEach(m => {
+                                deckStatusMap[m.id] = m.status === 'active';
+                            });
+                            updatedModules = updatedModules.map(module => {
+                                if (module.apiId in deckStatusMap) {
+                                    return { ...module, active: deckStatusMap[module.apiId] };
+                                }
+                                return module;
+                            });
+                        }
+                    } catch {
+                        console.warn('Could not read module-deck-config from localStorage');
                     }
-                } catch {
-                    console.warn('Could not read module-deck-config from localStorage');
                 }
 
                 setModules(updatedModules);

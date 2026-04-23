@@ -5,9 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -40,12 +38,10 @@ import {
     Copy,
     Archive,
     Check,
-    GitCompare,
     Play,
     History,
     Layers,
     SlidersHorizontal,
-    ExternalLink,
     FlaskConical,
     Loader2,
     Info,
@@ -55,12 +51,19 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
     settingsApi,
     SettingsVersion,
-    ModuleSetting,
-    TCACategory,
-    SimulationRun,
     MODULE_DEFINITIONS,
     DEFAULT_TCA_CATEGORIES,
 } from '@/lib/settings-api';
+
+type SimulationRun = {
+    id: number;
+    company_name?: string;
+    tca_score?: number;
+    settings_version_id: number;
+    run_at: string | Date;
+    status: string;
+    module_scores?: Record<string, number>;
+};
 
 export default function ModuleSettingsPage() {
     const [versions, setVersions] = useState<SettingsVersion[]>([]);
@@ -287,15 +290,30 @@ export default function ModuleSettingsPage() {
     const handleModuleToggle = async (moduleId: string, enabled: boolean) => {
         if (!selectedVersion) return;
 
+        // Update local state immediately for responsive UI
+        const updatedSettings = selectedVersion.module_settings?.map(m =>
+            m.module_id === moduleId ? { ...m, is_enabled: enabled } : m
+        );
         setSelectedVersion(prev => {
             if (!prev) return prev;
             return {
                 ...prev,
-                module_settings: prev.module_settings?.map(m =>
-                    m.module_id === moduleId ? { ...m, is_enabled: enabled } : m
-                ),
+                module_settings: updatedSettings,
             };
         });
+
+        // Sync localStorage module-deck-config so run/page.tsx sees the updated state
+        // (run/page.tsx uses backend as authoritative, but this keeps localStorage consistent as fallback)
+        try {
+            const allSettings = updatedSettings || selectedVersion.module_settings || [];
+            const deckConfig = allSettings.map(m => ({
+                id: m.module_id,
+                status: m.is_enabled ? 'active' : 'inactive'
+            }));
+            localStorage.setItem('module-deck-config', JSON.stringify(deckConfig));
+        } catch {
+            // Non-critical — localStorage sync failure is acceptable
+        }
 
         if (selectedVersion.id !== 0) {
             try {

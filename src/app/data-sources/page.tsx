@@ -146,6 +146,14 @@ const SourceDialog = ({
             <Label>API URL</Label>
             <Input value={editedSource.apiUrl} onChange={(e) => handleChange('apiUrl', e.target.value)} />
           </div>
+          <div className="space-y-2 col-span-2">
+            <Label>Website URL</Label>
+            <Input value={editedSource.websiteUrl || ''} onChange={(e) => handleChange('websiteUrl', e.target.value)} placeholder="https://..." />
+          </div>
+          <div className="space-y-2 col-span-2">
+            <Label>Get Key URL</Label>
+            <Input value={editedSource.getKeyUrl || ''} onChange={(e) => handleChange('getKeyUrl', e.target.value)} placeholder="https://..." />
+          </div>
           <div className="space-y-2">
             <Label>Type</Label>
             <Select value={editedSource.type} onValueChange={(v) => handleChange('type', v)}>
