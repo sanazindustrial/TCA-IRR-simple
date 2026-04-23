@@ -14,14 +14,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
   Settings,
   AlertTriangle,
   Plus,
@@ -39,12 +31,11 @@ import {
   Zap,
   Edit,
   Loader2,
+  RefreshCw,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { cn } from '@/lib/utils';
-import { Switch } from '@/components/ui/switch';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -78,14 +69,18 @@ type ApiKey = {
   value: string;
 };
 
+type ConnectionStatus = 'connected' | 'disconnected' | 'testing';
+type ConnectionItem = { name: string; status: ConnectionStatus; message?: string; latency_ms?: number };
+
 
 const initialEnvVars: EnvVar[] = [
   { id: '1', name: 'NODE_ENV', value: 'development', scope: 'backend', description: 'Backend-node only' },
-  { id: '2', name: 'AZURE_POSTGRESQL_HOST', value: 'tcairrapiccontainer.postgres.database.azure.com', scope: 'backend', description: 'Azure PostgreSQL host' },
-  { id: '3', name: 'DATABASE_URL', value: 'postgresql://***:***@tcairr...azure.com:5432/tcadb', scope: 'backend', description: 'Backend-node only' },
+  { id: '2', name: 'AZURE_POSTGRESQL_HOST', value: 'tcairrapiccontainer.postgres.database.azure.com', scope: 'backend', description: 'Azure PostgreSQL host — backend only' },
+  { id: '3', name: 'DATABASE_URL', value: 'postgresql://***:***@tcairr...azure.com:5432/tcadb', scope: 'backend', description: 'Full Azure PostgreSQL connection string — backend only' },
   { id: '4', name: 'OPENAI_API_KEY', value: '*****************', scope: 'backend', description: 'Backend-node only' },
   { id: '5', name: 'GEMINI_API_KEY', value: '*****************', scope: 'backend', description: 'Backend-node only' },
-  { id: '6', name: 'SMTP_HOST', value: 'smtp.gmail.com', scope: 'backend', description: 'Backend-node only' },
+  { id: '6', name: 'DATABASE_URL', value: 'postgresql://postgres:password@localhost:5432/pitch.db', scope: 'backend', description: 'Backend-node only' },
+  { id: '7', name: 'SMTP_HOST', value: 'smtp.gmail.com', scope: 'backend', description: 'Backend-node only' },
 ];
 
 const initialApiKeys: ApiKey[] = [
@@ -97,169 +92,15 @@ const initialApiKeys: ApiKey[] = [
     { id: 'key-6', name: 'GitHub', value: '', keySnippet: '' },
 ];
 
-type Connection = { name: string; status: 'connected' | 'disconnected' | 'testing' };
-
-const initialConnections: Connection[] = [
-    { name: 'Database', status: 'disconnected' },
-    { name: 'OpenAI', status: 'disconnected' },
-    { name: 'Azure PostgreSQL', status: 'disconnected' },
-    { name: 'Smtp', status: 'disconnected' },
-];
-
-const initialSystemHealth: Connection[] = [
-    { name: 'Database Connection', status: 'disconnected'},
-    { name: 'OpenAI API', status: 'disconnected'},
-    { name: 'Azure PostgreSQL', status: 'disconnected'},
-    { name: 'SMTP Email', status: 'disconnected'},
-]
-
 const configurationFeatures = [
-    { name: 'TCA Scorecard (12 categories, custom weights)' },
-    { name: 'Risk Assessment (14 domains with thresholds)' },
-    { name: 'Macro Trend Analysis (PESTEL + trend scores)' },
-    { name: 'Benchmark Comparison (performance vs. sector averages)' },
-    { name: 'Growth Classification (6 models)' },
-    { name: 'Gap Analysis (performance gap identification)' },
-    { name: 'Founder Fit Analysis (investor matching & readiness)' },
-    { name: 'Team Assessment (founder & team strength)' },
-    { name: 'Strategic Fit Matrix (strategic pathway alignment)' },
-    { name: 'Financial Analysis (revenue model, burn rate)' },
-    { name: 'Economic Analysis (market size, pricing, viability)' },
-    { name: 'Social Impact Analysis (ESG factors)' },
-    { name: 'Marketing Analysis (GTM, brand, channels)' },
-    { name: 'Environmental Analysis (compliance, sustainability)' },
-    { name: 'Funder Fit Analysis (investor alignment & readiness)' },
-    { name: 'Strategic Analysis (competitive positioning & roadmap)' },
-    { name: 'Analyst Review (NLP analysis + AI deviation review)' },
+    { name: 'TCA Categories (12) with custom weights'},
+    { name: 'Risk Flags (14) with thresholds'},
+    { name: 'Growth Classifier (6 models)'},
+    { name: 'DD Configuration (10 modules)'},
+    { name: 'Macro Trend Alignment'},
+    { name: 'Benchmark Comparison'},
+    { name: 'Founder & Strategic Fit Analysis'},
 ];
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ML Settings Panel
-// ─────────────────────────────────────────────────────────────────────────────
-const ML_MODELS = [
-  { id: 'arima',    label: 'ARIMA',    description: 'Autoregressive integrated moving average – time-series baseline' },
-  { id: 'xgboost',  label: 'XGBoost',  description: 'Gradient-boosted tree ensemble for tabular scoring features' },
-  { id: 'lstm',     label: 'LSTM',     description: 'Long short-term memory neural network for sequence patterns' },
-  { id: 'ensemble', label: 'Ensemble', description: 'Weighted blend (30 / 40 / 30) of ARIMA + XGBoost + LSTM' },
-] as const;
-
-type MlModelId = typeof ML_MODELS[number]['id'];
-
-function MLSettingsPanel() {
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
-  const { toast } = useToast();
-
-  const [enabled, setEnabled] = React.useState<Record<MlModelId, boolean>>({
-    arima: true, xgboost: true, lstm: true, ensemble: true,
-  });
-  const [training, setTraining] = React.useState(false);
-  const [trainResult, setTrainResult] = React.useState<string | null>(null);
-
-  const toggle = (id: MlModelId) =>
-    setEnabled(prev => ({ ...prev, [id]: !prev[id] }));
-
-  const handleRetrain = async () => {
-    setTraining(true);
-    setTrainResult(null);
-    try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
-      const res = await fetch(`${API_BASE}/api/v1/ml/train`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ force: true }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        const msg = data.message || 'Training job queued successfully';
-        setTrainResult(msg);
-        toast({ title: 'ML Training', description: msg });
-      } else {
-        throw new Error(data.detail || 'Training request failed');
-      }
-    } catch (err: any) {
-      const msg = err.message || 'Failed to reach ML training endpoint';
-      setTrainResult(`Error: ${msg}`);
-      toast({ title: 'Training Error', description: msg, variant: 'destructive' });
-    } finally {
-      setTraining(false);
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Cpu className="h-5 w-5 text-purple-500" />
-            Machine Learning Models
-          </CardTitle>
-          <CardDescription>
-            Enable or disable individual ML models used for scoring, risk detection, and time-series
-            forecasting. Changes apply on next model inference.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {ML_MODELS.map(m => (
-            <div
-              key={m.id}
-              className="flex items-center justify-between rounded-lg border p-4 transition-colors hover:bg-muted/40"
-            >
-              <div className="space-y-0.5">
-                <p className="font-medium">{m.label}</p>
-                <p className="text-sm text-muted-foreground">{m.description}</p>
-              </div>
-              <Switch
-                checked={enabled[m.id]}
-                onCheckedChange={() => toggle(m.id)}
-                aria-label={`${enabled[m.id] ? 'Disable' : 'Enable'} ${m.label}`}
-              />
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Zap className="h-5 w-5 text-yellow-500" />
-            Retrain Models
-          </CardTitle>
-          <CardDescription>
-            Trigger a full retraining pass using the current evaluation dataset stored in the
-            database. ARIMA, XGBoost, LSTM, and Ensemble weights will be refreshed.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {trainResult && (
-            <Alert variant={trainResult.startsWith('Error') ? 'destructive' : 'default'}>
-              <AlertDescription>{trainResult}</AlertDescription>
-            </Alert>
-          )}
-          <Button
-            onClick={handleRetrain}
-            disabled={training}
-            className="gap-2"
-          >
-            {training ? (
-              <><Loader2 className="h-4 w-4 animate-spin" />Training in progress…</>
-            ) : (
-              <><Rocket className="h-4 w-4" />Retrain All Models</>
-            )}
-          </Button>
-        </CardContent>
-        <CardFooter>
-          <p className="text-xs text-muted-foreground">
-            Training may take several minutes. The endpoint returns immediately and processes
-            asynchronously. Check the AI Training dashboard for live progress.
-          </p>
-        </CardFooter>
-      </Card>
-    </div>
-  );
-}
 
 const ApiKeyDialog = ({ open, onOpenChange, onSave, apiKey }: { open: boolean, onOpenChange: (open: boolean) => void, onSave: (key: ApiKey) => void, apiKey: ApiKey | null }) => {
     const [editedKey, setEditedKey] = useState<ApiKey | null>(apiKey);
@@ -314,12 +155,139 @@ const ApiKeyDialog = ({ open, onOpenChange, onSave, apiKey }: { open: boolean, o
 export default function SystemConfigPage() {
   const [envVars, setEnvVars] = useState(initialEnvVars);
   const [apiKeys, setApiKeys] = useState(initialApiKeys);
-  const [connections, setConnections] = useState<Connection[]>(initialConnections);
-  const [systemHealth, setSystemHealth] = useState<Connection[]>(initialSystemHealth);
   const [isApiKeyDialogOpen, setApiKeyDialogOpen] = useState(false);
   const [editingApiKey, setEditingApiKey] = useState<ApiKey | null>(null);
+  const [isTestingAll, setIsTestingAll] = useState(false);
+
+  const [connections, setConnections] = useState<ConnectionItem[]>([
+    { name: 'Database', status: 'disconnected' },
+    { name: 'OpenAI', status: 'disconnected' },
+    { name: 'Azure PostgreSQL', status: 'disconnected' },
+    { name: 'Smtp', status: 'disconnected' },
+    { name: 'Text Extraction', status: 'disconnected' },
+    { name: 'Company Info Extraction', status: 'disconnected' },
+    { name: 'Files Extract Text', status: 'disconnected' },
+    { name: 'AI Agents', status: 'disconnected' },
+    { name: 'AI Analysis Agent', status: 'disconnected' },
+    { name: 'Multi-Agent Orchestrator', status: 'disconnected' },
+  ]);
+  const [systemHealth, setSystemHealth] = useState<ConnectionItem[]>([
+    { name: 'Database Connection', status: 'disconnected' },
+    { name: 'OpenAI API', status: 'disconnected' },
+    { name: 'Azure PostgreSQL', status: 'disconnected' },
+    { name: 'SMTP Email', status: 'disconnected' },
+    { name: 'Text Extraction', status: 'disconnected' },
+    { name: 'Company Info Extraction', status: 'disconnected' },
+    { name: 'Files Extract Text', status: 'disconnected' },
+    { name: 'AI Agents', status: 'disconnected' },
+    { name: 'AI Analysis Agent', status: 'disconnected' },
+    { name: 'Multi-Agent Orchestrator', status: 'disconnected' },
+  ]);
 
   const { toast } = useToast();
+
+  const updateStatus = useCallback((key: string, status: ConnectionStatus, message?: string, latency_ms?: number) => {
+    const connectionMap: Record<string, string[]> = {
+      backend: ['Database'],
+      database: ['Azure PostgreSQL'],
+      openai: ['OpenAI'],
+      smtp: ['Smtp'],
+      textExtraction: ['Text Extraction'],
+      companyInfoExtraction: ['Company Info Extraction'],
+      filesExtractText: ['Files Extract Text'],
+      aiAgents: ['AI Agents'],
+      aiAnalysisAgent: ['AI Analysis Agent'],
+      multiAgentOrchestrator: ['Multi-Agent Orchestrator'],
+    };
+    const healthMap: Record<string, string[]> = {
+      backend: ['Database Connection'],
+      database: ['Azure PostgreSQL'],
+      openai: ['OpenAI API'],
+      smtp: ['SMTP Email'],
+      textExtraction: ['Text Extraction'],
+      companyInfoExtraction: ['Company Info Extraction'],
+      filesExtractText: ['Files Extract Text'],
+      aiAgents: ['AI Agents'],
+      aiAnalysisAgent: ['AI Analysis Agent'],
+      multiAgentOrchestrator: ['Multi-Agent Orchestrator'],
+    };
+    const connNames = connectionMap[key] || [key];
+    const healthNames = healthMap[key] || [key];
+    setConnections(prev => prev.map(c => connNames.includes(c.name) ? { ...c, status, message, latency_ms } : c));
+    setSystemHealth(prev => prev.map(c => healthNames.includes(c.name) ? { ...c, status, message, latency_ms } : c));
+  }, []);
+
+  const runHealthCheck = useCallback(async () => {
+    // Mark all as testing
+    setConnections(prev => prev.map(c => ({ ...c, status: 'testing' as ConnectionStatus })));
+    setSystemHealth(prev => prev.map(c => ({ ...c, status: 'testing' as ConnectionStatus })));
+    try {
+      const res = await fetch('/api/system-health');
+      const data = await res.json();
+      if (data.results) {
+        const r = data.results;
+        updateStatus('backend', r.backend?.connected ? 'connected' : 'disconnected', r.backend?.message, r.backend?.latency_ms);
+        updateStatus('database', r.database?.connected ? 'connected' : 'disconnected', r.database?.message, r.database?.latency_ms);
+        updateStatus('openai', r.openai?.connected ? 'connected' : 'disconnected', r.openai?.message);
+        updateStatus('smtp', r.smtp?.connected ? 'connected' : 'disconnected', r.smtp?.message);
+        updateStatus('textExtraction', r.textExtraction?.connected ? 'connected' : 'disconnected', r.textExtraction?.message, r.textExtraction?.latency_ms);
+        updateStatus('companyInfoExtraction', r.companyInfoExtraction?.connected ? 'connected' : 'disconnected', r.companyInfoExtraction?.message, r.companyInfoExtraction?.latency_ms);
+        updateStatus('filesExtractText', r.filesExtractText?.connected ? 'connected' : 'disconnected', r.filesExtractText?.message, r.filesExtractText?.latency_ms);
+        updateStatus('aiAgents', r.aiAgents?.connected ? 'connected' : 'disconnected', r.aiAgents?.message, r.aiAgents?.latency_ms);
+        updateStatus('aiAnalysisAgent', r.aiAnalysisAgent?.connected ? 'connected' : 'disconnected', r.aiAnalysisAgent?.message, r.aiAnalysisAgent?.latency_ms);
+        updateStatus('multiAgentOrchestrator', r.multiAgentOrchestrator?.connected ? 'connected' : 'disconnected', r.multiAgentOrchestrator?.message, r.multiAgentOrchestrator?.latency_ms);
+      }
+    } catch {
+      setConnections(prev => prev.map(c => ({ ...c, status: 'disconnected' as ConnectionStatus, message: 'Health check failed' })));
+      setSystemHealth(prev => prev.map(c => ({ ...c, status: 'disconnected' as ConnectionStatus, message: 'Health check failed' })));
+    }
+  }, [updateStatus]);
+
+  const handleTestConnection = useCallback(async (name: string) => {
+    // Map display name to health key
+    const keyMap: Record<string, string> = {
+      Database: 'backend', 'Database Connection': 'backend',
+      OpenAI: 'openai', 'OpenAI API': 'openai',
+      'Azure PostgreSQL': 'database',
+      Smtp: 'smtp', 'SMTP Email': 'smtp',
+      'Text Extraction': 'textExtraction',
+      'Company Info Extraction': 'companyInfoExtraction',
+      'Files Extract Text': 'filesExtractText',
+      'AI Agents': 'aiAgents',
+      'AI Analysis Agent': 'aiAnalysisAgent',
+      'Multi-Agent Orchestrator': 'multiAgentOrchestrator',
+    };
+    const key = keyMap[name] || name.toLowerCase();
+    updateStatus(key, 'testing');
+    try {
+      const res = await fetch('/api/system-health');
+      const data = await res.json();
+      if (data.results?.[key]) {
+        const r = data.results[key];
+        updateStatus(key, r.connected ? 'connected' : 'disconnected', r.message, r.latency_ms);
+        toast({
+          title: `${name}: ${r.connected ? 'Connected' : 'Disconnected'}`,
+          description: r.message || '',
+          variant: r.connected ? 'default' : 'destructive',
+        });
+      }
+    } catch {
+      updateStatus(key, 'disconnected', 'Request failed');
+      toast({ title: `${name}: Failed`, description: 'Could not reach health endpoint.', variant: 'destructive' });
+    }
+  }, [updateStatus, toast]);
+
+  const handleTestAll = useCallback(async () => {
+    setIsTestingAll(true);
+    await runHealthCheck();
+    setIsTestingAll(false);
+    toast({ title: 'Health check complete', description: 'All connection statuses have been updated.' });
+  }, [runHealthCheck, toast]);
+
+  // Auto-run health check on page load
+  useEffect(() => {
+    runHealthCheck();
+  }, [runHealthCheck]);
 
   const handleVarChange = (id: string, field: 'name' | 'value' | 'scope' | 'description', value: string) => {
     setEnvVars((prev) =>
@@ -385,57 +353,6 @@ export default function SystemConfigPage() {
     toast({ title: 'Downloading .env file' });
   };
 
-  const handleTestConnection = useCallback(async (name: string) => {
-    const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
-    const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-
-    const setStatus = (status: Connection['status']) => {
-      setConnections(prev => prev.map(c => c.name === name ? { ...c, status } : c));
-      // Mirror DB-related names into systemHealth
-      const shName = name === 'Database' ? 'Database Connection'
-        : name === 'Azure PostgreSQL' ? 'Azure PostgreSQL'
-        : name === 'OpenAI' ? 'OpenAI API'
-        : name === 'Smtp' ? 'SMTP Email'
-        : null;
-      if (shName) setSystemHealth(prev => prev.map(c => c.name === shName ? { ...c, status } : c));
-    };
-
-    setStatus('testing');
-    toast({ title: `Testing ${name}…`, description: 'Connecting to backend…' });
-
-    try {
-      let endpoint = '/api/health';
-      if (name === 'Database' || name === 'Azure PostgreSQL') {
-        endpoint = '/api/v1/admin/database/status';
-      } else if (name === 'OpenAI') {
-        endpoint = '/api/v1/tca/system-status';
-      } else if (name === 'Smtp') {
-        endpoint = '/api/health';
-      }
-
-      const res = await fetch(`${API_BASE}${endpoint}`, { headers });
-      const { ok } = res;
-      setStatus(ok ? 'connected' : 'disconnected');
-      toast({
-        title: ok ? `${name} Connected` : `${name} Unreachable`,
-        description: ok ? 'Connection successful.' : `Server returned ${res.status}.`,
-        variant: ok ? 'default' : 'destructive',
-      });
-    } catch {
-      setStatus('disconnected');
-      toast({ title: `${name} Failed`, description: 'Could not reach backend.', variant: 'destructive' });
-    }
-  }, [toast]);
-
-  useEffect(() => {
-    // Auto-test all connections on mount
-    const names = initialConnections.map(c => c.name);
-    names.forEach(name => handleTestConnection(name));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const handleOpenApiKeyDialog = (key: ApiKey | null) => {
     setEditingApiKey(key);
     setApiKeyDialogOpen(true);
@@ -474,8 +391,8 @@ export default function SystemConfigPage() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={() => toast({title: 'Testing all connections...'})}>
-                <TestTube className="mr-2" /> Test All
+              <Button variant="outline" onClick={handleTestAll} disabled={isTestingAll}>
+                {isTestingAll ? <Loader2 className="mr-2 animate-spin" /> : <TestTube className="mr-2" />} {isTestingAll ? 'Testing...' : 'Test All'}
               </Button>
               <Button onClick={handleDownloadEnv}>
                 <Download className="mr-2" /> Download .env
@@ -484,13 +401,12 @@ export default function SystemConfigPage() {
           </header>
 
           <Tabs defaultValue="api-keys">
-            <TabsList className="mb-6 grid grid-cols-1 md:grid-cols-6">
+            <TabsList className="mb-6 grid grid-cols-1 md:grid-cols-5">
               <TabsTrigger value="env-vars">Environment Variables</TabsTrigger>
               <TabsTrigger value="api-keys">API Keys</TabsTrigger>
               <TabsTrigger value="connection-status">Connection Status</TabsTrigger>
               <TabsTrigger value="system-testing">System Testing</TabsTrigger>
               <TabsTrigger value="sector-setup">Sector Setup Management</TabsTrigger>
-              <TabsTrigger value="machine-learning">Machine Learning</TabsTrigger>
             </TabsList>
             <TabsContent value="env-vars">
               <Card>
@@ -626,8 +542,15 @@ export default function SystemConfigPage() {
               <TabsContent value="connection-status">
                   <Card>
                       <CardHeader>
-                          <CardTitle>Connection Status</CardTitle>
-                          <CardDescription>Check the status of external service connections.</CardDescription>
+                          <div className="flex items-center justify-between">
+                              <div>
+                                  <CardTitle>Connection Status</CardTitle>
+                                  <CardDescription>Live status of all external service connections.</CardDescription>
+                              </div>
+                              <Button variant="outline" size="sm" onClick={handleTestAll} disabled={isTestingAll}>
+                                  <RefreshCw className={`mr-2 size-4 ${isTestingAll ? 'animate-spin' : ''}`} /> Refresh
+                              </Button>
+                          </div>
                       </CardHeader>
                       <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           {connections.map(conn => (
@@ -635,19 +558,24 @@ export default function SystemConfigPage() {
                                 <div className="flex items-center justify-between">
                                   <div>
                                       <h3 className="font-semibold">{conn.name}</h3>
+                                      {conn.message && <p className="text-xs text-muted-foreground mt-1">{conn.message}</p>}
+                                      {conn.latency_ms != null && conn.latency_ms > 0 && (
+                                          <p className="text-xs text-muted-foreground">{conn.latency_ms}ms</p>
+                                      )}
                                       <Button size="sm" className="mt-2" onClick={() => handleTestConnection(conn.name)} disabled={conn.status === 'testing'}>
-                                        {conn.status === 'testing' ? <><Loader2 className="mr-2 h-3 w-3 animate-spin"/>Testing…</> : 'Test Connection'}
+                                          {conn.status === 'testing' ? <Loader2 className="mr-2 size-3 animate-spin" /> : null}
+                                          Test Connection
                                       </Button>
                                   </div>
-                                  {conn.status === 'connected' ? (
+                                  {conn.status === 'testing' ? (
+                                      <Badge variant="secondary" className="gap-1.5">
+                                          <Loader2 className="size-3 animate-spin" />
+                                          Testing...
+                                      </Badge>
+                                  ) : conn.status === 'connected' ? (
                                       <Badge variant="success" className="gap-1.5">
                                           <CheckCircle className="size-3"/>
                                           Connected
-                                      </Badge>
-                                  ) : conn.status === 'testing' ? (
-                                      <Badge variant="secondary" className="gap-1.5">
-                                          <Loader2 className="size-3 animate-spin"/>
-                                          Testing
                                       </Badge>
                                   ) : (
                                       <Badge variant="destructive" className="gap-1.5">
@@ -668,9 +596,9 @@ export default function SystemConfigPage() {
                       </CardHeader>
                       <CardContent className="space-y-6">
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                              <Button size="lg" onClick={() => handleTestConnection('Database')} disabled={connections.find(c => c.name === 'Database')?.status === 'testing'}><Database className="mr-2"/> Test Database</Button>
-                              <Button size="lg" onClick={() => handleTestConnection('OpenAI')} disabled={connections.find(c => c.name === 'OpenAI')?.status === 'testing'}><Rocket className="mr-2"/> Test OpenAI API</Button>
-                              <Button size="lg" onClick={() => handleTestConnection('Azure PostgreSQL')} disabled={connections.find(c => c.name === 'Azure PostgreSQL')?.status === 'testing'}><TestTube className="mr-2"/> Test Azure PostgreSQL</Button>
+                              <Button size="lg" onClick={() => handleTestConnection('Database')}><Database className="mr-2"/> Test Database</Button>
+                              <Button size="lg" onClick={() => handleTestConnection('OpenAI API')}><Rocket className="mr-2"/> Test OpenAI API</Button>
+                              <Button size="lg" onClick={() => handleTestConnection('Azure PostgreSQL')}><TestTube className="mr-2"/> Test Azure PostgreSQL</Button>
                           </div>
                           <Card>
                               <CardHeader>
@@ -679,10 +607,23 @@ export default function SystemConfigPage() {
                               <CardContent className="space-y-2">
                                   {systemHealth.map(item => (
                                       <div key={item.name} className="flex justify-between items-center text-sm p-2 rounded-md bg-muted/50">
-                                          <p className="font-medium text-muted-foreground">{item.name}:</p>
-                                          <Badge variant={item.status === 'connected' ? 'success' : item.status === 'testing' ? 'secondary' : 'destructive'}>
-                                              {item.status === 'testing' ? <><Loader2 className="inline mr-1 h-3 w-3 animate-spin"/>testing…</> : item.status}
-                                          </Badge>
+                                          <div>
+                                              <p className="font-medium text-muted-foreground">{item.name}</p>
+                                              {item.message && <p className="text-xs text-muted-foreground">{item.message}</p>}
+                                          </div>
+                                          {item.status === 'testing' ? (
+                                              <Badge variant="secondary" className="gap-1.5">
+                                                  <Loader2 className="size-3 animate-spin" />Testing...
+                                              </Badge>
+                                          ) : item.status === 'connected' ? (
+                                              <Badge variant="success" className="gap-1.5">
+                                                  <CheckCircle className="size-3" />{item.latency_ms != null && item.latency_ms > 0 ? `Connected (${item.latency_ms}ms)` : 'Connected'}
+                                              </Badge>
+                                          ) : (
+                                              <Badge variant="destructive" className="gap-1.5">
+                                                  <XCircle className="size-3" />Disconnected
+                                              </Badge>
+                                          )}
                                       </div>
                                   ))}
                               </CardContent>
@@ -700,7 +641,7 @@ export default function SystemConfigPage() {
                               <Rocket className="h-4 w-4 !text-blue-400" />
                               <AlertTitle className="text-blue-300">Create New Analysis Configurations</AlertTitle>
                               <AlertDescription className="text-blue-200/80">
-                                  Configure custom analysis setups for different sectors, use cases, or client requirements. Each setup includes TCA categories, risk flags, growth classifier, and all 17 analysis modules.
+                                  Configure custom analysis setups for different sectors, use cases, or client requirements. Each setup includes TCA categories, risk flags, growth classifier, and all 9 analysis modules.
                                   <div className="mt-4">
                                       <Button asChild variant="outline" className="bg-transparent hover:bg-blue-400/20 border-blue-400/50 text-blue-300">
                                           <Link href="/analysis/modules/tca">Open Sector Configuration Panel</Link>
@@ -766,18 +707,13 @@ export default function SystemConfigPage() {
                                       <li>Click "Create New Setup" in the Setup Management section.</li>
                                       <li>Enter setup name and select target sector.</li>
                                       <li>Choose base template (default or existing setup).</li>
-                                      <li>Configure all 17 modules with custom weights and settings.</li>
+                                      <li>Configure all 9 modules with custom weights and settings.</li>
                                       <li>Save and activate your new configuration.</li>
                                   </ol>
                               </AlertDescription>
                           </Alert>
                       </CardContent>
                   </Card>
-              </TabsContent>
-
-              {/* ────────────── Machine Learning Tab ────────────── */}
-              <TabsContent value="machine-learning">
-                <MLSettingsPanel />
               </TabsContent>
           </Tabs>
         </div>

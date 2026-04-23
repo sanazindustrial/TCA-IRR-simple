@@ -43,6 +43,7 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
+  TrendingUp,
   FileDown,
   Plus,
   Eye,
@@ -53,9 +54,11 @@ import {
   Building2,
   Settings,
   Download,
-  UploadCloud,
-  Shield,
+  UserCheck,
+  Upload,
+  Wifi,
 } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 
@@ -106,16 +109,16 @@ interface ReportSection {
 }
 
 const DEFAULT_SSD_SECTIONS: ReportSection[] = [
-  { id: 'ss-page-1', title: 'Page 1: Executive Summary', description: 'Overall score, investment recommendation, analysis completeness, company snapshot', active: true },
-  { id: 'ss-page-2', title: 'Page 2: TCA Scorecard', description: 'Composite score, category breakdown, top strengths, areas of concern', active: true },
-  { id: 'ss-page-3', title: 'Page 3: TCA AI Interpretation', description: 'AI-powered analysis insights and interpretation of key metrics', active: true },
-  { id: 'ss-page-4', title: 'Page 4: Weighted Score Breakdown', description: 'Detailed breakdown of weighted scores by evaluation category', active: true },
-  { id: 'ss-page-5', title: 'Page 5: Risk Assessment', description: 'Risk score, flags count, severity levels, risk domains', active: true },
-  { id: 'ss-page-6', title: 'Page 6: Flag Analysis Narrative', description: 'In-depth narrative analysis of identified risk flags', active: true },
-  { id: 'ss-page-7', title: 'Page 7: Market & Team', description: 'Market score, TAM/SAM/SOM, team score, founders, gaps', active: true },
-  { id: 'ss-page-8', title: 'Page 8: Financials & Technology', description: 'Financial score, revenue, burn rate, runway, technology score, IP', active: true },
-  { id: 'ss-page-9', title: 'Page 9: CEO Questions', description: 'Strategic questions for CEO and leadership team', active: true },
-  { id: 'ss-page-10', title: 'Page 10: Final Recommendation', description: 'Final decision, funding recommendation, next steps', active: true },
+  { id: 'ss-page-1', title: 'Market Opportunity', description: 'Market size, trends, and opportunity assessment', active: true },
+  { id: 'ss-page-2', title: 'Product & Technology', description: 'Product maturity, tech stack, and IP', active: true },
+  { id: 'ss-page-3', title: 'Team & Founders', description: 'Founder backgrounds and team composition', active: true },
+  { id: 'ss-page-4', title: 'Business Model', description: 'Revenue model, pricing, and unit economics', active: true },
+  { id: 'ss-page-5', title: 'Traction & Metrics', description: 'Growth metrics, revenue, and KPIs', active: true },
+  { id: 'ss-page-6', title: 'Competitive Analysis', description: 'Competitive landscape and differentiation', active: true },
+  { id: 'ss-page-7', title: 'Go-to-Market Strategy', description: 'Customer acquisition and distribution', active: true },
+  { id: 'ss-page-8', title: 'Financial Overview', description: 'Funding history, burn rate, and projections', active: true },
+  { id: 'ss-page-9', title: 'Risk Assessment', description: 'Key risks and mitigation strategies', active: true },
+  { id: 'ss-page-10', title: 'Investment Recommendation', description: 'Final score and investment thesis', active: true },
 ];
 
 const SSD_WIZARD_STEPS = [
@@ -123,6 +126,7 @@ const SSD_WIZARD_STEPS = [
   { id: 2, name: 'Report Sections', icon: Settings },
   { id: 3, name: 'Storage Options', icon: Download },
   { id: 4, name: 'Submit & Track', icon: Zap },
+  { id: 5, name: 'Human Review', icon: UserCheck },
 ];
 
 function StatusBadge({ status }: { status: string }) {
@@ -161,18 +165,6 @@ function StatusBadge({ status }: { status: string }) {
 export default function SSDReportPage() {
   const { toast } = useToast();
 
-  // ── Access control ─────────────────────────────────────────────────────────
-  const [accessDenied, setAccessDenied] = useState(false);
-  useEffect(() => {
-    try {
-      const lu = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
-      // Block 'user' role by default — only admin and analyst can access SSD
-      if ((lu.role || '').toLowerCase() === 'user') {
-        setAccessDenied(true);
-      }
-    } catch { /* ignore */ }
-  }, []);
-
   const [stats, setStats] = useState<AuditStats | null>(null);
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
@@ -200,87 +192,15 @@ export default function SSDReportPage() {
   const [downloadAfterSubmit, setDownloadAfterSubmit] = useState(false);
   const [savedDbReportId, setSavedDbReportId] = useState<number | null>(null);
   const [pollingStatus, setPollingStatus] = useState<'idle' | 'polling' | 'done' | 'failed'>('idle');
+  const [isAdminOrAnalyst, setIsAdminOrAnalyst] = useState(false);
+  const [humanReviewNotes, setHumanReviewNotes] = useState('');
   const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const elapsedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const ssdFileInputRef = useRef<HTMLInputElement>(null);
 
-  // Workflow elapsed time
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-
-  // Add new section form
-  const [newSectionTitle, setNewSectionTitle] = useState('');
-  const [newSectionDesc, setNewSectionDesc] = useState('');
-  const [addSectionOpen, setAddSectionOpen] = useState(false);
-
-  // SSD document-based extraction
-  const [isExtractingSSD, setIsExtractingSSD] = useState(false);
-  const [ssdFieldsExtracted, setSsdFieldsExtracted] = useState(0);
-
-  const extractSSDFromFile = useCallback(async (file: File) => {
-    setIsExtractingSSD(true);
-    try {
-      const fd = new FormData();
-      fd.append('file', file);
-      const res = await fetch('/api/extract', { method: 'POST', body: fd });
-      if (!res.ok) return;
-      const d = await res.json();
-      const textContent: string = d.text_content || '';
-      if (textContent.trim().length > 20) {
-        const token = typeof window !== 'undefined' ? (localStorage.getItem('authToken') ?? '') : '';
-        const aiRes = await fetch('/api/ai-autofill', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: textContent, token }),
-        });
-        if (aiRes.ok) {
-          const aiJson = await aiRes.json();
-          const aiData = (aiJson.data as Record<string, unknown>) ?? {};
-          const pick = (v: unknown) => typeof v === 'string' && v.trim() ? v.trim() : '';
-          const companyName = pick(aiData.company_name);
-          const founderEmail = pick(aiData.website); // best proxy if email not directly found
-          let count = 0;
-          if (companyName) {
-            setSubmitForm((f) => ({ ...f, company_name: f.company_name || companyName }));
-            count++;
-          }
-          // Try to find an email in the extracted text
-          const emailMatch = textContent.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/);
-          if (emailMatch && !submitForm.founder_email) {
-            setSubmitForm((f) => ({ ...f, founder_email: f.founder_email || emailMatch[0] }));
-            count++;
-          }
-          setSsdFieldsExtracted(count);
-          if (count > 0) toast({ title: 'Auto-filled from document', description: `${count} field${count > 1 ? 's' : ''} filled — verify before submitting.` });
-        }
-      }
-    } catch { /* ignore */ }
-    finally { setIsExtractingSSD(false); }
-  }, [submitForm.founder_email, toast]);
-
-  // Evaluation metadata (populated client-side only to avoid hydration mismatch)
-  const [mounted, setMounted] = useState(false);
-  const [evaluationId, setEvaluationId] = useState<string>('');
-  const [createdByName, setCreatedByName] = useState<string>('Unknown');
-  const [sessionStartedAt, setSessionStartedAt] = useState<string>('');
-
-  const stopElapsedTimer = useCallback(() => {
-    if (elapsedTimerRef.current !== null) {
-      clearInterval(elapsedTimerRef.current);
-      elapsedTimerRef.current = null;
-    }
-  }, []);
-
-  const startElapsedTimer = useCallback(() => {
-    if (elapsedTimerRef.current !== null) clearInterval(elapsedTimerRef.current);
-    setElapsedSeconds(0);
-    elapsedTimerRef.current = setInterval(() => setElapsedSeconds((s) => s + 1), 1000);
-  }, []);
-
-  const formatElapsed = (sec: number): string => {
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return m > 0 ? `${m}m ${s}s` : `${s}s`;
-  };
+  // Tunnel / file-upload mode
+  const [submissionMode, setSubmissionMode] = useState<'direct' | 'tunnel'>('direct');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [tunnelStatusCheck, setTunnelStatusCheck] = useState<'checking' | 'connected' | 'degraded' | 'disconnected' | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const stopPolling = useCallback(() => {
     if (pollingIntervalRef.current !== null) {
@@ -289,7 +209,7 @@ export default function SSDReportPage() {
     }
   }, []);
 
-  const startPolling = useCallback((tid: string, shouldDownload: boolean) => {
+  const startPolling = useCallback((tid: string) => {
     stopPolling();
     setPollingStatus('polling');
     pollingIntervalRef.current = setInterval(async () => {
@@ -301,44 +221,30 @@ export default function SSDReportPage() {
         const entry = allLogs.find((l) => l.tracking_id === tid);
         if (entry?.status === 'completed') {
           stopPolling();
-          // Stop elapsed timer via stable ref (no closure capture needed)
-          if (elapsedTimerRef.current !== null) {
-            clearInterval(elapsedTimerRef.current);
-            elapsedTimerRef.current = null;
-          }
           setPollingStatus('done');
-          fetchLogs();
-          fetchStats();
-          if (shouldDownload) {
-            try {
-              const reportRes = await fetch(`${API_BASE}/api/v1/ssd/audit/logs/${tid}/report`, {
-                headers: SSD_HEADERS,
-              });
-              if (reportRes.ok) {
-                const reportData = await reportRes.json();
-                const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `ssd-report-${tid}.json`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-              }
-            } catch {
-              // download failed silently
+          // Auto-download the report
+          try {
+            const reportRes = await fetch(`${API_BASE}/api/v1/ssd/audit/logs/${tid}/report`, {
+              headers: SSD_HEADERS,
+            });
+            if (reportRes.ok) {
+              const reportData = await reportRes.json();
+              const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `ssd-report-${tid}.json`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
             }
+          } catch {
+            // download failed silently
           }
         } else if (entry?.status === 'failed') {
           stopPolling();
-          if (elapsedTimerRef.current !== null) {
-            clearInterval(elapsedTimerRef.current);
-            elapsedTimerRef.current = null;
-          }
           setPollingStatus('failed');
-          fetchLogs();
-          fetchStats();
         }
       } catch {
         // ignore transient poll errors
@@ -346,10 +252,10 @@ export default function SSDReportPage() {
     }, 10_000);
   }, [stopPolling]);
 
-  // Clean up polling and elapsed timer on unmount
+  // Clean up polling on unmount
   useEffect(() => {
-    return () => { stopPolling(); stopElapsedTimer(); };
-  }, [stopPolling, stopElapsedTimer]);
+    return () => stopPolling();
+  }, [stopPolling]);
 
   const fetchStats = useCallback(async () => {
     setIsLoadingStats(true);
@@ -386,19 +292,25 @@ export default function SSDReportPage() {
     fetchLogs();
   }, [fetchStats, fetchLogs]);
 
-  // Load user metadata on mount (client-only: avoids hydration mismatch with time-dependent values)
   useEffect(() => {
-    setEvaluationId(`EVL-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`);
-    setSessionStartedAt(new Date().toISOString());
-    setMounted(true);
-    try {
-      const lu = localStorage.getItem('loggedInUser');
-      if (lu) {
-        const u = JSON.parse(lu);
-        setCreatedByName(u.name || u.email || 'Unknown');
-      }
-    } catch { /* ignore */ }
+    const role = localStorage.getItem('userRole') || '';
+    setIsAdminOrAnalyst(role === 'admin' || role === 'analyst');
   }, []);
+
+  // Check tunnel status whenever submission mode switches to tunnel
+  useEffect(() => {
+    if (submissionMode !== 'tunnel') {
+      setTunnelStatusCheck(null);
+      return;
+    }
+    setTunnelStatusCheck('checking');
+    fetch('/api/tunnel')
+      .then((r) => r.json())
+      .then((d: { status?: string }) =>
+        setTunnelStatusCheck((d.status as 'connected' | 'degraded' | 'disconnected') ?? 'disconnected')
+      )
+      .catch(() => setTunnelStatusCheck('disconnected'));
+  }, [submissionMode]);
 
   // Load SSD section config when dialog opens
   useEffect(() => {
@@ -409,44 +321,11 @@ export default function SSDReportPage() {
   }, [submitOpen]);
 
   const toggleSsdSection = (id: string) => {
-    setSsdSections((prev) => {
-      const updated = prev.map((s) => (s.id === id ? { ...s, active: !s.active } : s));
-      localStorage.setItem('report-config-ssd-sections', JSON.stringify(updated));
-      return updated;
-    });
+    setSsdSections((prev) => prev.map((s) => (s.id === id ? { ...s, active: !s.active } : s)));
   };
 
   const toggleAllSsdSections = (active: boolean) => {
-    setSsdSections((prev) => {
-      const updated = prev.map((s) => ({ ...s, active }));
-      localStorage.setItem('report-config-ssd-sections', JSON.stringify(updated));
-      return updated;
-    });
-  };
-
-  const resetSsdSections = () => {
-    setSsdSections(DEFAULT_SSD_SECTIONS);
-    localStorage.removeItem('report-config-ssd-sections');
-    toast({ title: 'Reset to default', description: '10-page TCA TIRR format restored.' });
-  };
-
-  const addCustomSection = () => {
-    if (!newSectionTitle.trim()) return;
-    const newSection: ReportSection = {
-      id: `custom-page-${Date.now()}`,
-      title: newSectionTitle.trim(),
-      description: newSectionDesc.trim() || 'Custom section',
-      active: true,
-    };
-    setSsdSections((prev) => {
-      const updated = [...prev, newSection];
-      localStorage.setItem('report-config-ssd-sections', JSON.stringify(updated));
-      return updated;
-    });
-    setNewSectionTitle('');
-    setNewSectionDesc('');
-    setAddSectionOpen(false);
-    toast({ title: 'Section added', description: `"${newSection.title}" added to the report.` });
+    setSsdSections((prev) => prev.map((s) => ({ ...s, active })));
   };
 
   const wizardCanProceed = () => {
@@ -455,12 +334,13 @@ export default function SSDReportPage() {
       case 2: return ssdSections.filter((s) => s.active).length > 0;
       case 3: return true;
       case 4: return true;
+      case 5: return true;
       default: return false;
     }
   };
 
   const wizardNext = () => {
-    if (wizardCanProceed() && wizardStep < 4) setWizardStep((s) => s + 1);
+    if (wizardCanProceed() && wizardStep < SSD_WIZARD_STEPS.length) setWizardStep((s) => s + 1);
   };
 
   const wizardPrev = () => {
@@ -509,15 +389,34 @@ export default function SSDReportPage() {
         body.callback_url = submitForm.callback_url;
       }
       const activeSectionIds = ssdSections.filter((s) => s.active).map((s) => s.id);
-      // Always send active section IDs to the backend
-      if (activeSectionIds.length > 0) {
+      if (activeSectionIds.length > 0 && activeSectionIds.length < ssdSections.length) {
         body.pages = activeSectionIds.join(',');
       }
-      const res = await fetch(`${API_BASE}/api/v1/ssd/evaluate`, {
-        method: 'POST',
-        headers: SSD_HEADERS,
-        body: JSON.stringify(body),
-      });
+
+      let res: Response;
+      if (submissionMode === 'tunnel') {
+        if (selectedFile) {
+          const fd = new FormData();
+          fd.append('company_name', body.company_name);
+          fd.append('founder_email', body.founder_email);
+          if (body.callback_url) fd.append('callback_url', body.callback_url);
+          if (body.pages) fd.append('pages', body.pages);
+          fd.append('file', selectedFile, selectedFile.name);
+          res = await fetch('/api/tunnel', { method: 'POST', body: fd });
+        } else {
+          res = await fetch('/api/tunnel', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          });
+        }
+      } else {
+        res = await fetch(`${API_BASE}/api/v1/ssd/evaluate`, {
+          method: 'POST',
+          headers: SSD_HEADERS,
+          body: JSON.stringify(body),
+        });
+      }
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         throw new Error(
@@ -562,10 +461,9 @@ export default function SSDReportPage() {
         }
       }
 
-      // Always start polling to track status; pass download flag through
-      if (tid) {
-        startPolling(tid, downloadAfterSubmit);
-        startElapsedTimer();
+      // Start polling for completion and auto-download if requested
+      if (downloadAfterSubmit && tid) {
+        startPolling(tid);
       }
     } catch (err) {
       toast({
@@ -582,32 +480,6 @@ export default function SSDReportPage() {
     stats && stats.total_requests > 0
       ? Math.round((stats.status_breakdown.completed / stats.total_requests) * 100)
       : 0;
-
-  if (accessDenied) {
-    return (
-      <div className="container mx-auto p-4 md:p-8 max-w-6xl">
-        <Link
-          href="/dashboard/reports"
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary mb-6"
-        >
-          <ArrowLeft className="size-4" /> Back to Reports
-        </Link>
-        <Card className="border-destructive/50 bg-destructive/5">
-          <CardContent className="pt-6 pb-10 text-center space-y-4">
-            <Shield className="mx-auto h-12 w-12 text-destructive/60" />
-            <h2 className="text-xl font-semibold">Access Restricted</h2>
-            <p className="text-muted-foreground max-w-sm mx-auto">
-              You do not have permission to access the Startup Steroid Dashboard (SSD) report.
-              This feature is available to Analysts and Administrators only.
-            </p>
-            <Button asChild variant="outline">
-              <Link href="/dashboard/reports">Back to Reports</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6">
@@ -649,17 +521,15 @@ export default function SSDReportPage() {
               setSubmitOpen(open);
               if (!open) {
                 stopPolling();
-                stopElapsedTimer();
-                setElapsedSeconds(0);
                 setWizardStep(1);
                 setTrackingId(null);
                 setSavedDbReportId(null);
                 setPollingStatus('idle');
                 setSubmitForm({ company_name: '', founder_email: '', callback_url: '' });
-                setSsdFieldsExtracted(0);
-                setAddSectionOpen(false);
-                setNewSectionTitle('');
-                setNewSectionDesc('');
+                setHumanReviewNotes('');
+                setSubmissionMode('direct');
+                setSelectedFile(null);
+                if (fileInputRef.current) fileInputRef.current.value = '';
               }
             }}
           >
@@ -722,41 +592,6 @@ export default function SSDReportPage() {
               <div className="min-h-[240px]">
                 {wizardStep === 1 && (
                   <div className="space-y-4 py-2">
-                    {/* Optional: prefill from document */}
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Optional: Auto-fill from document</p>
-                      <div
-                        className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-muted-foreground/30 bg-muted/10 px-4 py-3 transition-colors hover:border-primary/50 hover:bg-muted/20"
-                        onClick={() => ssdFileInputRef.current?.click()}
-                      >
-                        {isExtractingSSD ? (
-                          <Loader2 className="size-5 animate-spin text-primary" />
-                        ) : (
-                          <UploadCloud className="size-5 text-muted-foreground" />
-                        )}
-                        <span className="text-sm text-muted-foreground">
-                          {isExtractingSSD
-                            ? 'Extracting…'
-                            : ssdFieldsExtracted > 0
-                              ? `✓ ${ssdFieldsExtracted} field${ssdFieldsExtracted > 1 ? 's' : ''} auto-filled — edit below if needed`
-                              : 'Upload pitch deck or any document to auto-fill company name'}
-                        </span>
-                        <input
-                          ref={ssdFileInputRef}
-                          type="file"
-                          className="hidden"
-                          title="Upload document to auto-fill company name"
-                          aria-label="Upload document to auto-fill company name"
-                          accept=".pdf,.pptx,.ppt,.docx,.doc,.xlsx,.xls,.csv,.txt,.json,.jpg,.jpeg,.png,.gif,.webp,.bmp,.tiff,.rtf,.odt,.odp,.ods"
-                          onChange={(e) => {
-                            const f = e.target.files?.[0];
-                            if (f) extractSSDFromFile(f);
-                            if (ssdFileInputRef.current) ssdFileInputRef.current.value = '';
-                          }}
-                        />
-                      </div>
-                    </div>
-
                     <div className="space-y-2">
                       <Label htmlFor="ssd-company">
                         Company Name <span className="text-destructive">*</span>
@@ -795,22 +630,142 @@ export default function SSDReportPage() {
                         }
                       />
                     </div>
+
+                    {/* Submission Source */}
+                    <div className="space-y-2 pt-1">
+                      <Label>Submission Source</Label>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setSubmissionMode('direct')}
+                          className={`flex-1 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+                            submissionMode === 'direct'
+                              ? 'border-primary bg-primary text-primary-foreground'
+                              : 'border-border bg-background text-muted-foreground hover:bg-muted'
+                          }`}
+                        >
+                          Direct API
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSubmissionMode('tunnel')}
+                          className={`flex-1 flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+                            submissionMode === 'tunnel'
+                              ? 'border-primary bg-primary text-primary-foreground'
+                              : 'border-border bg-background text-muted-foreground hover:bg-muted'
+                          }`}
+                        >
+                          <Wifi className="size-3.5" />
+                          Via Remote Tunnel
+                        </button>
+                      </div>
+                    </div>
+
+                    {submissionMode === 'tunnel' && (
+                      <div className="rounded-md border border-border bg-muted/30 p-3 space-y-3">
+                        {/* Tunnel status */}
+                        <div className="flex items-center gap-2 text-sm">
+                          {tunnelStatusCheck === 'checking' && (
+                            <>
+                              <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
+                              <span className="text-muted-foreground">Checking tunnel…</span>
+                            </>
+                          )}
+                          {tunnelStatusCheck === 'connected' && (
+                            <>
+                              <Wifi className="size-3.5 text-green-500" />
+                              <span className="text-green-600 font-medium">Tunnel connected</span>
+                            </>
+                          )}
+                          {tunnelStatusCheck === 'degraded' && (
+                            <>
+                              <Wifi className="size-3.5 text-amber-500" />
+                              <span className="text-amber-600 font-medium">Tunnel degraded</span>
+                            </>
+                          )}
+                          {tunnelStatusCheck === 'disconnected' && (
+                            <>
+                              <XCircle className="size-3.5 text-destructive" />
+                              <span className="text-destructive font-medium">Tunnel unavailable</span>
+                            </>
+                          )}
+                        </div>
+                        {/* Optional file upload */}
+                        <div className="space-y-1.5">
+                          <Label htmlFor="ssd-file" className="text-xs text-muted-foreground">
+                            Attach Document (optional — pitch deck, data sheet…)
+                          </Label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              ref={fileInputRef}
+                              id="ssd-file"
+                              type="file"
+                              accept=".pdf,.doc,.docx,.xlsx,.csv,.json,.txt"
+                              className="hidden"
+                              aria-label="Attach document for tunnel submission"
+                              onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="gap-1.5"
+                              onClick={() => fileInputRef.current?.click()}
+                            >
+                              <Upload className="size-3.5" />
+                              {selectedFile ? 'Change file' : 'Choose file'}
+                            </Button>
+                            {selectedFile && (
+                              <span className="text-xs text-muted-foreground truncate max-w-[180px]">
+                                {selectedFile.name}
+                              </span>
+                            )}
+                            {selectedFile && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-destructive hover:text-destructive"
+                                onClick={() => {
+                                  setSelectedFile(null);
+                                  if (fileInputRef.current) fileInputRef.current.value = '';
+                                }}
+                              >
+                                <XCircle className="size-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
                 {wizardStep === 2 && (
                   <div className="space-y-3 py-2">
-                    <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center justify-between">
                       <p className="text-sm font-medium">
-                        {ssdSections.filter((s) => s.active).length} / {ssdSections.length} pages active
+                        {ssdSections.filter((s) => s.active).length} / {ssdSections.length} pages
+                        active
                       </p>
-                      <div className="flex gap-2 flex-wrap">
-                        <Button variant="outline" size="sm" onClick={() => toggleAllSsdSections(true)}>Enable All</Button>
-                        <Button variant="outline" size="sm" onClick={() => toggleAllSsdSections(false)}>Disable All</Button>
-                        <Button variant="outline" size="sm" onClick={resetSsdSections}>Reset to Default</Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => toggleAllSsdSections(true)}
+                        >
+                          Enable All
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => toggleAllSsdSections(false)}
+                        >
+                          Disable All
+                        </Button>
                       </div>
                     </div>
-                    <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                    <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
                       {ssdSections.map((section) => (
                         <div
                           key={section.id}
@@ -827,42 +782,6 @@ export default function SSDReportPage() {
                         </div>
                       ))}
                     </div>
-                    {/* Add New Section */}
-                    {addSectionOpen ? (
-                      <div className="rounded-lg border border-dashed p-3 space-y-2">
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Add New Section</p>
-                        <div className="space-y-1">
-                          <Label htmlFor="new-sec-title" className="text-xs">Section Title</Label>
-                          <Input
-                            id="new-sec-title"
-                            placeholder="Section Title"
-                            value={newSectionTitle}
-                            onChange={(e) => setNewSectionTitle(e.target.value)}
-                            className="h-8 text-sm"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label htmlFor="new-sec-desc" className="text-xs">Section Description</Label>
-                          <Input
-                            id="new-sec-desc"
-                            placeholder="Section Description"
-                            value={newSectionDesc}
-                            onChange={(e) => setNewSectionDesc(e.target.value)}
-                            className="h-8 text-sm"
-                          />
-                        </div>
-                        <div className="flex gap-2">
-                          <Button size="sm" onClick={addCustomSection} disabled={!newSectionTitle.trim()}>
-                            <Plus className="size-3 mr-1" />Add Section
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={() => { setAddSectionOpen(false); setNewSectionTitle(''); setNewSectionDesc(''); }}>Cancel</Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <Button variant="outline" size="sm" className="w-full gap-1" onClick={() => setAddSectionOpen(true)}>
-                        <Plus className="size-3" />Add New Section
-                      </Button>
-                    )}
                   </div>
                 )}
 
@@ -953,45 +872,20 @@ export default function SSDReportPage() {
                           </div>
                         )}
                         {pollingStatus === 'polling' && (
-                          <div className="rounded-lg border bg-muted/40 p-3 flex items-center justify-between gap-2 text-sm">
-                            <div className="flex items-center gap-2">
-                              <Loader2 className="size-4 animate-spin text-primary shrink-0" />
-                              <span className="text-muted-foreground">
-                                {downloadAfterSubmit ? 'Waiting for completion — will auto-download when ready…' : 'Monitoring evaluation status…'}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1 text-xs font-mono text-muted-foreground shrink-0">
-                              <Timer className="size-3" />
-                              {formatElapsed(elapsedSeconds)}
-                            </div>
+                          <div className="rounded-lg border bg-muted/40 p-3 flex items-center gap-2 text-sm">
+                            <Loader2 className="size-4 animate-spin text-primary shrink-0" />
+                            <span className="text-muted-foreground">Waiting for evaluation to complete — will auto-download when ready&hellip;</span>
                           </div>
                         )}
                         {pollingStatus === 'done' && (
-                          <div className="rounded-lg border border-green-300 bg-green-50/40 p-3 flex items-center justify-between gap-2 text-sm">
-                            <div className="flex items-center gap-2">
-                              <CheckCircle2 className="size-4 text-green-600 shrink-0" />
-                              <span className="text-green-800">
-                                {downloadAfterSubmit ? 'Report completed and downloaded successfully.' : 'Evaluation completed successfully.'}
-                              </span>
-                            </div>
-                            {elapsedSeconds > 0 && (
-                              <span className="text-xs font-mono text-green-700 shrink-0 flex items-center gap-1">
-                                <Timer className="size-3" />{formatElapsed(elapsedSeconds)}
-                              </span>
-                            )}
+                          <div className="rounded-lg border border-green-300 bg-green-50/40 p-3 flex items-center gap-2 text-sm">
+                            <CheckCircle2 className="size-4 text-green-600 shrink-0" />
+                            <span className="text-green-800">Report completed and downloaded successfully.</span>
                           </div>
                         )}
                         {pollingStatus === 'failed' && (
-                          <div className="rounded-lg border border-red-300 bg-red-50/40 p-3 flex items-center justify-between gap-2 text-sm">
-                            <div className="flex items-center gap-2 text-red-700">
-                              <XCircle className="size-4 shrink-0" />
-                              Evaluation failed — no report available for download.
-                            </div>
-                            {elapsedSeconds > 0 && (
-                              <span className="text-xs font-mono text-red-600 shrink-0 flex items-center gap-1">
-                                <Timer className="size-3" />{formatElapsed(elapsedSeconds)}
-                              </span>
-                            )}
+                          <div className="rounded-lg border border-red-300 bg-red-50/40 p-3 text-sm text-red-700">
+                            Evaluation failed — no report available for download.
                           </div>
                         )}
                         <p className="text-sm text-muted-foreground">
@@ -1003,6 +897,26 @@ export default function SSDReportPage() {
                   </div>
                 )}
               </div>
+
+              {wizardStep === 5 && (
+                <div className="space-y-4 py-2">
+                  <div className="rounded-lg bg-muted/40 border p-4 space-y-2 text-sm">
+                    <p><span className="font-medium">Company:</span> {submitForm.company_name}</p>
+                    <p><span className="font-medium">Email:</span> {submitForm.founder_email}</p>
+                    {trackingId && <p><span className="font-medium">Tracking ID:</span> {trackingId}</p>}
+                    {savedDbReportId && <p><span className="font-medium">Report ID:</span> {savedDbReportId}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Human Review Notes</Label>
+                    <Textarea
+                      placeholder="Add analyst notes, observations, or recommendations..."
+                      value={humanReviewNotes}
+                      onChange={(e) => setHumanReviewNotes(e.target.value)}
+                      rows={5}
+                    />
+                  </div>
+                </div>
+              )}
 
               <DialogFooter className="flex items-center justify-between sm:justify-between gap-2">
                 <Button
@@ -1017,7 +931,7 @@ export default function SSDReportPage() {
                     </>
                   )}
                 </Button>
-                {wizardStep < 4 && (
+                {wizardStep < SSD_WIZARD_STEPS.length && wizardStep !== 4 && (
                   <Button onClick={wizardNext} disabled={!wizardCanProceed()}>
                     Next
                     <ArrowRight className="ml-1 size-4" />
@@ -1034,23 +948,26 @@ export default function SSDReportPage() {
                     )}
                   </Button>
                 )}
-                {wizardStep === 4 && trackingId && (
+                {wizardStep === 4 && trackingId && isAdminOrAnalyst && (
+                  <Button onClick={() => setWizardStep(5)}>
+                    Continue to Review
+                    <ArrowRight className="ml-1 size-4" />
+                  </Button>
+                )}
+                {wizardStep === 4 && trackingId && !isAdminOrAnalyst && (
                   <Button onClick={() => setSubmitOpen(false)}>Done</Button>
+                )}
+                {wizardStep === 5 && (
+                  <Button onClick={() => setSubmitOpen(false)}>
+                    <UserCheck className="mr-1 size-4" />
+                    Complete Review
+                  </Button>
                 )}
               </DialogFooter>
             </DialogContent>
           </Dialog>
         </div>
       </div>
-
-      {/* Evaluation metadata banner — rendered client-side only to prevent hydration mismatch */}
-      {mounted && (
-        <div className="rounded-lg border bg-muted/30 px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-muted-foreground">
-          <span><span className="font-semibold text-foreground">Evaluation ID:</span> <span className="font-mono text-primary">{evaluationId}</span></span>
-          <span><span className="font-semibold text-foreground">Created by:</span> {createdByName}</span>
-          <span><span className="font-semibold text-foreground">Session started:</span> {new Date(sessionStartedAt).toLocaleString()}</span>
-        </div>
-      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
