@@ -15,7 +15,12 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
 
-  serverExternalPackages: ['@opentelemetry/context-async-hooks'],
+  serverExternalPackages: [
+    '@opentelemetry/context-async-hooks',
+    'genkit',
+    '@genkit-ai/google-genai',
+    '@genkit-ai/next',
+  ],
 
   // Webpack optimization for code protection
   webpack: (config, { isServer, dev }) => {

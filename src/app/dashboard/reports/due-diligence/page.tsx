@@ -221,6 +221,11 @@ export default function DueDiligenceWorkflowPage() {
   useEffect(() => {
     try {
       const lu = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
+      // Block 'user' role by default — only admin and analyst can access DD
+      if ((lu.role || '').toLowerCase() === 'user') {
+        setAccessDenied(true);
+        return;
+      }
       const userId = lu.id || lu.backendId;
       if (!userId) return;
       const overrides = JSON.parse(localStorage.getItem('userOverrides') || '{}');

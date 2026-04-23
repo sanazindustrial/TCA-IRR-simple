@@ -20,29 +20,26 @@ import {
   ArrowDown,
   RefreshCw,
   XCircle,
+  Circle,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { useServiceHealth } from '@/hooks/use-service-health';
 
 const initialHealthData = {
-  cpu: 39.8,
-  memory: 64.8,
-  disk: 34.0,
-  network: 80.8,
-  responseTime: 113.49,
-  responseTimeChange: 15,
-  activeUsers: 156,
-  activeUsersChange: 12,
-  apiCalls: 12473,
-  apiCallsChange: 5.2,
-  uptime: 99.9,
-  errorRate: 0.2,
+  cpu: 0,
+  memory: 0,
+  disk: 0,
+  network: 0,
+  responseTime: 0,
+  responseTimeChange: 0,
+  activeUsers: 0,
+  activeUsersChange: 0,
+  apiCalls: 0,
+  apiCallsChange: 0,
+  uptime: 0,
+  errorRate: 0,
 };
-
-const initialAlerts = [
-    { id: 'alert-1', variant: 'destructive' as const, title: 'High Memory Usage', description: 'Memory usage is at 67% - consider scaling.', timestamp: '10/24/2025, 6:34:42 AM' },
-    { id: 'alert-2', variant: 'default' as const, title: 'Backup Completed', description: 'Daily backup completed successfully.', timestamp: '10/24/2025, 5:14:42 AM' },
-];
 
 const StatCard = ({
   title,
@@ -103,8 +100,11 @@ const SmallStatCard = ({
 
 export default function SystemHealthPage() {
     const [healthData, setHealthData] = useState(initialHealthData);
-    const [alerts, setAlerts] = useState(initialAlerts);
+    const [alerts, setAlerts] = useState<{ id: string; variant: 'destructive' | 'default'; title: string; description: string; timestamp: string; }[]>([]);
     const [currentTime, setCurrentTime] = useState(new Date());
+    const [dataFetched, setDataFetched] = useState(false);
+
+    const { report, overall } = useServiceHealth();
 
     const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
 
@@ -124,21 +124,36 @@ export default function SystemHealthPage() {
                 cpu: data.cpu?.percent ?? prev.cpu,
                 memory: data.memory?.percent ?? prev.memory,
                 disk: data.disk?.percent ?? prev.disk,
+                network: data.network?.bytes_sent_mb ?? prev.network,
+                responseTime: data.response_time_ms ?? prev.responseTime,
                 activeUsers: data.database?.user_count ?? prev.activeUsers,
                 apiCalls: data.database?.analysis_count ?? prev.apiCalls,
+                uptime: data.uptime_percent ?? 99.9,
+                errorRate: data.error_rate ?? 0.1,
             }));
+            setDataFetched(true);
+
+            // Build alerts from real health data
+            const newAlerts: typeof alerts = [];
+            if (data.cpu?.percent > 80) {
+                newAlerts.push({ id: 'cpu-high', variant: 'destructive', title: 'High CPU Usage', description: `CPU is at ${data.cpu.percent.toFixed(1)}%.`, timestamp: new Date().toLocaleString() });
+            }
+            if (data.memory?.percent > 80) {
+                newAlerts.push({ id: 'mem-high', variant: 'destructive', title: 'High Memory Usage', description: `Memory is at ${data.memory.percent.toFixed(1)}%.`, timestamp: new Date().toLocaleString() });
+            }
+            if (data.disk?.percent > 85) {
+                newAlerts.push({ id: 'disk-high', variant: 'destructive', title: 'Low Disk Space', description: `Disk is at ${data.disk.percent.toFixed(1)}%.`, timestamp: new Date().toLocaleString() });
+            }
+            if (newAlerts.length === 0) {
+                newAlerts.push({ id: 'all-good', variant: 'default', title: 'All Systems Operational', description: 'No active issues detected.', timestamp: new Date().toLocaleString() });
+            }
+            setAlerts(newAlerts);
         } catch {
-            // Fallback to random on failure
-            setHealthData(prev => ({
-                ...prev,
-                cpu: Math.random() * 80 + 10,
-                memory: Math.random() * 70 + 20,
-                disk: prev.disk + Math.random() * 0.01,
-                network: Math.random() * 100,
-                responseTime: Math.random() * 150 + 50,
-                activeUsers: Math.floor(Math.random() * 50) + 120,
-                apiCalls: prev.apiCalls + Math.floor(Math.random() * 100),
-            }));
+            // Do NOT fall back to random values — keep last known data
+            if (!dataFetched) {
+                // On first load with no data, create a connecting alert
+                setAlerts([{ id: 'connecting', variant: 'default', title: 'Connecting to Backend', description: 'Waiting for health data from the server...', timestamp: new Date().toLocaleString() }]);
+            }
         }
     };
 
@@ -153,11 +168,18 @@ export default function SystemHealthPage() {
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-
     const handleRefresh = () => {
         fetchHealthData();
     };
 
+    const getOverallBadge = () => {
+        switch (overall) {
+            case 'healthy': return <Badge variant="success">HEALTHY</Badge>;
+            case 'degraded': return <Badge variant="warning">DEGRADED</Badge>;
+            case 'down': return <Badge variant="destructive">DOWN</Badge>;
+            default: return <Badge variant="secondary">CHECKING</Badge>;
+        }
+    };
     const handleResolve = (alertId: string) => {
         setAlerts(prev => prev.filter(alert => alert.id !== alertId));
     };
@@ -184,7 +206,7 @@ export default function SystemHealthPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="success">HEALTHY</Badge>
+          {getOverallBadge()}
           <Button variant="outline" onClick={handleRefresh}>
             <RefreshCw className="mr-2 h-4 w-4" />
             Refresh
@@ -261,20 +283,50 @@ export default function SystemHealthPage() {
             <h3 className="text-sm font-medium text-muted-foreground">Uptime</h3>
             <p className="text-2xl font-bold text-success flex items-center gap-2">
                 <span className="h-3 w-3 rounded-full bg-success"></span>
-                {healthData.uptime}%
+                {dataFetched ? `${healthData.uptime.toFixed(1)}%` : '—'}
             </p>
             <p className="text-xs text-muted-foreground">Last 30 days</p>
           </div>
            <div className="p-4 bg-muted/50 rounded-lg">
             <h3 className="text-sm font-medium text-muted-foreground">Error Rate</h3>
-            <p className="text-2xl font-bold text-success flex items-center gap-2">
-                 <span className="h-3 w-3 rounded-full bg-success"></span>
-                 {healthData.errorRate}%
+            <p className={`text-2xl font-bold flex items-center gap-2 ${healthData.errorRate > 1 ? 'text-destructive' : 'text-success'}`}>
+                 <span className={`h-3 w-3 rounded-full ${healthData.errorRate > 1 ? 'bg-destructive' : 'bg-success'}`}></span>
+                 {dataFetched ? `${healthData.errorRate.toFixed(2)}%` : '—'}
             </p>
             <p className="text-xs text-muted-foreground">Last 24 hours</p>
           </div>
         </CardContent>
       </Card>
+
+      {report.groups.length > 0 && (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Service Groups</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {report.groups.map((group) => {
+              const dot =
+                group.status === 'healthy' ? 'bg-success' :
+                group.status === 'down' ? 'bg-destructive' :
+                group.status === 'degraded' ? 'bg-yellow-500' : 'bg-muted-foreground';
+              return (
+                <div key={group.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
+                  <div className="flex items-center gap-2">
+                    <span className={`h-2.5 w-2.5 rounded-full ${dot}`} />
+                    <span className="text-sm font-medium">{group.label}</span>
+                  </div>
+                  <Badge
+                    variant={group.status === 'healthy' ? 'success' : group.status === 'down' ? 'destructive' : 'secondary'}
+                    className="text-xs capitalize"
+                  >
+                    {group.status}
+                  </Badge>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
 
     </div>
   );

@@ -64,6 +64,13 @@ export class ApiClient {
     }
 
     private getHeaders(): HeadersInit {
+        // Always read a fresh token from localStorage at call time so that the
+        // singleton instance picks up the token after the user has logged in.
+        if (typeof window !== 'undefined') {
+            const freshToken = localStorage.getItem('authToken');
+            if (freshToken) this.token = freshToken;
+        }
+
         const headers: HeadersInit = {
             'Content-Type': 'application/json',
         };

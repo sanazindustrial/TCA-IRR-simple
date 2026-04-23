@@ -54,6 +54,7 @@ import {
   Settings,
   Download,
   UploadCloud,
+  Shield,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
@@ -159,6 +160,18 @@ function StatusBadge({ status }: { status: string }) {
 
 export default function SSDReportPage() {
   const { toast } = useToast();
+
+  // ── Access control ─────────────────────────────────────────────────────────
+  const [accessDenied, setAccessDenied] = useState(false);
+  useEffect(() => {
+    try {
+      const lu = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
+      // Block 'user' role by default — only admin and analyst can access SSD
+      if ((lu.role || '').toLowerCase() === 'user') {
+        setAccessDenied(true);
+      }
+    } catch { /* ignore */ }
+  }, []);
 
   const [stats, setStats] = useState<AuditStats | null>(null);
   const [logs, setLogs] = useState<AuditLog[]>([]);
@@ -569,6 +582,32 @@ export default function SSDReportPage() {
     stats && stats.total_requests > 0
       ? Math.round((stats.status_breakdown.completed / stats.total_requests) * 100)
       : 0;
+
+  if (accessDenied) {
+    return (
+      <div className="container mx-auto p-4 md:p-8 max-w-6xl">
+        <Link
+          href="/dashboard/reports"
+          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary mb-6"
+        >
+          <ArrowLeft className="size-4" /> Back to Reports
+        </Link>
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardContent className="pt-6 pb-10 text-center space-y-4">
+            <Shield className="mx-auto h-12 w-12 text-destructive/60" />
+            <h2 className="text-xl font-semibold">Access Restricted</h2>
+            <p className="text-muted-foreground max-w-sm mx-auto">
+              You do not have permission to access the Startup Steroid Dashboard (SSD) report.
+              This feature is available to Analysts and Administrators only.
+            </p>
+            <Button asChild variant="outline">
+              <Link href="/dashboard/reports">Back to Reports</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6">
