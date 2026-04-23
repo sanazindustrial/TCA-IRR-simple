@@ -25,6 +25,7 @@ import {
     Bell,
     MessageSquare,
     HelpCircle,
+    Cpu,
     BrainCircuit,
     Link as LinkIcon,
     GitBranch,
@@ -43,12 +44,12 @@ import {
     Calculator,
     Gauge,
     Lightbulb,
-    Megaphone,
+    Globe,
     Leaf,
     Building2,
     Compass,
-    Globe,
-    FileSearch,
+    LineChart,
+    Megaphone,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -134,6 +135,13 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
                                     <ThemeToggle />
                                 </div>
                             </div>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem asChild>
+                                <Link href="/dashboard/terms"><FileText className="mr-2 h-4 w-4" /> Terms of Use</Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                                <Link href="/dashboard/privacy"><Shield className="mr-2 h-4 w-4" /> Privacy Statement</Link>
+                            </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </SidebarMenuItem>
@@ -157,55 +165,59 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
                     </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                    <SidebarMenuButton href="/dashboard/reports/triage" isActive={pathname === '/dashboard/reports/triage' || pathname === '/dashboard/evaluation'} tooltip="Company Analysis">
+                    <SidebarMenuButton href="/dashboard/evaluation" isActive={pathname === '/dashboard/evaluation'} tooltip="Company Analysis">
                         <Upload />
                         <span>Company Analysis</span>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
-                <Collapsible open={reportsOpen} onOpenChange={setReportsOpen} className="group/collapsible">
-                    <SidebarMenuItem>
-                        <CollapsibleTrigger asChild>
-                            <SidebarMenuButton tooltip="Report Generation" isActive={pathname.startsWith('/dashboard/reports')}>
-                                <FileText />
-                                <span>Report Generation</span>
-                                <ChevronDown className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
-                            </SidebarMenuButton>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent>
-                            <SidebarMenuSub>
-                                <SidebarMenuSubItem>
-                                    <SidebarMenuSubButton href="/dashboard/reports" isActive={pathname === '/dashboard/reports'}>
-                                        <FileText className="size-4" />
-                                        <span>All Reports</span>
-                                    </SidebarMenuSubButton>
-                                </SidebarMenuSubItem>
-                                <SidebarMenuSubItem>
-                                    <SidebarMenuSubButton href="/dashboard/reports/triage" isActive={pathname === '/dashboard/reports/triage'}>
-                                        <Activity className="size-4" />
-                                        <span>Triage Report</span>
-                                    </SidebarMenuSubButton>
-                                </SidebarMenuSubItem>
-                                {isPrivilegedUser && (
+                <SidebarMenuItem>
+                    <SidebarMenuButton href="/dashboard/reports" isActive={pathname === '/dashboard/reports'} tooltip="Reports">
+                        <FileText />
+                        <span>Reports</span>
+                    </SidebarMenuButton>
+                </SidebarMenuItem>
+            </SidebarMenu>
+
+            <SidebarSeparator />
+
+            <SidebarGroup>
+                <SidebarGroupLabel>Report Generation</SidebarGroupLabel>
+                <SidebarMenu>
+                    <Collapsible open={reportsOpen} onOpenChange={setReportsOpen} className="group/collapsible">
+                        <SidebarMenuItem>
+                            <CollapsibleTrigger asChild>
+                                <SidebarMenuButton tooltip="Report Generation">
+                                    <FileText />
+                                    <span>Generate Reports</span>
+                                    <ChevronDown className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+                                </SidebarMenuButton>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                                <SidebarMenuSub>
+                                    <SidebarMenuSubItem>
+                                        <SidebarMenuSubButton href="/dashboard/reports/triage" isActive={pathname === '/dashboard/reports/triage'}>
+                                            <Target className="size-4" />
+                                            <span>Triage Report</span>
+                                        </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
                                     <SidebarMenuSubItem>
                                         <SidebarMenuSubButton href="/dashboard/reports/due-diligence" isActive={pathname === '/dashboard/reports/due-diligence'}>
-                                            <BarChart3 className="size-4" />
+                                            <Shield className="size-4" />
                                             <span>Due Diligence</span>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
-                                )}
-                                {isPrivilegedUser && (
                                     <SidebarMenuSubItem>
                                         <SidebarMenuSubButton href="/dashboard/reports/ssd" isActive={pathname === '/dashboard/reports/ssd'}>
-                                            <Layers className="size-4" />
+                                            <Activity className="size-4" />
                                             <span>SSD Report</span>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
-                                )}
-                            </SidebarMenuSub>
-                        </CollapsibleContent>
-                    </SidebarMenuItem>
-                </Collapsible>
-            </SidebarMenu>
+                                </SidebarMenuSub>
+                            </CollapsibleContent>
+                        </SidebarMenuItem>
+                    </Collapsible>
+                </SidebarMenu>
+            </SidebarGroup>
 
             <SidebarSeparator />
 
@@ -227,12 +239,6 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
                                         <SidebarMenuSubButton href="/analysis/modules/tca" isActive={pathname === '/analysis/modules/tca'}>
                                             <BarChart3 className="size-4" />
                                             <span>TCA Scorecard</span>
-                                        </SidebarMenuSubButton>
-                                    </SidebarMenuSubItem>
-                                    <SidebarMenuSubItem>
-                                        <SidebarMenuSubButton href="/analysis/modules/analyst" isActive={pathname === '/analysis/modules/analyst'}>
-                                            <FileSearch className="size-4" />
-                                            <span>Analyst Analysis</span>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
                                     <SidebarMenuSubItem>
@@ -291,7 +297,7 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
                                     </SidebarMenuSubItem>
                                     <SidebarMenuSubItem>
                                         <SidebarMenuSubButton href="/analysis/modules/economic" isActive={pathname === '/analysis/modules/economic'}>
-                                            <TrendingUp className="size-4" />
+                                            <LineChart className="size-4" />
                                             <span>Economic Analysis</span>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
@@ -316,7 +322,7 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
                                     <SidebarMenuSubItem>
                                         <SidebarMenuSubButton href="/analysis/modules/funder" isActive={pathname === '/analysis/modules/funder'}>
                                             <Building2 className="size-4" />
-                                            <span>Funder Analysis</span>
+                                            <span>Funder Fit</span>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
                                     <SidebarMenuSubItem>

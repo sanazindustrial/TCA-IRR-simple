@@ -83,7 +83,9 @@ const WORKFLOW_STEPS = [
   { id: 4, name: 'Analysis Areas', icon: FileSearch, description: 'Select areas to analyze' },
   { id: 5, name: 'Report Sections', icon: Settings, description: 'Configure report sections' },
   { id: 6, name: 'Review & Generate', icon: BrainCircuit, description: 'Review and generate report' },
-  { id: 7, name: 'Storage & Export', icon: Download, description: 'Save & download report' },
+  { id: 7, name: 'Preview Report', icon: Eye, description: 'Review generated report' },
+  { id: 8, name: 'Storage & Export', icon: Download, description: 'Save & download report' },
+  { id: 9, name: 'Report Complete', icon: CheckCircle2, description: 'Due diligence complete' },
 ];
 
 // Due Diligence analysis areas
@@ -200,100 +202,26 @@ export default function DueDiligenceWorkflowPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<unknown>(null);
 
-  // Extraction
-  const [isExtractingDD, setIsExtractingDD] = useState(false);
-  const [ddFieldsExtracted, setDdFieldsExtracted] = useState(0);
-
-  // Evaluation metadata
-  const [evaluationId] = useState<string>(
-    () => `EVL-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
-  );
-  const [createdByName, setCreatedByName] = useState<string>('Unknown');
-  const [sessionStartedAt] = useState<string>(() => new Date().toISOString());
-  const [recordedTimestamp, setRecordedTimestamp] = useState<string | null>(null);
+  const isAdminOrAnalyst = userRole === 'admin' || userRole === 'analyst';
+  const [showHumanReviewModal, setShowHumanReviewModal] = useState(false);
+  const [humanReviewNotes, setHumanReviewNotes] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const router = useRouter();
 
-  // ── Access control ─────────────────────────────────────────────────────────
-  const [accessDenied, setAccessDenied] = useState(false);
-  useEffect(() => {
-    try {
-      const lu = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
-      // Block 'user' role by default — only admin and analyst can access DD
-      if ((lu.role || '').toLowerCase() === 'user') {
-        setAccessDenied(true);
-        return;
-      }
-      const userId = lu.id || lu.backendId;
-      if (!userId) return;
-      const overrides = JSON.parse(localStorage.getItem('userOverrides') || '{}');
-      const userPerms: Array<{ name: string; enabled: boolean }> | undefined = overrides[userId]?.permissions;
-      if (!userPerms) return; // no overrides = role defaults = allow
-      const ddPerm = userPerms.find(p => p.name === 'Due Diligence Reports');
-      if (ddPerm && !ddPerm.enabled) setAccessDenied(true);
-    } catch { /* ignore */ }
-  }, []);
-
   // Calculate progress
   const progress = Math.round((completedSteps.length / WORKFLOW_STEPS.length) * 100);
 
   // File handling
-  const extractFromFilesAndAutoFill = useCallback(async (files: File[]) => {
-    if (files.length === 0) return;
-    setIsExtractingDD(true);
-    try {
-      let combinedText = '';
-      for (const file of files) {
-        try {
-          const fd = new FormData();
-          fd.append('file', file);
-          const res = await fetch('/api/extract', { method: 'POST', body: fd });
-          if (res.ok) {
-            const d = await res.json();
-            if (d.text_content) combinedText += '\n\n' + d.text_content;
-          }
-        } catch { /* ignore individual failures */ }
-      }
-      if (combinedText.trim().length > 20) {
-        const token = typeof window !== 'undefined' ? (localStorage.getItem('authToken') ?? '') : '';
-        const aiRes = await fetch('/api/ai-autofill', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: combinedText, token }),
-        });
-        if (aiRes.ok) {
-          const aiJson = await aiRes.json();
-          const aiData = (aiJson.data as Record<string, unknown>) ?? {};
-          const pick = (v: unknown) => typeof v === 'string' && v.trim() ? v.trim() : '';
-          const name = pick(aiData.company_name);
-          const desc = pick(aiData.company_description);
-          const industry = pick(aiData.sector);
-          if (name) setCompanyName(prev => prev || name);
-          if (desc) setCompanyDescription(prev => prev || desc);
-          if (industry) setCompanyIndustry(prev => prev || industry);
-          const fieldsN = [name, desc, industry].filter(Boolean).length;
-          setDdFieldsExtracted(fieldsN);
-          if (fieldsN > 0) {
-            toast({ title: 'AI Auto-Fill Complete', description: `${fieldsN} company field${fieldsN > 1 ? 's' : ''} filled — verify before proceeding.` });
-          }
-        }
-      }
-    } catch { /* ignore */ }
-    finally { setIsExtractingDD(false); }
-  }, [toast]);
-
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
-      const files = Array.from(event.target.files);
-      const newFiles = files.map((file) => ({
+      const newFiles = Array.from(event.target.files).map((file) => ({
         name: file.name,
         size: file.size,
       }));
       setUploadedFiles((prev) => [...prev, ...newFiles]);
-      toast({ title: 'Files added', description: `${newFiles.length} file(s) added. Running AI extraction…` });
-      extractFromFilesAndAutoFill(files);
+      toast({ title: 'Files uploaded', description: `${newFiles.length} file(s) added successfully.` });
     }
   };
 
@@ -351,6 +279,10 @@ export default function DueDiligenceWorkflowPage() {
       case 6:
         return true;
       case 7:
+        return true;
+      case 8:
+        return true;
+      case 9:
         return true;
       default:
         return false;
@@ -444,27 +376,16 @@ export default function DueDiligenceWorkflowPage() {
       };
       localStorage.setItem('ddContext', JSON.stringify(ddContext));
 
-      const ddFramework: 'general' | 'medtech' =
-        companyIndustry.toLowerCase().includes('health') ||
-        companyIndustry.toLowerCase().includes('bio') ||
-        companyIndustry.toLowerCase().includes('med')
-          ? 'medtech' : 'general';
-
-      const comprehensiveData = await runAnalysis(ddFramework, {
+      const comprehensiveData = await runAnalysis('general', {
         companyName,
-        companyDescription: [companyDescription, companyIndustry, dealType].filter(Boolean).join(' | '),
-        uploadedFiles: uploadedFiles as unknown as any[],
-        importedUrls,
-        submittedTexts,
-        activeModules: selectedAreas.map(areaId => ({
-          module_id: areaId,
-          weight: 10,
-          is_enabled: true,
-        })),
+        companyTicker,
+        companyIndustry,
+        companyDescription,
+        activeModules: DD_AREAS.filter(a => selectedAreas.includes(a.id)).map(a => ({ module_id: a.id, weight: 10, is_enabled: true }))
       });
       setAnalysisResult(comprehensiveData);
       localStorage.setItem('analysisResult', JSON.stringify(comprehensiveData));
-      localStorage.setItem('analysisFramework', ddFramework);
+      localStorage.setItem('analysisFramework', 'general');
 
       const savedReport = await reportsApi.createReport({
         company_name: companyName,
@@ -473,14 +394,6 @@ export default function DueDiligenceWorkflowPage() {
         missing_sections: reportSections.filter((s) => !s.active).map((s) => s.id),
       });
       setSavedReportId(savedReport.id);
-      // Track report usage per user
-      try {
-        const lu = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
-        const uid = String(lu.id || 'unknown');
-        const usage = JSON.parse(localStorage.getItem('reportUsage') || '{}');
-        usage[uid] = { triage: usage[uid]?.triage || 0, dd: (usage[uid]?.dd || 0) + 1 };
-        localStorage.setItem('reportUsage', JSON.stringify(usage));
-      } catch { /* ignore */ }
 
       if (!completedSteps.includes(6)) setCompletedSteps((prev) => [...prev, 6]);
       setCurrentStep(7);
@@ -540,7 +453,6 @@ export default function DueDiligenceWorkflowPage() {
         missing_sections: reportSections.filter((s) => !s.active).map((s) => s.id),
       });
       setSavedReportId(saved.id);
-      setRecordedTimestamp(new Date().toISOString());
       toast({ title: 'Report saved', description: `Report #${saved.id} saved successfully.` });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to save report.';
@@ -581,13 +493,6 @@ export default function DueDiligenceWorkflowPage() {
     setUserRole(role);
     const saved = localStorage.getItem('report-config-dd');
     setReportSections(saved ? JSON.parse(saved) : DEFAULT_DD_SECTIONS);
-    try {
-      const lu = localStorage.getItem('loggedInUser');
-      if (lu) {
-        const u = JSON.parse(lu);
-        setCreatedByName(u.name || u.email || 'Unknown');
-      }
-    } catch { /* ignore */ }
   }, []);
 
   // Load draft on mount
@@ -942,20 +847,9 @@ export default function DueDiligenceWorkflowPage() {
                     onClick={() => fileInputRef.current?.click()}
                   >
                     <UploadCloud className="h-10 w-10 text-muted-foreground" />
-                    <h3 className="mt-3 text-lg font-semibold">
-                      {isExtractingDD ? 'Extracting data with AI…' : 'Drop files here or click to browse'}
-                    </h3>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {isExtractingDD
-                        ? 'Analysing documents and auto-filling company fields…'
-                        : 'PDF, DOCX, PPTX, XLSX, images, JSON, TXT — all formats supported'}
-                    </p>
-                    {ddFieldsExtracted > 0 && !isExtractingDD && (
-                      <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
-                        ✓ {ddFieldsExtracted} field{ddFieldsExtracted > 1 ? 's' : ''} auto-filled by AI
-                      </span>
-                    )}
-                    <Input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} multiple accept=".pdf,.pptx,.ppt,.docx,.doc,.xlsx,.xls,.csv,.txt,.json,.jpg,.jpeg,.png,.gif,.webp,.bmp,.tiff,.rtf,.odt,.odp,.ods,.htm,.html" />
+                    <h3 className="mt-3 text-lg font-semibold">Drop files here or click to browse</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">PDF, DOCX, XLSX, TXT (Max 50MB each)</p>
+                    <Input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} multiple accept=".pdf,.docx,.xlsx,.txt,.csv" />
                   </div>
 
                   {uploadedFiles.length > 0 && (
@@ -1339,7 +1233,7 @@ export default function DueDiligenceWorkflowPage() {
                   <Button variant="outline" onClick={() => setShowPreview(true)}>
                     <Eye className="mr-2 size-4" /> Preview
                   </Button>
-                  <Button size="lg" onClick={handleGenerateReport} disabled={isLoading}>
+                  <Button size="lg" onClick={() => isAdminOrAnalyst ? setShowHumanReviewModal(true) : handleGenerateReport()} disabled={isLoading}>
                     {isLoading ? (
                       <><Loader2 className="mr-2 size-4 animate-spin" /> Generating...</>
                     ) : (
@@ -1353,6 +1247,60 @@ export default function DueDiligenceWorkflowPage() {
         );
 
       case 7:
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Eye className="size-5" />
+                Preview Report
+              </CardTitle>
+              <CardDescription>Review the generated due diligence analysis before saving.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="rounded-lg border bg-muted/30 p-4 space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Company</p>
+                  <p className="font-semibold">{companyName}</p>
+                  <p className="text-sm text-muted-foreground">{companyIndustry} · {dealType}</p>
+                </div>
+                <div className="rounded-lg border bg-muted/30 p-4 space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Areas Analyzed</p>
+                  <p className="font-semibold text-2xl">{selectedAreas.length}</p>
+                  <p className="text-sm text-muted-foreground">of {DD_AREAS.length} areas</p>
+                </div>
+                <div className="rounded-lg border bg-muted/30 p-4 space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Active Sections</p>
+                  <p className="font-semibold">{reportSections.filter((s) => s.active).length}</p>
+                  <p className="text-sm text-muted-foreground">report sections</p>
+                </div>
+              </div>
+              {analysisResult != null && (
+                <div className="rounded-lg border p-4 space-y-2">
+                  <p className="font-medium text-sm">Analysis completed successfully.</p>
+                  <p className="text-xs text-muted-foreground">Results are ready for review and export.</p>
+                </div>
+              )}
+              {isAdminOrAnalyst && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">Analyst Commentary</Label>
+                  <Textarea
+                    placeholder="Add analyst notes, observations, or qualitative commentary..."
+                    value={humanReviewNotes}
+                    onChange={(e) => setHumanReviewNotes(e.target.value)}
+                    rows={4}
+                  />
+                </div>
+              )}
+              <div className="flex justify-end">
+                <Button onClick={nextStep}>
+                  Proceed to Storage <ArrowRight className="ml-2 size-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        );
+
+      case 8:
         return (
           <Card>
             <CardHeader>
@@ -1433,36 +1381,39 @@ export default function DueDiligenceWorkflowPage() {
           </Card>
         );
 
+      case 9:
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CheckCircle2 className="size-5 text-green-600" />
+                Report Complete
+              </CardTitle>
+              <CardDescription>Your due diligence report has been generated and processed.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="rounded-lg border border-green-300 bg-green-50/40 p-6 text-center space-y-2">
+                <CheckCircle2 className="size-10 text-green-600 mx-auto" />
+                <p className="font-semibold text-green-800">Due Diligence Complete</p>
+                <p className="text-sm text-green-700">{companyName} — {selectedAreas.length} areas analyzed</p>
+                {savedReportId && <p className="text-xs text-green-700">Saved as Report #{savedReportId}</p>}
+              </div>
+              <div className="flex flex-wrap justify-center gap-3">
+                <Button asChild>
+                  <Link href="/dashboard/reports"><Eye className="mr-2 size-4" />View All Reports</Link>
+                </Button>
+                <Button variant="outline" onClick={() => window.location.reload()}>
+                  Start New Due Diligence
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        );
+
       default:
         return null;
     }
   };
-
-  if (accessDenied) {
-    return (
-      <div className="container mx-auto p-4 md:p-8 max-w-6xl">
-        <Link
-          href="/dashboard/reports"
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary mb-6"
-        >
-          <ArrowLeft className="size-4" /> Back to Reports
-        </Link>
-        <Card className="border-destructive/50 bg-destructive/5">
-          <CardContent className="pt-6 pb-10 text-center space-y-4">
-            <Shield className="mx-auto h-12 w-12 text-destructive/60" />
-            <h2 className="text-xl font-semibold">Access Restricted</h2>
-            <p className="text-muted-foreground max-w-sm mx-auto">
-              You do not have permission to access Due Diligence Reports.
-              Please contact your administrator to enable access.
-            </p>
-            <Button asChild variant="outline">
-              <Link href="/dashboard/reports">Back to Reports</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="container mx-auto p-4 md:p-8 max-w-6xl">
@@ -1491,18 +1442,6 @@ export default function DueDiligenceWorkflowPage() {
           </div>
         </div>
       </header>
-
-      {/* Evaluation metadata banner */}
-      <div className="rounded-lg border bg-muted/30 px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-muted-foreground mb-6">
-        <span><span className="font-semibold text-foreground">Evaluation ID:</span> <span className="font-mono text-primary">{evaluationId}</span></span>
-        <span><span className="font-semibold text-foreground">Created by:</span> {createdByName}</span>
-        <span><span className="font-semibold text-foreground">Session started:</span> {new Date(sessionStartedAt).toLocaleString()}</span>
-        {recordedTimestamp && (
-          <span className="text-green-600 dark:text-green-400">
-            <span className="font-semibold">Recorded:</span> {new Date(recordedTimestamp).toLocaleString()}
-          </span>
-        )}
-      </div>
 
       {/* Step indicator */}
       <div className="mb-8 overflow-x-auto">
@@ -1615,6 +1554,33 @@ export default function DueDiligenceWorkflowPage() {
             <Button variant="outline" onClick={() => setShowPreview(false)}>Close</Button>
             <Button onClick={handleGenerateReport} disabled={isLoading}>
               {isLoading ? 'Generating...' : 'Generate Report'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Human Review Modal */}
+      <Dialog open={showHumanReviewModal} onOpenChange={setShowHumanReviewModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Human Review Required</DialogTitle>
+            <DialogDescription>
+              As an analyst/admin, please confirm you have reviewed all input data before generating the report.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Label>Review Notes (optional)</Label>
+            <Textarea
+              placeholder="Document your pre-generation review observations..."
+              value={humanReviewNotes}
+              onChange={(e) => setHumanReviewNotes(e.target.value)}
+              rows={4}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowHumanReviewModal(false)}>Cancel</Button>
+            <Button onClick={() => { setShowHumanReviewModal(false); handleGenerateReport(); }}>
+              <BrainCircuit className="mr-2 size-4" /> Confirm & Generate
             </Button>
           </DialogFooter>
         </DialogContent>

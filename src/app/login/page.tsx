@@ -8,37 +8,43 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import Link from 'next/link';
-import { LogIn, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { LogIn, Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { users } from '@/lib/users';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
 
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
+    setIsLoading(true);
 
-    // 1. Try backend authentication first
+    // Always use backend API for authentication
     try {
       const { backendAPI } = await import('@/lib/backend-api');
       const response = await backendAPI.login(email, password);
 
-      if (response.success) {
-        // Build a user record from whatever the backend returned
-        const rawUser = response.user || {};
-        const userData = {
-          ...rawUser,
-          id: rawUser.user_id || rawUser.id || `user_${Date.now()}`,
-          name: rawUser.full_name || rawUser.name || rawUser.email || email,
-          email: rawUser.email || email,
-          role: rawUser.role || 'User',
+      if (response.success && response.user) {
+        // Store user data with role information
+        let userData = {
+          ...response.user,
+          id: response.user.user_id || response.user.id,
+          name: response.user.full_name || response.user.name || response.user.email,
+          role: response.user.role || 'User'
         };
+        // Restore persisted avatar if user had uploaded one before
+        const savedAvatar = localStorage.getItem(`userAvatar_${userData.id}`);
+        if (savedAvatar) {
+          userData = { ...userData, avatar: savedAvatar };
+        }
         localStorage.setItem('loggedInUser', JSON.stringify(userData));
+        localStorage.setItem('currentUser', JSON.stringify(userData));
         localStorage.setItem('authToken', response.access_token);
         if (response.refresh_token) {
           localStorage.setItem('refreshToken', response.refresh_token);
@@ -49,40 +55,19 @@ export default function LoginPage() {
         });
         router.push('/dashboard');
         return;
+      } else {
+        throw new Error(response.error || 'Login failed');
       }
-    } catch (backendError: any) {
-      // Backend failed – try local user fallback before giving up
-      console.warn('Backend login failed, trying local fallback:', backendError.message);
-    }
-
-    // 2. Local user fallback (for admin/dev access when backend is unavailable)
-    const localUser = users.find(
-      (u) => u.email.toLowerCase() === email.toLowerCase() && u.password === password
-    );
-    if (localUser) {
-      const userData = {
-        id: localUser.id,
-        name: localUser.name,
-        email: localUser.email,
-        role: localUser.role,
-      };
-      localStorage.setItem('loggedInUser', JSON.stringify(userData));
-      // No real JWT — use a placeholder so auth checks pass
-      localStorage.setItem('authToken', `local_${localUser.id}`);
+    } catch (error: any) {
+      console.error('Login error:', error);
       toast({
-        title: 'Login Successful',
-        description: `Welcome back, ${localUser.name}! (local session)`,
+        variant: 'destructive',
+        title: 'Login Failed',
+        description: error.message || 'Invalid email or password.',
       });
-      router.push('/dashboard');
-      return;
+    } finally {
+      setIsLoading(false);
     }
-
-    // 3. Both paths failed
-    toast({
-      variant: 'destructive',
-      title: 'Login Failed',
-      description: 'Invalid email or password. Please try again.',
-    });
   };
 
   return (
@@ -103,7 +88,7 @@ export default function LoginPage() {
               <Label htmlFor="email">Email Address</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <Input id="email" type="email" placeholder="Enter your email address" required className="pl-10" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" />
+                <Input id="email" type="email" placeholder="Enter your email address" required className="pl-10" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" disabled={isLoading} />
               </div>
             </div>
             <div className="space-y-2">
@@ -119,6 +104,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   autoComplete="current-password"
+                  disabled={isLoading}
                 />
                 <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
                   {showPassword ? <EyeOff /> : <Eye />}
@@ -132,8 +118,15 @@ export default function LoginPage() {
               </div>
               <Link href="/forgot-password" className="text-primary hover:underline">Forgot password?</Link>
             </div>
-            <Button type="submit" className="w-full bg-gradient-to-r from-primary to-accent text-lg h-12">
-              Sign In
+            <Button type="submit" disabled={isLoading} className="w-full bg-gradient-to-r from-primary to-accent text-lg h-12">
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Signing In...
+                </>
+              ) : (
+                'Sign In'
+              )}
             </Button>
           </form>
           <div className="mt-6 text-center text-sm">

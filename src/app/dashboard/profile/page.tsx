@@ -45,7 +45,9 @@ export default function ProfilePage() {
         if (storedUser) {
           try {
             const parsed = JSON.parse(storedUser);
-            setAvatarUrl(parsed.avatar || 'https://picsum.photos/seed/10/200/200');
+            // Prefer separate avatar key (survives logout) over embedded avatar
+            const persistedAvatar = localStorage.getItem(`userAvatar_${data.id || data.user_id}`);
+            setAvatarUrl(persistedAvatar || parsed.avatar || 'https://picsum.photos/seed/10/200/200');
           } catch {}
         }
       })
@@ -110,6 +112,10 @@ export default function ProfilePage() {
           const storedUser = localStorage.getItem('loggedInUser');
           const base = storedUser ? JSON.parse(storedUser) : {};
           localStorage.setItem('loggedInUser', JSON.stringify({ ...base, avatar: url }));
+          // Also save to separate key so avatar survives logout/login cycle
+          if (user?.id) {
+            localStorage.setItem(`userAvatar_${user.id}`, url);
+          }
           window.dispatchEvent(new Event('storage'));
           toast({ title: 'Profile Picture Updated', description: 'Your new profile picture has been set.' });
         } catch {
