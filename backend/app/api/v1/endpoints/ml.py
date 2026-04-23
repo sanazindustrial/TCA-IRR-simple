@@ -13,10 +13,20 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from app.ml.time_series_engine import time_series_engine
-from app.ml.ml_scoring import ml_scoring
-from app.ml.risk_classifier import risk_classifier
-from app.ml.growth_predictor import growth_predictor
+try:
+    from app.ml.time_series_engine import time_series_engine
+    from app.ml.ml_scoring import ml_scoring
+    from app.ml.risk_classifier import risk_classifier
+    from app.ml.growth_predictor import growth_predictor
+    _ML_AVAILABLE = True
+except Exception as _ml_import_err:  # pragma: no cover
+    _ML_AVAILABLE = False
+    _log = logging.getLogger(__name__)
+    _log.warning("ML modules not available: %s", _ml_import_err)
+    time_series_engine = None  # type: ignore
+    ml_scoring = None  # type: ignore
+    risk_classifier = None  # type: ignore
+    growth_predictor = None  # type: ignore
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
