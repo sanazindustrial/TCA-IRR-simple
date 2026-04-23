@@ -15,7 +15,8 @@ from . import (
     reports,
     cost,
     external_sources,
-    api_routes
+    api_routes,
+    ml
 )
 
 __all__ = [
@@ -32,5 +33,6 @@ __all__ = [
     "reports",
     "cost",
     "external_sources",
-    "api_routes"
+    "api_routes",
+    "ml"
 ]

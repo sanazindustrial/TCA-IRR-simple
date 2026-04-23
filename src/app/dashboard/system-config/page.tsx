@@ -44,6 +44,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
+import { Switch } from '@/components/ui/switch';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -131,6 +132,134 @@ const configurationFeatures = [
     { name: 'Strategic Analysis (competitive positioning & roadmap)' },
     { name: 'Analyst Review (NLP analysis + AI deviation review)' },
 ];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ML Settings Panel
+// ─────────────────────────────────────────────────────────────────────────────
+const ML_MODELS = [
+  { id: 'arima',    label: 'ARIMA',    description: 'Autoregressive integrated moving average – time-series baseline' },
+  { id: 'xgboost',  label: 'XGBoost',  description: 'Gradient-boosted tree ensemble for tabular scoring features' },
+  { id: 'lstm',     label: 'LSTM',     description: 'Long short-term memory neural network for sequence patterns' },
+  { id: 'ensemble', label: 'Ensemble', description: 'Weighted blend (30 / 40 / 30) of ARIMA + XGBoost + LSTM' },
+] as const;
+
+type MlModelId = typeof ML_MODELS[number]['id'];
+
+function MLSettingsPanel() {
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
+  const { toast } = useToast();
+
+  const [enabled, setEnabled] = React.useState<Record<MlModelId, boolean>>({
+    arima: true, xgboost: true, lstm: true, ensemble: true,
+  });
+  const [training, setTraining] = React.useState(false);
+  const [trainResult, setTrainResult] = React.useState<string | null>(null);
+
+  const toggle = (id: MlModelId) =>
+    setEnabled(prev => ({ ...prev, [id]: !prev[id] }));
+
+  const handleRetrain = async () => {
+    setTraining(true);
+    setTrainResult(null);
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+      const res = await fetch(`${API_BASE}/api/v1/ml/train`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ force: true }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        const msg = data.message || 'Training job queued successfully';
+        setTrainResult(msg);
+        toast({ title: 'ML Training', description: msg });
+      } else {
+        throw new Error(data.detail || 'Training request failed');
+      }
+    } catch (err: any) {
+      const msg = err.message || 'Failed to reach ML training endpoint';
+      setTrainResult(`Error: ${msg}`);
+      toast({ title: 'Training Error', description: msg, variant: 'destructive' });
+    } finally {
+      setTraining(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Cpu className="h-5 w-5 text-purple-500" />
+            Machine Learning Models
+          </CardTitle>
+          <CardDescription>
+            Enable or disable individual ML models used for scoring, risk detection, and time-series
+            forecasting. Changes apply on next model inference.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {ML_MODELS.map(m => (
+            <div
+              key={m.id}
+              className="flex items-center justify-between rounded-lg border p-4 transition-colors hover:bg-muted/40"
+            >
+              <div className="space-y-0.5">
+                <p className="font-medium">{m.label}</p>
+                <p className="text-sm text-muted-foreground">{m.description}</p>
+              </div>
+              <Switch
+                checked={enabled[m.id]}
+                onCheckedChange={() => toggle(m.id)}
+                aria-label={`${enabled[m.id] ? 'Disable' : 'Enable'} ${m.label}`}
+              />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Zap className="h-5 w-5 text-yellow-500" />
+            Retrain Models
+          </CardTitle>
+          <CardDescription>
+            Trigger a full retraining pass using the current evaluation dataset stored in the
+            database. ARIMA, XGBoost, LSTM, and Ensemble weights will be refreshed.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {trainResult && (
+            <Alert variant={trainResult.startsWith('Error') ? 'destructive' : 'default'}>
+              <AlertDescription>{trainResult}</AlertDescription>
+            </Alert>
+          )}
+          <Button
+            onClick={handleRetrain}
+            disabled={training}
+            className="gap-2"
+          >
+            {training ? (
+              <><Loader2 className="h-4 w-4 animate-spin" />Training in progress…</>
+            ) : (
+              <><Rocket className="h-4 w-4" />Retrain All Models</>
+            )}
+          </Button>
+        </CardContent>
+        <CardFooter>
+          <p className="text-xs text-muted-foreground">
+            Training may take several minutes. The endpoint returns immediately and processes
+            asynchronously. Check the AI Training dashboard for live progress.
+          </p>
+        </CardFooter>
+      </Card>
+    </div>
+  );
+}
 
 const ApiKeyDialog = ({ open, onOpenChange, onSave, apiKey }: { open: boolean, onOpenChange: (open: boolean) => void, onSave: (key: ApiKey) => void, apiKey: ApiKey | null }) => {
     const [editedKey, setEditedKey] = useState<ApiKey | null>(apiKey);
@@ -355,12 +484,13 @@ export default function SystemConfigPage() {
           </header>
 
           <Tabs defaultValue="api-keys">
-            <TabsList className="mb-6 grid grid-cols-1 md:grid-cols-5">
+            <TabsList className="mb-6 grid grid-cols-1 md:grid-cols-6">
               <TabsTrigger value="env-vars">Environment Variables</TabsTrigger>
               <TabsTrigger value="api-keys">API Keys</TabsTrigger>
               <TabsTrigger value="connection-status">Connection Status</TabsTrigger>
               <TabsTrigger value="system-testing">System Testing</TabsTrigger>
               <TabsTrigger value="sector-setup">Sector Setup Management</TabsTrigger>
+              <TabsTrigger value="machine-learning">Machine Learning</TabsTrigger>
             </TabsList>
             <TabsContent value="env-vars">
               <Card>
@@ -643,6 +773,11 @@ export default function SystemConfigPage() {
                           </Alert>
                       </CardContent>
                   </Card>
+              </TabsContent>
+
+              {/* ────────────── Machine Learning Tab ────────────── */}
+              <TabsContent value="machine-learning">
+                <MLSettingsPanel />
               </TabsContent>
           </Tabs>
         </div>

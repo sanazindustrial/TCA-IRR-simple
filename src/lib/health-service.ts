@@ -27,7 +27,8 @@ export type ServiceGroupId =
     | 'admin'
     | 'communication'
     | 'extraction'
-    | 'ai';
+    | 'ai'
+    | 'ml';
 
 export interface ServiceDef {
     id: string;
@@ -109,6 +110,7 @@ const GROUP_LABELS: Record<ServiceGroupId, string> = {
     communication: 'Communication',
     extraction:    'File & Text Extraction',
     ai:            'AI Agents',
+    ml:            'Machine Learning',
 };
 
 // ─── Service definitions ─────────────────────────────────────────────────────
@@ -163,7 +165,7 @@ const SERVICES: ServiceDef[] = [
 
     // ── Admin / config ──
     // cost/summary/public is unauthenticated and available to all
-    { id: 'cost-public-svc',    label: 'Cost (Public)',        group: 'admin', path: '/api/v1/cost/summary/public'                              },
+    { id: 'cost-public-svc',    label: 'Cost (Public)',        group: 'admin', path: '/api/v1/cost/summary/public',                             optional: true },
     { id: 'cost-summary-svc',   label: 'Cost Summary',         group: 'admin', path: '/api/v1/cost/summary',          requiresAuth: true, optional: true },
     { id: 'cost-usage-svc',     label: 'Cost Usage',           group: 'admin', path: '/api/v1/cost/usage',            requiresAuth: true, optional: true },
     { id: 'cost-budget-svc',    label: 'Cost Budget',          group: 'admin', path: '/api/v1/cost/budget',           requiresAuth: true, optional: true },
@@ -208,6 +210,11 @@ const SERVICES: ServiceDef[] = [
     // ── AI Agent services (optional – may not be deployed) ──
     { id: 'ai-analysis-svc',       label: 'AI Analysis Agent',             group: 'ai', path: '/api/v1/analysis/ai-extract',            requiresAuth: true, optional: true },
     { id: 'ai-multi-agent-svc',    label: 'Multi-Agent Orchestrator',      group: 'ai', path: '/api/v1/analysis/ai-orchestrate',        requiresAuth: true, optional: true },
+
+    // ── Machine Learning services (optional – may not be deployed) ──
+    { id: 'ml-scoring-svc',        label: 'ML Scoring',                    group: 'ml', path: '/api/v1/ml/status',                      optional: true },
+    { id: 'ml-timeseries-svc',     label: 'Time Series',                   group: 'ml', path: '/api/v1/ml/time-series/status',          optional: true },
+    { id: 'ml-training-svc',       label: 'ML Training',                   group: 'ml', path: '/api/v1/ml/training/status',             optional: true },
 ];
 
 // ─── Constants ───────────────────────────────────────────────────────────────

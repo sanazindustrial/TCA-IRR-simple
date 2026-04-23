@@ -34,6 +34,8 @@ import { useToast } from '@/hooks/use-toast';
 import PerformancePage from './performance/page';
 import DataQualityPage from './data-quality/page';
 import BiasFairnessPage from './bias-fairness/page';
+import { TimeSeriesPanel } from '@/components/ml/TimeSeriesPanel';
+import { MLDashboard } from '@/components/ml/MLDashboard';
 
 const MetricCard = ({ title, value, target, unit, icon: Icon }: { title: string, value: string, target: string, unit?: string, icon: React.ElementType}) => {
     const valueWithUnit = `${value}${unit || ''}`;
@@ -119,7 +121,11 @@ export default function AiTrainingPage() {
           <TabsTrigger value="overview"><BrainCircuit className="mr-2"/> Quality Overview</TabsTrigger>
           <TabsTrigger value="performance"><BarChart className="mr-2"/> Performance Deep Dive</TabsTrigger>
           <TabsTrigger value="data-quality"><Check className="mr-2"/> Data Quality</TabsTrigger>
-          <TabsTrigger value="bias-fairness"><Users className="mr-2"/> Bias & Fairness</TabsTrigger>
+          <TabsTrigger value="bias-fairness"><Users className="mr-2"/> Bias &amp; Fairness</TabsTrigger>
+          <TabsTrigger value="time-series"><Activity className="mr-2"/> Time-Series Engine</TabsTrigger>
+          <TabsTrigger value="ml-scoring"><Target className="mr-2"/> Score Prediction</TabsTrigger>
+          <TabsTrigger value="ml-risk"><ShieldCheck className="mr-2"/> Risk Detection</TabsTrigger>
+          <TabsTrigger value="ml-growth"><TrendingUp className="mr-2"/> Growth Classifier</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -231,6 +237,51 @@ export default function AiTrainingPage() {
         </TabsContent>
          <TabsContent value="bias-fairness">
           <BiasFairnessPage />
+        </TabsContent>
+
+        {/* ── Machine Learning tabs ── */}
+        <TabsContent value="time-series" className="space-y-4">
+          <div className="mb-2">
+            <h2 className="text-lg font-semibold flex items-center gap-2"><Activity className="text-primary"/> Time-Series Forecasting Engine</h2>
+            <p className="text-sm text-muted-foreground">ARIMA, XGBoost, LSTM ensemble forecasting. Enter comma-separated values and click Forecast.</p>
+          </div>
+          <TimeSeriesPanel
+            backendUrl={API_BASE}
+            authToken={typeof window !== 'undefined' ? (localStorage.getItem('authToken') ?? undefined) : undefined}
+          />
+        </TabsContent>
+
+        <TabsContent value="ml-scoring" className="space-y-4">
+          <div className="mb-2">
+            <h2 className="text-lg font-semibold flex items-center gap-2"><Target className="text-primary"/> ML Score Prediction</h2>
+            <p className="text-sm text-muted-foreground">12-category ML scoring blended with rule-based scores. Activates auto-learning after 50 training samples.</p>
+          </div>
+          <MLDashboard
+            backendUrl={API_BASE}
+            authToken={typeof window !== 'undefined' ? (localStorage.getItem('authToken') ?? undefined) : undefined}
+          />
+        </TabsContent>
+
+        <TabsContent value="ml-risk" className="space-y-4">
+          <div className="mb-2">
+            <h2 className="text-lg font-semibold flex items-center gap-2"><ShieldCheck className="text-primary"/> Risk Detection</h2>
+            <p className="text-sm text-muted-foreground">14-flag risk classifier detecting financial, market, and team risk signals.</p>
+          </div>
+          <MLDashboard
+            backendUrl={API_BASE}
+            authToken={typeof window !== 'undefined' ? (localStorage.getItem('authToken') ?? undefined) : undefined}
+          />
+        </TabsContent>
+
+        <TabsContent value="ml-growth" className="space-y-4">
+          <div className="mb-2">
+            <h2 className="text-lg font-semibold flex items-center gap-2"><TrendingUp className="text-primary"/> Growth Classifier</h2>
+            <p className="text-sm text-muted-foreground">Growth tier prediction (High/Moderate/Low) with Bear/Base/Bull 3-year revenue scenarios.</p>
+          </div>
+          <MLDashboard
+            backendUrl={API_BASE}
+            authToken={typeof window !== 'undefined' ? (localStorage.getItem('authToken') ?? undefined) : undefined}
+          />
         </TabsContent>
       </Tabs>
     </div>
