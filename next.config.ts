@@ -27,13 +27,9 @@ const nextConfig: NextConfig = {
     if (!dev && !isServer) {
       // Disable source maps completely
       config.devtool = false;
-
-      // Minimize and obfuscate code
-      if (config.optimization) {
-        config.optimization.minimize = true;
-        config.optimization.moduleIds = 'deterministic';
-        config.optimization.chunkIds = 'deterministic';
-      }
+      // NOTE: Do NOT override moduleIds/chunkIds here.
+      // Next.js already sets optimal deterministic IDs in production.
+      // Overriding them causes "No lowest priority node found" in SplitChunksPlugin.
     }
     return config;
   },

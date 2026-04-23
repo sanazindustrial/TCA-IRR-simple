@@ -69,6 +69,18 @@ class TrainRequest(BaseModel):
 @router.get("/status")
 async def ml_status() -> Dict[str, Any]:
     """Overall ML platform status – used as heartbeat."""
+    if not _ML_AVAILABLE:
+        return {
+            "status": "degraded",
+            "ml_available": False,
+            "models": {
+                "time_series": {"arima": False, "xgboost": False, "lstm": False, "ensemble": False},
+                "scoring": {"available": False, "trained": False},
+                "risk": {"available": False, "trained": False},
+                "growth": {"available": False, "trained": False},
+            },
+            "message": "ML libraries not available – rules-based fallback active",
+        }
     ts_status = time_series_engine.model_status()
     sc_status = ml_scoring.status()
     rc_status = risk_classifier.status()
@@ -90,6 +102,9 @@ async def ml_status() -> Dict[str, Any]:
 @router.get("/time-series/status")
 async def time_series_status() -> Dict[str, Any]:
     """Time-series engine heartbeat."""
+    if not _ML_AVAILABLE:
+        return {"status": "degraded", "arima": False, "xgboost": False, "lstm": False, "ensemble": False,
+                "message": "ML libraries not available"}
     return {
         "status": "online",
         **time_series_engine.model_status(),
@@ -99,6 +114,14 @@ async def time_series_status() -> Dict[str, Any]:
 @router.get("/training/status")
 async def training_status() -> Dict[str, Any]:
     """Training status heartbeat."""
+    if not _ML_AVAILABLE:
+        return {
+            "status": "degraded",
+            "scoring": {"sklearn_available": False, "trained": False},
+            "risk": {"sklearn_available": False, "trained": False},
+            "growth": {"sklearn_available": False, "trained": False},
+            "message": "ML libraries not available",
+        }
     return {
         "status": "online",
         "scoring": ml_scoring.status(),
@@ -119,6 +142,8 @@ async def run_time_series(req: TimeSeriesRequest) -> Dict[str, Any]:
 
     Returns individual model forecasts and blended ensemble prediction.
     """
+    if not _ML_AVAILABLE:
+        raise HTTPException(status_code=503, detail="ML libraries not available – rules-based fallback active")
     try:
         result = time_series_engine.run_ensemble(req.series, steps=req.steps)
         return {"status": "success", "input_length": len(req.series), **result}
@@ -129,6 +154,8 @@ async def run_time_series(req: TimeSeriesRequest) -> Dict[str, Any]:
 
 @router.post("/time-series/arima")
 async def run_arima(req: TimeSeriesRequest) -> Dict[str, Any]:
+    if not _ML_AVAILABLE:
+        raise HTTPException(status_code=503, detail="ML libraries not available")
     try:
         forecast = time_series_engine.run_arima(req.series, steps=req.steps)
         return {"model": "arima", "forecast": forecast}
@@ -138,6 +165,8 @@ async def run_arima(req: TimeSeriesRequest) -> Dict[str, Any]:
 
 @router.post("/time-series/xgboost")
 async def run_xgboost(req: TimeSeriesRequest) -> Dict[str, Any]:
+    if not _ML_AVAILABLE:
+        raise HTTPException(status_code=503, detail="ML libraries not available")
     try:
         forecast = time_series_engine.run_xgboost(req.series, steps=req.steps)
         return {"model": "xgboost", "forecast": forecast}
@@ -147,6 +176,8 @@ async def run_xgboost(req: TimeSeriesRequest) -> Dict[str, Any]:
 
 @router.post("/time-series/lstm")
 async def run_lstm(req: TimeSeriesRequest) -> Dict[str, Any]:
+    if not _ML_AVAILABLE:
+        raise HTTPException(status_code=503, detail="ML libraries not available")
     try:
         forecast = time_series_engine.run_lstm(req.series, steps=req.steps)
         return {"model": "lstm", "forecast": forecast}
@@ -162,6 +193,8 @@ async def run_lstm(req: TimeSeriesRequest) -> Dict[str, Any]:
 @router.post("/score")
 async def predict_score(req: ScoreRequest) -> Dict[str, Any]:
     """Predict 12-category startup scores (1-10) using ML + rules blend."""
+    if not _ML_AVAILABLE:
+        raise HTTPException(status_code=503, detail="ML libraries not available – rules-based fallback active")
     try:
         result = ml_scoring.predict(req.metrics, req.pitch_text)
         return {"status": "success", **result}
@@ -178,6 +211,8 @@ async def predict_score(req: ScoreRequest) -> Dict[str, Any]:
 @router.post("/risk")
 async def classify_risk(req: RiskRequest) -> Dict[str, Any]:
     """Classify 14 risk flags as RED / YELLOW / GREEN."""
+    if not _ML_AVAILABLE:
+        raise HTTPException(status_code=503, detail="ML libraries not available – rules-based fallback active")
     try:
         result = risk_classifier.classify(req.metrics)
         return {"status": "success", **result}
@@ -194,6 +229,8 @@ async def classify_risk(req: RiskRequest) -> Dict[str, Any]:
 @router.post("/predict")
 async def predict_growth(req: GrowthRequest) -> Dict[str, Any]:
     """Predict growth tier (1–3) and 3-year scenario matrix."""
+    if not _ML_AVAILABLE:
+        raise HTTPException(status_code=503, detail="ML libraries not available – rules-based fallback active")
     try:
         result = growth_predictor.predict_tier(req.metrics)
         return {"status": "success", **result}
@@ -217,6 +254,8 @@ async def train_models(req: TrainRequest) -> Dict[str, Any]:
     - risk:     list[dict[flag_id → severity]]  ('RED'|'YELLOW'|'GREEN')
     - growth:   list[int]  (1, 2, or 3)
     """
+    if not _ML_AVAILABLE:
+        raise HTTPException(status_code=503, detail="ML libraries not available – training unavailable")
     results: Dict[str, Any] = {}
 
     if req.model in ("all", "scoring"):
