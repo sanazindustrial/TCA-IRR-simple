@@ -162,7 +162,7 @@ function MLSettingsPanel() {
     setTraining(true);
     setTrainResult(null);
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+      const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
       const res = await fetch(`${API_BASE}/api/v1/ml/train`, {
         method: 'POST',
         headers: {

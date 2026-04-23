@@ -72,6 +72,30 @@ async def admin_health_check(
     )
 
 
+@router.get("/database/status")
+async def database_status(current_user: dict = Depends(get_current_user)):
+    """Check database connectivity — used by system-config test buttons"""
+    try:
+        async with db_manager.acquire() as db:
+            await db.fetchval("SELECT 1")
+        return {
+            "status": "healthy",
+            "connected": True,
+            "database": "PostgreSQL",
+            "message": "Database connection successful",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        logger.warning("Database connectivity check failed: %s", e)
+        return {
+            "status": "degraded",
+            "connected": False,
+            "database": "PostgreSQL",
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+
 @router.get("/system-status")
 async def system_status(
     request: Request,

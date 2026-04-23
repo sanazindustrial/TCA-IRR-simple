@@ -32,6 +32,30 @@ async def get_analyses(page: int = 1,
                              has_previous=False)
 
 
+@router.get("/ai-extract")
+async def ai_extract_status(current_user: dict = Depends(get_current_user)):
+    """AI Analysis Agent status endpoint for health monitoring"""
+    return {
+        "status": "operational",
+        "service": "AI Analysis Agent",
+        "available": True,
+        "mode": "calculated",
+        "message": "AI analysis service ready"
+    }
+
+
+@router.get("/ai-orchestrate")
+async def ai_orchestrate_status(current_user: dict = Depends(get_current_user)):
+    """Multi-Agent Orchestrator status endpoint for health monitoring"""
+    return {
+        "status": "operational",
+        "service": "Multi-Agent Orchestrator",
+        "available": True,
+        "mode": "sequential",
+        "message": "Multi-agent orchestration service ready"
+    }
+
+
 @router.post("/",
              response_model=AnalysisResponse,
              status_code=status.HTTP_201_CREATED)

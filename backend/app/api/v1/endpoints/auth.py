@@ -14,7 +14,7 @@ import logging
 import secrets
 from datetime import timedelta, datetime
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field, field_validator
 import asyncpg
