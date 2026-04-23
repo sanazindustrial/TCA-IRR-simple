@@ -34,8 +34,18 @@ import { useToast } from '@/hooks/use-toast';
 import PerformancePage from './performance/page';
 import DataQualityPage from './data-quality/page';
 import BiasFairnessPage from './bias-fairness/page';
-import { TimeSeriesPanel } from '@/components/ml/TimeSeriesPanel';
-import { MLDashboard } from '@/components/ml/MLDashboard';
+import dynamic from 'next/dynamic';
+
+// Dynamic imports prevent the recharts/ML chunk graph from triggering webpack's
+// "No lowest priority node found" SplitChunksPlugin error.
+const TimeSeriesPanel = dynamic(
+  () => import('@/components/ml/TimeSeriesPanel').then(m => ({ default: m.TimeSeriesPanel })),
+  { ssr: false, loading: () => <div className="p-8 text-center text-muted-foreground">Loading Time-Series Engine…</div> }
+);
+const MLDashboard = dynamic(
+  () => import('@/components/ml/MLDashboard').then(m => ({ default: m.MLDashboard })),
+  { ssr: false, loading: () => <div className="p-8 text-center text-muted-foreground">Loading ML Dashboard…</div> }
+);
 
 const MetricCard = ({ title, value, target, unit, icon: Icon }: { title: string, value: string, target: string, unit?: string, icon: React.ElementType}) => {
     const valueWithUnit = `${value}${unit || ''}`;
