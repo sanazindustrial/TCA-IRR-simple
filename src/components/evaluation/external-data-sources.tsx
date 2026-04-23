@@ -48,7 +48,8 @@ import {
     RefreshCw,
     Clock,
     AlertCircle,
-    CheckCircle2
+    CheckCircle2,
+    Save
 } from 'lucide-react';
 
 interface ExternalDataSourcesProps {
@@ -95,10 +96,11 @@ export function ExternalDataSources({ framework, className = '', companyName = '
     const [isFetching, setIsFetching] = useState(false);
     const [fetchSummary, setFetchSummary] = useState<AggregatedExternalData['fetchSummary'] | null>(null);
     const [lastFetchTime, setLastFetchTime] = useState<string | null>(null);
+    const [configApiKeys, setConfigApiKeys] = useState<Record<string, string>>({});
     const { toast } = useToast();
 
     const sourcesByCategory = getSourcesByCategory();
-    const connectedCount = getConnectedSources().length;
+    const connectedCount = sources.filter(s => s.connected).length;
     const freeSourcesCount = getFreeAndFreemiumSources().length;
 
     // Load saved fetch statuses from localStorage
@@ -114,6 +116,25 @@ export function ExternalDataSources({ framework, className = '', companyName = '
                 console.warn('Failed to load saved fetch statuses:', e);
             }
         }
+    }, []);
+
+    // Load saved connections and API keys from localStorage
+    useEffect(() => {
+        try {
+            const savedConnections = localStorage.getItem('external-sources-connections');
+            if (savedConnections) {
+                const connectionMap: Record<string, boolean> = JSON.parse(savedConnections);
+                setSources(prev => prev.map(s =>
+                    s.id in connectionMap ? { ...s, connected: connectionMap[s.id] } : s
+                ));
+            }
+        } catch { }
+        try {
+            const savedApiKeys = localStorage.getItem('external-sources-api-keys');
+            if (savedApiKeys) {
+                setConfigApiKeys(JSON.parse(savedApiKeys));
+            }
+        } catch { }
     }, []);
 
     // Fetch data from connected sources
@@ -256,13 +277,18 @@ export function ExternalDataSources({ framework, className = '', companyName = '
     );
 
     const toggleConnection = (sourceId: string) => {
-        setSources(prev => prev.map(source =>
-            source.id === sourceId
-                ? { ...source, connected: !source.connected }
-                : source
-        ));
-
         const source = sources.find(s => s.id === sourceId);
+        setSources(prev => {
+            const updated = prev.map(s =>
+                s.id === sourceId ? { ...s, connected: !s.connected } : s
+            );
+            try {
+                const connectionMap: Record<string, boolean> = {};
+                updated.forEach(s => { connectionMap[s.id] = s.connected; });
+                localStorage.setItem('external-sources-connections', JSON.stringify(connectionMap));
+            } catch { }
+            return updated;
+        });
         toast({
             title: source?.connected ? 'Source Disconnected' : 'Source Connected',
             description: `${source?.name} has been ${source?.connected ? 'disconnected from' : 'connected to'} your analysis pipeline.`,
@@ -270,11 +296,19 @@ export function ExternalDataSources({ framework, className = '', companyName = '
     };
 
     const connectAllFree = () => {
-        setSources(prev => prev.map(source =>
-            (source.pricing === 'Free' || source.pricing === 'Freemium') && relevantSources.includes(source)
-                ? { ...source, connected: true }
-                : source
-        ));
+        setSources(prev => {
+            const updated = prev.map(source =>
+                (source.pricing === 'Free' || source.pricing === 'Freemium') && relevantSources.includes(source)
+                    ? { ...source, connected: true }
+                    : source
+            );
+            try {
+                const connectionMap: Record<string, boolean> = {};
+                updated.forEach(s => { connectionMap[s.id] = s.connected; });
+                localStorage.setItem('external-sources-connections', JSON.stringify(connectionMap));
+            } catch { }
+            return updated;
+        });
         toast({
             title: 'Free Sources Connected',
             description: 'All free and freemium data sources have been connected.',
@@ -355,6 +389,8 @@ export function ExternalDataSources({ framework, className = '', companyName = '
                                                     id={`api-key-${source.id}`}
                                                     type="password"
                                                     placeholder="Enter API key..."
+                                                    value={configApiKeys[source.id] || ''}
+                                                    onChange={(e) => setConfigApiKeys(prev => ({ ...prev, [source.id]: e.target.value }))}
                                                 />
                                                 {source.apiEndpoint && (
                                                     <div className="text-xs text-muted-foreground">
@@ -364,6 +400,17 @@ export function ExternalDataSources({ framework, className = '', companyName = '
                                             </div>
                                         </div>
                                     ))}
+                                </div>
+                                <div className="flex justify-end pt-2">
+                                    <Button onClick={() => {
+                                        try {
+                                            localStorage.setItem('external-sources-api-keys', JSON.stringify(configApiKeys));
+                                            toast({ title: 'API Keys Saved', description: 'API key configuration has been saved.' });
+                                        } catch { }
+                                    }}>
+                                        <Save className="h-4 w-4 mr-1" />
+                                        Save API Keys
+                                    </Button>
                                 </div>
                             </DialogContent>
                         </Dialog>
