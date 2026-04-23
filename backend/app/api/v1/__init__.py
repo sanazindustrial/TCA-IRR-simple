@@ -4,7 +4,7 @@ import logging
 
 from fastapi import APIRouter
 from .endpoints import (auth, users, companies, analysis, investments, admin,
-                        tca, dashboard, ssd, settings, creports, cost,
+                        tca, dashboard, ssd, settings, reports, cost,
                         external_sources, api_routes, roles)
 
 _logger = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ api_router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 api_router.include_router(users.router, prefix="/users", tags=["Users"])
 api_router.include_router(roles.router, tags=["Role Configuration"])
 api_router.include_router(settings.router, tags=["Settings"])
-api_router.include_router(creports.router, tags=["Reports"])
+api_router.include_router(reports.router, tags=["Reports"])
 api_router.include_router(companies.router,
                           prefix="/companies",
                           tags=["Companies"])
