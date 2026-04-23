@@ -20,7 +20,8 @@ export const API_CONFIG = {
         },
         EVALUATIONS: {
             BASE: '/api/v1/evaluations',
-            BY_ID: (id: string) => `/api/v1/evaluations/${id}`
+            BY_ID: (id: string) => `/api/v1/evaluations/${id}`,
+            TCA_BATCH: '/api/v1/evaluations/tca/batch'
         }
     }
 };
@@ -82,19 +83,54 @@ export class ApiClient {
         return headers;
     }
 
+    // Attempt to refresh the auth token. Returns true if successful.
+    private async tryRefreshToken(): Promise<boolean> {
+        if (typeof window === 'undefined') return false;
+        const currentToken = localStorage.getItem('authToken');
+        if (!currentToken) return false;
+        try {
+            const res = await fetch(`${this.baseUrl}/api/v1/auth/refresh`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentToken}` },
+            });
+            if (!res.ok) return false;
+            const data = await res.json();
+            const newToken: string | undefined = data.access_token ?? data.token ?? data.authToken;
+            if (newToken) {
+                this.setToken(newToken);
+                return true;
+            }
+            return false;
+        } catch {
+            return false;
+        }
+    }
+
     async get<T = any>(path: string): Promise<ApiResponse<T>> {
         try {
             const url = `${this.baseUrl}${path}`;
             console.log('API GET Request:', url);
 
-            const response = await fetch(url, {
+            let response = await fetch(url, {
                 method: 'GET',
                 headers: this.getHeaders(),
-                mode: 'cors', // Explicitly enable CORS
-                credentials: 'omit', // Don't send credentials for now
+                mode: 'cors',
+                credentials: 'omit',
             });
 
             console.log('API GET Response Status:', response.status, response.statusText);
+
+            if (response.status === 401) {
+                const refreshed = await this.tryRefreshToken();
+                if (refreshed) {
+                    response = await fetch(url, {
+                        method: 'GET',
+                        headers: this.getHeaders(),
+                        mode: 'cors',
+                        credentials: 'omit',
+                    });
+                }
+            }
 
             if (!response.ok) {
                 const errorText = await response.text();
@@ -112,13 +148,26 @@ export class ApiClient {
                 error: error instanceof Error ? error.message : 'Unknown error'
             };
         }
-    } async post<T = any>(path: string, body: any = {}): Promise<ApiResponse<T>> {
+    }
+
+    async post<T = any>(path: string, body: any = {}): Promise<ApiResponse<T>> {
         try {
-            const response = await fetch(`${this.baseUrl}${path}`, {
+            let response = await fetch(`${this.baseUrl}${path}`, {
                 method: 'POST',
                 headers: this.getHeaders(),
                 body: JSON.stringify(body),
             });
+
+            if (response.status === 401) {
+                const refreshed = await this.tryRefreshToken();
+                if (refreshed) {
+                    response = await fetch(`${this.baseUrl}${path}`, {
+                        method: 'POST',
+                        headers: this.getHeaders(),
+                        body: JSON.stringify(body),
+                    });
+                }
+            }
 
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -137,11 +186,22 @@ export class ApiClient {
 
     async put<T = any>(path: string, body: any = {}): Promise<ApiResponse<T>> {
         try {
-            const response = await fetch(`${this.baseUrl}${path}`, {
+            let response = await fetch(`${this.baseUrl}${path}`, {
                 method: 'PUT',
                 headers: this.getHeaders(),
                 body: JSON.stringify(body),
             });
+
+            if (response.status === 401) {
+                const refreshed = await this.tryRefreshToken();
+                if (refreshed) {
+                    response = await fetch(`${this.baseUrl}${path}`, {
+                        method: 'PUT',
+                        headers: this.getHeaders(),
+                        body: JSON.stringify(body),
+                    });
+                }
+            }
 
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -160,10 +220,20 @@ export class ApiClient {
 
     async delete<T = any>(path: string): Promise<ApiResponse<T>> {
         try {
-            const response = await fetch(`${this.baseUrl}${path}`, {
+            let response = await fetch(`${this.baseUrl}${path}`, {
                 method: 'DELETE',
                 headers: this.getHeaders(),
             });
+
+            if (response.status === 401) {
+                const refreshed = await this.tryRefreshToken();
+                if (refreshed) {
+                    response = await fetch(`${this.baseUrl}${path}`, {
+                        method: 'DELETE',
+                        headers: this.getHeaders(),
+                    });
+                }
+            }
 
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -227,7 +297,10 @@ export const evaluationApi = {
         api.get(API_CONFIG.ENDPOINTS.EVALUATIONS.BY_ID(id)),
 
     update: (id: string, evaluationData: any) =>
-        api.put(API_CONFIG.ENDPOINTS.EVALUATIONS.BY_ID(id), evaluationData)
+        api.put(API_CONFIG.ENDPOINTS.EVALUATIONS.BY_ID(id), evaluationData),
+
+    batchTca: (batchData: any) =>
+        api.post(API_CONFIG.ENDPOINTS.EVALUATIONS.TCA_BATCH, batchData)
 };
 
 // Health check function
