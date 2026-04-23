@@ -169,7 +169,7 @@ const SERVICES: ServiceDef[] = [
     { id: 'cost-budget-svc',    label: 'Cost Budget',          group: 'admin', path: '/api/v1/cost/budget',           requiresAuth: true, optional: true },
     { id: 'settings-svc',       label: 'Settings/Config',      group: 'admin', path: '/api/v1/settings/versions',     requiresAuth: true, optional: true },
     // Trailing slash avoids 307 redirect that may not be proxied correctly on Azure
-    { id: 'users-svc',          label: 'Users',                group: 'admin', path: '/api/v1/users/',                requiresAuth: true },
+    { id: 'users-svc',          label: 'Users',                group: 'admin', path: '/api/v1/users/',                requiresAuth: true, optional: true },
     { id: 'users-export-svc',   label: 'User Export',          group: 'admin', path: '/api/v1/users/export',          requiresAuth: true, optional: true },
     // GET /roles has no handler – use /configurations sub-path
     { id: 'roles-svc',          label: 'Role Configurations',  group: 'admin', path: '/api/v1/roles/configurations',  requiresAuth: true, optional: true },
@@ -308,7 +308,7 @@ class HealthService {
             clearTimeout(timeoutId);
             const latencyMs = Date.now() - t0;
 
-            // 200-399 → healthy; 401/403 → service alive (needs auth); 500+ → down
+            // 200-399 → healthy; 401/403 → service alive (needs auth); 500+ → down (or 'checking' if optional)
             // 404/405 on optional endpoints → 'checking' (not deployed/available yet)
             // 405 on any endpoint → 'healthy' (service is up, just wrong HTTP method for ping)
             // 404 on required endpoints → 'degraded'
@@ -322,7 +322,9 @@ class HealthService {
                 // Method Not Allowed – service is alive, endpoint is POST-only
                 status = 'healthy';
             } else if (res.status >= 500) {
-                status = 'down';
+                // Optional endpoints: treat server errors as 'checking' so they don't
+                // drag the group status to 'down' / 'Offline' when DB is temporarily unavailable
+                status = def.optional ? 'checking' : 'down';
             } else if ((res.status === 404 || res.status === 422) && def.optional) {
                 // Optional endpoint not yet deployed – treat as not-available, not degraded
                 status = 'checking';
@@ -338,7 +340,7 @@ class HealthService {
             clearTimeout(timeoutId);
             return {
                 def,
-                status: 'down',
+                status: def.optional ? 'checking' : 'down',
                 code: -1,
                 latencyMs: Date.now() - t0,
                 checkedAt: new Date().toISOString(),

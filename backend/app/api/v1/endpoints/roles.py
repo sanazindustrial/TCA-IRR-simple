@@ -8,7 +8,7 @@ from typing import Dict, Any
 from fastapi import APIRouter, HTTPException, Depends, status
 import asyncpg
 
-from app.db import get_db
+from app.db import get_db, db_manager
 from app.models import (
     RolePermission,
     RoleLimits,
@@ -181,104 +181,102 @@ def parse_limit(value: Any) -> Any:
 
 
 @router.get("/configurations")
-async def get_role_configurations(db: asyncpg.Connection = Depends(
-    get_db)) -> Dict[str, Any]:
+async def get_role_configurations() -> Dict[str, Any]:
     """Get all role configurations from database"""
     try:
-        # Check if tables exist (run migration check)
-        table_exists = await db.fetchval("""
-            SELECT EXISTS (
-                SELECT 1 FROM information_schema.tables 
-                WHERE table_name = 'role_configurations'
-            )
-        """)
+        async with db_manager.get_connection() as db:
+            # Check if tables exist (run migration check)
+            table_exists = await db.fetchval("""
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.tables 
+                    WHERE table_name = 'role_configurations'
+                )
+            """)
 
-        if not table_exists:
-            # Return defaults if table doesn't exist yet
-            logger.warning(
-                "role_configurations table not found, returning defaults")
-            return {"roles": DEFAULT_ROLE_CONFIGS, "fromDefaults": True}
+            if not table_exists:
+                # Return defaults if table doesn't exist yet
+                logger.warning(
+                    "role_configurations table not found, returning defaults")
+                return {"roles": DEFAULT_ROLE_CONFIGS, "fromDefaults": True}
 
-        # Fetch role configurations
-        role_rows = await db.fetch("""
-            SELECT role_key, label, icon, color, bg_color, updated_at
-            FROM role_configurations
-            ORDER BY 
-                CASE role_key 
-                    WHEN 'admin' THEN 1 
-                    WHEN 'analyst' THEN 2 
-                    WHEN 'user' THEN 3 
-                    ELSE 4 
-                END
-        """)
+            # Fetch role configurations
+            role_rows = await db.fetch("""
+                SELECT role_key, label, icon, color, bg_color, updated_at
+                FROM role_configurations
+                ORDER BY 
+                    CASE role_key 
+                        WHEN 'admin' THEN 1 
+                        WHEN 'analyst' THEN 2 
+                        WHEN 'user' THEN 3 
+                        ELSE 4 
+                    END
+            """)
 
-        if not role_rows:
-            return {"roles": DEFAULT_ROLE_CONFIGS, "fromDefaults": True}
+            if not role_rows:
+                return {"roles": DEFAULT_ROLE_CONFIGS, "fromDefaults": True}
 
-        roles = {}
-        latest_update = None
+            roles = {}
+            latest_update = None
 
-        for row in role_rows:
-            role_key = row['role_key']
+            for row in role_rows:
+                role_key = row['role_key']
 
-            # Track latest update
-            if row['updated_at'] and (not latest_update
-                                      or row['updated_at'] > latest_update):
-                latest_update = row['updated_at']
+                # Track latest update
+                if row['updated_at'] and (not latest_update
+                                          or row['updated_at'] > latest_update):
+                    latest_update = row['updated_at']
 
-            # Fetch permissions for this role
-            perm_rows = await db.fetch(
-                """
-                SELECT id, permission_name, description, is_enabled
-                FROM role_permissions
-                WHERE role_key = $1
-                ORDER BY id
-            """, role_key)
+                # Fetch permissions for this role
+                perm_rows = await db.fetch(
+                    """
+                    SELECT id, permission_name, description, is_enabled
+                    FROM role_permissions
+                    WHERE role_key = $1
+                    ORDER BY id
+                """, role_key)
 
-            permissions = [{
-                "id": p['id'],
-                "name": p['permission_name'],
-                "description": p['description'],
-                "enabled": p['is_enabled']
-            } for p in perm_rows]
+                permissions = [{
+                    "id": p['id'],
+                    "name": p['permission_name'],
+                    "description": p['description'],
+                    "enabled": p['is_enabled']
+                } for p in perm_rows]
 
-            # Fetch limits for this role
-            limit_row = await db.fetchrow(
-                """
-                SELECT triage_reports, dd_reports
-                FROM role_limits
-                WHERE role_key = $1
-            """, role_key)
+                # Fetch limits for this role
+                limit_row = await db.fetchrow(
+                    """
+                    SELECT triage_reports, dd_reports
+                    FROM role_limits
+                    WHERE role_key = $1
+                """, role_key)
 
-            limits = {
-                "triageReports":
-                format_limit(limit_row['triage_reports'])
-                if limit_row else "Unlimited",
-                "ddReports":
-                format_limit(limit_row['dd_reports'])
-                if limit_row else "Unlimited"
+                limits = {
+                    "triageReports":
+                    format_limit(limit_row['triage_reports'])
+                    if limit_row else "Unlimited",
+                    "ddReports":
+                    format_limit(limit_row['dd_reports'])
+                    if limit_row else "Unlimited"
+                }
+
+                roles[role_key] = {
+                    "label": row['label'],
+                    "icon": row['icon'],
+                    "color": row['color'],
+                    "bgColor": row['bg_color'],
+                    "permissions": permissions,
+                    "limits": limits
+                }
+
+            return {
+                "roles": roles,
+                "updatedAt": latest_update.isoformat() if latest_update else None,
+                "fromDefaults": False
             }
-
-            roles[role_key] = {
-                "label": row['label'],
-                "icon": row['icon'],
-                "color": row['color'],
-                "bgColor": row['bg_color'],
-                "permissions": permissions,
-                "limits": limits
-            }
-
-        return {
-            "roles": roles,
-            "updatedAt": latest_update.isoformat() if latest_update else None,
-            "fromDefaults": False
-        }
 
     except Exception as e:
-        logger.error(f"Error fetching role configurations: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error fetching role configurations: {str(e)}")
+        logger.warning(f"DB unavailable for role configurations, returning defaults: {e}")
+        return {"roles": DEFAULT_ROLE_CONFIGS, "fromDefaults": True}
 
 
 @router.put("/configurations/{role_key}")
