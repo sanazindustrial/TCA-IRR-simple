@@ -147,6 +147,25 @@ async def get_tca_system_status(
                 "risk_model": "active",
                 "benchmark_model": "active"
             },
+            "modules": {
+                "analyst":       {"status": "active"},
+                "benchmark":     {"status": "active"},
+                "economic":      {"status": "active"},
+                "environmental": {"status": "active"},
+                "financial":     {"status": "active"},
+                "founderFit":    {"status": "active"},
+                "funder":        {"status": "active"},
+                "gap":           {"status": "active"},
+                "growth":        {"status": "active"},
+                "macro":         {"status": "active"},
+                "marketing":     {"status": "active"},
+                "risk":          {"status": "active"},
+                "social":        {"status": "active"},
+                "strategic":     {"status": "active"},
+                "strategicFit":  {"status": "active"},
+                "tca":           {"status": "active"},
+                "team":          {"status": "active"},
+            },
             "last_updated": "2024-01-20T10:00:00Z",
             "uptime": "99.8%"
         }
