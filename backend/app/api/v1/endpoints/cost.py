@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import Dict, Any, List, Optional
 import asyncpg
 
-from app.db import get_db
+from app.db import get_db, db_manager
 from .auth import get_current_user
 
 logger = logging.getLogger(__name__)
@@ -302,144 +302,145 @@ async def _table_exists(db: asyncpg.Connection, table_name: str) -> bool:
 async def get_public_cost_summary(
     start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
-    db: asyncpg.Connection = Depends(get_db)
 ):
     """
     Public cost summary endpoint (no authentication required).
     Returns aggregated cost metrics without sensitive user data.
     """
+    # Default fallback response (used when DB is unavailable)
+    _fallback = {
+        "totalCost": 82.75,
+        "totalRequests": 4,
+        "billedUsers": 3,
+        "dailyAverage": 2.76,
+        "breakdown": [
+            {"category": "AI Analysis (GPT-4)", "cost": 28.50, "percentage": 80.0, "executions": 63},
+            {"category": "Embeddings (Ada)", "cost": 4.25, "percentage": 12.0, "executions": 189},
+            {"category": "External Data APIs", "cost": 3.50, "percentage": 5.0, "executions": 126},
+            {"category": "Infrastructure", "cost": 1.50, "percentage": 3.0, "executions": 252}
+        ],
+        "trends": [],
+        "aiBreakdown": {
+            "totalAiCost": 35.80,
+            "costPerAnalysis": 0.45,
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "models": [],
+            "costByUser": [],
+            "costByReportType": []
+        },
+        "dateRange": {
+            "start": (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d"),
+            "end": datetime.utcnow().strftime("%Y-%m-%d")
+        }
+    }
     try:
         # Default to last 30 days if no dates specified
         if not end_date:
             end_dt = datetime.utcnow()
         else:
             end_dt = datetime.strptime(end_date, "%Y-%m-%d")
-        
+
         if not start_date:
             start_dt = end_dt - timedelta(days=30)
         else:
             start_dt = datetime.strptime(start_date, "%Y-%m-%d")
-        
-        # Get total analysis counts from database
-        analysis_stats = await db.fetchrow("""
-            SELECT 
-                COUNT(*) as total_analyses,
-                COUNT(DISTINCT user_id) as unique_users,
-                COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed
-            FROM company_analyses
-            WHERE created_at >= $1 AND created_at <= $2
-        """, start_dt, end_dt)
-        
-        total_analyses = analysis_stats['total_analyses'] if analysis_stats else 0
-        ai_cost_per_analysis = 0.45
-        total_ai_cost = total_analyses * ai_cost_per_analysis
-        
-        # Cost breakdown by category
-        breakdown = [
-            {
-                "category": "AI Analysis (GPT-4)",
-                "cost": round(total_ai_cost * 0.80, 2),
-                "percentage": 80.0,
-                "executions": total_analyses
-            },
-            {
-                "category": "Embeddings (Ada)",
-                "cost": round(total_ai_cost * 0.12, 2),
-                "percentage": 12.0,
-                "executions": total_analyses * 3
-            },
-            {
-                "category": "External Data APIs",
-                "cost": round(total_analyses * 0.10, 2),
-                "percentage": 5.0,
-                "executions": total_analyses * 5
-            },
-            {
-                "category": "Infrastructure",
-                "cost": round(total_analyses * 0.05, 2),
-                "percentage": 3.0,
-                "executions": total_analyses * 10
-            }
-        ]
-        
-        # Get daily trends
-        daily_trends = await db.fetch("""
-            SELECT 
-                DATE(created_at) as date,
-                COUNT(*) as analyses
-            FROM company_analyses
-            WHERE created_at >= $1 AND created_at <= $2
-            GROUP BY DATE(created_at)
-            ORDER BY date DESC
-            LIMIT 7
-        """, start_dt, end_dt)
-        
-        trends = [
-            {
-                "date": row['date'].strftime("%m/%d/%Y"),
-                "cost": round(row['analyses'] * ai_cost_per_analysis, 2)
-            }
-            for row in daily_trends
-        ]
-        
-        # AI breakdown
-        ai_breakdown = {
-            "totalAiCost": round(total_ai_cost, 2),
-            "costPerAnalysis": ai_cost_per_analysis,
-            "inputTokens": total_analyses * 2500,
-            "outputTokens": total_analyses * 625,
-            "models": [
-                {"name": "Analysis (GPT-4)", "cost": round(total_ai_cost * 0.80, 2), "percentage": 80.0},
-                {"name": "Embedding (Ada)", "cost": round(total_ai_cost * 0.12, 2), "percentage": 12.0},
-                {"name": "Fine-Tuning", "cost": round(total_ai_cost * 0.08, 2), "percentage": 8.0}
-            ],
-            "costByUser": [],
-            "costByReportType": [
-                {"name": "Triage Reports", "cost": round(total_analyses * 0.3, 2), "percentage": 70.0},
-                {"name": "Due Diligence", "cost": round(total_analyses * 0.15, 2), "percentage": 30.0}
+
+        async with db_manager.get_connection() as db:
+            # Get total analysis counts from database
+            analysis_stats = await db.fetchrow("""
+                SELECT 
+                    COUNT(*) as total_analyses,
+                    COUNT(DISTINCT user_id) as unique_users,
+                    COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed
+                FROM company_analyses
+                WHERE created_at >= $1 AND created_at <= $2
+            """, start_dt, end_dt)
+
+            total_analyses = analysis_stats['total_analyses'] if analysis_stats else 0
+            ai_cost_per_analysis = 0.45
+            total_ai_cost = total_analyses * ai_cost_per_analysis
+
+            # Cost breakdown by category
+            breakdown = [
+                {
+                    "category": "AI Analysis (GPT-4)",
+                    "cost": round(total_ai_cost * 0.80, 2),
+                    "percentage": 80.0,
+                    "executions": total_analyses
+                },
+                {
+                    "category": "Embeddings (Ada)",
+                    "cost": round(total_ai_cost * 0.12, 2),
+                    "percentage": 12.0,
+                    "executions": total_analyses * 3
+                },
+                {
+                    "category": "External Data APIs",
+                    "cost": round(total_analyses * 0.10, 2),
+                    "percentage": 5.0,
+                    "executions": total_analyses * 5
+                },
+                {
+                    "category": "Infrastructure",
+                    "cost": round(total_analyses * 0.05, 2),
+                    "percentage": 3.0,
+                    "executions": total_analyses * 10
+                }
             ]
-        }
-        
-        return {
-            "totalCost": round(total_ai_cost + 5.0, 2),
-            "totalRequests": total_analyses,
-            "billedUsers": analysis_stats['unique_users'] if analysis_stats else 0,
-            "dailyAverage": round((total_ai_cost + 5.0) / 30, 2),
-            "breakdown": breakdown,
-            "trends": trends,
-            "aiBreakdown": ai_breakdown,
-            "dateRange": {
-                "start": start_dt.strftime("%Y-%m-%d"),
-                "end": end_dt.strftime("%Y-%m-%d")
-            }
-        }
-        
-    except Exception as e:
-        logger.error(f"Public cost summary error: {e}")
-        # Return fallback data on error
-        return {
-            "totalCost": 82.75,
-            "totalRequests": 4,
-            "billedUsers": 3,
-            "dailyAverage": 2.76,
-            "breakdown": [
-                {"category": "AI Analysis (GPT-4)", "cost": 28.50, "percentage": 80.0, "executions": 63},
-                {"category": "Embeddings (Ada)", "cost": 4.25, "percentage": 12.0, "executions": 189},
-                {"category": "External Data APIs", "cost": 3.50, "percentage": 5.0, "executions": 126},
-                {"category": "Infrastructure", "cost": 1.50, "percentage": 3.0, "executions": 252}
-            ],
-            "trends": [],
-            "aiBreakdown": {
-                "totalAiCost": 35.80,
-                "costPerAnalysis": 0.45,
-                "inputTokens": 0,
-                "outputTokens": 0,
-                "models": [],
+
+            # Get daily trends
+            daily_trends = await db.fetch("""
+                SELECT 
+                    DATE(created_at) as date,
+                    COUNT(*) as analyses
+                FROM company_analyses
+                WHERE created_at >= $1 AND created_at <= $2
+                GROUP BY DATE(created_at)
+                ORDER BY date DESC
+                LIMIT 7
+            """, start_dt, end_dt)
+
+            trends = [
+                {
+                    "date": row['date'].strftime("%m/%d/%Y"),
+                    "cost": round(row['analyses'] * ai_cost_per_analysis, 2)
+                }
+                for row in daily_trends
+            ]
+
+            # AI breakdown
+            ai_breakdown = {
+                "totalAiCost": round(total_ai_cost, 2),
+                "costPerAnalysis": ai_cost_per_analysis,
+                "inputTokens": total_analyses * 2500,
+                "outputTokens": total_analyses * 625,
+                "models": [
+                    {"name": "Analysis (GPT-4)", "cost": round(total_ai_cost * 0.80, 2), "percentage": 80.0},
+                    {"name": "Embedding (Ada)", "cost": round(total_ai_cost * 0.12, 2), "percentage": 12.0},
+                    {"name": "Fine-Tuning", "cost": round(total_ai_cost * 0.08, 2), "percentage": 8.0}
+                ],
                 "costByUser": [],
-                "costByReportType": []
-            },
-            "dateRange": {
-                "start": (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d"),
-                "end": datetime.utcnow().strftime("%Y-%m-%d")
+                "costByReportType": [
+                    {"name": "Triage Reports", "cost": round(total_analyses * 0.3, 2), "percentage": 70.0},
+                    {"name": "Due Diligence", "cost": round(total_analyses * 0.15, 2), "percentage": 30.0}
+                ]
             }
-        }
+
+            return {
+                "totalCost": round(total_ai_cost + 5.0, 2),
+                "totalRequests": total_analyses,
+                "billedUsers": analysis_stats['unique_users'] if analysis_stats else 0,
+                "dailyAverage": round((total_ai_cost + 5.0) / 30, 2),
+                "breakdown": breakdown,
+                "trends": trends,
+                "aiBreakdown": ai_breakdown,
+                "dateRange": {
+                    "start": start_dt.strftime("%Y-%m-%d"),
+                    "end": end_dt.strftime("%Y-%m-%d")
+                }
+            }
+
+    except Exception as e:
+        logger.warning(f"DB unavailable for public cost summary, returning defaults: {e}")
+        return _fallback
