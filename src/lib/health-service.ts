@@ -172,12 +172,12 @@ const SERVICES: ServiceDef[] = [
     { id: 'users-svc',          label: 'Users',                group: 'admin', path: '/api/v1/users/',                requiresAuth: true },
     { id: 'users-export-svc',   label: 'User Export',          group: 'admin', path: '/api/v1/users/export',          requiresAuth: true, optional: true },
     // GET /roles has no handler – use /configurations sub-path
-    { id: 'roles-svc',          label: 'Role Configurations',  group: 'admin', path: '/api/v1/roles/configurations',  requiresAuth: true },
+    { id: 'roles-svc',          label: 'Role Configurations',  group: 'admin', path: '/api/v1/roles/configurations',  requiresAuth: true, optional: true },
     { id: 'dashboard-stats-svc',label: 'Dashboard Stats',      group: 'admin', path: '/api/v1/dashboard/stats',       requiresAuth: true, optional: true },
     { id: 'dashboard-charts-svc', label: 'Dashboard Charts',    group: 'admin', path: '/api/v1/dashboard/charts',      requiresAuth: true, optional: true },
     { id: 'dashboard-health-svc', label: 'Dashboard Health',    group: 'admin', path: '/api/v1/dashboard/health',      requiresAuth: true, optional: true },
     // admin.py endpoints – all require admin role; 403 for non-admin → treated as 'healthy'
-    { id: 'admin-health-svc',       label: 'Admin Health',           group: 'admin', path: '/api/v1/admin/health',               requiresAuth: true },
+    { id: 'admin-health-svc',       label: 'Admin Health',           group: 'admin', path: '/api/v1/admin/health',               requiresAuth: true, optional: true },
     { id: 'admin-status-svc',       label: 'Admin System Status',    group: 'admin', path: '/api/v1/admin/system-status',        requiresAuth: true, optional: true },
     { id: 'admin-audit-svc',        label: 'Audit Logs',             group: 'admin', path: '/api/v1/admin/audit-logs',           requiresAuth: true, optional: true },
     { id: 'admin-security-svc',     label: 'Security Events',        group: 'admin', path: '/api/v1/admin/security-events',      requiresAuth: true, optional: true },

@@ -1,6 +1,13 @@
 
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import {
+  saveConfigVersion,
+  getLatestConfig,
+  getVersionHistory,
+  type ConfigVersion,
+} from '@/lib/module-config-service';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -29,7 +36,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Edit, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Edit, RotateCcw, Save } from 'lucide-react';
+
+const MODULE_KEY = 'funder';
 import Link from 'next/link';
 
 interface WeightDimensions {
@@ -77,6 +86,37 @@ export default function FunderFitConfigPage() {
   const [weights, setWeights] = useState(initialWeights);
   const [affectsRouting, setAffectsRouting] = useState(true);
   const [affectsLanguage, setAffectsLanguage] = useState(true);
+  const [versionHistory, setVersionHistory] = useState<ConfigVersion[]>([]);
+  const [currentVersion, setCurrentVersion] = useState<number | null>(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const saved = getLatestConfig<{ isActive: boolean; thresholds: { strong: number; moderate: number }; weights: Weights; affectsRouting: boolean; affectsLanguage: boolean }>(MODULE_KEY);
+    if (saved) {
+      if (saved.isActive !== undefined) setIsActive(saved.isActive);
+      if (saved.thresholds) setThresholds(saved.thresholds);
+      if (saved.weights) setWeights(saved.weights);
+      if (saved.affectsRouting !== undefined) setAffectsRouting(saved.affectsRouting);
+      if (saved.affectsLanguage !== undefined) setAffectsLanguage(saved.affectsLanguage);
+    }
+    const history = getVersionHistory(MODULE_KEY);
+    setVersionHistory(history);
+    if (history.length > 0) setCurrentVersion(history[0].version);
+  }, []);
+
+  const handleSaveConfig = () => {
+    const config = { isActive, thresholds, weights, affectsRouting, affectsLanguage };
+    const storedUser = typeof window !== 'undefined' ? localStorage.getItem('loggedInUser') : null;
+    const userEmail = storedUser ? JSON.parse(storedUser).email : undefined;
+    const ver = saveConfigVersion(MODULE_KEY, config, {
+      label: `v${versionHistory.length + 1} - Manual Save`,
+      savedBy: userEmail,
+    });
+    const history = getVersionHistory(MODULE_KEY);
+    setVersionHistory(history);
+    setCurrentVersion(ver);
+    toast({ title: 'Configuration Saved', description: `Version ${ver} saved successfully.` });
+  };
 
   const handleWeightChange = (sector: 'tech' | 'med_life', dimension: keyof WeightDimensions, value: string) => {
     const newWeights = { ...weights };
@@ -263,7 +303,7 @@ export default function FunderFitConfigPage() {
       </div>
       <Card className="mt-8">
         <CardFooter className="p-4 flex justify-end">
-          <Button>Save Configuration</Button>
+          <Button onClick={handleSaveConfig} className="gap-2"><Save className="size-4" /> Save Configuration</Button>
         </CardFooter>
       </Card>
     </div>

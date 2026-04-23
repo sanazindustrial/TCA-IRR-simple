@@ -1,6 +1,13 @@
 
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import {
+  saveConfigVersion,
+  getLatestConfig,
+  getVersionHistory,
+  type ConfigVersion,
+} from '@/lib/module-config-service';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -22,7 +29,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, RotateCcw } from 'lucide-react';
+import { ArrowLeft, RotateCcw, Save } from 'lucide-react';
+
+const MODULE_KEY = 'strategic';
 import Link from 'next/link';
 
 const initialPathways = [
@@ -76,6 +85,37 @@ export default function StrategicFitConfigPage() {
   const [pathways, setPathways] = useState(initialPathways.join(', '));
   const [dimensions, setDimensions] = useState(initialDimensions);
   const [thresholds, setThresholds] = useState({ high: 8.0, medium: 6.5 });
+  const [versionHistory, setVersionHistory] = useState<ConfigVersion[]>([]);
+  const [currentVersion, setCurrentVersion] = useState<number | null>(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const saved = getLatestConfig<{ isActive: boolean; autoMap: boolean; pathways: string; dimensions: typeof initialDimensions; thresholds: { high: number; medium: number } }>(MODULE_KEY);
+    if (saved) {
+      if (saved.isActive !== undefined) setIsActive(saved.isActive);
+      if (saved.autoMap !== undefined) setAutoMap(saved.autoMap);
+      if (saved.pathways) setPathways(saved.pathways);
+      if (saved.dimensions) setDimensions(saved.dimensions);
+      if (saved.thresholds) setThresholds(saved.thresholds);
+    }
+    const history = getVersionHistory(MODULE_KEY);
+    setVersionHistory(history);
+    if (history.length > 0) setCurrentVersion(history[0].version);
+  }, []);
+
+  const handleSaveConfig = () => {
+    const config = { isActive, autoMap, pathways, dimensions, thresholds };
+    const storedUser = typeof window !== 'undefined' ? localStorage.getItem('loggedInUser') : null;
+    const userEmail = storedUser ? JSON.parse(storedUser).email : undefined;
+    const ver = saveConfigVersion(MODULE_KEY, config, {
+      label: `v${versionHistory.length + 1} - Manual Save`,
+      savedBy: userEmail,
+    });
+    const history = getVersionHistory(MODULE_KEY);
+    setVersionHistory(history);
+    setCurrentVersion(ver);
+    toast({ title: 'Configuration Saved', description: `Version ${ver} saved successfully.` });
+  };
 
   const handleWeightChange = (id: string, value: string, type: 'tech' | 'med') => {
       const numValue = parseInt(value, 10) || 0;
@@ -237,7 +277,7 @@ export default function StrategicFitConfigPage() {
       </div>
       <Card className="mt-8">
         <CardFooter className="p-4 flex justify-end">
-            <Button>Save Configuration</Button>
+            <Button onClick={handleSaveConfig} className="gap-2"><Save className="size-4" /> Save Configuration</Button>
         </CardFooter>
       </Card>
     </div>

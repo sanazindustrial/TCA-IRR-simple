@@ -1,6 +1,6 @@
 
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -19,7 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ArrowLeft, GripVertical, Plus, Trash2, RotateCcw } from 'lucide-react';
+import { ArrowLeft, GripVertical, Plus, Trash2, RotateCcw, Save } from 'lucide-react';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
 import { Label } from '@/components/ui/label';
@@ -32,6 +32,15 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
+import {
+  saveConfigVersion,
+  getLatestConfig,
+  getVersionHistory,
+  type ConfigVersion,
+} from '@/lib/module-config-service';
+
+const MODULE_KEY = 'benchmark';
 
 const initialPeerPriority = ['sector', 'stage', 'model'];
 
@@ -96,6 +105,40 @@ export default function BenchmarkConfigPage() {
     const [benchmarksEnabled, setBenchmarksEnabled] = useState(true);
     const [baselineSource, setBaselineSource] = useState('internal-db');
     const [overlayWeight, setOverlayWeight] = useState(5);
+    const [versionHistory, setVersionHistory] = useState<ConfigVersion[]>([]);
+    const [currentVersion, setCurrentVersion] = useState<number | null>(null);
+    const { toast } = useToast();
+
+    useEffect(() => {
+        const saved = getLatestConfig<{ peerPriority: typeof initialPeerPriority; universalMetrics: typeof initialUniversalMetrics; techMetrics: typeof initialTechMetrics; medMetrics: typeof initialMedMetrics; scoringLogic: typeof initialScoringLogic; benchmarksEnabled: boolean; baselineSource: string; overlayWeight: number }>(MODULE_KEY);
+        if (saved) {
+            if (saved.peerPriority) setPeerPriority(saved.peerPriority);
+            if (saved.universalMetrics) setUniversalMetrics(saved.universalMetrics);
+            if (saved.techMetrics) setTechMetrics(saved.techMetrics);
+            if (saved.medMetrics) setMedMetrics(saved.medMetrics);
+            if (saved.scoringLogic) setScoringLogic(saved.scoringLogic);
+            if (saved.benchmarksEnabled !== undefined) setBenchmarksEnabled(saved.benchmarksEnabled);
+            if (saved.baselineSource) setBaselineSource(saved.baselineSource);
+            if (saved.overlayWeight !== undefined) setOverlayWeight(saved.overlayWeight);
+        }
+        const history = getVersionHistory(MODULE_KEY);
+        setVersionHistory(history);
+        if (history.length > 0) setCurrentVersion(history[0].version);
+    }, []);
+
+    const handleSaveConfig = () => {
+        const config = { peerPriority, universalMetrics, techMetrics, medMetrics, scoringLogic, benchmarksEnabled, baselineSource, overlayWeight };
+        const storedUser = typeof window !== 'undefined' ? localStorage.getItem('loggedInUser') : null;
+        const userEmail = storedUser ? JSON.parse(storedUser).email : undefined;
+        const ver = saveConfigVersion(MODULE_KEY, config, {
+            label: `v${versionHistory.length + 1} - Manual Save`,
+            savedBy: userEmail,
+        });
+        const history = getVersionHistory(MODULE_KEY);
+        setVersionHistory(history);
+        setCurrentVersion(ver);
+        toast({ title: 'Configuration Saved', description: `Version ${ver} saved successfully.` });
+    };
     
     const currentJsonConfig = generateJsonConfig({
         benchmarksEnabled,
@@ -347,7 +390,7 @@ export default function BenchmarkConfigPage() {
       </div>
        <Card className="mt-8">
         <CardFooter className="p-4 flex justify-end">
-            <Button>Save Configuration</Button>
+            <Button onClick={handleSaveConfig} className="gap-2"><Save className="size-4" /> Save Configuration</Button>
         </CardFooter>
       </Card>
     </div>
