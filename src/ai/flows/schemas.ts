@@ -47,6 +47,7 @@ export const GenerateTcaScorecardOutputSchema = z.object({
     .array(TcaScorecardCategorySchema)
     .describe('The list of TCA categories with scores and interpretations.'),
   compositeScore: z.number().describe('The overall composite TCA score.'),
+  overallScore: z.number().optional().describe('Alias for compositeScore used by triage and report pages.'),
   summary: z
     .string()
     .describe('A summary of the startup based on the TCA scorecard.'),
