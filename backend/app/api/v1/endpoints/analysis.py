@@ -310,79 +310,54 @@ def _calculate_tca_categories(
 def _calculate_category_score(company_data: Dict[str, Any], category: str,
                               factors: List[str]) -> float:
     """Calculate score for a specific TCA category"""
+    BASE_SCORE = 5.0
 
-    base_score = 5.0  # Default neutral score
+    def _bool_score(keys_weights: List[tuple]) -> float:
+        return BASE_SCORE + sum(
+            w for key, w in keys_weights if company_data.get(key)
+        )
 
-    # Category-specific scoring logic
-    if category == "Leadership":
-        score = base_score
-        if company_data.get("founder_experience"):
-            score += 2.0
-        if company_data.get("leadership_team"):
-            score += 1.5
-        if company_data.get("advisory_board"):
-            score += 0.5
-        return min(score, 10.0)
+    scorers = {
+        "Leadership": lambda: _bool_score([
+            ("founder_experience", 2.0),
+            ("leadership_team", 1.5),
+            ("advisory_board", 0.5),
+        ]),
+        "Product-Market Fit": lambda: _bool_score([
+            ("customer_validation", 2.5),
+            ("revenue_traction", 2.0),
+            ("market_feedback", 1.0),
+        ]),
+        "Team Strength": lambda: (
+            BASE_SCORE
+            + (1.5 if company_data.get("team_size", 0) >= 5 else 0)
+            + (2.0 if company_data.get("technical_team") else 0)
+            + (1.5 if company_data.get("industry_experience") else 0)
+        ),
+        "Technology & IP": lambda: _bool_score([
+            ("patents", 2.0),
+            ("technical_innovation", 1.5),
+            ("tech_stack", 1.0),
+        ]),
+        "Market Potential": lambda: (
+            BASE_SCORE
+            + (2.5 if company_data.get("market_size", 0) > 1_000_000_000
+               else 1.5 if company_data.get("market_size", 0) > 100_000_000
+               else 0)
+            + (1.5 if company_data.get("growth_rate", 0) > 0.1 else 0)
+        ),
+        "Business Model & Financials": lambda: _bool_score([
+            ("revenue_model", 1.5),
+            ("positive_unit_economics", 1.5),
+        ]) + (2.0 if company_data.get("monthly_revenue", 0) > 0 else 0),
+    }
 
-    elif category == "Product-Market Fit":
-        score = base_score
-        if company_data.get("customer_validation"):
-            score += 2.5
-        if company_data.get("revenue_traction"):
-            score += 2.0
-        if company_data.get("market_feedback"):
-            score += 1.0
-        return min(score, 10.0)
+    scorer = scorers.get(category)
+    if scorer:
+        return min(scorer(), 10.0)
 
-    elif category == "Team Strength":
-        score = base_score
-        team_size = company_data.get("team_size", 0)
-        if team_size >= 5:
-            score += 1.5
-        if company_data.get("technical_team"):
-            score += 2.0
-        if company_data.get("industry_experience"):
-            score += 1.5
-        return min(score, 10.0)
-
-    elif category == "Technology & IP":
-        score = base_score
-        if company_data.get("patents"):
-            score += 2.0
-        if company_data.get("technical_innovation"):
-            score += 1.5
-        if company_data.get("tech_stack"):
-            score += 1.0
-        return min(score, 10.0)
-
-    elif category == "Market Potential":
-        score = base_score
-        market_size = company_data.get("market_size", 0)
-        if market_size > 1000000000:  # $1B+ market
-            score += 2.5
-        elif market_size > 100000000:  # $100M+ market
-            score += 1.5
-        if company_data.get("growth_rate", 0) > 0.1:  # 10%+ growth
-            score += 1.5
-        return min(score, 10.0)
-
-    elif category == "Business Model & Financials":
-        score = base_score
-        if company_data.get("revenue_model"):
-            score += 1.5
-        if company_data.get("monthly_revenue", 0) > 0:
-            score += 2.0
-        if company_data.get("positive_unit_economics"):
-            score += 1.5
-        return min(score, 10.0)
-
-    else:
-        # For other categories, use a formula based on available data
-        score = base_score
-        for factor in factors:
-            if company_data.get(factor):
-                score += 1.0
-        return min(score, 10.0)
+    # Default: score based on available factor fields
+    return min(BASE_SCORE + sum(1.0 for f in factors if company_data.get(f)), 10.0)
 
 
 def _calculate_composite_score(categories: List[Dict[str, Any]]) -> float:
@@ -397,21 +372,18 @@ def _calculate_risk_assessment(
     """Calculate risk assessment based on company data and TCA scores"""
 
     # Identify risk factors
-    risk_flags = []
 
     # Low scoring categories become risks
-    for cat in tca_categories:
-        if cat["rawScore"] < 6.5:
-            risk_flags.append({
-                "category":
-                cat["category"],
-                "severity":
-                "high" if cat["rawScore"] < 5.0 else "medium",
-                "description":
-                f"Below threshold performance in {cat['category']}",
-                "mitigation":
-                f"Focus improvement efforts on {cat['category'].lower()}"
-            })
+    risk_flags = [
+        {
+            "category": cat["category"],
+            "severity": "high" if cat["rawScore"] < 5.0 else "medium",
+            "description": f"Below threshold performance in {cat['category']}",
+            "mitigation": f"Focus improvement efforts on {cat['category'].lower()}"
+        }
+        for cat in tca_categories
+        if cat["rawScore"] < 6.5
+    ]
 
     # Market risks
     if company_data.get("competitive_landscape") == "highly_competitive":
@@ -425,7 +397,7 @@ def _calculate_risk_assessment(
     # Financial risks
     burn_rate = company_data.get("monthly_burn", 0)
     cash_balance = company_data.get("cash_balance", 0)
-    if burn_rate > 0 and cash_balance / burn_rate < 12:  # Less than 12 months runway
+    if burn_rate > 0 and cash_balance > 0 and cash_balance / burn_rate < 12:  # Less than 12 months runway
         risk_flags.append({
             "category":
             "Financial Risk",
@@ -614,8 +586,7 @@ async def extract_company_info(request_data: Dict[str, Any]):
                 break
     
     # ========== LEGAL NAME (if different) ==========
-    legal_match = re.search(r"(?:legal\s*name|registered\s*(?:as|name))[:\s=]+([A-Za-z0-9\s&.,'\-]+?)(?:\n|$|\s{2,})", content, re.IGNORECASE)
-    if legal_match:
+    if legal_match := re.search(r"(?:legal\s*name|registered\s*(?:as|name))[:\s=]+([A-Za-z0-9\s&.,'\-]+?)(?:\n|$|\s{2,})", content, re.IGNORECASE):
         extracted["legal_name"] = legal_match.group(1).strip()[:100]
     
     # ========== WEBSITE EXTRACTION (Enhanced) ==========
@@ -690,11 +661,9 @@ async def extract_company_info(request_data: Dict[str, Any]):
         parts = [p.strip() for p in addr.split(',')]
         if len(parts) >= 2:
             extracted["city"] = parts[0][:50]
+            extracted["country"] = parts[-1][:50]
             if len(parts) >= 3:
                 extracted["state"] = parts[-2][:50]
-                extracted["country"] = parts[-1][:50]
-            else:
-                extracted["country"] = parts[-1][:50]
     
     # Fallback location patterns
     if "city" not in extracted:
@@ -1151,7 +1120,7 @@ def _calculate_deviation_metrics(human_scores: Dict[str, float], ai_scores: Dict
         "bias": round(bias, 3),
         "bias_direction": "AI Higher" if bias > 0.1 else "Human Higher" if bias < -0.1 else "Neutral",
         "total_categories": n,
-        "high_deviation_count": sum(1 for d in deviations if d > 1.5),
+        "high_deviation_count": len([d for d in deviations if d > 1.5]),
         "calibration_quality": "High" if mae < 0.5 else "Medium" if mae < 1.0 else "Low"
     }
 
@@ -1222,9 +1191,9 @@ def _analyze_review_sentiment(comments: Dict[str, str], rationale: str) -> Dict[
     all_text = " ".join(comments.values()) + " " + rationale
     all_text_lower = all_text.lower()
     
-    positive_count = sum(1 for kw in positive_keywords if kw in all_text_lower)
-    negative_count = sum(1 for kw in negative_keywords if kw in all_text_lower)
-    neutral_count = sum(1 for kw in neutral_keywords if kw in all_text_lower)
+    positive_count = sum(kw in all_text_lower for kw in positive_keywords)
+    negative_count = sum(kw in all_text_lower for kw in negative_keywords)
+    neutral_count = sum(kw in all_text_lower for kw in neutral_keywords)
     
     total = positive_count + negative_count + neutral_count + 1  # +1 to avoid division by zero
     
@@ -1235,8 +1204,8 @@ def _analyze_review_sentiment(comments: Dict[str, str], rationale: str) -> Dict[
     category_sentiment = {}
     for cat, comment in comments.items():
         comment_lower = comment.lower()
-        cat_positive = sum(1 for kw in positive_keywords if kw in comment_lower)
-        cat_negative = sum(1 for kw in negative_keywords if kw in comment_lower)
+        cat_positive = sum(kw in comment_lower for kw in positive_keywords)
+        cat_negative = sum(kw in comment_lower for kw in negative_keywords)
         if cat_positive > cat_negative:
             category_sentiment[cat] = "positive"
         elif cat_negative > cat_positive:
@@ -1270,10 +1239,11 @@ def _deep_content_analysis(comments: Dict[str, str], rationale: str) -> Dict[str
         "risk_factors": r"risk|challenge|concern|threat|weakness|barrier",
     }
     
-    themes = []
-    for theme, pattern in theme_patterns.items():
-        if re.search(pattern, all_text, re.IGNORECASE):
-            themes.append(theme.replace("_", " ").title())
+    themes = [
+        theme.replace("_", " ").title()
+        for theme, pattern in theme_patterns.items()
+        if re.search(pattern, all_text, re.IGNORECASE)
+    ]
     
     # Extract action items (sentences with action verbs)
     action_patterns = [
@@ -1375,8 +1345,7 @@ async def extract_text_from_file(
                     with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
                         text_parts = []
                         for page in pdf.pages:
-                            text = page.extract_text()
-                            if text:
+                            if text := page.extract_text():
                                 text_parts.append(text)
                         content = "\n".join(text_parts)
                 except ImportError:
@@ -1418,8 +1387,7 @@ async def extract_text_from_file(
                     text_parts = []
                     for sheet_name in excel_file.sheet_names:
                         df = pd.read_excel(excel_file, sheet_name=sheet_name)
-                        text_parts.append(f"=== Sheet: {sheet_name} ===")
-                        text_parts.append(df.to_string())
+                        text_parts.extend([f"=== Sheet: {sheet_name} ===", df.to_string()])
                     content = "\n".join(text_parts)
                 except ImportError:
                     content = "[Excel extraction requires openpyxl or pandas]"
@@ -1435,11 +1403,10 @@ async def extract_text_from_file(
                 prs = Presentation(io.BytesIO(file_bytes))
                 text_parts = []
                 for slide_num, slide in enumerate(prs.slides, 1):
-                    slide_text = [f"=== Slide {slide_num} ==="]
-                    for shape in slide.shapes:
-                        if hasattr(shape, "text") and shape.text:
-                            slide_text.append(shape.text)
-                    text_parts.extend(slide_text)
+                    text_parts.extend(
+                        [f"=== Slide {slide_num} ==="] +
+                        [shape.text for shape in slide.shapes if hasattr(shape, "text") and shape.text]
+                    )
                 content = "\n".join(text_parts)
             except ImportError:
                 content = "[PowerPoint extraction requires python-pptx]"

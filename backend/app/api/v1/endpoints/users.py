@@ -165,9 +165,8 @@ async def export_users(
             )
         else:
             # Return JSON
-            users = []
-            for row in rows:
-                users.append({
+            users = [
+                {
                     "id": row['id'],
                     "username": row['username'],
                     "email": row['email'],
@@ -175,7 +174,9 @@ async def export_users(
                     "is_active": row['is_active'],
                     "created_at": row['created_at'].isoformat() if row['created_at'] else None,
                     "updated_at": row['updated_at'].isoformat() if row['updated_at'] else None
-                })
+                }
+                for row in rows
+            ]
             return {"users": users, "total": len(users)}
             
     except Exception as e:
@@ -274,7 +275,7 @@ async def invite_user(
             "email": email,
             "role": role,
             "email_sent": email_sent,
-            "invite_token": invite_token if not email_sent else None  # Only return token if email failed
+            "invite_token": None if email_sent else invite_token  # Only return token if email failed
         }
         
     except HTTPException:
