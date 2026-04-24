@@ -1,0 +1,12 @@
+
+> tca-irr-app@1.0.0 build
+> next build
+
+   ▲ Next.js 15.3.3
+   - Environments: .env.production
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 70s
+   Skipping validation of types
+   Skipping linting
+   Collecting page data ...

@@ -22,18 +22,6 @@ const nextConfig: NextConfig = {
     '@genkit-ai/next',
   ],
 
-  // Webpack optimization for code protection
-  webpack: (config, { isServer, dev }) => {
-    if (!dev && !isServer) {
-      // Disable source maps completely
-      config.devtool = false;
-      // NOTE: Do NOT override moduleIds/chunkIds here.
-      // Next.js already sets optimal deterministic IDs in production.
-      // Overriding them causes "No lowest priority node found" in SplitChunksPlugin.
-    }
-    return config;
-  },
-
   // Comprehensive security headers for production
   async headers() {
     return [
