@@ -86,18 +86,24 @@ export class ApiClient {
     // Attempt to refresh the auth token. Returns true if successful.
     private async tryRefreshToken(): Promise<boolean> {
         if (typeof window === 'undefined') return false;
-        const currentToken = localStorage.getItem('authToken');
-        if (!currentToken) return false;
+        const refreshToken = localStorage.getItem('refreshToken');
+        if (!refreshToken) return false;
         try {
             const res = await fetch(`${this.baseUrl}/api/v1/auth/refresh`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentToken}` },
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refresh_token: refreshToken }),
             });
-            if (!res.ok) return false;
+            if (!res.ok) {
+                localStorage.removeItem('authToken');
+                localStorage.removeItem('refreshToken');
+                if (typeof window !== 'undefined') window.location.href = '/login';
+                return false;
+            }
             const data = await res.json();
-            const newToken: string | undefined = data.access_token ?? data.token ?? data.authToken;
-            if (newToken) {
-                this.setToken(newToken);
+            if (data.access_token) {
+                this.setToken(data.access_token);
+                if (data.refresh_token) localStorage.setItem('refreshToken', data.refresh_token);
                 return true;
             }
             return false;

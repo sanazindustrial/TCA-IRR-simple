@@ -104,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         setIsAuthenticated(true);
                         localStorage.setItem('loggedInUser', JSON.stringify(response.user));
                         localStorage.setItem('authToken', response.access_token);
+                        if (response.refresh_token) localStorage.setItem('refreshToken', response.refresh_token);
                         return;
                     }
                 } catch (backendError) {
