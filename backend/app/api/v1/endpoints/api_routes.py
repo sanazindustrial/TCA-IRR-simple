@@ -64,13 +64,22 @@ class AppRequestCreate(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
 
 
+class AppRequestUpdate(BaseModel):
+    status: Optional[str] = None
+    resolution_notes: Optional[str] = None
+
+
 class AppRequestResponse(BaseModel):
     id: str
     request_type: str
     description: str
     priority: str
     status: str
+    resolution_notes: Optional[str] = None
+    username: Optional[str] = None
+    user_id: Optional[int] = None
     created_at: str
+    updated_at: Optional[str] = None
 
 
 class EvaluationCreate(BaseModel):
@@ -237,7 +246,7 @@ async def validate_extraction(
         errors.append("Missing company name")
     
     return ExtractionResult(
-        valid=len(errors) == 0,
+        valid=not errors,
         data=data,
         errors=errors
     )
@@ -297,39 +306,194 @@ async def submit_text(
 # APP REQUESTS ENDPOINTS (/requests/*)
 # ═══════════════════════════════════════════════════════════════════════
 
+_REQUESTS_TABLE_DDL = """
+    CREATE TABLE IF NOT EXISTS user_requests (
+        id UUID PRIMARY KEY,
+        user_id INTEGER,
+        username VARCHAR(255),
+        request_type VARCHAR(255),
+        description TEXT,
+        priority VARCHAR(50) DEFAULT 'normal',
+        status VARCHAR(50) DEFAULT 'pending',
+        resolution_notes TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    )
+"""
+
+
+def _row_to_request(row) -> AppRequestResponse:
+    created = row['created_at']
+    updated = row['updated_at']
+    return AppRequestResponse(
+        id=str(row['id']),
+        request_type=row['request_type'],
+        description=row['description'],
+        priority=row['priority'],
+        status=row['status'],
+        resolution_notes=row['resolution_notes'],
+        username=row['username'],
+        user_id=row['user_id'],
+        created_at=created.isoformat() if hasattr(created, 'isoformat') else str(created),
+        updated_at=updated.isoformat() if updated and hasattr(updated, 'isoformat') else (str(updated) if updated else None),
+    )
+
+
 @requests_router.post("", response_model=AppRequestResponse)
 async def create_app_request(
     request_data: AppRequestCreate,
+    db: asyncpg.Connection = Depends(get_db),
     current_user: dict = Depends(get_optional_current_user)
 ):
-    """Create a new app request"""
-    request_id = str(uuid.uuid4())
-    
-    return AppRequestResponse(
-        id=request_id,
-        request_type=request_data.request_type,
-        description=request_data.description,
-        priority=request_data.priority,
-        status="pending",
-        created_at=datetime.utcnow().isoformat()
-    )
+    """Create a new app request and persist to DB"""
+    try:
+        await db.execute(_REQUESTS_TABLE_DDL)
+
+        request_id = uuid.uuid4()
+        user_id = current_user.get('id') if current_user else None
+        username = (
+            current_user.get('username') or current_user.get('email', 'anonymous')
+            if current_user else 'anonymous'
+        )
+        now = datetime.utcnow()
+
+        await db.execute(
+            """
+            INSERT INTO user_requests
+                (id, user_id, username, request_type, description, priority, status, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7, $7)
+            """,
+            request_id, user_id, username,
+            request_data.request_type, request_data.description, request_data.priority,
+            now,
+        )
+
+        return AppRequestResponse(
+            id=str(request_id),
+            request_type=request_data.request_type,
+            description=request_data.description,
+            priority=request_data.priority,
+            status="pending",
+            username=username,
+            user_id=user_id,
+            created_at=now.isoformat(),
+            updated_at=now.isoformat(),
+        )
+    except Exception as e:
+        logger.error(f"Create request error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail=f"Failed to create request: {str(e)}")
 
 
 @requests_router.get("")
 async def get_app_requests(
     page: int = 1,
     size: int = 20,
-    status: Optional[str] = None,
+    req_status: Optional[str] = None,
+    db: asyncpg.Connection = Depends(get_db),
     current_user: dict = Depends(get_optional_current_user)
 ):
-    """Get all app requests"""
-    return {
-        "items": [],
-        "total": 0,
-        "page": page,
-        "size": size,
-        "pages": 0
-    }
+    """Get app requests from DB – admins see all, regular users see their own"""
+    try:
+        await db.execute(_REQUESTS_TABLE_DDL)
+
+        user_id = current_user.get('id') if current_user else None
+        role = current_user.get('role', 'user') if current_user else 'anonymous'
+        is_admin = role == 'admin'
+        offset = (page - 1) * size
+
+        if is_admin:
+            if req_status:
+                total = await db.fetchval(
+                    "SELECT COUNT(*) FROM user_requests WHERE status = $1", req_status)
+                rows = await db.fetch(
+                    "SELECT * FROM user_requests WHERE status = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+                    req_status, size, offset)
+            else:
+                total = await db.fetchval("SELECT COUNT(*) FROM user_requests")
+                rows = await db.fetch(
+                    "SELECT * FROM user_requests ORDER BY created_at DESC LIMIT $1 OFFSET $2",
+                    size, offset)
+        else:
+            if user_id is None:
+                return {"items": [], "total": 0, "page": page, "size": size, "pages": 0}
+            if req_status:
+                total = await db.fetchval(
+                    "SELECT COUNT(*) FROM user_requests WHERE user_id = $1 AND status = $2",
+                    user_id, req_status)
+                rows = await db.fetch(
+                    "SELECT * FROM user_requests WHERE user_id = $1 AND status = $2 ORDER BY created_at DESC LIMIT $3 OFFSET $4",
+                    user_id, req_status, size, offset)
+            else:
+                total = await db.fetchval(
+                    "SELECT COUNT(*) FROM user_requests WHERE user_id = $1", user_id)
+                rows = await db.fetch(
+                    "SELECT * FROM user_requests WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+                    user_id, size, offset)
+
+        items = [_row_to_request(r) for r in rows]
+        pages = max(1, (total + size - 1) // size) if total > 0 else 0
+
+        return {"items": items, "total": total, "page": page, "size": size, "pages": pages}
+    except Exception as e:
+        logger.error(f"Get requests error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail=f"Failed to get requests: {str(e)}")
+
+
+@requests_router.patch("/{request_id}", response_model=AppRequestResponse)
+async def update_app_request(
+    request_id: str,
+    update_data: AppRequestUpdate,
+    db: asyncpg.Connection = Depends(get_db),
+    current_user: dict = Depends(get_optional_current_user)
+):
+    """Update request status / resolution notes"""
+    try:
+        row = await db.fetchrow("SELECT * FROM user_requests WHERE id = $1", uuid.UUID(request_id))
+        if not row:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Request not found")
+
+        new_status = update_data.status if update_data.status is not None else row['status']
+        new_notes = update_data.resolution_notes if update_data.resolution_notes is not None else row['resolution_notes']
+        now = datetime.utcnow()
+
+        updated_row = await db.fetchrow(
+            """
+            UPDATE user_requests
+            SET status = $1, resolution_notes = $2, updated_at = $3
+            WHERE id = $4
+            RETURNING *
+            """,
+            new_status, new_notes, now, uuid.UUID(request_id),
+        )
+        return _row_to_request(updated_row)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Update request error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail=f"Failed to update request: {str(e)}")
+
+
+@requests_router.delete("/{request_id}", status_code=204)
+async def delete_app_request(
+    request_id: str,
+    db: asyncpg.Connection = Depends(get_db),
+    current_user: dict = Depends(get_optional_current_user)
+):
+    """Delete a request (admin only)"""
+    try:
+        result = await db.execute(
+            "DELETE FROM user_requests WHERE id = $1", uuid.UUID(request_id))
+        if result == "DELETE 0":
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Request not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Delete request error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail=f"Failed to delete request: {str(e)}")
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -430,10 +594,10 @@ async def get_evaluation(
         
         return EvaluationResponse(
             evaluation_id=str(evaluation['evaluation_id']),
-            company_name=evaluation.get('company_name', 'Unknown'),
-            evaluation_type=evaluation.get('evaluation_type', 'triage'),
-            status=evaluation.get('status', 'unknown'),
-            created_at=evaluation['created_at'].isoformat() if evaluation.get('created_at') else datetime.utcnow().isoformat()
+            company_name=evaluation['company_name'] or 'Unknown',
+            evaluation_type=evaluation['evaluation_type'] or 'triage',
+            status=evaluation['status'] or 'unknown',
+            created_at=evaluation['created_at'].isoformat() if evaluation['created_at'] else datetime.utcnow().isoformat()
         )
     except HTTPException:
         raise
