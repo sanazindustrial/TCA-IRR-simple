@@ -511,6 +511,7 @@ export async function runAnalysis(
       // Analysis configuration
       stage:       companyStage,
       companyName: userData?.companyName || extractedCompany.company_name || '',
+      ...(userData?.scoreOverrides && { module_score_overrides: userData.scoreOverrides }),
     };
 
     console.log('Making request to:', `${BACKEND_API_URL}${API_VERSION}/analysis/comprehensive`);
