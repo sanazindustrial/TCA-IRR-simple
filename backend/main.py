@@ -152,8 +152,8 @@ def create_application() -> FastAPI:
         version=settings.version,
         debug=settings.debug,
         lifespan=lifespan,
-        docs_url="/docs" if not settings.is_production else None,
-        redoc_url="/redoc" if not settings.is_production else None,
+        docs_url="/docs",
+        redoc_url="/redoc",
         openapi_url="/openapi.json",  # Always enabled — required by frontend API clients
         default_response_class=CustomJSONResponse,
         redirect_slashes=True)  # Re-enabled with proxy_headers=True in uvicorn for HTTPS redirects

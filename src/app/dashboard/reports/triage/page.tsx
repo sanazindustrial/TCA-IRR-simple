@@ -44,6 +44,7 @@ import {
   Settings,
   AlertCircle,
   SlidersHorizontal,
+  Sparkles,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
@@ -216,6 +217,9 @@ export default function TriageReportWizardPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showHumanReviewModal, setShowHumanReviewModal] = useState(false);
   const [humanReviewNotes, setHumanReviewNotes] = useState('');
+  const [isAutoFilling, setIsAutoFilling] = useState(false);
+  const [autoFillText, setAutoFillText] = useState('');
+  const [showAutoFill, setShowAutoFill] = useState(false);
 
   useEffect(() => {
     try {
@@ -281,20 +285,60 @@ export default function TriageReportWizardPage() {
   const fetchExternalData = async () => {
     if (selectedSources.length === 0) return;
     setFetchingData(true);
-    const results: Array<{ source: string; success: boolean; data: unknown; error?: string }> = [];
-    for (const sourceId of selectedSources) {
-      const src = EXTERNAL_SOURCES.find((s) => s.id === sourceId);
-      if (!src) continue;
-      try {
-        await new Promise((r) => setTimeout(r, 800));
-        results.push({ source: sourceId, success: true, data: { name: src.name, fetched: true, company: companyName } });
-      } catch (e) {
-        results.push({ source: sourceId, success: false, data: null, error: e instanceof Error ? e.message : 'Fetch failed' });
-      }
+    try {
+      const response = await fetch('/api/external-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ company: companyName, sources: selectedSources }),
+      });
+      const result = await response.json();
+      const results = selectedSources.map((sourceId) => ({
+        source: sourceId,
+        success: result.data?.[sourceId]?.success ?? false,
+        data: result.data?.[sourceId]?.data ?? null,
+        error: result.data?.[sourceId]?.error,
+      }));
+      setExternalData(results);
+      toast({ title: 'External data fetched', description: `${results.filter((r) => r.success).length}/${results.length} sources fetched.` });
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Fetch failed', description: e instanceof Error ? e.message : 'Failed to fetch external data' });
+    } finally {
+      setFetchingData(false);
     }
-    setExternalData(results);
-    setFetchingData(false);
-    toast({ title: 'External data fetched', description: `${results.filter((r) => r.success).length}/${results.length} sources fetched.` });
+  };
+
+  const handleAutoFill = async () => {
+    if (!autoFillText.trim()) return;
+    setIsAutoFilling(true);
+    try {
+      const res = await fetch('/api/ai-autofill', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: autoFillText }),
+      });
+      const result = await res.json();
+      if (result.success && result.data) {
+        const d = result.data;
+        if (d.company_name) setCompanyName(d.company_name);
+        if (d.website) setWebsite(d.website);
+        if (d.sector) setSector(d.sector);
+        if (d.stage) setStage(d.stage);
+        if (d.location) setLocation(d.location);
+        if (d.pitchSummary) setPitchSummary(d.pitchSummary);
+        if (d.keyMetrics) setKeyMetrics(d.keyMetrics);
+        if (d.teamInfo) setTeamInfo(d.teamInfo);
+        if (d.productDescription) setProductDescription(d.productDescription);
+        setShowAutoFill(false);
+        setAutoFillText('');
+        toast({ title: 'Auto-fill complete', description: `${result.fieldsExtracted || 'Fields'} extracted successfully.` });
+      } else {
+        toast({ variant: 'destructive', title: 'Auto-fill failed', description: 'Could not extract fields from text.' });
+      }
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Auto-fill failed', description: e instanceof Error ? e.message : 'Could not extract fields from text.' });
+    } finally {
+      setIsAutoFilling(false);
+    }
   };
 
   const handleSaveReport = async () => {
@@ -410,6 +454,11 @@ export default function TriageReportWizardPage() {
       const score = (analysisData as { tcaData?: { overallScore?: number } })?.tcaData?.overallScore ?? 0;
       setCompositeScore(score);
       setAnalysisResult(analysisData);
+      sessionStorage.setItem('companyData', JSON.stringify({
+        companyName, sector, stage, website, location,
+        pitchSummary, keyMetrics, teamInfo, productDescription
+      }));
+      localStorage.setItem('analysisCompanyName', companyName);
 
       const reportId = `triage-${Date.now()}`;
       const triageReport = {
@@ -519,6 +568,32 @@ export default function TriageReportWizardPage() {
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
                 />
+              </div>
+              <div className="border rounded-lg p-4 bg-muted/30 space-y-3">
+                <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => setShowAutoFill(!showAutoFill)}>
+                  <Sparkles className="size-4" />
+                  {showAutoFill ? 'Hide' : 'Auto-Fill from Pitch Deck'}
+                </Button>
+                {showAutoFill && (
+                  <div className="space-y-3">
+                    <Textarea
+                      placeholder="Paste your pitch deck or company description here..."
+                      value={autoFillText}
+                      onChange={(e) => setAutoFillText(e.target.value)}
+                      rows={5}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleAutoFill}
+                      disabled={isAutoFilling || !autoFillText.trim()}
+                      className="gap-2"
+                    >
+                      {isAutoFilling ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+                      {isAutoFilling ? 'Extracting...' : 'Extract & Fill Fields'}
+                    </Button>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -1079,6 +1154,29 @@ export default function TriageReportWizardPage() {
                   ))}
                 </div>
               </div>
+              {analysisResult && (analysisResult as { tcaData?: { categories?: Array<{ name: string; score: number; maxScore: number }> } })?.tcaData?.categories && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">TCA Category Breakdown</p>
+                  <div className="space-y-1">
+                    {(analysisResult as { tcaData: { categories: Array<{ name: string; score: number; maxScore: number }> } }).tcaData.categories.map((cat) => (
+                      <div key={cat.name} className="flex items-center justify-between rounded-md border p-2 text-sm">
+                        <span className="text-muted-foreground">{cat.name}</span>
+                        <span className="font-semibold">{cat.score?.toFixed(1)} / {cat.maxScore ?? 10}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {analysisResult && (analysisResult as { keyFindings?: string[] })?.keyFindings && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Key Findings</p>
+                  <ul className="list-disc pl-5 space-y-1">
+                    {(analysisResult as { keyFindings: string[] }).keyFindings.slice(0, 5).map((finding, i) => (
+                      <li key={i} className="text-sm text-muted-foreground">{finding}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               <div className="flex justify-end">
                 <Button onClick={goToNext}>
                   Proceed to Storage
@@ -1207,6 +1305,10 @@ export default function TriageReportWizardPage() {
                 </Button>
                 <Button variant="outline" onClick={() => window.location.reload()}>
                   Start New Triage
+                </Button>
+                <Button variant="secondary" onClick={() => { window.location.href = '/analysis/what-if'; }}>
+                  <LineChart className="mr-2 size-4" />
+                  Run What-If Simulation
                 </Button>
               </div>
             </CardContent>
