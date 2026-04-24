@@ -11027,6 +11027,12 @@ async def forgot_password_v1(
     return await forgot_password(data, background_tasks)
 
 
+@app.post("/api/v1/auth/refresh")
+async def refresh_access_token_v1(request: RefreshTokenRequest):
+    """Refresh access token - v1 alias"""
+    return await refresh_access_token(request)
+
+
 # --- Settings Versions Aliases (without /api/v1 prefix) ---
 @app.get("/settings/versions")
 async def get_settings_versions_alias(include_archived: bool = False):

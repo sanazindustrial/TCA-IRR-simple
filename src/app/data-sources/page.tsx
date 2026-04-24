@@ -863,6 +863,34 @@ export default function DataSourcesPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Navigation to analysis and report wizard */}
+      <Card className="bg-card/50 backdrop-blur-sm">
+        <CardContent className="p-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="font-semibold text-base">Ready to analyse?</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Use your configured data sources in a full analysis run or triage report.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3 shrink-0">
+              <Button asChild variant="outline">
+                <Link href="/analysis/run">
+                  <Lucide.Play className="mr-2 size-4" />
+                  Run Analysis
+                </Link>
+              </Button>
+              <Button asChild>
+                <Link href="/dashboard/reports/triage">
+                  <Lucide.FileText className="mr-2 size-4" />
+                  Triage Wizard
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </main>
   );
 }

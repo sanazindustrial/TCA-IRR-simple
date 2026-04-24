@@ -6,20 +6,124 @@
    - Environments: .env.production
 
    Creating an optimized production build ...
-Failed to compile.
+ ✓ Compiled successfully in 2.2min
+   Skipping validation of types
+   Skipping linting
+   Collecting page data ...
+   Generating static pages (0/94) ...
+   Generating static pages (23/94) 
+   Generating static pages (46/94) 
+   Generating static pages (70/94) 
+ ✓ Generating static pages (94/94)
+   Finalizing page optimization ...
+   Collecting build traces ...
 
-./src/middleware.ts
-Error:   [31mx[0m Expression expected
-   ,-[[36;1;4mc:\Users\Allot\Desktop\TCA-IRR-APP-main- simplify\TCA-IRR-simple\src\middleware.ts[0m:1:1]
- [2m1[0m | .import { NextRequest, NextResponse } from 'next/server';
-   : [35;1m^[0m
- [2m2[0m | import {
- [2m3[0m |     CSP_HEADERS,
- [2m3[0m |     RateLimiter,
-   `----
+Route (app)                                       Size  First Load JS
+┌ ○ /                                            208 B         105 kB
+├ ○ /_not-found                                  196 B         101 kB
+├ ○ /analysis/modules/analyst                  21.1 kB         243 kB
+├ ○ /analysis/modules/benchmark                8.28 kB         150 kB
+├ ○ /analysis/modules/economic                 6.15 kB         127 kB
+├ ○ /analysis/modules/environmental            6.24 kB         127 kB
+├ ○ /analysis/modules/financial                6.16 kB         127 kB
+├ ○ /analysis/modules/founderFit                 237 B         122 kB
+├ ○ /analysis/modules/funder                     185 B         122 kB
+├ ○ /analysis/modules/gap                      6.84 kB         123 kB
+├ ○ /analysis/modules/growth                   9.81 kB         139 kB
+├ ○ /analysis/modules/macro                    6.49 kB         127 kB
+├ ○ /analysis/modules/marketing                6.14 kB         127 kB
+├ ○ /analysis/modules/risk                     5.36 kB         126 kB
+├ ○ /analysis/modules/social                   6.17 kB         127 kB
+├ ○ /analysis/modules/strategic                  185 B         122 kB
+├ ○ /analysis/modules/strategicFit               237 B         122 kB
+├ ○ /analysis/modules/tca                      8.95 kB         125 kB
+├ ○ /analysis/modules/team                     6.36 kB         127 kB
+├ ○ /analysis/result                           34.4 kB         812 kB
+├ ○ /analysis/run                                13 kB         129 kB
+├ ○ /analysis/tca                              17.2 kB         238 kB
+├ ○ /analysis/what-if                            16 kB         166 kB
+├ ƒ /api/admin/requests                          196 B         101 kB
+├ ƒ /api/ai-autofill                             196 B         101 kB
+├ ƒ /api/analysis/comprehensive                  196 B         101 kB
+├ ƒ /api/backup                                  196 B         101 kB
+├ ƒ /api/database/query                          196 B         101 kB
+├ ƒ /api/external-data                           196 B         101 kB
+├ ƒ /api/extract                                 196 B         101 kB
+├ ƒ /api/reports                                 196 B         101 kB
+├ ƒ /api/scrape                                  196 B         101 kB
+├ ƒ /api/ssd/connection-test                     196 B         101 kB
+├ ƒ /api/system-health                           196 B         101 kB
+├ ƒ /api/test-backend                            196 B         101 kB
+├ ƒ /api/tunnel                                  196 B         101 kB
+├ ƒ /api/users/invite                            196 B         101 kB
+├ ○ /dashboard                                   208 B         105 kB
+├ ○ /dashboard/ai-training                     19.5 kB         253 kB
+├ ○ /dashboard/ai-training/bias-fairness       2.58 kB         214 kB
+├ ○ /dashboard/ai-training/data-quality        2.58 kB         220 kB
+├ ○ /dashboard/ai-training/performance         2.48 kB         218 kB
+├ ○ /dashboard/analyst                         8.74 kB         151 kB
+├ ○ /dashboard/backup                           5.4 kB         158 kB
+├ ○ /dashboard/cost                            30.1 kB         169 kB
+├ ○ /dashboard/database                        5.66 kB         324 kB
+├ ○ /dashboard/database-integration            7.74 kB         150 kB
+├ ○ /dashboard/evaluation                        196 B         101 kB
+├ ○ /dashboard/evaluation/modules              9.47 kB         151 kB
+├ ƒ /dashboard/evaluation/modules/[slug]        9.6 kB         151 kB
+├ ○ /dashboard/help                            11.7 kB         156 kB
+├ ○ /dashboard/help/add-new-source               208 B         105 kB
+├ ○ /dashboard/help/admin-configuration          208 B         105 kB
+├ ○ /dashboard/help/analyst-analysis             208 B         105 kB
+├ ○ /dashboard/help/cost-analysis                208 B         105 kB
+├ ○ /dashboard/help/detailed-report            7.84 kB         786 kB
+├ ○ /dashboard/help/getting-started              208 B         105 kB
+├ ○ /dashboard/help/module-guides                208 B         105 kB
+├ ○ /dashboard/help/triage-report              13.7 kB         277 kB
+├ ○ /dashboard/help/understanding-your-report   6.8 kB         119 kB
+├ ○ /dashboard/help/what-if-analysis           6.88 kB         123 kB
+├ ○ /dashboard/module-settings                   11 kB         161 kB
+├ ○ /dashboard/my-requests                     7.17 kB         124 kB
+├ ○ /dashboard/privacy                         4.93 kB         114 kB
+├ ○ /dashboard/profile                          6.6 kB         116 kB
+├ ○ /dashboard/remote                          10.3 kB         119 kB
+├ ○ /dashboard/reports                           18 kB         659 kB
+├ ○ /dashboard/reports/configure               21.9 kB         139 kB
+├ ○ /dashboard/reports/due-diligence           20.9 kB         173 kB
+├ ○ /dashboard/reports/ssd                     12.2 kB         143 kB
+├ ○ /dashboard/reports/triage                  18.9 kB         168 kB
+├ ○ /dashboard/request                         6.25 kB         145 kB
+├ ○ /dashboard/schema                            12 kB         123 kB
+├ ○ /dashboard/schema/external-sources           196 B         101 kB
+├ ○ /dashboard/schema/module-configurations      196 B         101 kB
+├ ○ /dashboard/schema/system-configuration       196 B         101 kB
+├ ○ /dashboard/settings                         7.9 kB         146 kB
+├ ○ /dashboard/ssd-audit                         18 kB         147 kB
+├ ○ /dashboard/system-config                   14.1 kB         160 kB
+├ ○ /dashboard/system-health                   8.03 kB         121 kB
+├ ○ /dashboard/terms                           4.53 kB         114 kB
+├ ○ /dashboard/user-requests                   6.66 kB         159 kB
+├ ○ /dashboard/users                           22.2 kB         177 kB
+├ ○ /data-sources                              16.6 kB         337 kB
+├ ○ /direct-test                                3.1 kB         112 kB
+├ ○ /forgot-password                           5.13 kB         118 kB
+├ ○ /login                                     6.63 kB         122 kB
+├ ○ /logout                                    1.38 kB         111 kB
+├ ○ /maintenance                                4.5 kB         114 kB
+├ ○ /reset-password                            5.73 kB         118 kB
+├ ○ /signup                                    7.63 kB         120 kB
+└ ○ /unauthorized                                208 B         105 kB
++ First Load JS shared by all                   101 kB
+  ├ chunks/1684-9aa2243483954a6b.js            45.8 kB
+  ├ chunks/4bd1b696-327d4366ffe7c022.js        53.2 kB
+  └ other shared chunks (total)                2.21 kB
 
-Caused by:
-    Syntax Error
+
+ƒ Middleware                                   34.7 kB
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
 
 
-> Build failed because of webpack errors
+> tca-irr-app@1.0.0 postbuild
+> echo 'Build completed successfully'
+
+'Build completed successfully'
