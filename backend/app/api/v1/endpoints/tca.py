@@ -131,7 +131,6 @@ async def sector_analysis(sector: str = "technology",
 
 @router.get("/system-status", response_model=Dict[str, Any])
 async def get_tca_system_status(
-        db: asyncpg.Connection = Depends(get_db),
         current_user: dict = Depends(get_current_user)):
     """Get TCA system status and health metrics"""
     try:
