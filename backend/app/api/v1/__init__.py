@@ -85,5 +85,8 @@ api_router.include_router(api_routes.records_router,
                           prefix="/records",
                           tags=["Records"])
 api_router.include_router(api_routes.api_health_router, tags=["API Health"])
+api_router.include_router(api_routes.ai_router, prefix="/ai", tags=["AI"])
+api_router.include_router(api_routes.export_router, prefix="/export", tags=["Export"])
+api_router.include_router(api_routes.notifications_router, prefix="/notifications", tags=["Notifications"])
 if _ml_router is not None:
     api_router.include_router(_ml_router, prefix="/ml", tags=["Machine Learning"])
