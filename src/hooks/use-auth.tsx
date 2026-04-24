@@ -105,6 +105,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         localStorage.setItem('loggedInUser', JSON.stringify(response.user));
                         localStorage.setItem('authToken', response.access_token);
                         if (response.refresh_token) localStorage.setItem('refreshToken', response.refresh_token);
+                        // Trigger immediate health sweep now that we have a token
+                        import('@/lib/health-service').then(({ healthService }) => healthService.sweep());
                         return;
                     }
                 } catch (backendError) {
