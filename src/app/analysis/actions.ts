@@ -752,14 +752,6 @@ export async function runAnalysis(
       // Strategic Fit Matrix Data
       strategicFitData: backendData.strategic_fit ? {} : null,
 
-      // Specialized Module Data (populated by module-specific analysis runs)
-      financialData: null,
-      economicData: null,
-      socialData: null,
-      marketingData: null,
-      environmentalData: null,
-      funderData: null,
-      strategicData: null,
     };
 
     return comprehensiveData;
