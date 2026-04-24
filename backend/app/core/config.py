@@ -76,7 +76,7 @@ class Settings(BaseSettings):
     db_pool_max_inactive_time: float = 300
 
     # Security Settings (overridden from Key Vault in production)
-    secret_key: str = "your-secret-key-here"
+    secret_key: str = "TCA-IRR-PLATFORM-SUPER-SECRET-KEY-2026-PRODUCTION-MIN32CHARS"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
@@ -124,8 +124,6 @@ class Settings(BaseSettings):
     # CORS Settings
     cors_origins: List[str] = [
         "http://localhost:3000",
-        "http://localhost:3001",
-        "https://localhost:3000",
         "https://tca-irr.azurewebsites.net",
         "https://tca-irr-app.azurewebsites.net",
         "https://tcairrapiccontainer.azurewebsites.net",
