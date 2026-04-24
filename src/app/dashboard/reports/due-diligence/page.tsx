@@ -74,6 +74,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import reportsApi from '@/lib/reports-api';
+import { externalSourcesConfig } from '@/lib/external-sources-config';
 
 // Define workflow steps
 const WORKFLOW_STEPS = [
@@ -101,14 +102,15 @@ const DD_AREAS = [
 ];
 
 // External data sources
-const EXTERNAL_SOURCES = [
-  { id: 'sec', name: 'SEC EDGAR', description: 'Company filings, 10-K, 10-Q reports', status: 'available', free: true },
-  { id: 'clinical-trials', name: 'ClinicalTrials.gov', description: 'Clinical trial data', status: 'available', free: true },
-  { id: 'fda', name: 'OpenFDA', description: 'Drug and device approvals', status: 'available', free: true },
-  { id: 'github', name: 'GitHub', description: 'Open source presence', status: 'available', free: true },
-  { id: 'news', name: 'News Aggregator', description: 'Recent news and press', status: 'available', free: true },
-  { id: 'patents', name: 'USPTO Patents', description: 'Patent filings', status: 'reference', free: true },
-];
+const EXTERNAL_SOURCES = externalSourcesConfig
+  .filter((s) => s.requirementGroup === 'A' || s.requirementGroup === 'B')
+  .map((s) => ({
+    id: s.id,
+    name: s.name,
+    description: s.description,
+    status: 'available' as const,
+    free: s.pricing === 'Free' || s.pricing === 'Freemium',
+  }));
 
 interface ExternalDataResult {
   source: string;
@@ -181,7 +183,7 @@ export default function DueDiligenceWorkflowPage() {
   const [textInput, setTextInput] = useState('');
 
   // External data
-  const [selectedSources, setSelectedSources] = useState<string[]>(['sec', 'news']);
+  const [selectedSources, setSelectedSources] = useState<string[]>(['sec-edgar', 'hackernews']);
   const [externalData, setExternalData] = useState<ExternalDataResult[]>([]);
   const [fetchingData, setFetchingData] = useState(false);
 

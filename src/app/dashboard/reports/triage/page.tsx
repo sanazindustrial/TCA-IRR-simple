@@ -61,6 +61,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { cn } from '@/lib/utils';
 import { runAnalysis } from '@/app/analysis/actions';
 import reportsApi from '@/lib/reports-api';
+import { externalSourcesConfig } from '@/lib/external-sources-config';
 
 const TRIAGE_STEPS = [
   { id: 1, name: 'Company Info', icon: Building2, description: 'Basic company details' },
@@ -77,14 +78,14 @@ const TRIAGE_STEPS = [
   { id: 12, name: 'Run Review', icon: UserCheck, description: 'Analysis run review' },
 ];
 
-const EXTERNAL_SOURCES = [
-  { id: 'sec', name: 'SEC EDGAR', description: 'Financial filings and regulatory disclosures for US public companies', free: true },
-  { id: 'clinical-trials', name: 'ClinicalTrials.gov', description: 'Medical/clinical trial data from NIH registry', free: true },
-  { id: 'fda', name: 'OpenFDA', description: 'FDA drug, device, and adverse event database', free: true },
-  { id: 'github', name: 'GitHub', description: 'Public repository activity, stars, contributors, and code metrics', free: true },
-  { id: 'news', name: 'Hacker News', description: 'Startup mentions, funding news, and tech trends', free: true },
-  { id: 'patents', name: 'USPTO Patents', description: 'Patent filings and intellectual property data', free: true },
-];
+const EXTERNAL_SOURCES = externalSourcesConfig
+  .filter((s) => s.requirementGroup === 'A' || s.requirementGroup === 'B')
+  .map((s) => ({
+    id: s.id,
+    name: s.name,
+    description: s.description,
+    free: s.pricing === 'Free' || s.pricing === 'Freemium',
+  }));
 
 const TRIAGE_MODULES = [
   { id: 'tca', name: 'TCA Scorecard', description: 'Core 12-category investment scoring', icon: Target, required: true, weight: 20 },
@@ -194,7 +195,7 @@ export default function TriageReportWizardPage() {
   const [framework, setFramework] = useState<Framework>('general');
   const [selectedModules, setSelectedModules] = useState<string[]>(['tca', 'risk', 'growth', 'macro']);
 
-  const [selectedSources, setSelectedSources] = useState<string[]>(['news']);
+  const [selectedSources, setSelectedSources] = useState<string[]>(['hackernews']);
   const [externalData, setExternalData] = useState<Array<{ source: string; success: boolean; data: unknown; error?: string }>>([]);
   const [fetchingData, setFetchingData] = useState(false);
 
@@ -267,9 +268,28 @@ export default function TriageReportWizardPage() {
 
   const toggleModule = (moduleId: string, required: boolean) => {
     if (required) return;
+    const isCurrentlySelected = selectedModules.includes(moduleId);
     setSelectedModules((prev) =>
-      prev.includes(moduleId) ? prev.filter((m) => m !== moduleId) : [...prev, moduleId]
+      isCurrentlySelected ? prev.filter((m) => m !== moduleId) : [...prev, moduleId]
     );
+    if (isCurrentlySelected) {
+      const moduleToSections: Record<string, string[]> = {
+        tca: ['tca-scorecard', 'tca-summary-card', 'tca-ai-table', 'tca-interpretation-summary', 'weighted-score-breakdown'],
+        risk: ['risk-flag-summary-table', 'flag-analysis-narrative'],
+        gap: ['gap-analysis'],
+        macro: ['macro-trend-alignment'],
+        benchmark: ['benchmark-comparison', 'competitive-landscape'],
+        growth: ['growth-classifier'],
+        team: ['team-assessment'],
+        analyst: ['analyst-comments', 'analyst-ai-deviation'],
+      };
+      const relatedSections = moduleToSections[moduleId] ?? [];
+      if (relatedSections.length > 0) {
+        setReportSections((prev) =>
+          prev.map((s) => relatedSections.includes(s.id) ? { ...s, active: false } : s)
+        );
+      }
+    }
   };
 
   const toggleSection = (sectionId: string) => {
@@ -442,7 +462,8 @@ export default function TriageReportWizardPage() {
       const analysisData = await runAnalysis(framework, {
         companyName, sector, stage, website, location,
         pitchSummary, keyMetrics, teamInfo, productDescription,
-        activeModules: TRIAGE_MODULES.filter(m => selectedModules.includes(m.id)).map(m => ({ module_id: m.id, weight: m.weight, is_enabled: true }))
+        activeModules: TRIAGE_MODULES.filter(m => selectedModules.includes(m.id)).map(m => ({ module_id: m.id, weight: m.weight, is_enabled: true })),
+        ...(isAdminOrAnalyst && Object.keys(simulatedScores).length > 0 && { scoreOverrides: simulatedScores }),
       });
       clearInterval(progressTimer);
       setGenerationProgress(100);
@@ -1157,17 +1178,22 @@ export default function TriageReportWizardPage() {
               </div>
               {(() => {
                 const tcaCategories = (analysisResult as { tcaData?: { categories?: Array<{ name: string; score: number; maxScore: number }> } } | null)?.tcaData?.categories;
-                if (!tcaCategories) return null;
+                const activeModules = TRIAGE_MODULES.filter((m) => selectedModules.includes(m.id));
                 return (
                   <div className="space-y-2">
                     <p className="text-sm font-medium">TCA Category Breakdown</p>
                     <div className="space-y-1">
-                      {tcaCategories.map((cat) => (
-                        <div key={cat.name} className="flex items-center justify-between rounded-md border p-2 text-sm">
-                          <span className="text-muted-foreground">{cat.name}</span>
-                          <span className="font-semibold">{cat.score?.toFixed(1)} / {cat.maxScore ?? 10}</span>
-                        </div>
-                      ))}
+                      {activeModules.map((m) => {
+                        const backendCat = tcaCategories?.find((c) => c.name.toLowerCase() === m.name.toLowerCase());
+                        const score = backendCat?.score ?? (simulatedScores[m.id] ?? 50) / 10;
+                        const maxScore = backendCat?.maxScore ?? 10;
+                        return (
+                          <div key={m.id} className="flex items-center justify-between rounded-md border p-2 text-sm">
+                            <span className="text-muted-foreground">{m.name}</span>
+                            <span className="font-semibold">{score.toFixed(1)} / {maxScore}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 );
