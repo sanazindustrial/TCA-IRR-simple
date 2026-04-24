@@ -71,14 +71,9 @@ def run_production_server():
     logger.info(f"Port: {os.getenv('PORT', 8000)}")
     logger.info(f"DB Host: {os.getenv('POSTGRES_HOST', 'not set')}")
 
-    # Check dependencies but don't fail if database check fails
-    # App will handle errors at runtime
-    try:
-        deps_ok = asyncio.run(check_dependencies())
-        if not deps_ok:
-            logger.warning("Dependency check failed, but continuing startup...")
-    except Exception as e:
-        logger.warning(f"Dependency check error: {e}, continuing startup...")
+    # NOTE: dependency pre-check removed — it blocked uvicorn from binding to the
+    # port before Azure's warmup probe deadline (~230 s), causing container kills.
+    # DB + AI initialisation is handled non-blocking inside main.py lifespan.
 
     # Start the server
     try:
