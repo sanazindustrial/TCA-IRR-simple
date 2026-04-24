@@ -36,16 +36,11 @@ class EmailService:
     @property
     def is_configured(self) -> bool:
         """Check if email service is properly configured"""
-        # Check Azure Communication Services first
-        if getattr(self.settings, 'azure_communication_connection_string', None):
-            return True
-        # Check SendGrid
-        if self.settings.sendgrid_api_key:
-            return True
-        # Check SMTP
-        if self.settings.smtp_user and self.settings.smtp_password:
-            return True
-        return False
+        return bool(
+            getattr(self.settings, 'azure_communication_connection_string', None)
+            or self.settings.sendgrid_api_key
+            or (self.settings.smtp_user and self.settings.smtp_password)
+        )
     
     @property
     def active_provider(self) -> str:
@@ -61,8 +56,7 @@ class EmailService:
     def _get_acs_client(self):
         """Get Azure Communication Services email client (lazy initialization)"""
         if self._acs_client is None:
-            connection_string = getattr(self.settings, 'azure_communication_connection_string', None)
-            if connection_string:
+            if connection_string := getattr(self.settings, 'azure_communication_connection_string', None):
                 try:
                     from azure.communication.email import EmailClient
                     self._acs_client = EmailClient.from_connection_string(connection_string)
