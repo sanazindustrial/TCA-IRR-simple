@@ -58,6 +58,20 @@ jobs:
         with:
           name: python-backend
 
+      - name: Validate publish profile secret
+        run: |
+          if [ -z "${{ secrets.AZURE_BACKEND_PUBLISH_PROFILE }}" ]; then
+            echo "ERROR: AZURE_BACKEND_PUBLISH_PROFILE secret is not set!"
+            echo "Go to: GitHub repo → Settings → Secrets → Actions → New secret"
+            echo "Name: AZURE_BACKEND_PUBLISH_PROFILE"
+            echo "Value: Download publish profile from Azure Portal → tcairrapiccontainer → Get publish profile"
+            exit 1
+          else
+            echo "Publish profile secret is configured (length: ${#PROFILE})"
+          fi
+        env:
+          PROFILE: ${{ secrets.AZURE_BACKEND_PUBLISH_PROFILE }}
+
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
@@ -65,3 +79,11 @@ jobs:
           publish-profile: ${{ secrets.AZURE_BACKEND_PUBLISH_PROFILE }}
           package: backend-deploy.zip
           startup-command: 'python start_production.py'
+
+      - name: Verify deployment
+        run: |
+          sleep 45
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://tcairrapiccontainer.azurewebsites.net/health)
+          echo "Backend health status: $STATUS"
+          DOCS=$(curl -s -o /dev/null -w "%{http_code}" https://tcairrapiccontainer.azurewebsites.net/docs)
+          echo "Backend /docs status: $DOCS"
