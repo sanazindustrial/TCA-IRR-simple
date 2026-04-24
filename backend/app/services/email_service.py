@@ -135,9 +135,7 @@ class EmailService:
                 return False
             
             # Get from email address from settings
-            from_email = getattr(self.settings, 'azure_communication_sender_address', None)
-            if not from_email:
-                from_email = self.settings.smtp_from_email
+            from_email = getattr(self.settings, 'azure_communication_sender_address', None) or self.settings.smtp_from_email
             
             # Build the email message
             message = {
