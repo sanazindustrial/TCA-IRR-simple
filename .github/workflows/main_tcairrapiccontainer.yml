@@ -1,3 +1,4 @@
+# Last triggered: 2026-04-23
 name: Build and deploy Python backend to Azure Web App - tcairrapiccontainer
 
 on:
