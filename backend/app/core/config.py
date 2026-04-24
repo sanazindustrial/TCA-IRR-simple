@@ -14,7 +14,17 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_secret_from_keyvault(secret_name: str, default: str = None) -> str:
+def _get_keyvault_secret(keyvault_url: str, secret_name: str) -> str:
+    """Create Azure Key Vault client and retrieve secret value."""
+    from azure.identity import DefaultAzureCredential
+    from azure.keyvault.secrets import SecretClient
+
+    credential = DefaultAzureCredential()
+    client = SecretClient(vault_url=keyvault_url, credential=credential)
+    return client.get_secret(secret_name).value
+
+
+def get_secret_from_keyvault(secret_name: str, default: Optional[str] = None) -> str:
     """
     Fetch secret from Azure Key Vault if available, otherwise use default.
     Requires: azure-identity, azure-keyvault-secrets packages
@@ -24,14 +34,9 @@ def get_secret_from_keyvault(secret_name: str, default: str = None) -> str:
         return default or os.environ.get(secret_name, "")
     
     try:
-        from azure.identity import DefaultAzureCredential
-        from azure.keyvault.secrets import SecretClient
-        
-        credential = DefaultAzureCredential()
-        client = SecretClient(vault_url=keyvault_url, credential=credential)
-        secret = client.get_secret(secret_name)
+        secret = _get_keyvault_secret(keyvault_url, secret_name)
         logger.info(f"Successfully loaded secret '{secret_name}' from Azure Key Vault")
-        return secret.value
+        return secret
     except ImportError:
         logger.warning("Azure Key Vault SDK not installed. Using environment variables.")
         return default or os.environ.get(secret_name, "")
