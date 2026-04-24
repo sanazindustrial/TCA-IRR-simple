@@ -1136,7 +1136,7 @@ def _calculate_deviation_metrics(human_scores: Dict[str, float], ai_scores: Dict
     # (simplified for numerical scores - use discretized buckets)
     human_bins = [_score_bucket(human_scores.get(c, 0)) for c in categories]
     ai_bins = [_score_bucket(ai_scores.get(c, 0)) for c in categories]
-    observed_agreement = sum(1 for h, a in zip(human_bins, ai_bins) if h == a) / n
+    observed_agreement = sum(h == a for h, a in zip(human_bins, ai_bins)) / n if n > 0 else 0
     expected_agreement = 0.33  # Random agreement for 3 buckets
     kappa = (observed_agreement - expected_agreement) / (1 - expected_agreement) if expected_agreement < 1 else 1
     
