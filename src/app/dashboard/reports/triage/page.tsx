@@ -449,6 +449,7 @@ export default function TriageReportWizardPage() {
       setGenerationStatus('Triage complete!');
 
       localStorage.setItem('analysisResult', JSON.stringify(analysisData));
+      sessionStorage.setItem('analysisResult', JSON.stringify(analysisData));
       localStorage.setItem('analysisFramework', framework);
 
       const score = (analysisData as { tcaData?: { overallScore?: number } })?.tcaData?.overallScore ?? 0;
@@ -1154,29 +1155,37 @@ export default function TriageReportWizardPage() {
                   ))}
                 </div>
               </div>
-              {analysisResult && (analysisResult as { tcaData?: { categories?: Array<{ name: string; score: number; maxScore: number }> } })?.tcaData?.categories && (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">TCA Category Breakdown</p>
-                  <div className="space-y-1">
-                    {(analysisResult as { tcaData: { categories: Array<{ name: string; score: number; maxScore: number }> } }).tcaData.categories.map((cat) => (
-                      <div key={cat.name} className="flex items-center justify-between rounded-md border p-2 text-sm">
-                        <span className="text-muted-foreground">{cat.name}</span>
-                        <span className="font-semibold">{cat.score?.toFixed(1)} / {cat.maxScore ?? 10}</span>
-                      </div>
-                    ))}
+              {(() => {
+                const tcaCategories = (analysisResult as { tcaData?: { categories?: Array<{ name: string; score: number; maxScore: number }> } } | null)?.tcaData?.categories;
+                if (!tcaCategories) return null;
+                return (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">TCA Category Breakdown</p>
+                    <div className="space-y-1">
+                      {tcaCategories.map((cat) => (
+                        <div key={cat.name} className="flex items-center justify-between rounded-md border p-2 text-sm">
+                          <span className="text-muted-foreground">{cat.name}</span>
+                          <span className="font-semibold">{cat.score?.toFixed(1)} / {cat.maxScore ?? 10}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
-              {analysisResult && (analysisResult as { keyFindings?: string[] })?.keyFindings && (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Key Findings</p>
-                  <ul className="list-disc pl-5 space-y-1">
-                    {(analysisResult as { keyFindings: string[] }).keyFindings.slice(0, 5).map((finding, i) => (
-                      <li key={i} className="text-sm text-muted-foreground">{finding}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+                );
+              })()}
+              {(() => {
+                const keyFindings = (analysisResult as { keyFindings?: string[] } | null)?.keyFindings;
+                if (!keyFindings) return null;
+                return (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Key Findings</p>
+                    <ul className="list-disc pl-5 space-y-1">
+                      {keyFindings.slice(0, 5).map((finding, i) => (
+                        <li key={i} className="text-sm text-muted-foreground">{finding}</li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })()}
               <div className="flex justify-end">
                 <Button onClick={goToNext}>
                   Proceed to Storage
@@ -1306,7 +1315,7 @@ export default function TriageReportWizardPage() {
                 <Button variant="outline" onClick={() => window.location.reload()}>
                   Start New Triage
                 </Button>
-                <Button variant="secondary" onClick={() => { window.location.href = '/analysis/what-if'; }}>
+                <Button variant="secondary" onClick={() => { router.push('/analysis/what-if'); }}>
                   <LineChart className="mr-2 size-4" />
                   Run What-If Simulation
                 </Button>

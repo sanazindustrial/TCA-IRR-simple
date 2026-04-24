@@ -92,12 +92,7 @@ export default function CostManagementPage() {
     try {
       const startDate = format(dateRange.from, 'yyyy-MM-dd');
       const endDate = format(dateRange.to, 'yyyy-MM-dd');
-      const data = await costApi.getSummary(
-        startDate,
-        endDate,
-        userFilter !== 'all' ? userFilter : undefined,
-        activityFilter !== 'all' ? activityFilter : undefined,
-      );
+      const data = await costApi.getSummary(startDate, endDate);
       setCostData(data);
     } catch (error) {
       console.error('Failed to fetch cost data:', error);
@@ -387,7 +382,7 @@ export default function CostManagementPage() {
                         <TableCell>{trend.date}</TableCell>
                         <TableCell className="text-right font-medium">${trend.cost.toFixed(2)}</TableCell>
                         <TableCell className="text-right text-muted-foreground">
-                          {trend.executions ? trend.executions.toLocaleString() : '-'}
+                          {'-'}
                         </TableCell>
                       </TableRow>
                     ))}
