@@ -237,10 +237,7 @@ class DocumentExtractor:
 
         try:
             doc = DocxDocument(io.BytesIO(file_content))
-            paragraphs = []
-            for para in doc.paragraphs:
-                if para.text.strip():
-                    paragraphs.append(para.text)
+            paragraphs = [para.text for para in doc.paragraphs if para.text.strip()]
             result["text_content"] = "\n".join(paragraphs)
             result["paragraphs"] = paragraphs
 
@@ -269,11 +266,7 @@ class DocumentExtractor:
 
             all_text = []
             for slide_num, slide in enumerate(prs.slides):
-                slide_text = []
-                for shape in slide.shapes:
-                    if hasattr(shape, "text"):
-                        if shape.text.strip():
-                            slide_text.append(shape.text)
+                slide_text = [shape.text for shape in slide.shapes if hasattr(shape, "text") and shape.text.strip()]
 
                 slide_content = "\n".join(slide_text)
                 all_text.append(slide_content)

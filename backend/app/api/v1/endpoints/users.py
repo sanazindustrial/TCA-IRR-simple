@@ -412,7 +412,7 @@ async def update_user(user_id: int,
             )
         
         # Add updated_at
-        update_fields.append(f"updated_at = NOW()")
+        update_fields.append("updated_at = NOW()")
         
         # Add user_id to values
         values.append(user_id)
