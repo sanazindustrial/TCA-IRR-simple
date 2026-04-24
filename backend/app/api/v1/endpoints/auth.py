@@ -19,7 +19,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field, field_validator
 import asyncpg
 
-from app.core import (settings, create_access_token, verify_token, 
+from app.core import (settings, create_access_token, create_refresh_token, verify_token, 
                       get_password_hash, verify_password,
                       account_lockout, token_blacklist, PasswordPolicy,
                       audit_logger, AuditEventType)
@@ -294,6 +294,13 @@ async def login(request: Request,
             "user_id": user['id']
         }, expires_delta=access_token_expires)
 
+        # Create refresh token
+        refresh_token = create_refresh_token(data={
+            "sub": user['username'],
+            "role": user['role'],
+            "user_id": user['id']
+        })
+
         # Log successful login
         await audit_logger.log(
             AuditEventType.LOGIN_SUCCESS,
@@ -308,6 +315,7 @@ async def login(request: Request,
         logger.info(f"Successful login for user: {user_credentials.email}")
 
         return Token(access_token=access_token,
+                     refresh_token=refresh_token,
                      token_type="bearer",
                      expires_in=settings.access_token_expire_minutes * 60)
 
@@ -437,6 +445,37 @@ async def get_current_user_info(
     Requires valid JWT token in Authorization header
     """
     return UserResponse(**current_user)
+
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
+
+
+@router.post("/refresh", response_model=Token)
+async def refresh_token_endpoint(refresh_data: RefreshTokenRequest, db: asyncpg.Connection = Depends(get_db)):
+    """Exchange a valid refresh token for a new access + refresh token pair."""
+    payload = verify_token(refresh_data.refresh_token)
+    if payload is None or payload.get("type") != "refresh":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token"
+        )
+    new_access_token = create_access_token(data={
+        "sub": payload["sub"],
+        "role": payload.get("role"),
+        "user_id": payload.get("user_id")
+    })
+    new_refresh_token = create_refresh_token(data={
+        "sub": payload["sub"],
+        "role": payload.get("role"),
+        "user_id": payload.get("user_id")
+    })
+    return Token(
+        access_token=new_access_token,
+        refresh_token=new_refresh_token,
+        token_type="bearer",
+        expires_in=settings.access_token_expire_minutes * 60
+    )
 
 
 @router.post("/logout", response_model=BaseResponse)

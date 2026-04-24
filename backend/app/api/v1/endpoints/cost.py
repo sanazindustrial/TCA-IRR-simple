@@ -176,7 +176,7 @@ async def get_cost_summary(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve cost summary: {str(e)}"
-        )
+        ) from e
 
 
 @router.get("/usage")
@@ -236,7 +236,7 @@ async def get_usage_details(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve usage details"
-        )
+        ) from e
 
 
 @router.get("/budget")
@@ -287,14 +287,13 @@ async def get_budget_status(
 async def _table_exists(db: asyncpg.Connection, table_name: str) -> bool:
     """Check if a table exists in the database"""
     try:
-        result = await db.fetchval("""
+        return await db.fetchval("""
             SELECT EXISTS (
                 SELECT FROM information_schema.tables 
                 WHERE table_name = $1
             )
         """, table_name)
-        return result
-    except:
+    except Exception:
         return False
 
 
