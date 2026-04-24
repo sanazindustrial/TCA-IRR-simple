@@ -237,9 +237,8 @@ class DocumentExtractor:
 
         try:
             doc = DocxDocument(io.BytesIO(file_content))
-            paragraphs = [para.text for para in doc.paragraphs if para.text.strip()]
-            result["text_content"] = "\n".join(paragraphs)
-            result["paragraphs"] = paragraphs
+            result["paragraphs"] = [para.text for para in doc.paragraphs if para.text.strip()]
+            result["text_content"] = "\n".join(result["paragraphs"])
 
             for table in doc.tables:
                 table_data = []
@@ -317,113 +316,80 @@ class DocumentExtractor:
         return result
 
     @classmethod
+    def _first_pattern_match(cls, patterns: list, text: str, flags=re.IGNORECASE) -> Optional[re.Match]:
+        """Return the first regex match found among a list of patterns."""
+        for pattern in patterns:
+            if match := re.search(pattern, text, flags):
+                return match
+        return None
+
+    @classmethod
+    def _extract_amount_from_patterns(cls, patterns: list, text: str) -> Optional[float]:
+        """Return a parsed financial amount from the first matching pattern."""
+        if not (match := cls._first_pattern_match(patterns, text)):
+            return None
+        value = match.group(1)
+        mult = match.group(2) if len(match.groups()) > 1 else None
+        return cls.parse_amount(value, mult)
+
+    @classmethod
+    def _detect_industry(cls, text_lower: str) -> Optional[str]:
+        """Detect industry from text using keyword matching."""
+        industry_keywords = {
+            'fintech': ['fintech', 'financial technology', 'payments', 'banking', 'lending'],
+            'healthtech': ['healthtech', 'healthcare', 'medical', 'health tech', 'telehealth'],
+            'edtech': ['edtech', 'education', 'learning', 'ed tech', 'e-learning'],
+            'saas': ['saas', 'software as a service', 'cloud software', 'subscription software'],
+            'e-commerce': ['e-commerce', 'ecommerce', 'online retail', 'marketplace'],
+            'ai_ml': ['artificial intelligence', 'machine learning', 'ai', 'ml', 'deep learning'],
+            'biotech': ['biotech', 'biotechnology', 'pharma', 'life sciences'],
+            'cleantech': ['cleantech', 'clean energy', 'renewable', 'sustainability'],
+            'proptech': ['proptech', 'real estate tech', 'property technology'],
+            'insurtech': ['insurtech', 'insurance technology', 'insurance tech'],
+        }
+        return next(
+            (industry for industry, keywords in industry_keywords.items()
+             if any(kw in text_lower for kw in keywords)),
+            None
+        )
+
+    @classmethod
     def extract_company_info(cls, text: str) -> dict:
         """Extract company information from text using regex patterns"""
-        info = {}
         text_lower = text.lower()
+        info = {}
 
-        # Company name - look for patterns
-        for pattern in cls.COMPANY_PATTERNS['company_name']:
-            match = re.search(pattern, text, re.IGNORECASE | re.MULTILINE)
-            if match:
-                name = match.group(1).strip()
-                if len(name) > 2 and len(name) < 100:
-                    info['company_name'] = name
-                    break
+        if name_match := cls._first_pattern_match(
+                cls.COMPANY_PATTERNS['company_name'], text, re.IGNORECASE | re.MULTILINE):
+            name = name_match.group(1).strip()
+            if 2 < len(name) < 100:
+                info['company_name'] = name
 
-        # Funding
-        for pattern in cls.COMPANY_PATTERNS['funding']:
-            match = re.search(pattern, text, re.IGNORECASE)
-            if match:
-                value = match.group(1)
-                mult = match.group(2) if len(match.groups()) > 1 else None
-                info['funding_amount'] = cls.parse_amount(value, mult)
-                break
+        if (funding := cls._extract_amount_from_patterns(cls.COMPANY_PATTERNS['funding'], text)) is not None:
+            info['funding_amount'] = funding
 
-        # Revenue
-        for pattern in cls.COMPANY_PATTERNS['revenue']:
-            match = re.search(pattern, text, re.IGNORECASE)
-            if match:
-                value = match.group(1)
-                mult = match.group(2) if len(match.groups()) > 1 else None
-                info['revenue'] = cls.parse_amount(value, mult)
-                break
+        if (revenue := cls._extract_amount_from_patterns(cls.COMPANY_PATTERNS['revenue'], text)) is not None:
+            info['revenue'] = revenue
 
-        # Employees
-        for pattern in cls.COMPANY_PATTERNS['employees']:
-            match = re.search(pattern, text, re.IGNORECASE)
-            if match:
-                info['employee_count'] = int(match.group(1))
-                break
+        if emp_match := cls._first_pattern_match(cls.COMPANY_PATTERNS['employees'], text):
+            info['employee_count'] = int(emp_match.group(1))
 
-        # Founded year
-        for pattern in cls.COMPANY_PATTERNS['founded']:
-            match = re.search(pattern, text, re.IGNORECASE)
-            if match:
-                year = int(match.group(1))
-                if 1900 <= year <= 2030:
-                    info['founded_year'] = year
-                    break
+        if founded_match := cls._first_pattern_match(cls.COMPANY_PATTERNS['founded'], text):
+            year = int(founded_match.group(1))
+            if 1900 <= year <= 2030:
+                info['founded_year'] = year
 
-        # Location
-        for pattern in cls.COMPANY_PATTERNS['location']:
-            match = re.search(pattern, text, re.IGNORECASE)
-            if match:
-                info['location'] = match.group(1).strip()
-                break
+        if loc_match := cls._first_pattern_match(cls.COMPANY_PATTERNS['location'], text):
+            info['location'] = loc_match.group(1).strip()
 
-        # Website
-        for pattern in cls.COMPANY_PATTERNS['website']:
-            match = re.search(pattern, text, re.IGNORECASE)
-            if match:
-                info['website'] = match.group(0)
-                break
+        if web_match := cls._first_pattern_match(cls.COMPANY_PATTERNS['website'], text):
+            info['website'] = web_match.group(0)
 
-        # Email
-        for pattern in cls.COMPANY_PATTERNS['email']:
-            match = re.search(pattern, text)
-            if match:
-                info['email'] = match.group(0)
-                break
+        if email_match := cls._first_pattern_match(cls.COMPANY_PATTERNS['email'], text, 0):
+            info['email'] = email_match.group(0)
 
-        # Industry detection
-        industry_keywords = {
-            'fintech': [
-                'fintech', 'financial technology', 'payments', 'banking',
-                'lending'
-            ],
-            'healthtech': [
-                'healthtech', 'healthcare', 'medical', 'health tech',
-                'telehealth'
-            ],
-            'edtech':
-            ['edtech', 'education', 'learning', 'ed tech', 'e-learning'],
-            'saas': [
-                'saas', 'software as a service', 'cloud software',
-                'subscription software'
-            ],
-            'e-commerce':
-            ['e-commerce', 'ecommerce', 'online retail', 'marketplace'],
-            'ai_ml': [
-                'artificial intelligence', 'machine learning', 'ai', 'ml',
-                'deep learning'
-            ],
-            'biotech': ['biotech', 'biotechnology', 'pharma', 'life sciences'],
-            'cleantech':
-            ['cleantech', 'clean energy', 'renewable', 'sustainability'],
-            'proptech':
-            ['proptech', 'real estate tech', 'property technology'],
-            'insurtech':
-            ['insurtech', 'insurance technology', 'insurance tech'],
-        }
-
-        for industry, keywords in industry_keywords.items():
-            for keyword in keywords:
-                if keyword in text_lower:
-                    info['industry'] = industry
-                    break
-            if 'industry' in info:
-                break
+        if industry := cls._detect_industry(text_lower):
+            info['industry'] = industry
 
         return info
 
