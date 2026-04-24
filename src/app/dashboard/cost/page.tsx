@@ -149,6 +149,29 @@ export default function CostManagementPage() {
     ? (costData.aiBreakdown.totalAiCost / costData.totalCost) * 100
     : 0;
 
+  // Client-side activity filter
+  const filteredBreakdown = activityFilter === 'all'
+    ? costData.breakdown
+    : costData.breakdown.filter(item => {
+        const cat = item.category.toLowerCase();
+        if (activityFilter === 'ai-analysis') return cat.includes('ai') || cat.includes('analysis');
+        if (activityFilter === 'data-storage') return cat.includes('storage');
+        if (activityFilter === 'auth') return cat.includes('auth');
+        if (activityFilter === 'report-gen') return cat.includes('report');
+        return true;
+      });
+
+  // Client-side user filter
+  const filteredCostByUser = userFilter === 'all'
+    ? costData.aiBreakdown.costByUser
+    : costData.aiBreakdown.costByUser.filter(user => {
+        const name = user.name.toLowerCase();
+        if (userFilter === 'admin') return name.includes('admin');
+        if (userFilter === 'reviewer1') return name.includes('reviewer');
+        if (userFilter === 'user1') return name.includes('user1') || name === 'user1';
+        return true;
+      });
+
   if (isLoading && !costData.totalRequests) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -280,7 +303,7 @@ export default function CostManagementPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
-                  {costData.breakdown.map(item => (
+                  {filteredBreakdown.map(item => (
                     <div key={item.category}>
                       <div className="flex justify-between mb-1">
                         <p className="text-sm font-medium">{item.category}</p>
@@ -333,7 +356,7 @@ export default function CostManagementPage() {
                 <div>
                   <p className="text-sm font-medium mb-2">Cost by User</p>
                   <div className="space-y-2">
-                    {costData.aiBreakdown.costByUser.map(user => (
+                    {filteredCostByUser.map(user => (
                       <div key={user.name}>
                         <div className="flex justify-between text-xs mb-1">
                           <p>{user.name}</p>

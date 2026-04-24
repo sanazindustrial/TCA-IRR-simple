@@ -2,8 +2,9 @@
 Administrative endpoints with enhanced security and governance features
 """
 
+import contextlib
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from typing import Dict, Any, List, Optional
 from app.utils.json_utils import json_response_with_datetime
@@ -36,7 +37,7 @@ async def admin_health_check(
 ):
     """Detailed health check for administrators"""
     # Log admin action (best-effort — don't fail if DB is down)
-    try:
+    with contextlib.suppress(Exception):
         async with db_manager.acquire() as db:
             await audit_logger.log(
                 AuditEventType.ADMIN_ACTION,
@@ -46,8 +47,6 @@ async def admin_health_check(
                 action_details={"action": "health_check"},
                 db=db
             )
-    except Exception:
-        pass
 
     # Get database health (best-effort)
     try:
@@ -68,7 +67,7 @@ async def admin_health_check(
         database=db_health,
         ai_service=ai_health,
         external_apis={"status": "healthy"},
-        timestamp=datetime.utcnow()
+        timestamp=datetime.now(timezone.utc)
     )
 
 
@@ -83,7 +82,7 @@ async def database_status(current_user: dict = Depends(get_current_user)):
             "connected": True,
             "database": "PostgreSQL",
             "message": "Database connection successful",
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
     except Exception as e:
         logger.warning("Database connectivity check failed: %s", e)
@@ -92,7 +91,7 @@ async def database_status(current_user: dict = Depends(get_current_user)):
             "connected": False,
             "database": "PostgreSQL",
             "error": str(e),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
 
@@ -133,7 +132,7 @@ async def system_status(
             "max_concurrent_sessions": GovernancePolicy.MAX_CONCURRENT_SESSIONS,
             "session_timeout_minutes": GovernancePolicy.SESSION_TIMEOUT_MINUTES
         },
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
 
@@ -160,13 +159,14 @@ async def get_audit_logs(
     )
     
     # Build query dynamically
-    query = """
+    params = [f"{hours} hours"]
+    param_count = 1
+
+    query = f"""
         SELECT * FROM audit_logs 
-        WHERE created_at > CURRENT_TIMESTAMP - INTERVAL '%s hours'
-    """ % hours
-    params = []
-    param_count = 0
-    
+        WHERE created_at > CURRENT_TIMESTAMP - ${param_count}::interval
+    """
+
     if event_type:
         param_count += 1
         query += f" AND event_type = ${param_count}"
@@ -177,7 +177,7 @@ async def get_audit_logs(
         query += f" AND username = ${param_count}"
         params.append(username)
     
-    query += " ORDER BY created_at DESC LIMIT $" + str(param_count + 1)
+    query += f" ORDER BY created_at DESC LIMIT ${param_count + 1}"
     params.append(limit)
     
     try:

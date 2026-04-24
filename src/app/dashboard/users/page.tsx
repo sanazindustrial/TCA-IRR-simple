@@ -277,6 +277,27 @@ export default function UserManagementPage() {
   const getAuthToken = () => localStorage.getItem('authToken');
   const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://tcairrapiccontainer.azurewebsites.net';
 
+  // Attempt silent token refresh; returns new access token or null
+  const tryRefreshAndGetToken = async (): Promise<string | null> => {
+    const refreshToken = localStorage.getItem('refreshToken');
+    if (!refreshToken) return null;
+    try {
+      const res = await fetch(`${backendUrl}/api/v1/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data.access_token) {
+        localStorage.setItem('authToken', data.access_token);
+        if (data.refresh_token) localStorage.setItem('refreshToken', data.refresh_token);
+        return data.access_token;
+      }
+    } catch { /* ignore */ }
+    return null;
+  };
+
   // Check if current user is admin
   const isAdmin = currentUser?.role?.toLowerCase() === 'admin';
 
@@ -303,12 +324,25 @@ export default function UserManagementPage() {
       const params = new URLSearchParams({ size: '100' });
       if (searchQuery) params.append('search', searchQuery);
 
-      const response = await fetch(`${backendUrl}/api/v1/users?${params.toString()}`, {
+      let response = await fetch(`${backendUrl}/api/v1/users?${params.toString()}`, {
         headers: {
           'Accept': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
       });
+
+      // On 401 silently refresh and retry once
+      if (response.status === 401) {
+        const newToken = await tryRefreshAndGetToken();
+        if (newToken) {
+          response = await fetch(`${backendUrl}/api/v1/users?${params.toString()}`, {
+            headers: {
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${newToken}`,
+            },
+          });
+        }
+      }
 
       if (response.ok) {
         const data = await response.json();

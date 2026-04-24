@@ -3,7 +3,7 @@ Cost Management API endpoints for tracking usage, AI costs, and billing
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import Dict, Any, List, Optional
 import asyncpg
@@ -188,7 +188,7 @@ async def get_usage_details(
     """Get detailed usage statistics"""
     try:
         # Calculate date range
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         if time_period == "7d":
             start_date = now - timedelta(days=7)
         elif time_period == "30d":

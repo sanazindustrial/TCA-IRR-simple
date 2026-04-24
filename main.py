@@ -328,8 +328,8 @@ class DocumentExtractor:
         """Return a parsed financial amount from the first matching pattern."""
         if not (match := cls._first_pattern_match(patterns, text)):
             return None
-        value = match.group(1)
-        mult = match.group(2) if len(match.groups()) > 1 else None
+        value = match[1]
+        mult = match[2] if len(match.groups()) > 1 else None
         return cls.parse_amount(value, mult)
 
     @classmethod
@@ -399,8 +399,7 @@ class DocumentExtractor:
         financials = {}
 
         for key, pattern in cls.FINANCIAL_PATTERNS.items():
-            match = re.search(pattern, text, re.IGNORECASE)
-            if match:
+            if match := re.search(pattern, text, re.IGNORECASE):
                 value = match.group(1)
                 mult = match.group(2) if len(match.groups()) > 1 else None
                 if key in ['gross_margin', 'growth_rate', 'churn']:
@@ -421,68 +420,65 @@ class DocumentExtractor:
         team_match = re.search(r'(\d+)\s*(?:team|employees?|people|staff)',
                                text, re.IGNORECASE)
         if team_match:
-            metrics['team_size'] = int(team_match.group(1))
+            metrics['team_size'] = int(team_match[1])
 
         # Customer count
-        customer_match = re.search(
+        if customer_match := re.search(
             r'(\d+(?:,\d{3})*(?:\+)?)\s*(?:customers?|clients?|users?)', text,
-            re.IGNORECASE)
-        if customer_match:
+            re.IGNORECASE):
             metrics['customers'] = int(
-                customer_match.group(1).replace(',', '').replace('+', ''))
+                customer_match[1].replace(',', '').replace('+', ''))
 
         # MRR/ARR
-        mrr_match = re.search(
+        if mrr_match := re.search(
             r'(?:mrr|monthly recurring revenue)[:\s]*\$?([\d,.]+)\s*([MK])?',
-            text, re.IGNORECASE)
-        if mrr_match:
-            metrics['mrr'] = cls.parse_amount(mrr_match.group(1),
-                                              mrr_match.group(2))
+            text, re.IGNORECASE):
+            metrics['mrr'] = cls.parse_amount(mrr_match[1],
+                                              mrr_match[2])
 
         arr_match = re.search(
             r'(?:arr|annual recurring revenue)[:\s]*\$?([\d,.]+)\s*([MK])?',
             text, re.IGNORECASE)
         if arr_match:
-            metrics['arr'] = cls.parse_amount(arr_match.group(1),
-                                              arr_match.group(2))
+            metrics['arr'] = cls.parse_amount(arr_match[1],
+                                              arr_match[2])
 
         # Growth rate
-        growth_match = re.search(r'(\d+(?:\.\d+)?)\s*%\s*(?:growth|yoy|mom)',
-                                 text, re.IGNORECASE)
-        if growth_match:
-            metrics['growth_rate'] = float(growth_match.group(1))
+        if growth_match := re.search(r'(\d+(?:\.\d+)?)\s*%\s*(?:growth|yoy|mom)',
+                                     text, re.IGNORECASE):
+            metrics['growth_rate'] = float(growth_match[1])
 
         # NRR (Net Revenue Retention)
         nrr_match = re.search(
             r'(?:nrr|net revenue retention)[:\s]*([\d.]+)\s*%?', text,
             re.IGNORECASE)
         if nrr_match:
-            metrics['nrr'] = float(nrr_match.group(1))
+            metrics['nrr'] = float(nrr_match[1])
 
         # CAC (Customer Acquisition Cost)
         cac_match = re.search(
             r'(?:cac|customer acquisition cost)[:\s]*\$?([\d,.]+)', text,
             re.IGNORECASE)
         if cac_match:
-            metrics['cac'] = cls.parse_amount(cac_match.group(1), None)
+            metrics['cac'] = cls.parse_amount(cac_match[1], None)
 
         # LTV (Lifetime Value)
         ltv_match = re.search(r'(?:ltv|lifetime value|clv)[:\s]*\$?([\d,.]+)',
                               text, re.IGNORECASE)
         if ltv_match:
-            metrics['ltv'] = cls.parse_amount(ltv_match.group(1), None)
+            metrics['ltv'] = cls.parse_amount(ltv_match[1], None)
 
         # Churn
         churn_match = re.search(r'(?:churn|churn rate)[:\s]*([\d.]+)\s*%?',
                                 text, re.IGNORECASE)
         if churn_match:
-            metrics['churn'] = float(churn_match.group(1))
+            metrics['churn'] = float(churn_match[1])
 
         # NPS
         nps_match = re.search(r'(?:nps|net promoter score)[:\s]*([+-]?\d+)',
                               text, re.IGNORECASE)
         if nps_match:
-            metrics['nps'] = int(nps_match.group(1))
+            metrics['nps'] = int(nps_match[1])
 
         return metrics
 
@@ -708,11 +704,12 @@ class DocumentExtractor:
                 r'(?:California|CA|NY|TX|FL|WA|MA|CO|IL|GA)\b',
                 r'(?:USA|US|United States|Canada|UK|Germany|France|Australia)',
             ]
-            for pattern in loc_patterns:
-                match = re.search(pattern, text, re.IGNORECASE)
-                if match:
-                    company_info['location'] = match.group(0)
-                    break
+            if loc_match := next(
+                (re.search(pattern, text, re.IGNORECASE) for pattern in loc_patterns
+                 if re.search(pattern, text, re.IGNORECASE)),
+                None
+            ):
+                company_info['location'] = loc_match.group(0)
 
         # Estimate founded year from context
         if not company_info.get('founded_year'):
@@ -3802,7 +3799,7 @@ async def get_module_weights():
         }
 
     # Check if custom SSD weights are configured
-    custom_weights = SSD_MODULE_WEIGHTS if SSD_MODULE_WEIGHTS else None
+    custom_weights = SSD_MODULE_WEIGHTS
 
     return {
         "modules": weights,
