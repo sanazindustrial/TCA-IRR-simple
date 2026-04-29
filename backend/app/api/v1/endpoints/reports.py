@@ -304,19 +304,17 @@ async def create_report(
         
         record = await db.fetchrow("""
             INSERT INTO reports (
-                company_id, report_type, title, content, summary, status, 
-                generated_at, generated_by, metadata
+                company_id, report_type, title, status, 
+                generated_at, user_id, metadata
             ) VALUES (
-                $1, $2, $3, $4, $5, 'Completed',
-                NOW(), $6, $7
+                $1, $2, $3, 'Completed',
+                NOW(), $4, $5
             )
             RETURNING *
         """,
             report.company_id,
             report.report_type,
             report.company_name,  # Use company_name as title
-            "",  # Empty content
-            "",  # Empty summary
             user_id,
             json.dumps(metadata)
         )
@@ -329,7 +327,7 @@ async def create_report(
                 u.email as user_email,
                 c.name as company_name_from_company
             FROM reports r
-            LEFT JOIN users u ON r.generated_by = u.id
+            LEFT JOIN users u ON r.user_id = u.id
             LEFT JOIN companies c ON r.company_id = c.id
             WHERE r.id = $1
         """, record["id"])

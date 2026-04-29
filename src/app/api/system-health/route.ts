@@ -25,11 +25,11 @@ export async function GET() {
     results.backend = await testWithTimeout(async () => {
         const start = Date.now();
         try {
-            const res = await fetch(`${BACKEND_API_URL}/api/health`);
+            const res = await fetch(`${BACKEND_API_URL}/health`);
             const latency_ms = Date.now() - start;
             if (res.ok) {
                 const data = await res.json();
-                return { connected: true, latency_ms, message: `Status: ${data.status || 'ok'}, DB: ${data.database || 'connected'}` };
+                return { connected: true, latency_ms, message: `Status: ${data.status || 'ok'}, Ready: ${data.ready ? 'yes' : 'no'}` };
             }
             return { connected: false, latency_ms, message: `HTTP ${res.status}` };
         } catch (e) {
@@ -41,17 +41,17 @@ export async function GET() {
     results.database = await testWithTimeout(async () => {
         const start = Date.now();
         try {
-            const res = await fetch(`${BACKEND_API_URL}/api/health`);
+            const res = await fetch(`${BACKEND_API_URL}/health`);
             const latency_ms = Date.now() - start;
             if (res.ok) {
                 const data = await res.json();
-                const dbConnected = data.database === 'connected' || data.database === 'ok';
+                const dbConnected = data.status === 'healthy' && data.ready === true;
                 return {
                     connected: dbConnected,
                     latency_ms,
                     message: dbConnected
                         ? `Azure PostgreSQL connected (${latency_ms}ms)`
-                        : `Database status: ${data.database || 'unknown'}`,
+                        : `Service status: ${data.status || 'unknown'}, ready: ${data.ready}`,
                 };
             }
             return { connected: false, latency_ms, message: `Backend returned HTTP ${res.status}` };
