@@ -286,7 +286,7 @@ class HealthService {
      * Optional probes generate browser console noise (403/405) on protected or
      * POST-only endpoints. Keep them off by default; allow opt-in debugging.
      */
-    private shouldProbeOptionalEndpoints(): boolean {j
+    private shouldProbeOptionalEndpoints(): boolean {
         if (typeof window === 'undefined') return false;
         this.applyProbeDebugToggleFromUrl();
         return window.localStorage.getItem('enableOptionalHealthProbes') === 'true';
@@ -341,6 +341,18 @@ class HealthService {
     // ── Single service ping ───────────────────────────────────────────────────
 
     private async pingService(def: ServiceDef): Promise<ServiceResult> {
+        // Auth-required probes are noisy in browser logs (401) when session/token
+        // is missing or stale. Keep them off by default; allow opt-in debug mode.
+        if (def.requiresAuth && !this.shouldProbeOptionalEndpoints()) {
+            return {
+                def,
+                status: 'checking',
+                code: 0,
+                latencyMs: 0,
+                checkedAt: new Date().toISOString(),
+            };
+        }
+
         // Optional probes are informational only. Skip by default to avoid noisy
         // browser console errors from protected/POST-only endpoints.
         if (def.optional && !this.shouldProbeOptionalEndpoints()) {
@@ -481,6 +493,8 @@ class HealthService {
     private async fetchTCASystemStatus(): Promise<Record<string, boolean>> {
         try {
             const token = this.getToken();
+            // Keep auth-required status probes off by default unless debug mode is enabled.
+            if (!this.shouldProbeOptionalEndpoints()) return {};
             // Skip the request when unauthenticated to avoid a 401 console error
             if (!token) return {};
             const controller = new AbortController();
