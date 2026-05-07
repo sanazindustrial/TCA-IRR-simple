@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
-const SSD_API_KEY = process.env.SSD_API_KEY || process.env.NEXT_PUBLIC_SSD_API_KEY || 'ssd-tca-58ceb369539c4a098b9ac49c';
+const SSD_API_KEY = process.env.SSD_API_KEY;
 
 // POST /api/tunnel — Submit a file for analysis via the tunnel
 export async function POST(req: NextRequest) {
+    if (!SSD_API_KEY) {
+        return NextResponse.json({ error: 'SSD service not configured' }, { status: 503 });
+    }
     try {
         const contentType = req.headers.get('content-type') || '';
         let companyName = '';

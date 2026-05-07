@@ -7,16 +7,18 @@ export default function WelcomePage() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background">
       <div className="text-center p-8">
-         <div className="flex justify-center items-center mb-6">
-            <div className="bg-primary/10 border-2 border-primary/20 p-4 rounded-xl">
-                 <LogIn className="text-primary size-8" />
-            </div>
+        <div className="flex justify-center items-center mb-6">
+          <img
+            src="/TCAVG-Logo-IRR.png"
+            alt="TCA Venture Group"
+            className="h-20 w-auto object-contain"
+          />
         </div>
         <h1 className="text-4xl md:text-5xl font-bold font-headline text-primary tracking-tight">
-          Welcome to TCA-IRR
+          Welcome to TCA Investment Readiness Report
         </h1>
         <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-          Your intelligent partner for comprehensive startup evaluation and risk assessment.
+          AI-Powered Startup Analysis
         </p>
         <div className="mt-8 flex justify-center gap-4">
           <Button asChild size="lg">

@@ -3,6 +3,7 @@ import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { ThemeProvider } from '@/components/theme-provider';
 import { CopyProtection } from '@/components/copy-protection';
+import { BetaBanner } from '@/components/BetaBanner';
 
 export const metadata: Metadata = {
   title: 'TCA-IRR APP',
@@ -17,6 +18,8 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <link rel="icon" href="/icon.jpg" type="image/jpeg" />
+        <link rel="shortcut icon" href="/icon.jpg" type="image/jpeg" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
           rel="preconnect"
@@ -29,6 +32,7 @@ export default function RootLayout({
         />
       </head>
       <body className="font-body antialiased">
+        <BetaBanner />
         <CopyProtection />
         <ThemeProvider
           attribute="class"

@@ -103,6 +103,24 @@ export default function ModuleSettingsPage() {
         setIsMounted(true);
     }, []);
 
+    // Merge MODULE_DEFINITIONS to ensure all 17 modules appear
+    const mergeModuleSettings = useCallback((version: SettingsVersion): SettingsVersion => {
+        const existingIds = new Set((version.module_settings || []).map((m: { module_id: string }) => m.module_id));
+        const missing = Object.entries(MODULE_DEFINITIONS)
+            .filter(([id]) => !existingIds.has(id))
+            .map(([id, def], idx) => ({
+                module_id: id,
+                module_name: def.name,
+                weight: def.weight,
+                is_enabled: false,
+                priority: (version.module_settings?.length ?? 0) + idx + 1,
+                settings: {},
+                thresholds: {},
+            }));
+        if (missing.length === 0) return version;
+        return { ...version, module_settings: [...(version.module_settings || []), ...missing] };
+    }, []);
+
     // Load versions on mount
     const loadVersions = useCallback(async () => {
         try {
@@ -114,10 +132,10 @@ export default function ModuleSettingsPage() {
             const activeVersion = data.find(v => v.is_active);
             if (activeVersion) {
                 const fullVersion = await settingsApi.getVersion(activeVersion.id);
-                setSelectedVersion(fullVersion);
+                setSelectedVersion(mergeModuleSettings(fullVersion));
             } else if (data.length > 0) {
                 const fullVersion = await settingsApi.getVersion(data[0].id);
-                setSelectedVersion(fullVersion);
+                setSelectedVersion(mergeModuleSettings(fullVersion));
             }
         } catch (error) {
             console.error('Failed to load settings versions:', error);
@@ -176,7 +194,7 @@ export default function ModuleSettingsPage() {
     const handleSelectVersion = async (versionId: number) => {
         try {
             const fullVersion = await settingsApi.getVersion(versionId);
-            setSelectedVersion(fullVersion);
+            setSelectedVersion(mergeModuleSettings(fullVersion));
         } catch (error) {
             toast({
                 title: 'Error',

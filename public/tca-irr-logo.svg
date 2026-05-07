@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 115" fill="none">
+  <defs>
+    <linearGradient id="wg3" x1="5" y1="85" x2="85" y2="5" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#9C6F0A"/>
+      <stop offset="50%" stop-color="#C8900A"/>
+      <stop offset="100%" stop-color="#F5C330"/>
+    </linearGradient>
+  </defs>
+  <!-- Wave symbol — left side -->
+  <path d="M 8 73 C 22 50 47 46 80 24" stroke="url(#wg3)" stroke-width="9" stroke-linecap="round" fill="none"/>
+  <path d="M 8 54 C 24 33 50 30 80 46" stroke="url(#wg3)" stroke-width="9" stroke-linecap="round" fill="none" opacity="0.65"/>
+  <path d="M 8 35 C 27 17 54 14 80 64" stroke="url(#wg3)" stroke-width="9" stroke-linecap="round" fill="none" opacity="0.35"/>
+  <!-- Vertical divider -->
+  <line x1="98" y1="14" x2="98" y2="76" stroke="#00285c" stroke-width="1.5" opacity="0.25"/>
+  <!-- TCA — large bold serif text -->
+  <text x="112" y="62" font-family="Georgia, 'Times New Roman', serif" font-size="48" font-weight="700" fill="#00285c" letter-spacing="4">TCA</text>
+  <!-- VENTURE GROUP — small spaced caps -->
+  <text x="114" y="78" font-family="Arial, Helvetica, sans-serif" font-size="11.5" font-weight="600" fill="#00285c" letter-spacing="6">VENTURE GROUP</text>
+  <!-- Separator line -->
+  <line x1="114" y1="89" x2="374" y2="89" stroke="#998763" stroke-width="0.8" opacity="0.6"/>
+  <!-- Investment Readiness Report — gold italic -->
+  <text x="114" y="107" font-family="Georgia, 'Times New Roman', serif" font-size="14" font-style="italic" fill="#998763" letter-spacing="1.5">Investment Readiness Report</text>
+</svg>

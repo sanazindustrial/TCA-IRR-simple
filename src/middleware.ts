@@ -82,6 +82,13 @@ export function middleware(request: NextRequest) {
             '/api/analysis',        // Analysis endpoints - uses backend auth
             '/api/tracking',        // Tracking endpoints - uses backend auth
             '/api/ssd',             // SSD integration proxy - uses API key auth on backend
+            '/api/database',        // Database query proxy - protected by Bearer token auth
+            '/api/tunnel',          // Tunnel proxy - proxies to backend with API key auth
+            '/api/extract-pitch-deck', // Pitch deck extraction - file upload route
+            '/api/external-data',   // External data fetch - backend auth
+            '/api/ai-autofill',     // AI autofill - backend auth
+            '/api/extract',         // File extraction proxy - backend auth
+            '/api/scrape',          // Web scrape proxy - backend auth
         ];
         const shouldCheckCSRF = !skipCSRFRoutes.some(route => pathname.startsWith(route))
             && !isNextServerAction;
@@ -158,13 +165,8 @@ export function middleware(request: NextRequest) {
     }
 
     // ===== SECURE ROUTING =====
-    // Protect admin routes
-    if (pathname.startsWith('/admin') || pathname.startsWith('/dashboard/admin')) {
-        const authCookie = request.cookies.get('session-token');
-        if (!authCookie) {
-            return NextResponse.redirect(new URL('/login', request.url));
-        }
-    }
+    // Note: Auth is localStorage-based (JWT), not cookie-based.
+    // Route protection for /dashboard/admin is handled client-side by the dashboard layout and page guards.
 
     // Protect DD reports (admin/Analyst only)
     if (pathname === '/analysis/result' && url.searchParams.get('type') === 'dd') {

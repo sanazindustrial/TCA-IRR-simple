@@ -58,7 +58,7 @@ import { FlagAnalysisNarrative } from '@/components/evaluation/flag-analysis-nar
 import Loading from '../../loading';
 
 // Sample Data and Types
-import { sampleAnalysisData, type ComprehensiveAnalysisOutput } from '@/lib/sample-data';
+import { type ComprehensiveAnalysisOutput } from '@/lib/sample-data';
 import { normalizeAnalysisData } from '@/lib/normalize-tca-data';
 
 // Type Definitions
@@ -398,7 +398,7 @@ export default function AnalysisResultPage({
     const [reportType, setReportType] = useState<ReportType>('triage');
     const [framework, setFramework] = useState<'general' | 'medtech'>('general');
     const [visibleSections, setVisibleSections] = useState<ReportSection[]>([]);
-    const [analysisData, setAnalysisData] = useState<ComprehensiveAnalysisOutput>(sampleAnalysisData);
+    const [analysisData, setAnalysisData] = useState<ComprehensiveAnalysisOutput | null>(null);
     const [wizardResult, setWizardResult] = useState<WizardResult | null>(null);
     const [analysisDuration, setAnalysisDuration] = useState<number | null>(null);
     const [params, setParams] = useState<{ preview?: string; type?: string; evalId?: string; anlId?: string; company?: string; user?: string }>({});

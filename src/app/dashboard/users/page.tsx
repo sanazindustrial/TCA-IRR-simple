@@ -784,14 +784,20 @@ export default function UserManagementPage() {
 
   // Reset password handler
   const handleResetPassword = async (user: User) => {
-    const token = getAuthToken();
-    if (!token) return;
+    if (!user.email) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'This user does not have an email address on file.'
+      });
+      return;
+    }
 
     try {
-      const response = await fetch(`${backendUrl}/api/v1/users/${user.backendId}/reset-password`, {
+      const response = await fetch(`${backendUrl}/api/v1/auth/forgot-password`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: user.email }),
       });
 
       if (!response.ok) {
@@ -799,10 +805,9 @@ export default function UserManagementPage() {
         throw new Error(data.detail || 'Failed to reset password');
       }
 
-      const data = await response.json();
       toast({
-        title: '🔑 Password Reset Link Generated',
-        description: `A password reset link has been sent to ${user.email}.`
+        title: '🔑 Password Reset Email Sent',
+        description: `If an account exists for ${user.email}, a password reset email has been sent.`
       });
     } catch (error) {
       toast({

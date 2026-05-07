@@ -86,10 +86,6 @@ const initialEnvVars: EnvVar[] = [
 const initialApiKeys: ApiKey[] = [
     { id: 'key-1', name: 'Gemini', value: 'AIzaSy****************', keySnippet: 'AIzaSy...' },
     { id: 'key-2', name: 'OpenAI', value: 'sk-****************', keySnippet: 'sk-...' },
-    { id: 'key-3', name: 'Azure PostgreSQL', value: '', keySnippet: '' },
-    { id: 'key-4', name: 'Crunchbase', value: '', keySnippet: '' },
-    { id: 'key-5', name: 'Anthropic', value: '', keySnippet: '' },
-    { id: 'key-6', name: 'GitHub', value: '', keySnippet: '' },
 ];
 
 const configurationFeatures = [

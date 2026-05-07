@@ -50,8 +50,8 @@ import { useToast } from '@/hooks/use-toast';
 const allGuides = [
   { title: "Getting Started Guide", description: "A complete walkthrough of your first analysis.", icon: Book, href: "/dashboard/help/getting-started", roles: ['user', 'analyst', 'admin'] },
   { title: "Understanding Your Report", description: "Learn what each section of the analysis means.", icon: Book, href: "/dashboard/help/understanding-your-report", roles: ['user', 'analyst', 'admin'] },
-  { title: "Module Guides", description: "A detailed breakdown of all 9 analysis modules.", icon: Book, href: "/dashboard/help/module-guides", roles: ['user', 'analyst', 'admin'] },
-  { title: "Analyst Analysis Guide", description: "How to use the Analyst input and analysis tools.", icon: MessageSquare, href: "/dashboard/help/Analyst-analysis", roles: ['analyst', 'admin'] },
+  { title: "Module Guides", description: "A detailed breakdown of all 17 analysis modules.", icon: Book, href: "/dashboard/help/module-guides", roles: ['user', 'analyst', 'admin'] },
+  { title: "Analyst Analysis Guide", description: "How to use the Analyst input and analysis tools.", icon: MessageSquare, href: "/dashboard/help/analyst-analysis", roles: ['analyst', 'admin'] },
   { title: "What-If Analysis Guide", description: "Simulate outcomes by adjusting scores before finalizing.", icon: Calculator, href: "/dashboard/help/what-if-analysis", roles: ['analyst', 'admin'] },
   { title: "Detailed DD Report Guide", description: "An in-depth look at the Due Diligence report sections.", icon: FileSearch, href: "/dashboard/help/detailed-report", roles: ['analyst', 'admin'] },
   { title: "Configuring Modules", description: "Customize module weights, scoring, and logic.", icon: SlidersHorizontal, href: "/dashboard/help/admin-configuration", roles: ['analyst', 'admin'] },
@@ -101,6 +101,7 @@ const requestCategories = [
 
 export default function HelpPage() {
   const [guides, setGuides] = useState(allGuides);
+  const [searchQuery, setSearchQuery] = useState('');
   const [user, setUser] = useState<User | null>(null);
   const [requestType, setRequestType] = useState('general_question');
   const [message, setMessage] = useState('');
@@ -187,7 +188,7 @@ export default function HelpPage() {
 
       <div className="relative mb-8">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-        <Input placeholder="Search help topics..." className="pl-10 h-12" />
+        <Input placeholder="Search help topics..." className="pl-10 h-12" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
       </div>
 
       <Tabs defaultValue="faq" className="w-full">
@@ -220,7 +221,7 @@ export default function HelpPage() {
               <CardDescription>Step-by-step tutorials to get the most out of the platform.</CardDescription>
             </CardHeader>
             <CardContent className='space-y-4'>
-              {guides.map(guide => {
+              {guides.filter(g => !searchQuery || g.title.toLowerCase().includes(searchQuery.toLowerCase()) || g.description.toLowerCase().includes(searchQuery.toLowerCase())).map(guide => {
                 const Icon = guide.icon;
                 return (
                   <div key={guide.title} className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 transition-colors">

@@ -37,6 +37,8 @@ $API_URL    = 'https://tcairrapiccontainer.azurewebsites.net'
 $ProjectRoot = $PSScriptRoot
 $ZIP_PATH   = Join-Path $ProjectRoot 'deploy-now.zip'
 $STANDALONE = Join-Path $ProjectRoot '.next\standalone'
+$STANDALONE_NESTED = Join-Path $ProjectRoot '.next\standalone\.actual-ui'
+$STANDALONE_ROOT = $null
 # ─────────────────────────────────────────────────────────────────────────────
 
 function Write-Step([string]$msg) { Write-Host "`n=== $msg ===" -ForegroundColor Cyan }
@@ -66,8 +68,14 @@ if (-not $SkipBuild) {
 
 # ── Step 2: Verify standalone output ─────────────────────────────────────────
 Write-Step "2/5 - Verifying build output"
-if (-not (Test-Path $STANDALONE))                           { throw "Standalone dir not found: $STANDALONE" }
-if (-not (Test-Path (Join-Path $STANDALONE 'server.js'))) { throw "server.js missing from standalone output" }
+if (-not (Test-Path $STANDALONE)) { throw "Standalone dir not found: $STANDALONE" }
+if (Test-Path (Join-Path $STANDALONE 'server.js')) {
+    $STANDALONE_ROOT = $STANDALONE
+} elseif (Test-Path (Join-Path $STANDALONE_NESTED 'server.js')) {
+    $STANDALONE_ROOT = $STANDALONE_NESTED
+} else {
+    throw "server.js missing from standalone output (checked: $STANDALONE and $STANDALONE_NESTED)"
+}
 Write-OK "Standalone output verified"
 
 # ── Step 3: Package ───────────────────────────────────────────────────────────
@@ -75,7 +83,7 @@ Write-Step "3/5 - Creating deployment package"
 
 # Ensure .next/static is inside standalone
 $staticSrc = Join-Path $ProjectRoot '.next\static'
-$staticDst = Join-Path $STANDALONE '.next\static'
+$staticDst = Join-Path $STANDALONE_ROOT '.next\static'
 if (Test-Path $staticSrc) {
     if (-not (Test-Path $staticDst)) { New-Item -ItemType Directory -Path $staticDst -Force | Out-Null }
     Copy-Item "$staticSrc\*" -Destination $staticDst -Recurse -Force
@@ -84,7 +92,7 @@ if (Test-Path $staticSrc) {
 
 # Ensure public/ is inside standalone
 $publicSrc = Join-Path $ProjectRoot 'public'
-$publicDst = Join-Path $STANDALONE 'public'
+$publicDst = Join-Path $STANDALONE_ROOT 'public'
 if (Test-Path $publicSrc) {
     if (-not (Test-Path $publicDst)) { New-Item -ItemType Directory -Path $publicDst -Force | Out-Null }
     Copy-Item "$publicSrc\*" -Destination $publicDst -Recurse -Force
@@ -93,7 +101,7 @@ if (Test-Path $publicSrc) {
 
 if (Test-Path $ZIP_PATH) { Remove-Item $ZIP_PATH -Force }
 
-Push-Location $STANDALONE
+Push-Location $STANDALONE_ROOT
 try {
     Compress-Archive -Path ".\*" -DestinationPath $ZIP_PATH -Force
 } finally {

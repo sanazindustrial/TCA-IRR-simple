@@ -43,6 +43,57 @@ security = HTTPBearer()
 password_reset_tokens: dict = {}
 
 
+async def issue_password_reset_email(
+    *,
+    db: asyncpg.Connection,
+    user_id: int,
+    email: str,
+    username: str,
+    client_ip: str,
+    user_agent: str,
+    action_details: Optional[dict] = None,
+) -> None:
+    """Create a reset token, store it, audit it, and email the user."""
+    reset_token = secrets.token_urlsafe(32)
+    expires_at = datetime.utcnow() + timedelta(hours=1)
+
+    password_reset_tokens[reset_token] = {
+        "user_id": user_id,
+        "email": email,
+        "username": username,
+        "expires_at": expires_at,
+    }
+
+    await audit_logger.log(
+        AuditEventType.PASSWORD_RESET_REQUEST,
+        user_id=user_id,
+        username=username,
+        ip_address=client_ip,
+        user_agent=user_agent,
+        action_details=action_details or {"email": email},
+        success=True,
+        db=db,
+    )
+
+    logger.info(f"Password reset requested for user: {username}, token: {reset_token[:8]}...")
+
+    try:
+        email_sent = await send_password_reset_email(
+            to_email=email,
+            reset_token=reset_token,
+            username=username,
+        )
+        if email_sent:
+            logger.info(f"Password reset email sent to {email}")
+        else:
+            logger.warning(
+                f"Failed to send password reset email to {email}. "
+                f"Provider={email_service.active_provider}, error={email_service.last_error}"
+            )
+    except Exception as email_error:
+        logger.error(f"Error sending password reset email: {email_error}")
+
+
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(
     security),
                            db: asyncpg.Connection = Depends(get_db)) -> dict:
@@ -539,45 +590,15 @@ async def forgot_password(
         )
         
         if user:
-            # Generate password reset token
-            reset_token = secrets.token_urlsafe(32)
-            expires_at = datetime.utcnow() + timedelta(hours=1)
-            
-            # Store the reset token (in-memory for demo, use database/Redis for production)
-            password_reset_tokens[reset_token] = {
-                "user_id": user['id'],
-                "email": user['email'],
-                "username": user['username'],
-                "expires_at": expires_at
-            }
-            
-            # Log the password reset request
-            await audit_logger.log(
-                AuditEventType.PASSWORD_RESET_REQUEST,
+            await issue_password_reset_email(
+                db=db,
                 user_id=user['id'],
+                email=user['email'],
                 username=user['username'],
-                ip_address=client_ip,
+                client_ip=client_ip,
                 user_agent=user_agent,
                 action_details={"email": forgot_request.email},
-                success=True,
-                db=db
             )
-            
-            logger.info(f"Password reset requested for user: {user['username']}, token: {reset_token[:8]}...")
-            
-            # Send password reset email
-            try:
-                email_sent = await send_password_reset_email(
-                    to_email=user['email'],
-                    reset_token=reset_token,
-                    username=user['username']
-                )
-                if email_sent:
-                    logger.info(f"Password reset email sent to {user['email']}")
-                else:
-                    logger.warning(f"Failed to send password reset email to {user['email']} - email service may not be configured")
-            except Exception as email_error:
-                logger.error(f"Error sending password reset email: {email_error}")
         else:
             # Log the attempt even if user doesn't exist (for security monitoring)
             logger.info(f"Password reset requested for non-existent email: {forgot_request.email}")
@@ -1335,19 +1356,22 @@ async def email_service_status(
             detail="Only admins can check email service status"
         )
     
-    sendgrid_configured = bool(email_service.settings.sendgrid_api_key)
-    smtp_configured = bool(email_service.settings.smtp_user and email_service.settings.smtp_password)
-    
+    diagnostics = email_service.get_diagnostics()
+
     return {
-        "is_configured": email_service.is_configured,
-        "provider": "sendgrid" if sendgrid_configured else ("smtp" if smtp_configured else "none"),
-        "sendgrid_configured": sendgrid_configured,
-        "smtp_configured": smtp_configured,
-        "smtp_host": email_service.settings.smtp_host if smtp_configured else None,
-        "from_email": email_service.settings.smtp_from_email,
-        "from_name": email_service.settings.smtp_from_name,
-        "frontend_url": email_service.settings.frontend_url,
-        "message": "Email service is ready" if email_service.is_configured else "Email service not configured - set SENDGRID_API_KEY or SMTP_USER/SMTP_PASSWORD"
+        "is_configured": diagnostics["is_configured"],
+        "provider": diagnostics["active_provider"],
+        "acs_configured": diagnostics["acs_configured"],
+        "acs_client_ready": diagnostics["acs_client_ready"],
+        "acs_sender_address": diagnostics["acs_sender_address"],
+        "sendgrid_configured": diagnostics["sendgrid_configured"],
+        "smtp_configured": diagnostics["smtp_configured"],
+        "smtp_host": diagnostics["smtp_host"],
+        "from_email": diagnostics["from_email"],
+        "from_name": diagnostics["from_name"],
+        "frontend_url": diagnostics["frontend_url"],
+        "last_error": diagnostics["last_error"],
+        "message": "Email service is ready" if diagnostics["is_configured"] else "Email service not configured - set AZURE_COMMUNICATION_CONNECTION_STRING, SENDGRID_API_KEY, or SMTP_USER/SMTP_PASSWORD"
     }
 
 
@@ -1399,12 +1423,13 @@ async def send_test_email(
             logger.info(f"Test email sent to {request.to_email} by {current_user['username']}")
             return {
                 "success": True,
-                "message": f"Test email sent successfully to {request.to_email}"
+                "message": f"Test email sent successfully to {request.to_email}",
+                "provider": email_service.active_provider
             }
         else:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to send test email. Check server logs for details."
+                detail=f"Failed to send test email. Provider={email_service.active_provider}; error={email_service.last_error}"
             )
     except HTTPException:
         raise

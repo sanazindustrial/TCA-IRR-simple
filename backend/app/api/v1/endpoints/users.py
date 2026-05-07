@@ -6,17 +6,16 @@ import logging
 import io
 import csv
 import secrets
-import hashlib
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from fastapi.responses import StreamingResponse
-from typing import List, Optional
+from typing import Any, List, Optional, cast
 import asyncpg
 import math
 
 from app.db import get_db
 from app.models import UserResponse, UserUpdate, PaginatedResponse
-from .auth import get_current_user
+from .auth import get_current_user, issue_password_reset_email
 from app.services.email_service import send_invite_email
 
 logger = logging.getLogger(__name__)
@@ -93,11 +92,12 @@ async def get_users(page: int = 1,
             users.append(UserResponse(**user_dict))
         
         # Calculate pagination
-        total_pages = math.ceil(total / size) if total > 0 else 0
+        total_count = int(total or 0)
+        total_pages = math.ceil(total_count / size) if total_count > 0 else 0
         
         return PaginatedResponse(
             items=users,
-            total=total,
+            total=total_count,
             page=page,
             size=size,
             pages=total_pages,
@@ -260,7 +260,7 @@ async def invite_user(
                 to_email=email,
                 invite_token=invite_token,
                 role=role,
-                inviter_name=current_user.get('username', 'Admin')
+                invited_by=current_user.get('username', 'Admin')
             )
             email_sent = True
         except Exception as e:
@@ -320,7 +320,8 @@ async def get_user(user_id: int,
                 detail="User not found"
             )
         
-        return UserResponse(**dict(row))
+        user_data: dict[str, Any] = cast(dict[str, Any], dict(row))
+        return UserResponse(**user_data)
         
     except HTTPException:
         raise
@@ -425,9 +426,15 @@ async def update_user(user_id: int,
         """
         
         row = await db.fetchrow(query, *values)
+        if not row:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
         
         logger.info(f"User {user_id} updated by {current_user['username']}")
-        return UserResponse(**dict(row))
+        user_data: dict[str, Any] = cast(dict[str, Any], dict(row))
+        return UserResponse(**user_data)
         
     except HTTPException:
         raise
@@ -604,6 +611,7 @@ async def activate_user(
 @router.post("/{user_id}/reset-password")
 async def reset_user_password(
     user_id: int,
+    request: Request,
     db: asyncpg.Connection = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
@@ -626,21 +634,26 @@ async def reset_user_password(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found"
             )
-        
-        # Generate a temporary password
-        temp_password = secrets.token_urlsafe(12)
-        hashed_password = hashlib.sha256(temp_password.encode()).hexdigest()
-        
-        # Update password
-        await db.execute(
-            "UPDATE users SET password = $1, updated_at = NOW() WHERE id = $2",
-            hashed_password, user_id
+
+        client_ip = request.client.host if request.client else "unknown"
+        user_agent = request.headers.get("user-agent", "unknown")
+
+        await issue_password_reset_email(
+            db=db,
+            user_id=user_id,
+            email=existing['email'],
+            username=existing['username'],
+            client_ip=client_ip,
+            user_agent=user_agent,
+            action_details={
+                "email": existing['email'],
+                "requested_by": current_user['username'],
+                "method": "admin_reset",
+            },
         )
         
         logger.info(f"Password reset for user {existing['username']} (ID: {user_id}) by {current_user['username']}")
-        
-        # In production, you would send an email with the reset link
-        # For now, return success (the temp password would be emailed)
+
         return {
             "success": True,
             "message": f"Password reset link sent to {existing['email']}",

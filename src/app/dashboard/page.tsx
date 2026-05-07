@@ -8,11 +8,12 @@ export default function DashboardHome() {
   return (
     <div className="container mx-auto p-4 md:p-8">
       <header className="text-center mb-12">
+        <img src="/TCAVG-Logo-IRR.png" className="mx-auto mb-6 h-24 w-auto" alt="TCA Venture Group Investment Readiness Report"/>
         <h1 className="text-4xl md:text-5xl font-bold font-headline text-primary tracking-tight">
-          Welcome to Startup Compass
+          Welcome to TCA Investment Readiness Report
         </h1>
         <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-          Your central hub for AI-powered startup evaluation and due diligence.
+          AI-Powered Startup Analysis
         </p>
       </header>
 
@@ -29,7 +30,7 @@ export default function DashboardHome() {
           </CardHeader>
           <CardContent>
             <Button asChild size="lg" className="w-full">
-              <Link href="/dashboard/evaluation">Run Company Analysis</Link>
+              <Link href="/dashboard/reports/triage">Run Company Analysis</Link>
             </Button>
           </CardContent>
         </Card>

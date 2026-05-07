@@ -1,6 +1,12 @@
-﻿import { redirect } from 'next/navigation';
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function EvaluationPage() {
-  redirect('/dashboard/reports/triage');
+  const router = useRouter();
+  useEffect(() => {
+    router.replace('/dashboard/reports/triage');
+  }, [router]);
+  return null;
 }
-

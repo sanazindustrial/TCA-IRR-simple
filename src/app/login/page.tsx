@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import Link from 'next/link';
-import { LogIn, Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function LoginPage() {
@@ -75,12 +75,10 @@ export default function LoginPage() {
       <Card className="w-full max-w-md shadow-2xl">
         <CardHeader className="text-center">
           <div className="flex justify-center items-center mb-4">
-            <div className="bg-primary/10 border-2 border-primary/20 p-4 rounded-xl">
-              <LogIn className="text-primary size-8" />
-            </div>
+            <img src="/icon.jpg" alt="TCA Venture Group" className="h-16 w-auto object-contain" />
           </div>
           <CardTitle className="text-3xl font-bold tracking-tight">Welcome Back</CardTitle>
-          <CardDescription>Sign in to your TCA-IRR APP account</CardDescription>
+          <CardDescription>Sign in to your TCA Venture Group account</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-6">

@@ -282,15 +282,94 @@ class HealthService {
         return localStorage.getItem('authToken');
     }
 
+    /**
+     * Optional probes generate browser console noise (403/405) on protected or
+     * POST-only endpoints. Keep them off by default; allow opt-in debugging.
+     */
+    private shouldProbeOptionalEndpoints(): boolean {j
+        if (typeof window === 'undefined') return false;
+        this.applyProbeDebugToggleFromUrl();
+        return window.localStorage.getItem('enableOptionalHealthProbes') === 'true';
+    }
+
+    /**
+     * Supports automatic toggling via URL query params:
+     *   ?probeDebug=on|true|1   -> enable optional probes
+     *   ?probeDebug=off|false|0 -> disable optional probes
+     */
+    private applyProbeDebugToggleFromUrl(): void {
+        try {
+            const url = new URL(window.location.href);
+            const raw = (url.searchParams.get('probeDebug') ?? '').toLowerCase();
+            if (!raw) return;
+
+            const enableValues = new Set(['1', 'true', 'on', 'yes']);
+            const disableValues = new Set(['0', 'false', 'off', 'no']);
+
+            if (enableValues.has(raw)) {
+                window.localStorage.setItem('enableOptionalHealthProbes', 'true');
+            } else if (disableValues.has(raw)) {
+                window.localStorage.setItem('enableOptionalHealthProbes', 'false');
+            } else {
+                return;
+            }
+
+            url.searchParams.delete('probeDebug');
+            const next = `${url.pathname}${url.search}${url.hash}`;
+            window.history.replaceState({}, '', next);
+        } catch {
+            // Ignore URL parsing failures and keep default localStorage behavior.
+        }
+    }
+
+    /** Endpoints that are expected to reject GET or require elevated roles. */
+    private isNoisyOptionalEndpoint(path: string): boolean {
+        const noisyPatterns: RegExp[] = [
+            /^\/api\/v1\/auth\/(login|register|refresh)$/,
+            /^\/api\/v1\/(analysis\/comprehensive|tca\/batch|ssd\/evaluate|records\/sync)$/,
+            /^\/api\/v1\/(extraction\/validate|extraction\/reprocess)$/,
+            /^\/api\/v1\/(analysis\/extract-text-from-file|analysis\/extract-company-info)$/,
+            /^\/api\/v1\/files\/(upload|extract-text)$/,
+            /^\/api\/v1\/cost\/(summary|usage|budget)$/,
+            /^\/api\/v1\/users\/?$/,
+            /^\/api\/v1\/users\/export$/,
+            /^\/api\/v1\/admin\//,
+        ];
+        return noisyPatterns.some((re) => re.test(path));
+    }
+
     // ── Single service ping ───────────────────────────────────────────────────
 
     private async pingService(def: ServiceDef): Promise<ServiceResult> {
-        const token = this.getToken();
-        if (def.requiresAuth && !token) {
-            // User not logged in – report as checking rather than down
+        // Optional probes are informational only. Skip by default to avoid noisy
+        // browser console errors from protected/POST-only endpoints.
+        if (def.optional && !this.shouldProbeOptionalEndpoints()) {
             return {
                 def,
                 status: 'checking',
+                code: 0,
+                latencyMs: 0,
+                checkedAt: new Date().toISOString(),
+            };
+        }
+
+        // Even in debug mode, suppress known noisy endpoints.
+        if (def.optional && this.isNoisyOptionalEndpoint(def.path)) {
+            return {
+                def,
+                status: 'checking',
+                code: 0,
+                latencyMs: 0,
+                checkedAt: new Date().toISOString(),
+            };
+        }
+
+        const token = this.getToken();
+        if (def.requiresAuth && !token) {
+            // User not logged in – report degraded (optional) or down (required)
+            return {
+                def,
+                status: (def.optional ? 'degraded' : 'down') as ServiceStatus,
                 code: 0,
                 latencyMs: 0,
                 checkedAt: new Date().toISOString(),
