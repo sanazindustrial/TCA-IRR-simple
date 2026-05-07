@@ -28,15 +28,166 @@ export async function OPTIONS() {
 
 // ── Regex-based local extraction fallback ─────────────────────────────────────
 
+function inferCompanyNameFromText(text: string): string {
+  const patterns: RegExp[] = [
+    /(?:company|startup|organization|legal)\s*(?:name)?\s*[:\-]\s*([^\n]{2,100})/i,
+    /\b([A-Z][A-Za-z0-9&.'-]*(?:\s+[A-Z][A-Za-z0-9&.'-]*){0,3})\s*,\s*(?:[A-Z][a-z]+ing\b[^\n]*)/,
+    /(?:^|\n)\s*([A-Z][A-Za-z0-9&.'-]*(?:\s+[A-Z][A-Za-z0-9&.'-]*){0,3})\s*(?:\n|$)/m,
+  ];
+
+  for (const re of patterns) {
+    const match = text.match(re);
+    const candidate = cleanCompanyName(match?.[1]);
+    if (candidate) return candidate;
+  }
+
+  return '';
+}
+
+function normalizeWebsite(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  const raw = value.trim();
+  if (!raw) return '';
+  if (/^https?:\/\//i.test(raw)) return raw;
+  if (/^[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?:\/.*)?$/.test(raw)) return `https://${raw}`;
+  return '';
+}
+
+function guessWebsiteFromCompanyName(value: string): string {
+  const slug = value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .join('');
+  if (slug.length < 3) return '';
+  return `https://${slug}.com`;
+}
+
+function isWebsiteLikelyForCompany(website: string, companyName: string): boolean {
+  try {
+    const host = new URL(normalizeWebsite(website)).hostname.toLowerCase().replace(/^www\./, '');
+    const companyTokens = companyName
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter((token) => token.length >= 4);
+    if (companyTokens.length === 0) return true;
+    return companyTokens.some((token) => host.includes(token));
+  } catch {
+    return false;
+  }
+}
+
+async function enrichCompanyOnline(companyName: string): Promise<Record<string, unknown>> {
+  const enriched: Record<string, unknown> = {};
+  const query = companyName.trim();
+  if (!query) return enriched;
+
+  const pickBestWebsiteFromHtml = (html: string): string => {
+    const matches = [...html.matchAll(/uddg=([^&"']+)/g)].map((m) => decodeURIComponent(m[1]));
+    const blockedHosts = [
+      'duckduckgo.com', 'google.com', 'bing.com', 'yahoo.com', 'wikipedia.org',
+      'linkedin.com', 'facebook.com', 'instagram.com', 'youtube.com', 'news.ycombinator.com',
+    ];
+    for (const candidate of matches) {
+      const normalized = normalizeWebsite(candidate);
+      if (!normalized) continue;
+      try {
+        const host = new URL(normalized).hostname.toLowerCase();
+        if (!blockedHosts.some((blocked) => host.includes(blocked))) {
+          return normalized;
+        }
+      } catch {
+        // ignore invalid URL
+      }
+    }
+    return '';
+  };
+
+  const buildGuessedDomains = (name: string): string[] => {
+    const slug = name.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean).join('');
+    if (!slug || slug.length < 3) return [];
+    return [`https://${slug}.com`, `https://www.${slug}.com`];
+  };
+
+  const canReachDomain = async (url: string): Promise<boolean> => {
+    try {
+      const controller = new AbortController();
+      const tid = setTimeout(() => controller.abort(), 6000);
+      const res = await fetch(url, { method: 'GET', redirect: 'follow', signal: controller.signal, cache: 'no-store' });
+      clearTimeout(tid);
+      return res.status >= 200 && res.status < 500;
+    } catch {
+      return false;
+    }
+  };
+
+  // 1) Clearbit company autocomplete (public endpoint)
+  try {
+    const res = await fetch(
+      `https://autocomplete.clearbit.com/v1/companies/suggest?query=${encodeURIComponent(query)}`,
+      { cache: 'no-store' }
+    );
+    if (res.ok) {
+      const data = await res.json() as Array<{ name?: string; domain?: string }>;
+      const top = Array.isArray(data) ? data[0] : undefined;
+      if (top?.name) {
+        enriched.legal_name = top.name;
+      }
+      if (top?.domain) {
+        const site = normalizeWebsite(top.domain);
+        if (site && isWebsiteLikelyForCompany(site, query)) enriched.website = site;
+      }
+    }
+  } catch {
+    // keep trying other strategies
+  }
+
+  // 2) Web search fallback for official website
+  if (!enriched.website) {
+    try {
+      const res = await fetch(
+        `https://duckduckgo.com/html/?q=${encodeURIComponent(`${query} official website`)}`,
+        { cache: 'no-store' }
+      );
+      if (res.ok) {
+        const html = await res.text();
+        const picked = pickBestWebsiteFromHtml(html);
+        if (picked && isWebsiteLikelyForCompany(picked, query)) enriched.website = picked;
+      }
+    } catch {
+      // ignore and try domain guess
+    }
+  }
+
+  // 3) Domain guess fallback for early-stage startups without public directory entries
+  if (!enriched.website) {
+    const guessed = buildGuessedDomains(query);
+    for (const candidate of guessed) {
+      if (await canReachDomain(candidate)) {
+        enriched.website = candidate;
+        break;
+      }
+    }
+  }
+
+  // If no legal name discovered, use a cleaned company name as fallback.
+  if (!enriched.legal_name) {
+    const cleaned = cleanCompanyName(query);
+    if (cleaned) enriched.legal_name = cleaned;
+  }
+
+  return enriched;
+}
+
 function localExtract(text: string): Record<string, unknown> {
   const lower = text.toLowerCase();
   const result: Record<string, unknown> = {};
 
   // Company name — first capitalised line or "Company: X" pattern
-  const nameMatch =
-    text.match(/company(?:\s+name)?[:\s]+([A-Za-z0-9\s&.,'-]{2,80})/i) ??
-    text.match(/^([A-Z][A-Za-z0-9\s&.,'-]{2,60})[\r\n]/m);
-  if (nameMatch?.[1]) result.company_name = nameMatch[1].trim();
+  const inferredCompanyName = inferCompanyNameFromText(text);
+  if (inferredCompanyName) result.company_name = inferredCompanyName;
 
   // Website
   const urlMatch = text.match(/https?:\/\/[^\s"'<>()]+\.[a-z]{2,}/i);
@@ -138,6 +289,20 @@ function localExtract(text: string): Record<string, unknown> {
     if (mul === 'million' || mul === 'm') amt *= 1_000_000;
     if (mul === 'billion' || mul === 'b') amt *= 1_000_000_000;
     result.valuation = amt;
+  }
+
+  // Pre-money valuation (human-readable string for triage wizard form field)
+  const preMoneyMatch =
+    text.match(/pre[-\s]?money\s+valuation[:\s]*\$?([\d,.]+)\s*(million|m|billion|b|k|thousand)?/i) ??
+    text.match(/valuation[:\s]*\$?([\d,.]+)\s*(million|m|billion|b|k|thousand)?/i);
+  if (preMoneyMatch) {
+    const raw = preMoneyMatch[1].replace(/,/g, '');
+    const mul = preMoneyMatch[2]?.toLowerCase();
+    let display = `$${raw}`;
+    if (mul === 'million' || mul === 'm') display = `$${raw}M`;
+    else if (mul === 'billion' || mul === 'b') display = `$${raw}B`;
+    else if (mul === 'thousand' || mul === 'k') display = `$${raw}K`;
+    result.pre_money_valuation = display;
   }
 
   // Team info
@@ -243,6 +408,312 @@ function localExtract(text: string): Record<string, unknown> {
   return result;
 }
 
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function flattenRecord(input: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...input };
+  for (const value of Object.values(input)) {
+    if (!isObjectRecord(value)) continue;
+    for (const [nestedKey, nestedValue] of Object.entries(value)) {
+      if (!(nestedKey in out) && nestedValue !== undefined) {
+        out[nestedKey] = nestedValue;
+      }
+    }
+  }
+  return out;
+}
+
+function cleanCompanyName(value: unknown): string {
+  if (typeof value !== 'string') return '';
+
+  let candidate = value
+    .replace(/\r\n/g, '\n')
+    .split('\n')[0]
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!candidate) return '';
+
+  const separators = [' | ', ' - ', ' -', ' |', ' -- ', ' : ', ' - ', ' -'];
+  for (const sep of separators) {
+    const idx = candidate.indexOf(sep);
+    if (idx > 2) {
+      const left = candidate.slice(0, idx).trim();
+      if (left.length >= 2) {
+        candidate = left;
+        break;
+      }
+    }
+  }
+
+  // Remove trailing sentence/tagline parts.
+  candidate = candidate.split(/[.!?]/)[0].trim();
+  if (candidate.includes(',')) {
+    const [left, right = ''] = candidate.split(',', 2).map((part) => part.trim());
+    if (left.length >= 2 && (right.split(/\s+/).length <= 2 || /ing$/i.test(right))) {
+      candidate = left;
+    }
+  }
+  candidate = candidate.replace(/\s+we\b.*$/i, '').trim();
+
+  candidate = candidate.replace(/^['"`\s]+|['"`\s]+$/g, '').trim();
+  if (!candidate) return '';
+
+  const invalidSentenceHint = /(specializing|delivering|transforming|platform|solution|that\s+deliver|we\s+|our\s+)/i;
+  if (invalidSentenceHint.test(candidate) && candidate.split(/\s+/).length > 4) {
+    const titleLead = candidate.match(/^[A-Z0-9][A-Za-z0-9&.'-]*(?:\s+[A-Z0-9][A-Za-z0-9&.'-]*){0,3}/)?.[0] ?? '';
+    candidate = titleLead || '';
+  }
+
+  if (!candidate) return '';
+  if (candidate.length > 60) {
+    const shortened = candidate.slice(0, 60);
+    const wordSafe = shortened.slice(0, shortened.lastIndexOf(' ')).trim();
+    candidate = wordSafe || shortened.trim();
+  }
+
+  if (/^[a-z]/.test(candidate) && candidate.split(/\s+/).length >= 4) {
+    return '';
+  }
+
+  return candidate;
+}
+
+function inferBusinessModel(text: string): string {
+  const lower = text.toLowerCase();
+  if (/subscription|monthly|arr|mrr|saas|license/.test(lower)) return 'B2B SaaS subscription';
+  if (/marketplace|take rate|buyer|seller/.test(lower)) return 'Marketplace';
+  if (/enterprise|pilot|contracts|procurement/.test(lower)) return 'B2B enterprise sales';
+  if (/consumer|direct-to-consumer|d2c|e-commerce/.test(lower)) return 'D2C / Consumer';
+  if (/hospital|clinic|provider|medtech|device/.test(lower)) return 'Healthcare / MedTech sales';
+  return '';
+}
+
+function improveCompanyInfoQuality(payload: Record<string, unknown>, sourceText: string): Record<string, unknown> {
+  const improved: Record<string, unknown> = { ...payload };
+
+  const cleanOneLine = (value: string): string => {
+    return value
+      .replace(/^company\s+name\s*:\s*/i, '')
+      .replace(/^startup\s+name\s*:\s*/i, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  const cleanedName = cleanCompanyName(improved.company_name ?? improved.companyName ?? improved.legal_name ?? improved.legalName);
+  if (cleanedName) {
+    improved.company_name = cleanedName;
+    improved.companyName = cleanedName;
+  } else {
+    const inferredName = inferCompanyNameFromText(sourceText);
+    if (inferredName) {
+      improved.company_name = inferredName;
+      improved.companyName = inferredName;
+    }
+  }
+
+  if (!improved.business_model) {
+    const inferred = inferBusinessModel(sourceText);
+    if (inferred) {
+      improved.business_model = inferred;
+      improved.businessModel = inferred;
+    }
+  }
+
+  if (!improved.legal_name) {
+    const fallbackLegal = cleanCompanyName(String(improved.company_name ?? improved.companyName ?? ''));
+    if (fallbackLegal) {
+      improved.legal_name = fallbackLegal;
+      improved.legalName = fallbackLegal;
+    }
+  }
+
+  if (!improved.website) {
+    const directUrl = sourceText.match(/https?:\/\/[^\s"'<>()]+\.[a-z]{2,}/i)?.[0] ?? '';
+    const normalizedUrl = normalizeWebsite(directUrl);
+    if (normalizedUrl) {
+      improved.website = normalizedUrl;
+    } else {
+      const websiteGuess = guessWebsiteFromCompanyName(String(improved.company_name ?? improved.companyName ?? ''));
+      if (websiteGuess) improved.website = websiteGuess;
+    }
+  }
+
+  if (typeof improved.website === 'string' && typeof improved.company_name === 'string') {
+    const normalized = normalizeWebsite(improved.website);
+    if (!isWebsiteLikelyForCompany(normalized, improved.company_name)) {
+      const websiteGuess = guessWebsiteFromCompanyName(improved.company_name);
+      if (websiteGuess) improved.website = websiteGuess;
+    } else {
+      improved.website = normalized;
+    }
+  }
+
+  if (!improved.annual_revenue) {
+    const revenue = improved.revenue ?? improved.annualRevenue ?? improved.yearly_revenue ?? improved.yearlyRevenue;
+    if (revenue !== undefined && revenue !== null && String(revenue).trim() !== '') {
+      improved.annual_revenue = String(revenue);
+      improved.annualRevenue = String(revenue);
+    }
+  }
+
+  if (!improved.number_of_employees) {
+    const fromTeamInfo = typeof improved.team_info === 'string'
+      ? improved.team_info.match(/(?:team\s+size|employees?|headcount|staff)[:\s]*(\d{1,6})/i)?.[1]
+      : undefined;
+    const fromSource = sourceText.match(/(?:team\s+size|employees?|headcount|staff)[:\s]*(\d{1,6})/i)?.[1];
+    const employees = fromTeamInfo ?? fromSource;
+    if (employees) {
+      improved.number_of_employees = employees;
+      improved.numberOfEmployees = employees;
+    }
+  }
+
+  if ((!improved.city || !improved.state || !improved.country) && typeof improved.location === 'string') {
+    const parts = improved.location.split(',').map((p) => p.trim()).filter(Boolean);
+    if (!improved.city && parts[0]) improved.city = parts[0];
+    if (!improved.state && parts[1]) improved.state = parts[1];
+    if (!improved.country && parts[2]) improved.country = parts[2];
+  }
+
+  if (!improved.one_line_description && typeof improved.pitch_summary === 'string') {
+    const oneLine = improved.pitch_summary.split(/[.!?\n]/).map((s) => s.trim()).find((s) => s.length >= 20 && s.length <= 160) ?? '';
+    if (oneLine) {
+      const cleaned = cleanOneLine(oneLine);
+      improved.one_line_description = cleaned;
+      improved.oneLineDescription = cleaned;
+    }
+  } else if (typeof improved.one_line_description === 'string') {
+    const cleaned = cleanOneLine(improved.one_line_description);
+    improved.one_line_description = cleaned;
+    improved.oneLineDescription = cleaned;
+  } else if (typeof improved.oneLineDescription === 'string') {
+    const cleaned = cleanOneLine(improved.oneLineDescription);
+    improved.one_line_description = cleaned;
+    improved.oneLineDescription = cleaned;
+  }
+
+  if (!improved.company_description && typeof improved.pitch_summary === 'string') {
+    const summary = String(improved.pitch_summary).trim();
+    if (summary) {
+      improved.company_description = summary.slice(0, 1500);
+      improved.companyDescription = improved.company_description;
+    }
+  }
+
+  if (!improved.product_description) {
+    const fromProduct = typeof improved.productDescription === 'string' ? improved.productDescription : '';
+    const fromOneLine = typeof improved.one_line_description === 'string' ? improved.one_line_description : '';
+    const fromCompanyDesc = typeof improved.company_description === 'string' ? improved.company_description : '';
+    const product = fromProduct || fromOneLine || fromCompanyDesc.split(/[.!?\n]/).map((s) => s.trim()).find((s) => s.length >= 20) || '';
+    if (product) {
+      improved.product_description = product;
+      improved.productDescription = product;
+    }
+  }
+
+  if (typeof improved.company_name === 'string' && improved.company_name.includes(',')) {
+    const concise = improved.company_name.split(',')[0].trim();
+    if (concise.length >= 2) {
+      improved.company_name = concise;
+      improved.companyName = concise;
+    }
+  }
+
+  return improved;
+}
+
+function normalizeExtractionPayload(input: Record<string, unknown>): Record<string, unknown> {
+  const flat = flattenRecord(input);
+  const normalized: Record<string, unknown> = { ...flat };
+
+  const pick = (...keys: string[]): unknown => {
+    for (const key of keys) {
+      const val = flat[key];
+      if (val !== undefined && val !== null && val !== '') return val;
+    }
+    return undefined;
+  };
+
+  const aliases: Record<string, string[]> = {
+    company_name: ['company_name', 'companyName', 'startup_name', 'startupName', 'name', 'organization_name'],
+    website: ['website', 'company_website', 'companyWebsite', 'url', 'domain'],
+    sector: ['sector', 'industry', 'industry_vertical', 'industryVertical', 'vertical'],
+    stage: ['stage', 'company_stage', 'companyStage', 'funding_stage', 'fundingStage', 'development_stage', 'developmentStage'],
+    business_model: ['business_model', 'businessModel', 'model'],
+    pitch_deck_path: ['pitch_deck_path', 'pitchDeckPath'],
+    country: ['country'],
+    state: ['state', 'province', 'region'],
+    city: ['city'],
+    location: ['location', 'hq', 'headquarters', 'headquarter_location', 'headquarterLocation', 'city_country'],
+    company_description: ['company_description', 'companyDescription', 'description', 'about', 'startup_description', 'startupDescription'],
+    one_line_description: ['one_line_description', 'oneLineDescription', 'tagline', 'summary_line', 'executive_summary_line'],
+    pitch_summary: ['pitch_summary', 'pitchSummary', 'executive_summary', 'executiveSummary', 'summary', 'problemSolution'],
+    key_metrics: ['key_metrics', 'keyMetrics', 'metrics', 'traction_metrics', 'tractionMetrics', 'cashFlow', 'fundingHistory'],
+    team_info: ['team_info', 'teamInfo', 'team_background', 'teamBackground', 'founder_info', 'founderInfo', 'companyBackgroundTeam'],
+    product_description: ['product_description', 'productDescription', 'product_overview', 'productOverview', 'solution_description', 'solutionDescription'],
+    annual_revenue: ['annual_revenue', 'annualRevenue', 'yearly_revenue', 'yearlyRevenue'],
+    pre_money_valuation: ['pre_money_valuation', 'preMoneyValuation'],
+    legal_name: ['legal_name', 'legalName'],
+    number_of_employees: ['number_of_employees', 'numberOfEmployees', 'team_size'],
+  };
+
+  for (const [canonical, keys] of Object.entries(aliases)) {
+    const value = pick(...keys);
+    if (value !== undefined) normalized[canonical] = value;
+  }
+
+  // Keep camelCase aliases expected by existing triage page logic.
+  if (normalized.pitch_summary && !normalized.pitchSummary) normalized.pitchSummary = normalized.pitch_summary;
+  if (normalized.key_metrics && !normalized.keyMetrics) normalized.keyMetrics = normalized.key_metrics;
+  if (normalized.team_info && !normalized.teamInfo) normalized.teamInfo = normalized.team_info;
+  if (normalized.product_description && !normalized.productDescription) normalized.productDescription = normalized.product_description;
+  if (normalized.one_line_description && !normalized.oneLineDescription) normalized.oneLineDescription = normalized.one_line_description;
+  if (normalized.business_model && !normalized.businessModel) normalized.businessModel = normalized.business_model;
+  if (normalized.pitch_deck_path && !normalized.pitchDeckPath) normalized.pitchDeckPath = normalized.pitch_deck_path;
+  if (normalized.sector && !normalized.industryVertical) normalized.industryVertical = normalized.sector;
+  if (normalized.stage && !normalized.developmentStage) normalized.developmentStage = normalized.stage;
+  if (normalized.company_description && !normalized.companyDescription) normalized.companyDescription = normalized.company_description;
+  if (normalized.annual_revenue && !normalized.annualRevenue) normalized.annualRevenue = normalized.annual_revenue;
+  if (normalized.pre_money_valuation && !normalized.preMoneyValuation) normalized.preMoneyValuation = normalized.pre_money_valuation;
+  if (normalized.legal_name && !normalized.legalName) normalized.legalName = normalized.legal_name;
+  if (normalized.number_of_employees && !normalized.numberOfEmployees) normalized.numberOfEmployees = normalized.number_of_employees;
+
+  // Build location from SSD-style city/state/country fields when location is not provided.
+  if (!normalized.location) {
+    const city = typeof normalized.city === 'string' ? normalized.city.trim() : '';
+    const state = typeof normalized.state === 'string' ? normalized.state.trim() : '';
+    const country = typeof normalized.country === 'string' ? normalized.country.trim() : '';
+    const parts = [city, state, country].filter(Boolean);
+    if (parts.length > 0) {
+      normalized.location = parts.join(', ');
+    }
+  }
+
+  // Quality fallback: if pitch summary is missing, use company description.
+  if (!normalized.pitch_summary && normalized.company_description) {
+    normalized.pitch_summary = normalized.company_description;
+    normalized.pitchSummary = normalized.company_description;
+  }
+
+  // If key metrics are empty, synthesize a compact metrics summary from numeric SSD fields.
+  if (!normalized.key_metrics) {
+    const snippets: string[] = [];
+    if (normalized.annual_revenue !== undefined) snippets.push(`Annual Revenue: ${String(normalized.annual_revenue)}`);
+    if (normalized.pre_money_valuation !== undefined) snippets.push(`Pre-money Valuation: ${String(normalized.pre_money_valuation)}`);
+    if (normalized.monthlyRecurringRevenue !== undefined) snippets.push(`MRR: ${String(normalized.monthlyRecurringRevenue)}`);
+    if (normalized.burnRate !== undefined || normalized.burn_rate !== undefined) snippets.push(`Burn Rate: ${String(normalized.burnRate ?? normalized.burn_rate)}`);
+    if (snippets.length > 0) {
+      normalized.key_metrics = snippets.join('\n');
+      normalized.keyMetrics = normalized.key_metrics;
+    }
+  }
+
+  return normalized;
+}
+
 // ── Call backend AI extraction ─────────────────────────────────────────────
 
 async function callBackendAI(text: string, token?: string): Promise<Record<string, unknown> | null> {
@@ -253,6 +724,7 @@ async function callBackendAI(text: string, token?: string): Promise<Record<strin
     '/api/v1/ai/extract',
     '/api/v1/ai/autofill',
     '/api/v1/analysis/ai-extract',
+    '/api/v1/analysis/extract-company-info',
     '/api/v1/tca/extract-fields',
     '/api/v1/extract/ai',
   ];
@@ -264,7 +736,32 @@ async function callBackendAI(text: string, token?: string): Promise<Record<strin
       const res = await fetch(`${BACKEND}${ep}`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ text, max_tokens: 2000 }),
+        body: JSON.stringify({
+          text,
+          max_tokens: 2500,
+          temperature: 0.1,
+          quality: 'high',
+          output_format: 'json',
+          schema: 'ssd_tca_tirr_v1',
+          extraction_goal: 'Fill all startup steroid company information fields with concise, high-confidence values. Prefer canonical company name without marketing taglines.',
+          required_fields: [
+            'companyName',
+            'legalName',
+            'industryVertical',
+            'developmentStage',
+            'businessModel',
+            'website',
+            'country',
+            'state',
+            'city',
+            'oneLineDescription',
+            'companyDescription',
+            'productDescription',
+            'annualRevenue',
+            'preMoneyValuation',
+            'numberOfEmployees',
+          ],
+        }),
         signal: controller.signal,
       });
       clearTimeout(tid);
@@ -291,6 +788,7 @@ export async function POST(req: NextRequest) {
       text: string;
       filename?: string;
       token?: string;
+      companyHint?: string;
     };
 
     if (!body.text || typeof body.text !== 'string') {
@@ -316,12 +814,32 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const normalized = normalizeExtractionPayload(merged);
+    const improved = improveCompanyInfoQuality(normalized, text);
+
+    // If critical company fields are still missing, enrich via online company lookup.
+    const companyHintRaw =
+      (typeof body.companyHint === 'string' ? body.companyHint : '') ||
+      (typeof improved.company_name === 'string' ? improved.company_name : '') ||
+      (typeof improved.companyName === 'string' ? improved.companyName : '');
+
+    if (companyHintRaw && (!improved.website || !improved.legal_name)) {
+      const online = await enrichCompanyOnline(companyHintRaw);
+      if (!improved.website && online.website) {
+        improved.website = online.website;
+      }
+      if (!improved.legal_name && online.legal_name) {
+        improved.legal_name = online.legal_name;
+        if (!improved.legalName) improved.legalName = online.legal_name;
+      }
+    }
+
     return NextResponse.json(
       {
         success: true,
-        data: merged,
+        data: improved,
         source: aiResult ? 'ai+local' : 'local',
-        fieldsExtracted: Object.keys(merged).filter(k => merged[k] !== '' && merged[k] !== null && merged[k] !== undefined).length,
+        fieldsExtracted: Object.keys(improved).filter(k => improved[k] !== '' && improved[k] !== null && improved[k] !== undefined).length,
       },
       { status: 200, headers: corsHeaders }
     );

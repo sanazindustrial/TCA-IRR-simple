@@ -99,12 +99,7 @@ interface ConnectionTestResponse {
     workflow: WorkflowStep[];
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
-const SSD_API_KEY = process.env.NEXT_PUBLIC_SSD_API_KEY || 'ssd-tca-58ceb369539c4a098b9ac49c';
-const SSD_HEADERS = {
-    'Content-Type': 'application/json',
-    'X-API-Key': SSD_API_KEY,
-};
+// SSD API calls go through server-side proxy routes — no client-side API key needed
 
 interface AuditLogEvent {
     event_type: string;
@@ -334,9 +329,7 @@ export default function SsdAuditLogPage() {
     const fetchLogs = async () => {
         try {
             const statusParam = filterStatus !== 'all' ? `?status=${filterStatus}` : '';
-            const response = await fetch(`${API_BASE}/api/v1/ssd/audit/logs${statusParam}`, {
-                headers: { 'Accept': 'application/json', 'X-API-Key': SSD_API_KEY },
-            });
+            const response = await fetch(`/api/ssd/audit-logs${statusParam}`);
             if (!response.ok) {
                 if (response.status === 404) {
                     console.warn('Startup Steroid audit endpoint not available (404)');
@@ -362,9 +355,7 @@ export default function SsdAuditLogPage() {
 
     const fetchStats = async () => {
         try {
-            const response = await fetch(`${API_BASE}/api/v1/ssd/audit/stats`, {
-                headers: { 'Accept': 'application/json', 'X-API-Key': SSD_API_KEY },
-            });
+            const response = await fetch('/api/ssd/stats');
             if (!response.ok) {
                 if (response.status === 404) {
                     console.warn('Startup Steroid stats endpoint not available (404)');
@@ -381,9 +372,7 @@ export default function SsdAuditLogPage() {
 
     const fetchLogDetails = async (trackingId: string) => {
         try {
-            const response = await fetch(`${API_BASE}/api/v1/ssd/audit/logs/${trackingId}`, {
-                headers: { 'Accept': 'application/json', 'X-API-Key': SSD_API_KEY },
-            });
+            const response = await fetch(`/api/ssd/audit-logs/${trackingId}`);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
@@ -409,10 +398,7 @@ export default function SsdAuditLogPage() {
     const handleDelete = async (trackingId: string) => {
         if (!confirm('Are you sure you want to delete this audit log and associated report?')) return;
         try {
-            await fetch(`${API_BASE}/api/v1/ssd/audit/logs/${trackingId}`, {
-                method: 'DELETE',
-                headers: { 'X-API-Key': SSD_API_KEY },
-            });
+            await fetch(`/api/ssd/audit-logs/${trackingId}`, { method: 'DELETE' });
             toast({ title: 'Deleted', description: 'Audit log deleted successfully' });
             await fetchLogs();
         } catch (error) {
@@ -427,9 +413,7 @@ export default function SsdAuditLogPage() {
 
     const downloadReport = async (trackingId: string) => {
         try {
-            const response = await fetch(`${API_BASE}/api/v1/ssd/audit/logs/${trackingId}/report`, {
-                headers: { 'Accept': 'application/json', 'X-API-Key': SSD_API_KEY },
-            });
+            const response = await fetch(`/api/ssd/report/${trackingId}`);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
             // API returns the report as the root object (not nested under .report)

@@ -17,11 +17,17 @@ KUDU_URL = f"https://{WEBAPP_NAME.lower()}.scm.azurewebsites.net"
 def create_deployment_zip():
     """Create deployment zip from .next/standalone folder"""
     zip_path = "frontend-deploy.zip"
-    standalone_dir = ".next/standalone"
+    # Next.js traces files relative to workspace root (one level up from .actual-ui),
+    # so standalone output lands inside .next/standalone/.actual-ui/
+    standalone_dir = ".next/standalone/.actual-ui"
+    if not os.path.isdir(standalone_dir):
+        # Fallback to flat standalone if .actual-ui subdir not present
+        standalone_dir = ".next/standalone"
     
     if not os.path.isdir(standalone_dir):
-        print(f"ERROR: {standalone_dir} not found. Run 'npm run build' first.")
+        print(f"ERROR: .next/standalone not found. Run 'npm run build' first.")
         sys.exit(1)
+    print(f"Using standalone dir: {standalone_dir}")
     
     print("Creating deployment zip from standalone build...")
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
@@ -44,6 +50,17 @@ def create_deployment_zip():
                     filepath = os.path.join(root, file)
                     # Preserve .next/static path structure
                     arcname = filepath  # Keeps .next/static/...
+                    zf.write(filepath, arcname)
+        
+        # Include public folder (images, icons, etc.) at the root of the zip
+        public_dir = "public"
+        if os.path.isdir(public_dir):
+            print(f"  Adding public assets (images/icons)...")
+            for root, dirs, files in os.walk(public_dir):
+                for file in files:
+                    filepath = os.path.join(root, file)
+                    # Place under public/ so Next.js serves them correctly
+                    arcname = filepath  # Keeps public/...
                     zf.write(filepath, arcname)
                         
     size_mb = os.path.getsize(zip_path) / (1024 * 1024)

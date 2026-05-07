@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const BACKEND_API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
-const SSD_API_KEY = process.env.SSD_API_KEY || 'ssd-tca-58ceb369539c4a098b9ac49c';
+const SSD_API_KEY = process.env.SSD_API_KEY;
 
 interface ConnectionTestResult {
     endpoint: string;
@@ -23,6 +23,9 @@ interface WorkflowStep {
 }
 
 export async function GET() {
+    if (!SSD_API_KEY) {
+        return NextResponse.json({ error: 'SSD service not configured' }, { status: 503 });
+    }
     const results: ConnectionTestResult[] = [];
     const workflow: WorkflowStep[] = [];
     const startTime = Date.now();

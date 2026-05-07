@@ -17,7 +17,7 @@ export default function ModuleGuidesPage() {
           Analysis Module Guides
         </h1>
         <p className="mt-4 text-lg text-muted-foreground max-w-3xl">
-          A detailed breakdown of the nine core analysis modules in the evaluation system.
+          A detailed breakdown of the seventeen core analysis modules in the evaluation system.
         </p>
       </header>
 

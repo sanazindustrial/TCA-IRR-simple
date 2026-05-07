@@ -150,6 +150,27 @@ const DEFAULT_DD_SECTIONS: ReportSection[] = [
 ];
 
 export default function DueDiligenceWorkflowPage() {
+  const router = useRouter();
+
+  // Route guard: no access for standard users
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('loggedInUser');
+      if (stored) {
+        const user = JSON.parse(stored);
+        const role = user.role?.toLowerCase() || 'user';
+        if (role !== 'admin' && role !== 'analyst') {
+          router.replace('/unauthorized');
+          return;
+        }
+      } else {
+        router.replace('/unauthorized');
+      }
+    } catch {
+      router.replace('/unauthorized');
+    }
+  }, [router]);
+
   // Step management
   const [currentStep, setCurrentStep] = useState(1);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
@@ -207,10 +228,11 @@ export default function DueDiligenceWorkflowPage() {
   const isAdminOrAnalyst = userRole === 'admin' || userRole === 'analyst';
   const [showHumanReviewModal, setShowHumanReviewModal] = useState(false);
   const [humanReviewNotes, setHumanReviewNotes] = useState('');
+  const [htmlReportContent, setHtmlReportContent] = useState('');
+  const [previewEditMode, setPreviewEditMode] = useState<'view' | 'edit'>('view');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
-  const router = useRouter();
 
   // Calculate progress
   const progress = Math.round((completedSteps.length / WORKFLOW_STEPS.length) * 100);
@@ -389,17 +411,22 @@ export default function DueDiligenceWorkflowPage() {
       localStorage.setItem('analysisResult', JSON.stringify(comprehensiveData));
       localStorage.setItem('analysisFramework', 'general');
 
-      const savedReport = await reportsApi.createReport({
-        company_name: companyName,
-        report_type: 'due_diligence',
-        analysis_data: comprehensiveData as Record<string, unknown>,
-        missing_sections: reportSections.filter((s) => !s.active).map((s) => s.id),
-      });
-      setSavedReportId(savedReport.id);
+      // Try to save to backend — non-blocking: proceed even if save fails
+      try {
+        const savedReport = await reportsApi.createReport({
+          company_name: companyName,
+          report_type: 'due_diligence',
+          analysis_data: comprehensiveData as Record<string, unknown>,
+          missing_sections: reportSections.filter((s) => !s.active).map((s) => s.id),
+        });
+        setSavedReportId(savedReport.id);
+      } catch (saveError) {
+        console.warn('Report save to backend failed (non-blocking):', saveError);
+      }
 
       if (!completedSteps.includes(6)) setCompletedSteps((prev) => [...prev, 6]);
       setCurrentStep(7);
-      toast({ title: 'Report Generated', description: 'Your due diligence report has been saved.' });
+      toast({ title: 'Report Generated', description: 'Your due diligence report has been generated.' });
     } catch (error) {
       console.error('Failed to run DD analysis:', error);
       toast({
@@ -606,6 +633,54 @@ export default function DueDiligenceWorkflowPage() {
   useEffect(() => {
     loadExistingCompanies();
   }, [loadExistingCompanies]);
+
+  // Generate HTML report content when entering step 7
+  useEffect(() => {
+    if (currentStep !== 7) return;
+    const activeSections = reportSections.filter((s) => s.active);
+    const result = analysisResult as Record<string, unknown> | null;
+    const now = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const dealLabel = dealType ? dealType.charAt(0).toUpperCase() + dealType.slice(1) : 'Due Diligence';
+
+    const sectionsHtml = activeSections
+      .map((s) => {
+        const sectionData =
+          result && typeof result === 'object'
+            ? (result[s.id] as string) ?? (result['content'] as string) ?? ''
+            : '';
+        const bodyText = sectionData
+          ? sectionData
+          : `${s.description} — Pending analyst review.`;
+        return `<section style="margin-bottom:2.25rem;page-break-inside:avoid;">
+  <h2 style="font-size:1.05rem;font-weight:700;color:#1e3a5f;border-bottom:2px solid #e2e8f0;padding-bottom:0.4rem;margin-bottom:0.75rem;">${s.title}</h2>
+  <p style="color:#374151;font-size:0.9rem;line-height:1.75;">${bodyText}</p>
+</section>`;
+      })
+      .join('\n');
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>Due Diligence Report – ${companyName}</title>
+</head>
+<body style="font-family:Georgia,'Times New Roman',serif;max-width:860px;margin:0 auto;padding:2.5rem 2rem;color:#1e293b;line-height:1.75;">
+  <header style="text-align:center;border-bottom:3px solid #1e3a5f;padding-bottom:1.5rem;margin-bottom:2.5rem;">
+    <p style="font-size:0.75rem;letter-spacing:0.12em;text-transform:uppercase;color:#94a3b8;margin:0 0 0.4rem;">Confidential — Not for Distribution</p>
+    <h1 style="font-size:1.9rem;font-weight:800;color:#1e3a5f;margin:0 0 0.4rem;">${companyName}</h1>
+    <p style="font-size:1rem;color:#475569;margin:0 0 0.5rem;">${dealLabel} Due Diligence Report</p>
+    <p style="font-size:0.8rem;color:#94a3b8;margin:0;">${companyIndustry ? companyIndustry + '&nbsp;&middot;&nbsp;' : ''}${now}</p>
+  </header>
+${sectionsHtml}
+  <footer style="border-top:1px solid #e2e8f0;padding-top:1rem;margin-top:2rem;text-align:center;color:#94a3b8;font-size:0.72rem;">
+    Confidential &mdash; ${activeSections.length} section${activeSections.length !== 1 ? 's' : ''} &mdash; Generated ${now}
+  </footer>
+</body>
+</html>`;
+    setHtmlReportContent(html);
+    setPreviewEditMode('view');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep]);
 
   // Handle selecting an existing company
   const handleSelectExistingCompany = useCallback((companyId: string) => {
@@ -1252,18 +1327,41 @@ export default function DueDiligenceWorkflowPage() {
         return (
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Eye className="size-5" />
-                Preview Report
-              </CardTitle>
-              <CardDescription>Review the generated due diligence analysis before saving.</CardDescription>
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Eye className="size-5" />
+                    Preview Report
+                  </CardTitle>
+                  <CardDescription>Review the generated due diligence analysis before saving.</CardDescription>
+                </div>
+                {isAdminOrAnalyst && (
+                  <div className="flex gap-2">
+                    <Button
+                      variant={previewEditMode === 'view' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setPreviewEditMode('view')}
+                    >
+                      <Eye className="size-4 mr-1" /> Preview
+                    </Button>
+                    <Button
+                      variant={previewEditMode === 'edit' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setPreviewEditMode('edit')}
+                    >
+                      <FileText className="size-4 mr-1" /> Edit HTML
+                    </Button>
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="space-y-5">
+              {/* Summary stats */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="rounded-lg border bg-muted/30 p-4 space-y-1">
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">Company</p>
                   <p className="font-semibold">{companyName}</p>
-                  <p className="text-sm text-muted-foreground">{companyIndustry} · {dealType}</p>
+                  <p className="text-sm text-muted-foreground">{companyIndustry}{companyIndustry && dealType ? ' · ' : ''}{dealType}</p>
                 </div>
                 <div className="rounded-lg border bg-muted/30 p-4 space-y-1">
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">Areas Analyzed</p>
@@ -1272,19 +1370,44 @@ export default function DueDiligenceWorkflowPage() {
                 </div>
                 <div className="rounded-lg border bg-muted/30 p-4 space-y-1">
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">Active Sections</p>
-                  <p className="font-semibold">{reportSections.filter((s) => s.active).length}</p>
+                  <p className="font-semibold text-2xl">{reportSections.filter((s) => s.active).length}</p>
                   <p className="text-sm text-muted-foreground">report sections</p>
                 </div>
               </div>
-              {analysisResult != null && (
-                <div className="rounded-lg border p-4 space-y-2">
-                  <p className="font-medium text-sm">Analysis completed successfully.</p>
-                  <p className="text-xs text-muted-foreground">Results are ready for review and export.</p>
+
+              {/* Report preview / edit */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold">Report Content</p>
+                  {analysisResult != null && (
+                    <span className="inline-flex items-center gap-1 text-xs text-emerald-600 font-medium">
+                      <CheckCircle2 className="size-3.5" /> Analysis complete
+                    </span>
+                  )}
                 </div>
-              )}
+                {isAdminOrAnalyst && previewEditMode === 'edit' ? (
+                  <Textarea
+                    value={htmlReportContent}
+                    onChange={(e) => setHtmlReportContent(e.target.value)}
+                    rows={26}
+                    className="font-mono text-xs leading-relaxed"
+                    placeholder="HTML report content..."
+                  />
+                ) : (
+                  <div
+                    className="rounded-lg border bg-white shadow-sm overflow-y-auto"
+                    style={{ maxHeight: '620px' }}
+                    dangerouslySetInnerHTML={{
+                      __html: htmlReportContent || '<p style="padding:1.5rem;color:#94a3b8;font-size:0.875rem;">Report preview will appear here after generation.</p>',
+                    }}
+                  />
+                )}
+              </div>
+
+              {/* Analyst commentary (admin/analyst only) */}
               {isAdminOrAnalyst && (
                 <div className="space-y-2">
-                  <Label className="text-sm font-semibold">Analyst Commentary</Label>
+                  <p className="text-sm font-semibold">Analyst Commentary</p>
                   <Textarea
                     placeholder="Add analyst notes, observations, or qualitative commentary..."
                     value={humanReviewNotes}
@@ -1293,11 +1416,6 @@ export default function DueDiligenceWorkflowPage() {
                   />
                 </div>
               )}
-              <div className="flex justify-end">
-                <Button onClick={nextStep}>
-                  Proceed to Storage <ArrowRight className="ml-2 size-4" />
-                </Button>
-              </div>
             </CardContent>
           </Card>
         );

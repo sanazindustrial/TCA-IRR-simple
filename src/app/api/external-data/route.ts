@@ -345,12 +345,76 @@ export async function GET(request: NextRequest) {
     }
 }
 
-// Test endpoint
+// POST handler - handles bulk fetch (triage wizard) and single source test
 export async function POST(request: NextRequest) {
     const body = await request.json();
-    const { source, apiKey } = body;
 
-    // Test connection to a specific source
+    // BULK FETCH MODE: Triage wizard sends { company, sources: string[] }
+    if (body.sources && Array.isArray(body.sources)) {
+        const company = (body.company as string) || '';
+        const sources: string[] = body.sources;
+        const results: Record<string, unknown> = {};
+
+        await Promise.allSettled(
+            sources.map(async (sourceId: string) => {
+                try {
+                    switch (sourceId) {
+                        case 'sec-edgar':
+                            results[sourceId] = await fetchSECFilings(company);
+                            break;
+                        case 'github':
+                            results[sourceId] = await fetchGitHubData(company, 5);
+                            break;
+                        case 'hackernews':
+                            results[sourceId] = await fetchNewsData(company, 10);
+                            break;
+                        case 'clinical-trials':
+                            results[sourceId] = await fetchClinicalTrials(company, 5);
+                            break;
+                        case 'fda':
+                            results[sourceId] = await fetchFDAData(company, 'drug', 5);
+                            break;
+                        case 'worldbank':
+                            results[sourceId] = await fetchWorldBankData('US', 'NY.GDP.MKTP.CD');
+                            break;
+                        case 'paperswithcode':
+                            results[sourceId] = await fetchNewsData(company + ' machine learning', 5);
+                            break;
+                        case 'patents':
+                            results[sourceId] = await fetchPatentData(company);
+                            break;
+                        default:
+                            // Paid / OAuth / Enterprise sources — return informational note
+                            results[sourceId] = {
+                                success: true,
+                                data: {
+                                    note: `${sourceId} requires API key or enterprise subscription`,
+                                    suggestion: `Configure ${sourceId} API key in Settings > Data Sources`,
+                                    company
+                                },
+                                source: sourceId
+                            };
+                    }
+                } catch (err) {
+                    results[sourceId] = {
+                        success: false,
+                        error: err instanceof Error ? err.message : 'Fetch failed',
+                        source: sourceId
+                    };
+                }
+            })
+        );
+
+        return NextResponse.json({
+            success: true,
+            data: results,
+            fetched: Object.keys(results).length,
+            timestamp: new Date().toISOString()
+        });
+    }
+
+    // SINGLE SOURCE TEST MODE: { source, apiKey }
+    const { source } = body as { source?: string };
     try {
         let testResult;
 
@@ -373,7 +437,7 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({
             success: testResult.success,
-            message: testResult.success ? 'Connection successful' : testResult.error,
+            message: testResult.success ? 'Connection successful' : (testResult as { error?: string }).error,
             source: source
         });
     } catch (error) {

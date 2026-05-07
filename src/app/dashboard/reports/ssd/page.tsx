@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import reportsApi from '@/lib/reports-api';
 import { Button } from '@/components/ui/button';
 import {
@@ -62,12 +63,7 @@ import { Textarea } from '@/components/ui/textarea';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
-const SSD_API_KEY = process.env.NEXT_PUBLIC_SSD_API_KEY || 'ssd-tca-58ceb369539c4a098b9ac49c';
-const SSD_HEADERS = {
-  'Content-Type': 'application/json',
-  'X-API-Key': SSD_API_KEY,
-};
+// SSD API calls are proxied through server-side routes — no client-side key needed
 
 interface AuditLog {
   tracking_id: string;
@@ -163,7 +159,27 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function SSDReportPage() {
+  const router = useRouter();
   const { toast } = useToast();
+
+  // Route guard: no access for standard users
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('loggedInUser');
+      if (stored) {
+        const user = JSON.parse(stored);
+        const role = user.role?.toLowerCase() || 'user';
+        if (role !== 'admin' && role !== 'analyst') {
+          router.replace('/unauthorized');
+          return;
+        }
+      } else {
+        router.replace('/unauthorized');
+      }
+    } catch {
+      router.replace('/unauthorized');
+    }
+  }, [router]);
 
   const [stats, setStats] = useState<AuditStats | null>(null);
   const [logs, setLogs] = useState<AuditLog[]>([]);
@@ -196,8 +212,7 @@ export default function SSDReportPage() {
   const [humanReviewNotes, setHumanReviewNotes] = useState('');
   const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Tunnel / file-upload mode
-  const [submissionMode, setSubmissionMode] = useState<'direct' | 'tunnel'>('direct');
+  // Tunnel / file-upload state
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [tunnelStatusCheck, setTunnelStatusCheck] = useState<'checking' | 'connected' | 'degraded' | 'disconnected' | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -214,7 +229,7 @@ export default function SSDReportPage() {
     setPollingStatus('polling');
     pollingIntervalRef.current = setInterval(async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/v1/ssd/audit/logs`, { headers: SSD_HEADERS });
+        const res = await fetch('/api/ssd/audit-logs');
         if (!res.ok) return;
         const data = await res.json();
         const allLogs: AuditLog[] = Array.isArray(data) ? data : (data as { logs?: AuditLog[] }).logs ?? [];
@@ -224,9 +239,7 @@ export default function SSDReportPage() {
           setPollingStatus('done');
           // Auto-download the report
           try {
-            const reportRes = await fetch(`${API_BASE}/api/v1/ssd/audit/logs/${tid}/report`, {
-              headers: SSD_HEADERS,
-            });
+            const reportRes = await fetch(`/api/ssd/report/${tid}`);
             if (reportRes.ok) {
               const reportData = await reportRes.json();
               const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
@@ -261,7 +274,7 @@ export default function SSDReportPage() {
     setIsLoadingStats(true);
     setStatsError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/v1/ssd/audit/stats`, { headers: SSD_HEADERS });
+      const res = await fetch('/api/ssd/stats');
       if (!res.ok) throw new Error(`Stats fetch failed: ${res.status}`);
       const data = await res.json();
       setStats(data);
@@ -276,7 +289,7 @@ export default function SSDReportPage() {
     setIsLoadingLogs(true);
     setLogsError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/v1/ssd/audit/logs`, { headers: SSD_HEADERS });
+      const res = await fetch('/api/ssd/audit-logs');
       if (!res.ok) throw new Error(`Logs fetch failed: ${res.status}`);
       const data = await res.json();
       setLogs(Array.isArray(data) ? data : data.logs ?? []);
@@ -297,9 +310,9 @@ export default function SSDReportPage() {
     setIsAdminOrAnalyst(role === 'admin' || role === 'analyst');
   }, []);
 
-  // Check tunnel status whenever submission mode switches to tunnel
+  // Check tunnel status when dialog opens
   useEffect(() => {
-    if (submissionMode !== 'tunnel') {
+    if (!submitOpen) {
       setTunnelStatusCheck(null);
       return;
     }
@@ -310,7 +323,7 @@ export default function SSDReportPage() {
         setTunnelStatusCheck((d.status as 'connected' | 'degraded' | 'disconnected') ?? 'disconnected')
       )
       .catch(() => setTunnelStatusCheck('disconnected'));
-  }, [submissionMode]);
+  }, [submitOpen]);
 
   // Load SSD section config when dialog opens
   useEffect(() => {
@@ -352,9 +365,7 @@ export default function SSDReportPage() {
     setIsLoadingReport(true);
     setReportContent(null);
     try {
-      const res = await fetch(`${API_BASE}/api/v1/ssd/audit/logs/${trackingId}/report`, {
-        headers: SSD_HEADERS,
-      });
+      const res = await fetch(`/api/ssd/report/${trackingId}`);
       if (!res.ok) throw new Error(`Report fetch failed: ${res.status}`);
       const data = await res.json();
       setReportContent(data);
@@ -394,8 +405,7 @@ export default function SSDReportPage() {
       }
 
       let res: Response;
-      if (submissionMode === 'tunnel') {
-        if (selectedFile) {
+      if (selectedFile) {
           const fd = new FormData();
           fd.append('company_name', body.company_name);
           fd.append('founder_email', body.founder_email);
@@ -410,13 +420,6 @@ export default function SSDReportPage() {
             body: JSON.stringify(body),
           });
         }
-      } else {
-        res = await fetch(`${API_BASE}/api/v1/ssd/evaluate`, {
-          method: 'POST',
-          headers: SSD_HEADERS,
-          body: JSON.stringify(body),
-        });
-      }
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         throw new Error(
@@ -527,7 +530,6 @@ export default function SSDReportPage() {
                 setPollingStatus('idle');
                 setSubmitForm({ company_name: '', founder_email: '', callback_url: '' });
                 setHumanReviewNotes('');
-                setSubmissionMode('direct');
                 setSelectedFile(null);
                 if (fileInputRef.current) fileInputRef.current.value = '';
               }
@@ -631,38 +633,7 @@ export default function SSDReportPage() {
                       />
                     </div>
 
-                    {/* Submission Source */}
-                    <div className="space-y-2 pt-1">
-                      <Label>Submission Source</Label>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setSubmissionMode('direct')}
-                          className={`flex-1 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-                            submissionMode === 'direct'
-                              ? 'border-primary bg-primary text-primary-foreground'
-                              : 'border-border bg-background text-muted-foreground hover:bg-muted'
-                          }`}
-                        >
-                          Direct API
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setSubmissionMode('tunnel')}
-                          className={`flex-1 flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-                            submissionMode === 'tunnel'
-                              ? 'border-primary bg-primary text-primary-foreground'
-                              : 'border-border bg-background text-muted-foreground hover:bg-muted'
-                          }`}
-                        >
-                          <Wifi className="size-3.5" />
-                          Via Remote Tunnel
-                        </button>
-                      </div>
-                    </div>
-
-                    {submissionMode === 'tunnel' && (
-                      <div className="rounded-md border border-border bg-muted/30 p-3 space-y-3">
+                    <div className="rounded-md border border-border bg-muted/30 p-3 space-y-3">
                         {/* Tunnel status */}
                         <div className="flex items-center gap-2 text-sm">
                           {tunnelStatusCheck === 'checking' && (
@@ -736,8 +707,7 @@ export default function SSDReportPage() {
                             )}
                           </div>
                         </div>
-                      </div>
-                    )}
+                    </div>
                   </div>
                 )}
 

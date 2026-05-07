@@ -398,6 +398,25 @@ export default function SimulationPage() {
   const router = useRouter();
   const { toast } = useToast();
 
+  // Role-based access guard: only admin/analyst can access Simulation
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('loggedInUser');
+      if (stored) {
+        const user = JSON.parse(stored);
+        const role = user.role?.toLowerCase() || 'user';
+        if (role !== 'admin' && role !== 'analyst') {
+          router.replace('/unauthorized');
+          return;
+        }
+      } else {
+        router.replace('/unauthorized');
+      }
+    } catch {
+      router.replace('/unauthorized');
+    }
+  }, [router]);
+
   // Load settings versions
   const loadSettingsVersions = useCallback(async () => {
     try {

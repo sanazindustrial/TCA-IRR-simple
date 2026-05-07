@@ -1,8 +1,6 @@
 'use server';
 
 import type { ComprehensiveAnalysisOutput } from '@/ai/flows/schemas';
-import { sampleAnalysisData } from '@/lib/sample-data';
-
 // Try different backend URLs based on environment
 const BACKEND_API_URL = 'https://tcairrapiccontainer.azurewebsites.net'; // Production fallback
 const API_VERSION = '/api/v1'; // API prefix with version
@@ -15,42 +13,6 @@ const sectorMap = {
   general: 'tech',
   medtech: 'med_life'
 } as const;
-
-// Replace all "Innovate Inc." and "Innovate" references in fallback data with the real company name
-// Also marks the returned object with _isFallbackData: true so result/page.tsx can block auto-save
-function buildFallbackData(
-  userData?: { companyName?: string },
-  fallbackSource: ComprehensiveAnalysisOutput = sampleAnalysisData as unknown as ComprehensiveAnalysisOutput
-): ComprehensiveAnalysisOutput {
-  const companyName = userData?.companyName?.trim();
-  if (!companyName) return { ...fallbackSource, _isFallbackData: true } as ComprehensiveAnalysisOutput;
-
-  const replacer = (value: unknown): unknown => {
-    if (typeof value === 'string') {
-      return value
-        .replace(/Innovate Inc\./g, companyName)
-        .replace(/\bInnovate\b/g, companyName);
-    }
-    if (Array.isArray(value)) return value.map(replacer);
-    if (value !== null && typeof value === 'object') {
-      return Object.fromEntries(
-        Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, replacer(v)])
-      );
-    }
-    return value;
-  };
-
-  try {
-    // Deep clone via JSON so we don't mutate sampleAnalysisData
-    const cloned = JSON.parse(JSON.stringify(fallbackSource));
-    const replaced = replacer(cloned) as ComprehensiveAnalysisOutput;
-    // Mark as fallback so the result page does NOT auto-save it to the database
-    (replaced as any)._isFallbackData = true;
-    return replaced;
-  } catch {
-    return { ...fallbackSource, _isFallbackData: true } as ComprehensiveAnalysisOutput;
-  }
-}
 
 // Backend sector mapping for TCA analysis
 const backendSectorMap = {
@@ -763,6 +725,14 @@ export async function runAnalysis(
       timestamp: new Date().toISOString(),
     });
 
-    throw error;
+    const errMsg = (error as Error).message || 'Unknown error';
+    throw new Error(
+      `Backend analysis failed: ${errMsg}. ` +
+      `Backend: ${BACKEND_API_URL}. ` +
+      `Company: ${(userData as any)?.companyName || 'unknown'}. ` +
+      `Timestamp: ${new Date().toISOString()}. ` +
+      `Admin action: Check Azure App Service logs for tcairrapiccontainer, ` +
+      `verify BACKEND_API_URL env var, and confirm the backend is running.`
+    );
   }
 }

@@ -212,7 +212,7 @@ const approvalStatusColors: { [key: string]: string } = {
 };
 
 
-const ReportCard = ({ report, isPrivileged, onViewVersions }: { report: Report; isPrivileged: boolean; onViewVersions?: () => void }) => {
+const ReportCard = ({ report, isPrivileged, onViewVersions, onDelete }: { report: Report; isPrivileged: boolean; onViewVersions?: () => void; onDelete?: () => void }) => {
   return (
     <Card className="overflow-hidden">
       <div className="p-6 grid grid-cols-1 md:grid-cols-6 lg:grid-cols-8 items-center gap-4">
@@ -224,7 +224,7 @@ const ReportCard = ({ report, isPrivileged, onViewVersions }: { report: Report; 
               {report.reportId && (
                 <Badge variant="secondary" className="font-mono text-xs">{report.reportId}</Badge>
               )}
-              <Badge variant="outline">{report.type.toUpperCase()}</Badge>
+              <Badge variant="outline">{(report.type ?? '').toUpperCase()}</Badge>
               <Badge variant={report.status === 'Completed' ? 'success' : 'warning'}>{report.status}</Badge>
               <Badge className={approvalStatusColors[report.approval] || 'bg-gray-500/20'}>{report.approval}</Badge>
               {report.version && report.version > 1 && (
@@ -257,11 +257,11 @@ const ReportCard = ({ report, isPrivileged, onViewVersions }: { report: Report; 
             </div>
             <div>
               <p className="text-muted-foreground">Recommendation</p>
-              <p className={`font-bold ${report.recommendation === 'Recommend' || report.recommendation === 'Invest' ? 'text-success' : 'text-warning'}`}>{report.recommendation.toUpperCase()}</p>
+              <p className={`font-bold ${report.recommendation === 'Recommend' || report.recommendation === 'Invest' ? 'text-success' : 'text-warning'}`}>{(report.recommendation ?? '').toUpperCase()}</p>
             </div>
             <div>
               <p className="text-muted-foreground">User</p>
-              <p className="font-semibold truncate">{report.user.name}</p>
+              <p className="font-semibold truncate">{report.user?.name ?? 'Unknown'}</p>
             </div>
             <div>
               <p className="text-muted-foreground">Created</p>
@@ -287,6 +287,11 @@ const ReportCard = ({ report, isPrivileged, onViewVersions }: { report: Report; 
           <div className='w-full'>
             <ExportButtons />
           </div>
+          {onDelete && (
+            <Button variant="ghost" size="sm" className="justify-start text-destructive hover:text-destructive hover:bg-destructive/10" onClick={onDelete}>
+              <Trash2 className="mr-2 size-4" /> Delete
+            </Button>
+          )}
         </div>
       </div>
     </Card>
@@ -303,6 +308,7 @@ export default function ReportsPage() {
   const [typeFilter, setTypeFilter] = useState<string>('');
   const { toast } = useToast();
   const [isMounted, setIsMounted] = useState(false);
+  const [currentUserEmail, setCurrentUserEmail] = useState('user@tca.com');
 
   // Safe date formatter that returns consistent output
   const formatDate = useCallback((dateInput: string | Date | undefined, includeTime = false) => {
@@ -336,7 +342,7 @@ export default function ReportsPage() {
   const [isUploading, setIsUploading] = useState(false);
 
   // Function to get pending sync reports from localStorage
-  const getPendingSyncReports = useCallback((): Report[] => {
+  const  getPendingSyncReports = useCallback((): Report[] => {
     if (typeof window === 'undefined') return [];
     try {
       // Check multiple possible storage keys for pending sync
@@ -594,7 +600,7 @@ export default function ReportsPage() {
         // Backend connected - use API reports only (Azure storage is source of truth)
         console.log('Using Azure storage as source of truth');
         for (const report of apiReports) {
-          const key = report.company.toLowerCase();
+          const key = (report.company ?? '').toLowerCase();
           if (!seenCompanies.has(key)) {
             seenCompanies.add(key);
             mergedReports.push(report);
@@ -607,7 +613,7 @@ export default function ReportsPage() {
         console.log('Using localStorage as fallback');
         // Add local reports first (most recent saves)
         for (const report of localReports) {
-          const key = report.company.toLowerCase();
+          const key = (report.company ?? '').toLowerCase();
           if (!seenCompanies.has(key)) {
             seenCompanies.add(key);
             mergedReports.push(report);
@@ -616,7 +622,7 @@ export default function ReportsPage() {
 
         // Add API reports that aren't duplicates
         for (const report of apiReports) {
-          const key = report.company.toLowerCase();
+          const key = (report.company ?? '').toLowerCase();
           if (!seenCompanies.has(key)) {
             seenCompanies.add(key);
             mergedReports.push(report);
@@ -648,17 +654,17 @@ export default function ReportsPage() {
         if (searchQuery) {
           const query = searchQuery.toLowerCase();
           filteredReports = mergedReports.filter(r =>
-            r.company.toLowerCase().includes(query)
+            (r.company ?? '').toLowerCase().includes(query)
           );
         }
         if (statusFilter) {
           filteredReports = filteredReports.filter(r =>
-            r.status.toLowerCase() === statusFilter.toLowerCase()
+            (r.status ?? '').toLowerCase() === statusFilter.toLowerCase()
           );
         }
         if (typeFilter) {
           filteredReports = filteredReports.filter(r =>
-            r.type.toLowerCase().includes(typeFilter.toLowerCase())
+            (r.type ?? '').toLowerCase().includes(typeFilter.toLowerCase())
           );
         }
         setAllReports(filteredReports);
@@ -700,13 +706,16 @@ export default function ReportsPage() {
         const userRole = user.role?.toLowerCase() || 'user';
         setRole(userRole);
         setPrivilegedUser(userRole === 'admin' || userRole === 'analyst');
+        setCurrentUserEmail(user.email || localStorage.getItem('userEmail') || 'user@tca.com');
       } catch (e) {
         setRole('user');
         setPrivilegedUser(false);
+        setCurrentUserEmail(localStorage.getItem('userEmail') || 'user@tca.com');
       }
     } else {
       setRole('user');
       setPrivilegedUser(false);
+      setCurrentUserEmail(localStorage.getItem('userEmail') || 'user@tca.com');
     }
 
     // Load reports from API
@@ -819,20 +828,23 @@ export default function ReportsPage() {
     }
   }, [uploadCompanyName, uploadReportType, uploadScore, uploadRecommendation, toast, loadReports]);
 
-  // Get current user email from localStorage
-  const currentUserEmail = typeof window !== 'undefined'
-    ? (() => {
-      try {
-        const user = JSON.parse(localStorage.getItem('loggedInUser') || '{}');
-        return user.email || localStorage.getItem('userEmail') || 'user@tca.com';
-      } catch {
-        return localStorage.getItem('userEmail') || 'user@tca.com';
+  const handleDeleteReport = useCallback(async (id: string | number) => {
+    if (!window.confirm('Delete this report? This action cannot be undone.')) return;
+    try {
+      if (typeof id === 'number') {
+        await reportsApi.deleteReport(id);
+      } else {
+        setPendingSyncReports(prev => prev.filter(r => r.id !== id));
       }
-    })()
-    : 'user@tca.com';
+      setAllReports(prev => prev.filter(r => r.id !== id));
+      toast({ title: 'Report deleted', description: 'The report has been removed.' });
+    } catch {
+      toast({ title: 'Delete failed', variant: 'destructive', description: 'Could not delete the report. Please try again.' });
+    }
+  }, [toast]);
 
-  const reportsForUser = allReports.filter(r => isPrivilegedUser || r.user.email === currentUserEmail);
-  const myReports = allReports.filter(r => r.user.email === currentUserEmail);
+  const reportsForUser = allReports.filter(r => isPrivilegedUser || r.user?.email === currentUserEmail);
+  const myReports = allReports.filter(r => r.user?.email === currentUserEmail);
   const pendingReports = allReports.filter(r => r.approval === 'Pending');
 
 
@@ -1059,6 +1071,7 @@ export default function ReportsPage() {
                     report={report}
                     isPrivileged={isPrivilegedUser}
                     onViewVersions={typeof report.id === 'number' ? () => viewReportVersions(report.id as number, report.company) : undefined}
+                    onDelete={role === 'admin' ? () => handleDeleteReport(report.id) : undefined}
                   />
                 )) : (
                   <Card className="p-8 text-center">
@@ -1078,6 +1091,7 @@ export default function ReportsPage() {
                       report={report}
                       isPrivileged={isPrivilegedUser}
                       onViewVersions={typeof report.id === 'number' ? () => viewReportVersions(report.id as number, report.company) : undefined}
+                      onDelete={role === 'admin' ? () => handleDeleteReport(report.id) : undefined}
                     />
                   ))
                   : (
@@ -1105,6 +1119,7 @@ export default function ReportsPage() {
                       report={report}
                       isPrivileged={isPrivilegedUser}
                       onViewVersions={typeof report.id === 'number' ? () => viewReportVersions(report.id as number, report.company) : undefined}
+                      onDelete={role === 'admin' ? () => handleDeleteReport(report.id) : undefined}
                     />
                   ))
                   : (
@@ -1131,6 +1146,7 @@ export default function ReportsPage() {
                     report={report}
                     isPrivileged={isPrivilegedUser}
                     onViewVersions={typeof report.id === 'number' ? () => viewReportVersions(report.id as number, report.company) : undefined}
+                    onDelete={role === 'admin' ? () => handleDeleteReport(report.id) : undefined}
                   />
                 )) : <p className="text-center text-muted-foreground py-10">No reports are pending approval.</p>}
               </TabsContent>
@@ -1189,7 +1205,7 @@ export default function ReportsPage() {
                             <div className="min-w-0">
                               <div className="flex items-center gap-2">
                                 <h3 className="text-xl font-bold truncate">{report.company}</h3>
-                                <Badge variant="outline">{report.type.toUpperCase()}</Badge>
+                                <Badge variant="outline">{(report.type ?? '').toUpperCase()}</Badge>
                                 <Badge className="bg-yellow-500/20 text-yellow-600">Pending Sync</Badge>
                               </div>
                             </div>
@@ -1240,6 +1256,7 @@ export default function ReportsPage() {
                     report={report}
                     isPrivileged={isPrivilegedUser}
                     onViewVersions={typeof report.id === 'number' ? () => viewReportVersions(report.id as number, report.company) : undefined}
+                    onDelete={role === 'admin' ? () => handleDeleteReport(report.id) : undefined}
                   />
                 )) : (
                   <Card className="p-8 text-center">

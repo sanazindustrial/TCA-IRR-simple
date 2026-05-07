@@ -32,12 +32,70 @@ class EmailService:
         self.settings = settings
         self._sendgrid_client = None
         self._acs_client = None
+        self._last_error: Optional[str] = None
+
+    @property
+    def last_error(self) -> Optional[str]:
+        """Return the latest provider error, if any."""
+        return self._last_error
+
+    def _set_last_error(self, message: Optional[str]) -> None:
+        """Store provider diagnostics without raising."""
+        self._last_error = message
+
+    @staticmethod
+    def _normalize_secret(value: Optional[str]) -> Optional[str]:
+        """Normalize env-backed secret values to avoid false positives/negatives."""
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            return None
+        if normalized.lower() in {"none", "null", "undefined"}:
+            return None
+        return normalized
+
+    def _get_acs_connection_string(self) -> Optional[str]:
+        """Resolve ACS connection string from settings with env fallback."""
+        configured = self._normalize_secret(
+            getattr(self.settings, 'azure_communication_connection_string', None)
+        )
+        if configured:
+            return configured
+
+        # Fallback helps when runtime settings hydration differs across hosts.
+        return self._normalize_secret(os.environ.get("AZURE_COMMUNICATION_CONNECTION_STRING"))
+
+    def get_diagnostics(self) -> Dict[str, Any]:
+        """Return provider readiness and configuration details."""
+        acs_configured = bool(self._get_acs_connection_string())
+        sendgrid_configured = bool(self.settings.sendgrid_api_key)
+        smtp_configured = bool(self.settings.smtp_user and self.settings.smtp_password)
+        acs_client_ready = False
+
+        if acs_configured:
+            acs_client_ready = self._get_acs_client() is not None
+
+        return {
+            "is_configured": self.is_configured,
+            "active_provider": self.active_provider,
+            "acs_configured": acs_configured,
+            "acs_sender_address": getattr(self.settings, 'azure_communication_sender_address', None),
+            "acs_client_ready": acs_client_ready,
+            "sendgrid_configured": sendgrid_configured,
+            "smtp_configured": smtp_configured,
+            "smtp_host": self.settings.smtp_host if smtp_configured else None,
+            "from_email": self.settings.smtp_from_email,
+            "from_name": self.settings.smtp_from_name,
+            "frontend_url": self.settings.frontend_url,
+            "last_error": self.last_error,
+        }
         
     @property
     def is_configured(self) -> bool:
         """Check if email service is properly configured"""
         return bool(
-            getattr(self.settings, 'azure_communication_connection_string', None)
+            self._get_acs_connection_string()
             or self.settings.sendgrid_api_key
             or (self.settings.smtp_user and self.settings.smtp_password)
         )
@@ -45,7 +103,7 @@ class EmailService:
     @property
     def active_provider(self) -> str:
         """Get the name of the active email provider"""
-        if getattr(self.settings, 'azure_communication_connection_string', None):
+        if self._get_acs_connection_string():
             return "azure_communication_services"
         if self.settings.sendgrid_api_key:
             return "sendgrid"
@@ -56,16 +114,21 @@ class EmailService:
     def _get_acs_client(self):
         """Get Azure Communication Services email client (lazy initialization)"""
         if self._acs_client is None:
-            if connection_string := getattr(self.settings, 'azure_communication_connection_string', None):
+            if connection_string := self._get_acs_connection_string():
                 try:
                     from azure.communication.email import EmailClient
                     self._acs_client = EmailClient.from_connection_string(connection_string)
+                    self._set_last_error(None)
                     logger.info("Azure Communication Services email client initialized")
                 except ImportError:
-                    logger.warning("Azure Communication Email SDK not installed. Run: pip install azure-communication-email")
+                    message = "Azure Communication Email SDK not installed. Run: pip install azure-communication-email"
+                    self._set_last_error(message)
+                    logger.warning(message)
                     return None
                 except Exception as e:
-                    logger.error(f"Failed to initialize ACS email client: {e}")
+                    message = f"Failed to initialize ACS email client: {e}"
+                    self._set_last_error(message)
+                    logger.error(message)
                     return None
         return self._acs_client
     
@@ -76,7 +139,9 @@ class EmailService:
                 from sendgrid import SendGridAPIClient
                 self._sendgrid_client = SendGridAPIClient(self.settings.sendgrid_api_key)
             except ImportError:
-                logger.warning("SendGrid package not installed. Run: pip install sendgrid")
+                message = "SendGrid package not installed. Run: pip install sendgrid"
+                self._set_last_error(message)
+                logger.warning(message)
                 return None
         return self._sendgrid_client
     
@@ -101,18 +166,25 @@ class EmailService:
         """
         if not self.is_configured:
             logger.warning("Email service not configured. Skipping email send.")
+            self._set_last_error("Email service not configured")
             return False
         
         # Try Azure Communication Services first
-        if getattr(self.settings, 'azure_communication_connection_string', None):
-            return await self._send_via_acs(to_email, subject, html_content, text_content)
+        if self._get_acs_connection_string():
+            if await self._send_via_acs(to_email, subject, html_content, text_content):
+                return True
+            logger.warning("ACS send failed; attempting configured fallback provider")
         
         # Try SendGrid
         if self.settings.sendgrid_api_key:
-            return await self._send_via_sendgrid(to_email, subject, html_content, text_content)
+            if await self._send_via_sendgrid(to_email, subject, html_content, text_content):
+                return True
         
         # Fallback to SMTP
-        return await self._send_via_smtp(to_email, subject, html_content, text_content)
+        if self.settings.smtp_user and self.settings.smtp_password:
+            return await self._send_via_smtp(to_email, subject, html_content, text_content)
+
+        return False
     
     async def _send_via_acs(
         self,
@@ -125,7 +197,9 @@ class EmailService:
         try:
             client = self._get_acs_client()
             if not client:
-                logger.error("Azure Communication Services email client not available")
+                message = "Azure Communication Services email client not available"
+                self._set_last_error(message)
+                logger.error(message)
                 return False
             
             # Get from email address from settings
@@ -156,16 +230,25 @@ class EmailService:
             
             # Wait for result
             result = await loop.run_in_executor(None, poller.result)
-            
-            if result.get("status") == "Succeeded":
+
+            status_value = getattr(result, "status", None)
+            if status_value is None and isinstance(result, dict):
+                status_value = result.get("status")
+
+            if str(status_value).lower() == "succeeded":
+                self._set_last_error(None)
                 logger.info(f"Email sent successfully via ACS to {to_email}")
                 return True
             else:
-                logger.error(f"ACS email failed with status: {result.get('status')}")
+                message = f"ACS email failed with status: {status_value}"
+                self._set_last_error(message)
+                logger.error(message)
                 return False
                 
         except Exception as e:
-            logger.error(f"Azure Communication Services email error: {e}")
+            message = f"Azure Communication Services email error: {e}"
+            self._set_last_error(message)
+            logger.error(message)
             return False
     
     async def _send_via_sendgrid(
@@ -197,14 +280,19 @@ class EmailService:
             response = client.send(message)
             
             if response.status_code in [200, 201, 202]:
+                self._set_last_error(None)
                 logger.info(f"Email sent successfully via SendGrid to {to_email}")
                 return True
             else:
-                logger.error(f"SendGrid returned status {response.status_code}")
+                message = f"SendGrid returned status {response.status_code}"
+                self._set_last_error(message)
+                logger.error(message)
                 return False
                 
         except Exception as e:
-            logger.error(f"SendGrid email error: {e}")
+            message = f"SendGrid email error: {e}"
+            self._set_last_error(message)
+            logger.error(message)
             return False
     
     async def _send_via_smtp(
@@ -246,11 +334,14 @@ class EmailService:
             )
             server.quit()
             
+            self._set_last_error(None)
             logger.info(f"Email sent successfully via SMTP to {to_email}")
             return True
             
         except Exception as e:
-            logger.error(f"SMTP email error: {e}")
+            message = f"SMTP email error: {e}"
+            self._set_last_error(message)
+            logger.error(message)
             return False
     
     # ================== Email Templates ==================
@@ -434,8 +525,8 @@ class EmailService:
         invited_by: str
     ) -> bool:
         """Send invitation email for admin/analyst accounts"""
-        # Use /signup?token=xxx to match frontend signup page that handles invites
-        invite_url = f"{self.settings.frontend_url}/signup?token={invite_token}"
+        # Send invited roles to a dedicated invite-acceptance page
+        invite_url = f"{self.settings.frontend_url}/accept-invite?token={invite_token}"
         role_display = role.capitalize()
         
         content = f"""

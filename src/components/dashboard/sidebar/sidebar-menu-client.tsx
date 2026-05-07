@@ -180,46 +180,50 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
 
             <SidebarSeparator />
 
-            <SidebarGroup>
-                <SidebarGroupLabel>Report Generation</SidebarGroupLabel>
-                <SidebarMenu>
-                    <Collapsible open={reportsOpen} onOpenChange={setReportsOpen} className="group/collapsible">
-                        <SidebarMenuItem>
-                            <CollapsibleTrigger asChild>
-                                <SidebarMenuButton tooltip="Report Generation">
-                                    <FileText />
-                                    <span>Generate Reports</span>
-                                    <ChevronDown className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
-                                </SidebarMenuButton>
-                            </CollapsibleTrigger>
-                            <CollapsibleContent>
-                                <SidebarMenuSub>
-                                    <SidebarMenuSubItem>
-                                        <SidebarMenuSubButton href="/dashboard/reports/triage" isActive={pathname === '/dashboard/reports/triage'}>
-                                            <Target className="size-4" />
-                                            <span>Triage Report</span>
-                                        </SidebarMenuSubButton>
-                                    </SidebarMenuSubItem>
-                                    <SidebarMenuSubItem>
-                                        <SidebarMenuSubButton href="/dashboard/reports/due-diligence" isActive={pathname === '/dashboard/reports/due-diligence'}>
-                                            <Shield className="size-4" />
-                                            <span>Due Diligence</span>
-                                        </SidebarMenuSubButton>
-                                    </SidebarMenuSubItem>
-                                    <SidebarMenuSubItem>
-                                        <SidebarMenuSubButton href="/dashboard/reports/ssd" isActive={pathname === '/dashboard/reports/ssd'}>
-                                            <Activity className="size-4" />
-                                            <span>SSD Report</span>
-                                        </SidebarMenuSubButton>
-                                    </SidebarMenuSubItem>
-                                </SidebarMenuSub>
-                            </CollapsibleContent>
-                        </SidebarMenuItem>
-                    </Collapsible>
-                </SidebarMenu>
-            </SidebarGroup>
+            {isPrivilegedUser && (
+                <>
+                    <SidebarGroup>
+                        <SidebarGroupLabel>Report Generation</SidebarGroupLabel>
+                        <SidebarMenu>
+                            <Collapsible open={reportsOpen} onOpenChange={setReportsOpen} className="group/collapsible">
+                                <SidebarMenuItem>
+                                    <CollapsibleTrigger asChild>
+                                        <SidebarMenuButton tooltip="Report Generation">
+                                            <FileText />
+                                            <span>Generate Reports</span>
+                                            <ChevronDown className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+                                        </SidebarMenuButton>
+                                    </CollapsibleTrigger>
+                                    <CollapsibleContent>
+                                        <SidebarMenuSub>
+                                            <SidebarMenuSubItem>
+                                                <SidebarMenuSubButton href="/dashboard/reports/triage" isActive={pathname === '/dashboard/reports/triage'}>
+                                                    <Target className="size-4" />
+                                                    <span>Triage Report</span>
+                                                </SidebarMenuSubButton>
+                                            </SidebarMenuSubItem>
+                                            <SidebarMenuSubItem>
+                                                <SidebarMenuSubButton href="/dashboard/reports/due-diligence" isActive={pathname === '/dashboard/reports/due-diligence'}>
+                                                    <Shield className="size-4" />
+                                                    <span>Due Diligence</span>
+                                                </SidebarMenuSubButton>
+                                            </SidebarMenuSubItem>
+                                            <SidebarMenuSubItem>
+                                                <SidebarMenuSubButton href="/dashboard/reports/ssd" isActive={pathname === '/dashboard/reports/ssd'}>
+                                                    <Activity className="size-4" />
+                                                    <span>SSD Report</span>
+                                                </SidebarMenuSubButton>
+                                            </SidebarMenuSubItem>
+                                        </SidebarMenuSub>
+                                    </CollapsibleContent>
+                                </SidebarMenuItem>
+                            </Collapsible>
+                        </SidebarMenu>
+                    </SidebarGroup>
 
-            <SidebarSeparator />
+                    <SidebarSeparator />
+                </>
+            )}
 
             <SidebarGroup>
                 <SidebarGroupLabel>Analysis Modules</SidebarGroupLabel>
@@ -331,12 +335,14 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
                                             <span>Strategic Analysis</span>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
+                                    {isPrivilegedUser && (
                                     <SidebarMenuSubItem>
                                         <SidebarMenuSubButton href="/analysis/what-if" isActive={pathname === '/analysis/what-if'}>
                                             <Lightbulb className="size-4" />
                                             <span>Simulation</span>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
+                                    )}
                                 </SidebarMenuSub>
                             </CollapsibleContent>
                         </SidebarMenuItem>
@@ -387,6 +393,14 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
                         <SidebarMenu>
                             {isAdmin && (
                                 <SidebarMenuItem>
+                                    <SidebarMenuButton href="/dashboard/admin" isActive={pathname === '/dashboard/admin'} tooltip="Admin Control Panel">
+                                        <Shield />
+                                        <span>Admin Control Panel</span>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            )}
+                            {isAdmin && (
+                                <SidebarMenuItem>
                                     <SidebarMenuButton href="/dashboard/users" isActive={pathname === '/dashboard/users'} tooltip="User Management">
                                         <Users />
                                         <span>User Management</span>
@@ -401,24 +415,30 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
                             )}
-                            <SidebarMenuItem>
-                                <SidebarMenuButton href="/dashboard/system-health" isActive={pathname === '/dashboard/system-health'} tooltip="System Health">
-                                    <Activity />
-                                    <span>System Health</span>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
-                            <SidebarMenuItem>
-                                <SidebarMenuButton href="/dashboard/ai-training" isActive={pathname === '/dashboard/ai-training'} tooltip="AI Training">
-                                    <BrainCircuit />
-                                    <span>AI Training</span>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
-                            <SidebarMenuItem>
-                                <SidebarMenuButton href="/dashboard/backup" isActive={pathname === '/dashboard/backup'} tooltip="Backup & Recovery">
-                                    <DatabaseBackup />
-                                    <span>Backup & Recovery</span>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
+                            {isAdmin && (
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton href="/dashboard/system-health" isActive={pathname === '/dashboard/system-health'} tooltip="System Health">
+                                        <Activity />
+                                        <span>System Health</span>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            )}
+                            {isAdmin && (
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton href="/dashboard/ai-training" isActive={pathname === '/dashboard/ai-training'} tooltip="AI Training">
+                                        <BrainCircuit />
+                                        <span>AI Training</span>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            )}
+                            {isAdmin && (
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton href="/dashboard/backup" isActive={pathname === '/dashboard/backup'} tooltip="Backup & Recovery">
+                                        <DatabaseBackup />
+                                        <span>Backup & Recovery</span>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            )}
                             <SidebarMenuItem>
                                 <SidebarMenuButton href="/data-sources" isActive={pathname === '/data-sources'} tooltip="External Links">
                                     <LinkIcon />
@@ -487,12 +507,14 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
                             )}
-                            <SidebarMenuItem>
-                                <SidebarMenuButton href="/dashboard/ssd-audit" isActive={pathname === '/dashboard/ssd-audit'} tooltip="Startup Steroid Audit">
-                                    <Activity />
-                                    <span>Startup Steroid Audit</span>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
+                            {isAdmin && (
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton href="/dashboard/ssd-audit" isActive={pathname === '/dashboard/ssd-audit'} tooltip="Startup Steroid Audit">
+                                        <Activity />
+                                        <span>Startup Steroid Audit</span>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            )}
                             {isAdmin && (
                                 <SidebarMenuItem>
                                     <SidebarMenuButton href="/dashboard/evaluation/modules" isActive={pathname.startsWith('/analysis/modules')} tooltip="Complete Admin Config">
