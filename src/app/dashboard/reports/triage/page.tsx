@@ -113,6 +113,153 @@ const TRIAGE_MODULES = [
   { id: 'strategicFit', name: 'Strategic Fit', description: 'Alignment with investor thesis and portfolio', icon: BrainCircuit, required: false, weight: 2 },
 ];
 
+const DEFAULT_MODULE_SCORE = 50;
+
+const getDefaultSimulatedScores = (): Record<string, number> =>
+  Object.fromEntries(TRIAGE_MODULES.map((m) => [m.id, DEFAULT_MODULE_SCORE]));
+
+const getDefaultSelectedModulesForRole = (role: 'admin' | 'analyst' | 'standard'): string[] =>
+  role === 'standard' ? ['tca', 'risk'] : TRIAGE_MODULES.map((m) => m.id);
+
+const clampScoreToTen = (score: number): number => Math.max(0, Math.min(10, score));
+
+const toNumberOrNull = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+};
+
+const normalizeModuleScore = (raw: number | null): number | null => {
+  if (raw === null) return null;
+  return clampScoreToTen(raw > 10 ? raw / 10 : raw);
+};
+
+const average = (values: number[]): number | null => {
+  if (values.length === 0) return null;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+};
+
+const deriveRiskScore = (analysisData: Record<string, unknown>): number | null => {
+  const riskData = analysisData.riskData as { riskFlags?: Array<{ flag?: string }> } | undefined;
+  const flags = Array.isArray(riskData?.riskFlags) ? riskData.riskFlags : [];
+  if (flags.length === 0) return null;
+
+  const flagToScore: Record<string, number> = {
+    green: 10,
+    yellow: 6,
+    red: 2,
+  };
+
+  const scores = flags
+    .map((f) => flagToScore[(f.flag || '').toLowerCase()])
+    .filter((s): s is number => Number.isFinite(s));
+
+  const avg = average(scores);
+  return avg === null ? null : clampScoreToTen(avg);
+};
+
+const deriveModuleScore = (moduleId: string, analysisResult: unknown): number | null => {
+  const data = (analysisResult || {}) as Record<string, unknown>;
+  const tcaData = data.tcaData as { compositeScore?: number; overallScore?: number } | undefined;
+  const macroData = data.macroData as { pestelDashboard?: Record<string, number> } | undefined;
+  const benchmarkData = data.benchmarkData as { benchmarkOverlay?: Array<{ score?: number }> } | undefined;
+  const growthData = data.growthData as { tier?: number; confidence?: number } | undefined;
+  const founderFitData = data.founderFitData as { readinessScore?: number } | undefined;
+  const teamData = data.teamData as { teamScore?: number } | undefined;
+  const gapData = data.gapData as { heatmap?: Array<{ gap?: number }> } | undefined;
+  const strategicFitData = data.strategicFitData;
+
+  const tcaScore = normalizeModuleScore(toNumberOrNull(tcaData?.compositeScore) ?? toNumberOrNull(tcaData?.overallScore));
+  const riskScore = deriveRiskScore(data);
+
+  const pestelValues = Object.values(macroData?.pestelDashboard ?? {})
+    .map((v) => toNumberOrNull(v))
+    .filter((v): v is number => v !== null);
+  const macroScore = normalizeModuleScore(average(pestelValues));
+
+  const benchmarkValues = (benchmarkData?.benchmarkOverlay ?? [])
+    .map((item) => normalizeModuleScore(toNumberOrNull(item.score)))
+    .filter((v): v is number => v !== null);
+  const benchmarkScore = normalizeModuleScore(average(benchmarkValues));
+
+  const growthTier = toNumberOrNull(growthData?.tier);
+  const growthConfidence = toNumberOrNull(growthData?.confidence);
+  let growthScore: number | null = null;
+  if (growthTier !== null) {
+    const tierScore = growthTier > 10 ? growthTier / 10 : growthTier * 2;
+    if (growthConfidence !== null) {
+      const confidenceScore = growthConfidence <= 1 ? growthConfidence * 10 : growthConfidence;
+      growthScore = normalizeModuleScore((tierScore * 0.8) + (confidenceScore * 0.2));
+    } else {
+      growthScore = normalizeModuleScore(tierScore);
+    }
+  }
+
+  const founderScore = normalizeModuleScore(toNumberOrNull(founderFitData?.readinessScore));
+  const teamScore = normalizeModuleScore(toNumberOrNull(teamData?.teamScore));
+
+  const gapValues = (gapData?.heatmap ?? [])
+    .map((item) => toNumberOrNull(item.gap))
+    .filter((v): v is number => v !== null);
+  const avgGap = average(gapValues);
+  const gapScore = avgGap === null ? null : clampScoreToTen(10 - (avgGap / 10));
+
+  const strategicScore = strategicFitData ? (benchmarkScore ?? tcaScore) : null;
+
+  switch (moduleId) {
+    case 'tca':
+      return tcaScore;
+    case 'risk':
+      return riskScore;
+    case 'growth':
+      return growthScore;
+    case 'macro':
+    case 'economic':
+    case 'environmental':
+    case 'social':
+      return macroScore;
+    case 'benchmark':
+    case 'marketing':
+    case 'strategic':
+      return benchmarkScore;
+    case 'team':
+    case 'founderFit':
+      return teamScore ?? founderScore;
+    case 'funder':
+    case 'financial':
+      return founderScore;
+    case 'gap':
+      return gapScore;
+    case 'analyst':
+      return tcaScore ?? riskScore;
+    case 'strategicFit':
+      return strategicScore;
+    default:
+      return null;
+  }
+};
+
+const computeWeightedCompositeScore = (
+  selectedModules: string[],
+  moduleScores: Record<string, number | null>
+): number | null => {
+  const active = TRIAGE_MODULES
+    .filter((module) => selectedModules.includes(module.id))
+    .map((module) => ({ ...module, score: moduleScores[module.id] }))
+    .filter((module): module is (typeof TRIAGE_MODULES)[number] & { score: number } => module.score !== null);
+
+  if (active.length === 0) return null;
+
+  const totalWeight = active.reduce((sum, module) => sum + module.weight, 0);
+  if (totalWeight <= 0) return null;
+
+  const weighted = active.reduce((sum, module) => sum + (module.score * module.weight), 0) / totalWeight;
+  return clampScoreToTen(weighted);
+};
+
 const SECTORS = [
   'Technology / SaaS',
   'Healthcare / MedTech',
@@ -422,19 +569,18 @@ export default function TriageReportWizardPage() {
   const [productDescription, setProductDescription] = useState('');
 
   const [framework, setFramework] = useState<Framework>('general');
-  const [selectedModules, setSelectedModules] = useState<string[]>(['tca', 'risk', 'growth', 'macro']);
+  const [selectedModules, setSelectedModules] = useState<string[]>(TRIAGE_MODULES.map((m) => m.id));
 
   const [selectedSources, setSelectedSources] = useState<string[]>(['hackernews']);
   const [externalData, setExternalData] = useState<Array<{ source: string; success: boolean; data: unknown; error?: string }>>([]);
   const [fetchingData, setFetchingData] = useState(false);
 
-  const [simulatedScores, setSimulatedScores] = useState<Record<string, number>>(
-    Object.fromEntries(TRIAGE_MODULES.map(m => [m.id, 50]))
-  );
+  const [simulatedScores, setSimulatedScores] = useState<Record<string, number>>(getDefaultSimulatedScores());
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [generationStatus, setGenerationStatus] = useState('');
   const [analysisResult, setAnalysisResult] = useState<unknown>(null);
+  const [moduleScores, setModuleScores] = useState<Record<string, number | null>>({});
   const [compositeScore, setCompositeScore] = useState<number>(0);
 
   // Role-based
@@ -494,15 +640,16 @@ export default function TriageReportWizardPage() {
     setTeamInfo('');
     setProductDescription('');
     setFramework('general');
-    setSelectedModules(['tca', 'risk', 'growth', 'macro']);
+    setSelectedModules(getDefaultSelectedModulesForRole(userRole));
     setSelectedSources(['hackernews']);
     setExternalData([]);
     setFetchingData(false);
-    setSimulatedScores(Object.fromEntries(TRIAGE_MODULES.map((m) => [m.id, 50])));
+    setSimulatedScores(getDefaultSimulatedScores());
     setIsGenerating(false);
     setGenerationProgress(0);
     setGenerationStatus('');
     setAnalysisResult(null);
+    setModuleScores({});
     setCompositeScore(0);
     setSavedReportId(null);
     setIsSaving(false);
@@ -548,6 +695,7 @@ export default function TriageReportWizardPage() {
         parsedRole === 'admin' ? 'admin' : parsedRole === 'analyst' ? 'analyst' : 'standard';
 
       setUserRole(role);
+      setSelectedModules(getDefaultSelectedModulesForRole(role));
 
       const isPrivileged = role === 'admin' || role === 'analyst';
       if (isPrivileged) {
@@ -562,13 +710,6 @@ export default function TriageReportWizardPage() {
       setReportSections(DEFAULT_STANDARD_SECTIONS);
     }
   }, []);
-
-    // Auto-set modules for standard users: only TCA and Risk (required modules only)
-    useEffect(() => {
-      if (userRole === 'standard') {
-        setSelectedModules(['tca', 'risk']);
-      }
-    }, [userRole]);
 
   const isAdminOrAnalyst = userRole === 'admin' || userRole === 'analyst';
   const visibleSteps = isAdminOrAnalyst
@@ -1211,13 +1352,22 @@ export default function TriageReportWizardPage() {
     }, 1500);
 
     try {
+      const hasCustomScoreOverrides = isAdminOrAnalyst && selectedModules.some(
+        (moduleId) => (simulatedScores[moduleId] ?? DEFAULT_MODULE_SCORE) !== DEFAULT_MODULE_SCORE
+      );
+      const selectedModuleOverrides = Object.fromEntries(
+        selectedModules
+          .map((moduleId) => [moduleId, simulatedScores[moduleId]])
+          .filter((entry): entry is [string, number] => typeof entry[1] === 'number')
+      );
+
       const analysisData = await runAnalysis(framework, {
         companyName, sector, stage, website, location,
         pitchSummary, keyMetrics, teamInfo, productDescription,
         strictRealDataOnly: true,
         disallowSampleFallback: true,
         activeModules: TRIAGE_MODULES.filter(m => selectedModules.includes(m.id)).map(m => ({ module_id: m.id, weight: m.weight, is_enabled: true })),
-        ...(isAdminOrAnalyst && Object.keys(simulatedScores).length > 0 && { scoreOverrides: simulatedScores }),
+        ...(hasCustomScoreOverrides && { scoreOverrides: selectedModuleOverrides }),
       });
       clearInterval(progressTimer);
       setGenerationProgress(100);
@@ -1228,7 +1378,13 @@ export default function TriageReportWizardPage() {
       localStorage.setItem('analysisFramework', framework);
 
       const scoreData = (analysisData as { tcaData?: { overallScore?: number; compositeScore?: number } })?.tcaData;
-      const score = scoreData?.compositeScore ?? scoreData?.overallScore ?? 0;
+      const tcaScore = scoreData?.compositeScore ?? scoreData?.overallScore ?? 0;
+      const derivedScores = Object.fromEntries(
+        TRIAGE_MODULES.map((module) => [module.id, deriveModuleScore(module.id, analysisData)])
+      ) as Record<string, number | null>;
+      setModuleScores(derivedScores);
+      const weightedScore = computeWeightedCompositeScore(selectedModules, derivedScores);
+      const score = weightedScore ?? tcaScore;
       setCompositeScore(score);
       setAnalysisResult(analysisData);
       sessionStorage.setItem('companyData', JSON.stringify({
@@ -2272,7 +2428,7 @@ export default function TriageReportWizardPage() {
                   variant="outline"
                   size="sm"
                   onClick={() =>
-                    setSimulatedScores(Object.fromEntries(TRIAGE_MODULES.map(m => [m.id, 50])))
+                    setSimulatedScores(getDefaultSimulatedScores())
                   }
                 >
                   <RefreshCw className="size-4 mr-2" />
@@ -2445,7 +2601,7 @@ export default function TriageReportWizardPage() {
               </div>
               <div className="flex items-center justify-between pt-2 border-t">
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setSimulatedScores(Object.fromEntries(TRIAGE_MODULES.map(m => [m.id, 50])))}>
+                  <Button variant="outline" size="sm" onClick={() => setSimulatedScores(getDefaultSimulatedScores())}>
                     <RefreshCw className="size-4 mr-2" />Reset All
                   </Button>
                   <Button variant="outline" size="sm" onClick={() => window.open('/analysis/what-if', '_blank')}>
@@ -2508,19 +2664,20 @@ export default function TriageReportWizardPage() {
                 const activeModules = TRIAGE_MODULES.filter((m) => selectedModules.includes(m.id));
                 return (
                   <div className="space-y-2">
-                    <p className="text-sm font-medium">TCA Category Breakdown</p>
+                    <p className="text-sm font-medium">Module Score Breakdown</p>
                     <div className="space-y-1">
                       {activeModules.map((m) => {
                         const backendCat = tcaCategories?.find((c) => {
                           const label = (c.name ?? c.category ?? '').toLowerCase();
                           return label === m.name.toLowerCase();
                         });
-                        const score = backendCat?.score ?? backendCat?.rawScore ?? (simulatedScores[m.id] ?? 50) / 10;
-                        const maxScore = backendCat?.maxScore ?? 10;
+                        const explicitModuleScore = moduleScores[m.id] ?? null;
+                        const tcaCategoryScore = normalizeModuleScore(toNumberOrNull(backendCat?.score) ?? toNumberOrNull(backendCat?.rawScore));
+                        const score = explicitModuleScore ?? tcaCategoryScore;
                         return (
                           <div key={m.id} className="flex items-center justify-between rounded-md border p-2 text-sm">
                             <span className="text-muted-foreground">{m.name}</span>
-                            <span className="font-semibold">{score.toFixed(1)} / {maxScore}</span>
+                            <span className="font-semibold">{score === null ? 'N/A' : `${score.toFixed(1)} / 10`}</span>
                           </div>
                         );
                       })}

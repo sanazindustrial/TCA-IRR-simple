@@ -297,6 +297,68 @@ export async function runAnalysis(
       enrichedDocChars: enrichedDocumentText.length,
     });
 
+    const moduleIdMap: Record<string, string> = {
+      tca: 'tca_scorecard',
+      risk: 'risk_flags',
+      growth: 'growth_classifier',
+      macro: 'macro_trend_alignment',
+      benchmark: 'benchmark_comparison',
+      team: 'team_assessment',
+      analyst: 'analyst_review',
+      funder: 'funder_fit_analysis',
+      gap: 'gap_analysis',
+      strategic: 'strategic_analysis',
+      economic: 'economic_analysis',
+      financial: 'financial_analysis',
+      environmental: 'environmental_analysis',
+      marketing: 'marketing_analysis',
+      social: 'social_impact_analysis',
+      founderFit: 'founder_fit',
+      strategicFit: 'strategic_fit',
+    };
+
+    const incomingActiveModules = Array.isArray(userData?.activeModules) ? userData.activeModules : [];
+    const normalizedActiveModules = incomingActiveModules
+      .map((module: any) => {
+        const sourceId = String(module?.module_id ?? '').trim();
+        if (!sourceId) return null;
+        const normalizedId = moduleIdMap[sourceId] || sourceId;
+        const weightValue = typeof module?.weight === 'number' && Number.isFinite(module.weight)
+          ? module.weight
+          : undefined;
+
+        return {
+          module_id: normalizedId,
+          source_module_id: sourceId,
+          is_enabled: module?.is_enabled !== false,
+          ...(weightValue !== undefined && { weight: weightValue }),
+        };
+      })
+      .filter((module): module is { module_id: string; source_module_id: string; is_enabled: boolean; weight?: number } => module !== null);
+
+    const requestedScoreOverrides =
+      userData?.scoreOverrides && typeof userData.scoreOverrides === 'object'
+        ? userData.scoreOverrides as Record<string, unknown>
+        : undefined;
+
+    const filteredScoreOverrides = requestedScoreOverrides
+      ? Object.fromEntries(
+          Object.entries(requestedScoreOverrides)
+            .filter(([key, value]) => {
+              const numericScore = typeof value === 'number' ? value : Number(value);
+              const isKnownModule = normalizedActiveModules.some(
+                (module) => module.source_module_id === key || module.module_id === key
+              );
+              return Number.isFinite(numericScore) && isKnownModule;
+            })
+            .map(([key, value]) => {
+              const numericScore = typeof value === 'number' ? value : Number(value);
+              const mappedKey = moduleIdMap[key] || key;
+              return [mappedKey, numericScore];
+            })
+        )
+      : undefined;
+
     // Prepare comprehensive analysis payload — all 9 modules receive real extracted data
     const analysisPayload = {
       // Framework configuration
@@ -473,7 +535,18 @@ export async function runAnalysis(
       // Analysis configuration
       stage:       companyStage,
       companyName: userData?.companyName || extractedCompany.company_name || '',
-      ...(userData?.scoreOverrides && { module_score_overrides: userData.scoreOverrides }),
+      ...(normalizedActiveModules.length > 0 && {
+        active_modules: normalizedActiveModules,
+        analysis_config: {
+          active_modules: normalizedActiveModules,
+          module_count: normalizedActiveModules.length,
+          strict_real_data_only: Boolean(userData?.strictRealDataOnly),
+          disallow_sample_fallback: Boolean(userData?.disallowSampleFallback),
+        },
+      }),
+      ...(filteredScoreOverrides && Object.keys(filteredScoreOverrides).length > 0 && {
+        module_score_overrides: filteredScoreOverrides,
+      }),
     };
 
     console.log('Making request to:', `${BACKEND_API_URL}${API_VERSION}/analysis/comprehensive`);
