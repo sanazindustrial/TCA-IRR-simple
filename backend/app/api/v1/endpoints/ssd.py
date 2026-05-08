@@ -1292,6 +1292,11 @@ async def ssd_tirr_status(tracking_id: str):
                 "tracking_id": tracking_id,
                 "message": "Report is still being generated.",
                 "events": len(audit.get("events", [])),
+                "next_poll_seconds": 5,
+            },
+            headers={
+                "Cache-Control": "no-store",
+                "Retry-After": "5",
             },
         )
     

@@ -97,6 +97,23 @@ class EvaluationResponse(BaseModel):
     created_at: str
 
 
+def _normalize_status(value: Optional[str]) -> str:
+    """Normalize status values to frontend-safe lower-case enums."""
+    mapping = {
+        "pending": "pending",
+        "queued": "pending",
+        "processing": "processing",
+        "running": "processing",
+        "in_progress": "processing",
+        "completed": "completed",
+        "done": "completed",
+        "failed": "failed",
+        "error": "failed",
+    }
+    key = (value or "unknown").strip().lower()
+    return mapping.get(key, "unknown")
+
+
 # ═══════════════════════════════════════════════════════════════════════
 # FILE UPLOAD ENDPOINTS (/api/files/*)
 # ═══════════════════════════════════════════════════════════════════════
@@ -559,7 +576,7 @@ async def create_evaluation(
             evaluation_id=evaluation_id,
             company_name=evaluation_data.company_name,
             evaluation_type=evaluation_data.evaluation_type,
-            status="pending",
+            status=_normalize_status("pending"),
             created_at=datetime.utcnow().isoformat()
         )
     except Exception as e:
@@ -584,7 +601,7 @@ async def list_evaluations(
             evaluation_id=str(r['evaluation_id']),
             company_name=r['company_name'] or 'Unknown',
             evaluation_type=r['evaluation_type'] or 'triage',
-            status=r['status'] or 'unknown',
+            status=_normalize_status(r['status']),
             created_at=r['created_at'].isoformat() if r['created_at'] else datetime.utcnow().isoformat()
         ) for r in rows]
     except Exception as e:
@@ -642,7 +659,7 @@ async def get_evaluation(
             evaluation_id=str(evaluation['evaluation_id']),
             company_name=evaluation['company_name'] or 'Unknown',
             evaluation_type=evaluation['evaluation_type'] or 'triage',
-            status=evaluation['status'] or 'unknown',
+            status=_normalize_status(evaluation['status']),
             created_at=evaluation['created_at'].isoformat() if evaluation['created_at'] else datetime.utcnow().isoformat()
         )
     except HTTPException:

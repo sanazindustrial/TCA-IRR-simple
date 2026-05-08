@@ -238,6 +238,16 @@ async def health_check_fast():
     }
 
 
+@app.get("/api/health", response_model=None)
+async def api_health_alias():
+    """Compatibility alias used by frontend probes."""
+    return {
+        "status": "healthy" if _app_ready else "starting",
+        "version": settings.version,
+        "service": "tca-irr-api",
+    }
+
+
 @app.get("/healthz", response_model=None)
 async def healthz():
     """Kubernetes-style health endpoint - INSTANT"""
@@ -259,6 +269,12 @@ async def readiness():
             status_code=503, 
             content={"status": "starting", "message": "Services initializing..."}
         )
+
+
+@app.get("/robots933456.txt", response_model=None)
+async def robots_probe_alias():
+    """Handle noisy bot/probe path without generating 404 spam."""
+    return JSONResponse(status_code=200, content={"status": "ok"})
 
 
 # =============================================================================

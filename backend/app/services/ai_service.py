@@ -40,6 +40,7 @@ class AIFlowsClient:
     def __init__(self):
         self.base_url = settings.genkit_host
         self.timeout = settings.genkit_timeout
+        self.use_genkit = bool(getattr(settings, "use_genkit", False))
         self.max_retries = 3
         self.retry_delay = 2
         
@@ -67,6 +68,10 @@ class AIFlowsClient:
                             data: Dict[str, Any],
                             retry_count: int = 0) -> Dict[str, Any]:
         """Make HTTP request to Genkit AI service with retry logic"""
+
+        if not self.use_genkit:
+            logger.info("Genkit disabled by configuration, using fallback for %s", flow_name)
+            return await self._generate_fallback_response(flow_name, data)
 
         # Genkit API endpoint format
         url = f"{self.base_url}/api/runFlow"
@@ -486,14 +491,17 @@ Return your response as valid JSON with this structure:
         genkit_error = None
         
         # Check Genkit availability
-        try:
-            async with httpx.AsyncClient(timeout=5) as client:
-                response = await client.get(f"{self.base_url}/health")
-                response.raise_for_status()
-                genkit_available = True
-        except Exception as e:
-            genkit_error = str(e)
-            logger.info(f"Genkit not available: {e}")
+        if self.use_genkit:
+            try:
+                async with httpx.AsyncClient(timeout=5) as client:
+                    response = await client.get(f"{self.base_url}/health")
+                    response.raise_for_status()
+                    genkit_available = True
+            except Exception as e:
+                genkit_error = str(e)
+                logger.info(f"Genkit not available: {e}")
+        else:
+            genkit_error = "disabled by USE_GENKIT=false"
         
         # Determine overall status
         if genkit_available:
@@ -1663,6 +1671,65 @@ class AnalysisProcessor:
 
     # Additional methods would continue...
     # For brevity, I'll implement key missing methods
+
+    def _assess_revenue_model(self, company_data: Dict[str, Any]) -> float:
+        """Assess revenue model quality score on a 1-10 scale."""
+        revenue_model = str(company_data.get("revenue_model", "")).lower()
+        financial_data = company_data.get("financial_data", {})
+        recurring_pct = float(financial_data.get("recurring_revenue_pct", 0) or 0)
+
+        score = 5.5
+        strong_models = ["saas", "subscription", "recurring", "license"]
+        weak_models = ["ad hoc", "services only", "one-time"]
+
+        if any(model in revenue_model for model in strong_models):
+            score += 2.0
+        if any(model in revenue_model for model in weak_models):
+            score -= 1.0
+        if recurring_pct >= 60:
+            score += 1.0
+
+        return min(10.0, max(1.0, score))
+
+    def _assess_growth_potential(self, company_data: Dict[str, Any]) -> float:
+        """Assess growth potential score on a 1-10 scale."""
+        financial_data = company_data.get("financial_data", {})
+        market_data = company_data.get("market_data", {})
+        growth_rate = float(financial_data.get("revenue_growth_pct", 0) or 0)
+        market_growth = float(market_data.get("market_growth_pct", 0) or 0)
+        customers = float(financial_data.get("customer_count", 0) or 0)
+
+        score = 5.0
+        if growth_rate >= 50:
+            score += 2.0
+        elif growth_rate >= 20:
+            score += 1.0
+
+        if market_growth >= 15:
+            score += 1.0
+        if customers >= 100:
+            score += 1.0
+
+        return min(10.0, max(1.0, score))
+
+    def _assess_investment_readiness(self, company_data: Dict[str, Any]) -> float:
+        """Assess investment readiness score on a 1-10 scale."""
+        financial_data = company_data.get("financial_data", {})
+        team_data = company_data.get("team_data", {})
+
+        score = 5.0
+        runway_months = float(financial_data.get("runway_months", 0) or 0)
+        has_validation = bool(company_data.get("customer_validation"))
+        has_founders = bool(team_data.get("founders"))
+
+        if runway_months >= 12:
+            score += 1.5
+        if has_validation:
+            score += 1.5
+        if has_founders:
+            score += 1.0
+
+        return min(10.0, max(1.0, score))
 
     def _generate_risk_flags(self,
                              risk_domains: Dict[str, float]) -> Dict[str, Any]:
