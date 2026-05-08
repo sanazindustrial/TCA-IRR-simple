@@ -1,0 +1,142 @@
+{
+  "total_count": 2,
+  "jobs": [
+    {
+      "id": 72067368415,
+      "run_id": 24648973073,
+      "workflow_name": "Build and deploy Node.js app to Azure Web App - TCA-IRR",
+      "head_branch": "main",
+      "run_url": "https://api.github.com/repos/sanazindustrial/TCA-IRR-simple/actions/runs/24648973073",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOQQxKIc8AAAAQx4zF3w",
+      "head_sha": "4476dcf10f849cfaa504bdff5051a44c98475f1a",
+      "url": "https://api.github.com/repos/sanazindustrial/TCA-IRR-simple/actions/jobs/72067368415",
+      "html_url": "https://github.com/sanazindustrial/TCA-IRR-simple/actions/runs/24648973073/job/72067368415",
+      "status": "completed",
+      "conclusion": "failure",
+      "created_at": "2026-04-20T04:49:08Z",
+      "started_at": "2026-04-20T04:49:10Z",
+      "completed_at": "2026-04-20T04:50:06Z",
+      "name": "build",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-04-20T04:49:11Z",
+          "completed_at": "2026-04-20T04:49:12Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-04-20T04:49:12Z",
+          "completed_at": "2026-04-20T04:49:17Z"
+        },
+        {
+          "name": "Set up Node.js version",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-04-20T04:49:17Z",
+          "completed_at": "2026-04-20T04:49:18Z"
+        },
+        {
+          "name": "Install dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-04-20T04:49:18Z",
+          "completed_at": "2026-04-20T04:49:44Z"
+        },
+        {
+          "name": "Build Next.js (standalone)",
+          "status": "completed",
+          "conclusion": "failure",
+          "number": 5,
+          "started_at": "2026-04-20T04:49:44Z",
+          "completed_at": "2026-04-20T04:50:05Z"
+        },
+        {
+          "name": "Prepare standalone deployment",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 6,
+          "started_at": "2026-04-20T04:50:05Z",
+          "completed_at": "2026-04-20T04:50:05Z"
+        },
+        {
+          "name": "Upload artifact for deployment job",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 7,
+          "started_at": "2026-04-20T04:50:05Z",
+          "completed_at": "2026-04-20T04:50:05Z"
+        },
+        {
+          "name": "Post Set up Node.js version",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 13,
+          "started_at": "2026-04-20T04:50:05Z",
+          "completed_at": "2026-04-20T04:50:05Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-04-20T04:50:05Z",
+          "completed_at": "2026-04-20T04:50:05Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-04-20T04:50:05Z",
+          "completed_at": "2026-04-20T04:50:05Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/sanazindustrial/TCA-IRR-simple/check-runs/72067368415",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000000723,
+      "runner_name": "GitHub Actions 1000000723",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 72067444662,
+      "run_id": 24648973073,
+      "workflow_name": "Build and deploy Node.js app to Azure Web App - TCA-IRR",
+      "head_branch": "main",
+      "run_url": "https://api.github.com/repos/sanazindustrial/TCA-IRR-simple/actions/runs/24648973073",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOQQxKIc8AAAAQx43vtg",
+      "head_sha": "4476dcf10f849cfaa504bdff5051a44c98475f1a",
+      "url": "https://api.github.com/repos/sanazindustrial/TCA-IRR-simple/actions/jobs/72067444662",
+      "html_url": "https://github.com/sanazindustrial/TCA-IRR-simple/actions/runs/24648973073/job/72067444662",
+      "status": "completed",
+      "conclusion": "skipped",
+      "created_at": "2026-04-20T04:50:07Z",
+      "started_at": "2026-04-20T04:50:07Z",
+      "completed_at": "2026-04-20T04:50:07Z",
+      "name": "deploy",
+      "steps": [
+
+      ],
+      "check_run_url": "https://api.github.com/repos/sanazindustrial/TCA-IRR-simple/check-runs/72067444662",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": null,
+      "runner_name": null,
+      "runner_group_id": null,
+      "runner_group_name": null
+    }
+  ]
+}

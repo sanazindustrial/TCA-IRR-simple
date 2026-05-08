@@ -1,0 +1,193 @@
+commit 8ad1480cc5934f1e3bcf810ea21db2f1a12d585d
+Author: sanazindustrial <sanazindustrial@gmail.com>
+Date:   Sun Apr 19 15:49:08 2026 -0700
+
+    fix: cost page dashboard error, evaluation/modules list, analyst redirect, profile picture save
+
+diff --git a/src/app/dashboard/cost/page.tsx b/src/app/dashboard/cost/page.tsx
+index f16fdf3b..15f07546 100644
+--- a/src/app/dashboard/cost/page.tsx
++++ b/src/app/dashboard/cost/page.tsx
+@@ -39,12 +39,9 @@ import { Progress } from '@/components/ui/progress';
+ import { Checkbox } from '@/components/ui/checkbox';
+ import { cn } from '@/lib/utils';
+ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+-import { ExportButtons } from '@/components/evaluation/export-buttons';
+ import { useToast } from '@/hooks/use-toast';
+ import { Label } from '@/components/ui/label';
+ import { Switch } from '@/components/ui/switch';
+-import { EvaluationProvider } from '@/components/evaluation/evaluation-provider';
+-import { ReportType } from '@/app/analysis/result/page';
+ import { costApi, CostSummary, fallbackCostData } from '@/lib/cost-api';
+ 
+ // Use fallback data as initial state
+@@ -70,7 +67,7 @@ const StatCard = ({
+     </CardHeader>
+     <CardContent>
+       <div className="text-2xl font-bold">
+-        {isCurrency ? `$${(value ?? 0).toFixed(2)}` : (value ?? 0)}
++        {isCurrency ? `$${value.toFixed(2)}` : value}
+       </div>
+       <p className="text-xs text-muted-foreground">{description}</p>
+     </CardContent>
+@@ -95,7 +92,12 @@ export default function CostManagementPage() {
+     try {
+       const startDate = format(dateRange.from, 'yyyy-MM-dd');
+       const endDate = format(dateRange.to, 'yyyy-MM-dd');
+-      const data = await costApi.getSummary(startDate, endDate);
++      const data = await costApi.getSummary(
++        startDate,
++        endDate,
++        userFilter !== 'all' ? userFilter : undefined,
++        activityFilter !== 'all' ? activityFilter : undefined,
++      );
+       setCostData(data);
+     } catch (error) {
+       console.error('Failed to fetch cost data:', error);
+@@ -107,7 +109,7 @@ export default function CostManagementPage() {
+     } finally {
+       setIsLoading(false);
+     }
+-  }, [dateRange, toast]);
++  }, [dateRange, userFilter, activityFilter, toast]);
+ 
+   // Initial fetch
+   useEffect(() => {
+@@ -127,8 +129,8 @@ export default function CostManagementPage() {
+     if (type === 'user') setUserFilter(value);
+     if (type === 'date' && value) setDateRange(value);
+ 
+-    if (liveUpdate && type === 'date') {
+-      // Re-fetch with new date range
++    if (liveUpdate) {
++      // Re-fetch with updated filters
+       setTimeout(() => {
+         fetchCostData();
+         toast({
+@@ -162,13 +164,6 @@ export default function CostManagementPage() {
+   }
+ 
+   return (
+-    <EvaluationProvider role={'user'} reportType={'dd'} framework={'general'} onFrameworkChangeAction={function (): void {
+-      throw new Error('Function not implemented.');
+-    }} setReportTypeAction={function (): void {
+-      throw new Error('Function not implemented.');
+-    }} isLoading={false} handleRunAnalysisAction={function (): void {
+-      throw new Error('Function not implemented.');
+-    }}>
+       <div className="bg-muted/30 min-h-screen">
+         <div className="container mx-auto p-4 md:p-8">
+           <header className="mb-8">
+@@ -248,7 +243,6 @@ export default function CostManagementPage() {
+             </div>
+             <div className="ml-auto flex items-center gap-2">
+               <Button variant="outline" onClick={handleRefresh}><RefreshCw className="mr-2" /> Refresh Data</Button>
+-              <ExportButtons />
+             </div>
+           </div>
+ 
+@@ -259,7 +253,7 @@ export default function CostManagementPage() {
+                 <DollarSign className="size-4 text-success-foreground/70" />
+               </CardHeader>
+               <CardContent>
+-                <div className="text-3xl font-bold">${(costData.totalCost ?? 0).toFixed(2)}</div>
++                <div className="text-3xl font-bold">${costData.totalCost.toFixed(2)}</div>
+                 <p className="text-xs text-success-foreground/80">Period: 11/01/2023 - 11/14/2023</p>
+               </CardContent>
+             </Card>
+@@ -295,7 +289,7 @@ export default function CostManagementPage() {
+                     <div key={item.category}>
+                       <div className="flex justify-between mb-1">
+                         <p className="text-sm font-medium">{item.category}</p>
+-                        <p className="text-sm font-medium">${(item.cost ?? 0).toFixed(2)} <span className="text-muted-foreground">({(item.percentage ?? 0).toFixed(1)}%)</span></p>
++                        <p className="text-sm font-medium">${item.cost.toFixed(2)} <span className="text-muted-foreground">({item.percentage.toFixed(1)}%)</span></p>
+                       </div>
+                       <Progress value={item.percentage} />
+                       <p className="text-xs text-muted-foreground mt-1">{item.executions.toLocaleString()} Executions</p>
+@@ -313,14 +307,14 @@ export default function CostManagementPage() {
+                 <div>
+                   <div className="flex justify-between items-baseline mb-1">
+                     <p className="text-sm font-medium">AI Cost Contribution</p>
+-                    <p className="text-lg font-bold">${(costData.aiBreakdown?.totalAiCost ?? 0).toFixed(2)}</p>
++                    <p className="text-lg font-bold">${costData.aiBreakdown.totalAiCost.toFixed(2)}</p>
+                   </div>
+                   <Progress value={aiCostPercentage} />
+-                  <p className="text-xs text-muted-foreground mt-1">{(aiCostPercentage ?? 0).toFixed(1)}% of total cost</p>
++                  <p className="text-xs text-muted-foreground mt-1">{aiCostPercentage.toFixed(1)}% of total cost</p>
+                 </div>
+                 <div>
+                   <p className="text-sm font-medium">Cost per Analysis</p>
+-                  <p className="font-bold">${(costData.aiBreakdown?.costPerAnalysis ?? 0).toFixed(2)}</p>
++                  <p className="font-bold">${costData.aiBreakdown.costPerAnalysis.toFixed(2)}</p>
+                 </div>
+                 <div>
+                   <p className="text-sm font-medium">Token Usage</p>
+@@ -330,13 +324,13 @@ export default function CostManagementPage() {
+                 <div>
+                   <p className="text-sm font-medium mb-2">Cost by Model</p>
+                   <div className="space-y-2">
+-                    {(costData.aiBreakdown?.models ?? []).map(model => (
++                    {costData.aiBreakdown.models.map(model => (
+                       <div key={model.name}>
+                         <div className="flex justify-between text-xs mb-1">
+                           <p>{model.name}</p>
+-                          <p>${(model.cost ?? 0).toFixed(2)} ({(model.percentage ?? 0).toFixed(1)}%)</p>
++                          <p>${model.cost.toFixed(2)} ({model.percentage.toFixed(1)}%)</p>
+                         </div>
+-                        <Progress value={model.percentage ?? 0} />
++                        <Progress value={model.percentage} />
+                       </div>
+                     ))}
+                   </div>
+@@ -344,13 +338,13 @@ export default function CostManagementPage() {
+                 <div>
+                   <p className="text-sm font-medium mb-2">Cost by User</p>
+                   <div className="space-y-2">
+-                    {(costData.aiBreakdown?.costByUser ?? []).map(user => (
++                    {costData.aiBreakdown.costByUser.map(user => (
+                       <div key={user.name}>
+                         <div className="flex justify-between text-xs mb-1">
+                           <p>{user.name}</p>
+-                          <p>${(user.cost ?? 0).toFixed(2)} ({(user.percentage ?? 0).toFixed(1)}%)</p>
++                          <p>${user.cost.toFixed(2)} ({user.percentage.toFixed(1)}%)</p>
+                         </div>
+-                        <Progress value={user.percentage ?? 0} />
++                        <Progress value={user.percentage} />
+                       </div>
+                     ))}
+                   </div>
+@@ -358,13 +352,13 @@ export default function CostManagementPage() {
+                 <div>
+                   <p className="text-sm font-medium mb-2">Cost by Report Type</p>
+                   <div className="space-y-2">
+-                    {(costData.aiBreakdown?.costByReportType ?? []).map(report => (
++                    {costData.aiBreakdown.costByReportType.map(report => (
+                       <div key={report.name}>
+                         <div className="flex justify-between text-xs mb-1">
+                           <p>{report.name}</p>
+-                          <p>${(report.cost ?? 0).toFixed(2)} ({(report.percentage ?? 0).toFixed(1)}%)</p>
++                          <p>${report.cost.toFixed(2)} ({report.percentage.toFixed(1)}%)</p>
+                         </div>
+-                        <Progress value={report.percentage ?? 0} />
++                        <Progress value={report.percentage} />
+                       </div>
+                     ))}
+                   </div>
+@@ -393,7 +387,7 @@ export default function CostManagementPage() {
+                         <TableCell>{trend.date}</TableCell>
+                         <TableCell className="text-right font-medium">${trend.cost.toFixed(2)}</TableCell>
+                         <TableCell className="text-right text-muted-foreground">
+-                          {Math.floor(Math.random() * 100000 + 50000).toLocaleString()}
++                          {trend.executions ? trend.executions.toLocaleString() : '-'}
+                         </TableCell>
+                       </TableRow>
+                     ))}
+@@ -404,7 +398,7 @@ export default function CostManagementPage() {
+           </div>
+         </div>
+       </div>
+-    </EvaluationProvider>
++    </div>
+   );
+ }
+ 

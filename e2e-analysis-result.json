@@ -1,0 +1,163 @@
+{
+  "final_tca_score": 78.5,
+  "investment_recommendation": "Proceed with due diligence",
+  "scorecard": {
+    "categories": {
+      "market_potential": {
+        "name": "Market Potential",
+        "raw_score": 8.2,
+        "weight": 0.2,
+        "weighted_score": 16.4,
+        "notes": "Strong market opportunity with clear value proposition"
+      },
+      "technology_innovation": {
+        "name": "Technology Innovation",
+        "raw_score": 7.8,
+        "weight": 0.15,
+        "weighted_score": 11.7,
+        "notes": "Solid technology foundation with competitive advantages"
+      },
+      "team_capability": {
+        "name": "Team Capability",
+        "raw_score": 8,
+        "weight": 0.25,
+        "weighted_score": 20,
+        "notes": "Experienced team with relevant domain expertise"
+      },
+      "business_model": {
+        "name": "Business Model",
+        "raw_score": 7.5,
+        "weight": 0.2,
+        "weighted_score": 15,
+        "notes": "Clear revenue model with growth potential"
+      },
+      "financial_health": {
+        "name": "Financial Health",
+        "raw_score": 7,
+        "weight": 0.2,
+        "weighted_score": 14,
+        "notes": "Adequate funding runway with reasonable burn rate"
+      }
+    }
+  },
+  "risk_assessment": {
+    "overall_risk_score": 6.5,
+    "flags": {
+      "market_risk": {
+        "level": {
+          "value": "yellow"
+        },
+        "trigger": "Market competition intensity",
+        "impact": "Medium competitive pressure in target market",
+        "severity_score": 6,
+        "mitigation": "Strengthen differentiation and build market partnerships",
+        "ai_recommendation": "Focus on unique value proposition and early customer acquisition"
+      },
+      "technology_risk": {
+        "level": {
+          "value": "green"
+        },
+        "trigger": "Technology scalability",
+        "impact": "Strong technical architecture with good scalability",
+        "severity_score": 3,
+        "mitigation": "Continue investing in technical talent and infrastructure",
+        "ai_recommendation": "Maintain current technical roadmap and expand development team"
+      }
+    }
+  },
+  "pestel_analysis": {
+    "political": 7.2,
+    "economic": 7.8,
+    "social": 8,
+    "technological": 8.5,
+    "environmental": 6.8,
+    "legal": 7,
+    "composite_score": 75.5,
+    "trend_alignment": {
+      "digital_transformation": "Strong alignment",
+      "sustainability": "Moderate alignment",
+      "regulatory_changes": "Good preparation",
+      "economic_growth": "Positive outlook",
+      "technology_adoption": "Excellent positioning"
+    }
+  },
+  "benchmark_analysis": {
+    "overall_percentile": 72,
+    "category_benchmarks": {
+      "growth_metrics": {
+        "percentile_rank": 75,
+        "sector_average": 65,
+        "z_score": 0.8
+      },
+      "financial_metrics": {
+        "percentile_rank": 68,
+        "sector_average": 70,
+        "z_score": -0.2
+      },
+      "operational_metrics": {
+        "percentile_rank": 74,
+        "sector_average": 68,
+        "z_score": 0.6
+      }
+    }
+  },
+  "gap_analysis": {
+    "total_gaps": 5,
+    "priority_areas": [
+      "Sales and Marketing Capability",
+      "Customer Success Infrastructure"
+    ],
+    "quick_wins": [
+      "Automated onboarding process",
+      "Enhanced product analytics"
+    ],
+    "gaps": [
+      {
+        "category": "Sales Performance",
+        "gap_size": 15,
+        "priority": "High",
+        "gap_percentage": 20
+      },
+      {
+        "category": "Marketing Reach",
+        "gap_size": 12,
+        "priority": "Medium",
+        "gap_percentage": 15
+      }
+    ]
+  },
+  "funder_analysis": {
+    "funding_readiness_score": 76,
+    "recommended_round_size": 2.5,
+    "investor_matches": [
+      {
+        "investor_name": "TechStars Ventures",
+        "sector_focus": "B2B SaaS and AI",
+        "fit_score": 85,
+        "stage_match": "Seed"
+      },
+      {
+        "investor_name": "Accel Partners",
+        "sector_focus": "Technology Infrastructure",
+        "fit_score": 78,
+        "stage_match": "Series A"
+      }
+    ]
+  },
+  "team_analysis": {
+    "team_completeness": 82,
+    "diversity_score": 75,
+    "founders": [
+      {
+        "name": "CEO/Founder",
+        "experience_score": 85,
+        "track_record": "Previous successful exit, 10+ years domain experience"
+      },
+      {
+        "name": "CTO/Co-founder",
+        "experience_score": 80,
+        "track_record": "Technical leadership at scale-up companies, strong engineering background"
+      }
+    ]
+  }
+}

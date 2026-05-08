@@ -1,0 +1,149 @@
+{
+  "summary": {
+    "total": 22,
+    "passed": 22,
+    "failed": 0,
+    "warnings": 1,
+    "success_rate": 100.0
+  },
+  "tests": [
+    {
+      "name": "1.1 Backend server responding",
+      "passed": true,
+      "details": "Server is up",
+      "warning": false
+    },
+    {
+      "name": "1.2 Health check endpoint",
+      "passed": true,
+      "details": "DB: healthy, AI: unhealthy",
+      "warning": false
+    },
+    {
+      "name": "1.3 API version info",
+      "passed": true,
+      "details": "Message: Welcome to TCA Investment Analysis Platform v1.0.0",
+      "warning": false
+    },
+    {
+      "name": "2.1 Database connection status",
+      "passed": true,
+      "details": "Status: healthy, Pool: 1",
+      "warning": false
+    },
+    {
+      "name": "2.2 Database write access",
+      "passed": true,
+      "details": "DB write operations working",
+      "warning": false
+    },
+    {
+      "name": "3.x GET /auth/me",
+      "passed": true,
+      "details": "",
+      "warning": false
+    },
+    {
+      "name": "3.x POST /auth/login",
+      "passed": true,
+      "details": "",
+      "warning": false
+    },
+    {
+      "name": "3.x POST /auth/register",
+      "passed": true,
+      "details": "",
+      "warning": false
+    },
+    {
+      "name": "3.x POST /auth/logout",
+      "passed": true,
+      "details": "",
+      "warning": false
+    },
+    {
+      "name": "3.x POST /auth/forgot-password",
+      "passed": true,
+      "details": "",
+      "warning": false
+    },
+    {
+      "name": "3.x POST /auth/reset-password",
+      "passed": true,
+      "details": "",
+      "warning": false
+    },
+    {
+      "name": "4.1 CORS headers configured",
+      "passed": true,
+      "details": "Allow-Origin: http://localhost:3000",
+      "warning": false
+    },
+    {
+      "name": "4.2 Security headers present",
+      "passed": true,
+      "details": "Found: X-Content-Type-Options, X-Frame-Options, X-XSS-Protection",
+      "warning": false
+    },
+    {
+      "name": "5.1 OpenAPI spec available",
+      "passed": true,
+      "details": "39 endpoints documented",
+      "warning": false
+    },
+    {
+      "name": "5.2 Swagger UI (/docs)",
+      "passed": true,
+      "details": "Available",
+      "warning": false
+    },
+    {
+      "name": "5.3 ReDoc (/redoc)",
+      "passed": true,
+      "details": "Available",
+      "warning": false
+    },
+    {
+      "name": "6.1 Environment mode",
+      "passed": true,
+      "details": "Environment: development, Version: 1.0.0",
+      "warning": false
+    },
+    {
+      "name": "6.2 Python version",
+      "passed": true,
+      "details": "Python 3.12.10",
+      "warning": false
+    },
+    {
+      "name": "6.3 Backend .env file",
+      "passed": true,
+      "details": "Not found (using defaults)",
+      "warning": true
+    },
+    {
+      "name": "7.1 User registration",
+      "passed": true,
+      "details": "",
+      "warning": false
+    },
+    {
+      "name": "7.2 User login",
+      "passed": true,
+      "details": "",
+      "warning": false
+    },
+    {
+      "name": "7.3 Access protected endpoint",
+      "passed": true,
+      "details": "",
+      "warning": false
+    },
+    {
+      "name": "7.4 User logout",
+      "passed": true,
+      "details": "",
+      "warning": false
+    }
+  ]
+}
