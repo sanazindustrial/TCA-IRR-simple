@@ -27,6 +27,11 @@ def require_admin(current_user: dict = Depends(get_current_user)):
 router = APIRouter()
 
 
+def _as_dict(record: Optional[asyncpg.Record]) -> Dict[str, Any]:
+    """Convert asyncpg.Record to a plain dict for safe access."""
+    return dict(record) if record else {}
+
+
 @router.get("/summary")
 async def get_cost_summary(
     start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
@@ -47,25 +52,37 @@ async def get_cost_summary(
         else:
             start_dt = datetime.strptime(start_date, "%Y-%m-%d")
         
-        # Get total analysis counts from database
-        analysis_stats = await db.fetchrow("""
-            SELECT 
-                COUNT(*) as total_analyses,
-                COUNT(DISTINCT user_id) as unique_users,
-                COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed
-            FROM company_analyses
-            WHERE created_at >= $1 AND created_at <= $2
-        """, start_dt, end_dt)
+        # Get total analysis counts from database (schema-safe)
+        analysis_stats: Dict[str, Any] = {
+            "total_analyses": 0,
+            "unique_users": 0,
+            "completed": 0,
+        }
+        if await _table_exists(db, 'company_analyses'):
+            analysis_stats = _as_dict(await db.fetchrow("""
+                SELECT 
+                    COUNT(*) as total_analyses,
+                    COUNT(DISTINCT user_id) as unique_users,
+                    COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed
+                FROM company_analyses
+                WHERE created_at >= $1 AND created_at <= $2
+            """, start_dt, end_dt))
         
         # Get report counts
-        report_stats = await db.fetchrow("""
-            SELECT 
-                COUNT(*) as total_reports,
-                COUNT(CASE WHEN report_type = 'triage' THEN 1 END) as triage_reports,
-                COUNT(CASE WHEN report_type = 'due_diligence' THEN 1 END) as dd_reports
-            FROM reports
-            WHERE created_at >= $1 AND created_at <= $2
-        """, start_dt, end_dt) if await _table_exists(db, 'reports') else {'total_reports': 0, 'triage_reports': 0, 'dd_reports': 0}
+        report_stats: Dict[str, Any] = {
+            'total_reports': 0,
+            'triage_reports': 0,
+            'dd_reports': 0,
+        }
+        if await _table_exists(db, 'reports'):
+            report_stats = _as_dict(await db.fetchrow("""
+                SELECT 
+                    COUNT(*) as total_reports,
+                    COUNT(CASE WHEN report_type = 'triage' THEN 1 END) as triage_reports,
+                    COUNT(CASE WHEN report_type = 'due_diligence' THEN 1 END) as dd_reports
+                FROM reports
+                WHERE created_at >= $1 AND created_at <= $2
+            """, start_dt, end_dt))
         
         # Get user activity
         user_activity = await db.fetch("""
@@ -83,7 +100,7 @@ async def get_cost_summary(
         """, start_dt, end_dt)
         
         # Calculate estimated costs based on usage
-        total_analyses = analysis_stats['total_analyses'] if analysis_stats else 0
+        total_analyses = int(analysis_stats.get('total_analyses', 0) or 0)
         ai_cost_per_analysis = 0.45  # Estimated cost per analysis
         total_ai_cost = total_analyses * ai_cost_per_analysis
         
@@ -152,15 +169,15 @@ async def get_cost_summary(
                 for row in user_activity[:5]
             ],
             "costByReportType": [
-                {"name": "Triage Reports", "cost": round((report_stats.get('triage_reports', 0) if report_stats else 0) * ai_cost_per_analysis, 2), "percentage": 70.0},
-                {"name": "Due Diligence", "cost": round((report_stats.get('dd_reports', 0) if report_stats else 0) * ai_cost_per_analysis * 2, 2), "percentage": 30.0}
+                {"name": "Triage Reports", "cost": round(int(report_stats.get('triage_reports', 0) or 0) * ai_cost_per_analysis, 2), "percentage": 70.0},
+                {"name": "Due Diligence", "cost": round(int(report_stats.get('dd_reports', 0) or 0) * ai_cost_per_analysis * 2, 2), "percentage": 30.0}
             ]
         }
         
         return {
             "totalCost": round(total_ai_cost + 5.0, 2),  # Add base infrastructure cost
             "totalRequests": total_analyses,
-            "billedUsers": analysis_stats['unique_users'] if analysis_stats else 0,
+            "billedUsers": int(analysis_stats.get('unique_users', 0) or 0),
             "dailyAverage": round((total_ai_cost + 5.0) / 30, 2),
             "breakdown": breakdown,
             "trends": trends,
@@ -347,16 +364,22 @@ async def get_public_cost_summary(
 
         async with db_manager.get_connection() as db:
             # Get total analysis counts from database
-            analysis_stats = await db.fetchrow("""
-                SELECT 
-                    COUNT(*) as total_analyses,
-                    COUNT(DISTINCT user_id) as unique_users,
-                    COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed
-                FROM company_analyses
-                WHERE created_at >= $1 AND created_at <= $2
-            """, start_dt, end_dt)
+            analysis_stats: Dict[str, Any] = {
+                "total_analyses": 0,
+                "unique_users": 0,
+                "completed": 0,
+            }
+            if await _table_exists(db, 'company_analyses'):
+                analysis_stats = _as_dict(await db.fetchrow("""
+                    SELECT 
+                        COUNT(*) as total_analyses,
+                        COUNT(DISTINCT user_id) as unique_users,
+                        COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed
+                    FROM company_analyses
+                    WHERE created_at >= $1 AND created_at <= $2
+                """, start_dt, end_dt))
 
-            total_analyses = analysis_stats['total_analyses'] if analysis_stats else 0
+            total_analyses = int(analysis_stats.get('total_analyses', 0) or 0)
             ai_cost_per_analysis = 0.45
             total_ai_cost = total_analyses * ai_cost_per_analysis
 
@@ -429,7 +452,7 @@ async def get_public_cost_summary(
             return {
                 "totalCost": round(total_ai_cost + 5.0, 2),
                 "totalRequests": total_analyses,
-                "billedUsers": analysis_stats['unique_users'] if analysis_stats else 0,
+                "billedUsers": int(analysis_stats.get('unique_users', 0) or 0),
                 "dailyAverage": round((total_ai_cost + 5.0) / 30, 2),
                 "breakdown": breakdown,
                 "trends": trends,
