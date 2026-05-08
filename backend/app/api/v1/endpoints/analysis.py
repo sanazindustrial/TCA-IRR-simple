@@ -91,6 +91,14 @@ async def test_analysis(company_data: Dict[str, Any]):
 async def comprehensive_analysis(company_data: Dict[str, Any]):
     """Run comprehensive TCA analysis on company data"""
     try:
+        company_name = (company_data.get("company_name") or company_data.get("name") or "").strip()
+        if not company_name:
+            raise HTTPException(status_code=422, detail="company_name is required")
+
+        company_data["company_name"] = company_name
+        if not company_data.get("industry") and not company_data.get("industry_vertical"):
+            raise HTTPException(status_code=422, detail="industry or industry_vertical is required")
+
         logger.info(
             f"Starting comprehensive analysis for: {company_data.get('company_name', 'Unknown')}"
         )
@@ -939,6 +947,12 @@ async def create_analyst_review(review_data: Dict[str, Any]):
     except Exception as e:
         logger.error(f"Failed to create analyst review: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/analyst-reviews", response_model=Dict[str, Any])
+async def upsert_analyst_review(review_data: Dict[str, Any]):
+    """PUT alias for clients that upsert analyst reviews."""
+    return await create_analyst_review(review_data)
 
 
 @router.get("/analyst-reviews/{analysis_id}", response_model=Dict[str, Any])

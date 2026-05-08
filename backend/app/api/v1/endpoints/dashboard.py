@@ -3,6 +3,7 @@ Dashboard endpoints for analytics and statistics
 """
 
 import logging
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import Dict, Any
 import asyncpg
@@ -15,43 +16,89 @@ router = APIRouter()
 
 
 @router.get("/stats", response_model=Dict[str, Any])
-async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
+async def get_dashboard_stats(
+    db: asyncpg.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
     """Get dashboard statistics and metrics"""
     try:
-        # Mock dashboard statistics
+        users = await db.fetchrow(
+            """
+            SELECT COUNT(*) AS total_users,
+                   COUNT(*) FILTER (WHERE is_active = true) AS active_users,
+                   COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days') AS new_users_this_month
+            FROM users
+            """
+        )
+
+        analyses = await db.fetchrow(
+            """
+            SELECT COUNT(*) AS total_analyses,
+                   COUNT(*) FILTER (WHERE LOWER(COALESCE(status, '')) = 'completed') AS completed_analyses,
+                   COUNT(*) FILTER (WHERE LOWER(COALESCE(status, '')) IN ('pending', 'processing', 'running')) AS pending_analyses,
+                   COUNT(*) FILTER (WHERE LOWER(COALESCE(status, '')) IN ('failed', 'error')) AS failed_analyses
+            FROM company_analyses
+            """
+        )
+
+        companies = await db.fetchrow(
+            """
+            SELECT COUNT(*) AS total_companies
+            FROM companies
+            """
+        )
+
+        companies_analyzed = await db.fetchval(
+            """
+            SELECT COUNT(DISTINCT company_id)
+            FROM company_analyses
+            WHERE company_id IS NOT NULL
+            """
+        )
+
+        recent = await db.fetch(
+            """
+            SELECT COALESCE(company_name, 'Unknown Company') AS company_name,
+                   created_at,
+                   COALESCE(status, 'unknown') AS status
+            FROM company_analyses
+            ORDER BY created_at DESC
+            LIMIT 5
+            """
+        )
+
         stats_data = {
             "user_metrics": {
-                "total_users": 150,
-                "active_users": 45,
-                "new_users_this_month": 12
+                "total_users": int((users or {}).get("total_users", 0) or 0),
+                "active_users": int((users or {}).get("active_users", 0) or 0),
+                "new_users_this_month": int((users or {}).get("new_users_this_month", 0) or 0),
             },
             "analysis_metrics": {
-                "total_analyses": 89,
-                "completed_analyses": 76,
-                "pending_analyses": 8,
-                "failed_analyses": 5
+                "total_analyses": int((analyses or {}).get("total_analyses", 0) or 0),
+                "completed_analyses": int((analyses or {}).get("completed_analyses", 0) or 0),
+                "pending_analyses": int((analyses or {}).get("pending_analyses", 0) or 0),
+                "failed_analyses": int((analyses or {}).get("failed_analyses", 0) or 0),
             },
             "company_metrics": {
-                "total_companies": 234,
-                "companies_analyzed": 89,
-                "avg_analysis_time": "45 minutes"
+                "total_companies": int((companies or {}).get("total_companies", 0) or 0),
+                "companies_analyzed": int(companies_analyzed or 0),
+                "avg_analysis_time": "n/a",
             },
             "system_metrics": {
-                "uptime": "99.5%",
-                "avg_response_time": "250ms",
-                "error_rate": "0.2%"
+                "uptime": "n/a",
+                "avg_response_time": "n/a",
+                "error_rate": "n/a",
             },
-            "recent_activity": [{
-                "type": "analysis_completed",
-                "company": "TechCorp Inc",
-                "timestamp": "2024-01-20T09:45:00Z"
-            }, {
-                "type": "user_registered",
-                "user": "john.doe",
-                "timestamp": "2024-01-20T09:30:00Z"
-            }],
-            "updated_at":
-            "2024-01-20T10:00:00Z"
+            "recent_activity": [
+                {
+                    "type": "analysis_status",
+                    "company": row.get("company_name", "Unknown Company"),
+                    "status": row.get("status", "unknown"),
+                    "timestamp": row["created_at"].isoformat() if row.get("created_at") else datetime.utcnow().isoformat(),
+                }
+                for row in recent
+            ],
+            "updated_at": datetime.utcnow().isoformat(),
         }
 
         return stats_data
@@ -68,24 +115,46 @@ async def get_dashboard_charts(timeframe: str = "30d",
                                current_user: dict = Depends(get_current_user)):
     """Get dashboard chart data"""
     try:
-        # Mock chart data
+        if timeframe == "7d":
+            days = 7
+        elif timeframe == "90d":
+            days = 90
+        else:
+            days = 30
+
+        start_dt = datetime.utcnow() - timedelta(days=days)
+        trend_rows = await db.fetch(
+            """
+            SELECT DATE(created_at) AS day,
+                   COUNT(*) AS cnt
+            FROM company_analyses
+            WHERE created_at >= $1
+            GROUP BY DATE(created_at)
+            ORDER BY day
+            """,
+            start_dt,
+        )
+
+        labels = [r["day"].strftime("%m/%d") for r in trend_rows]
+        values = [int(r["cnt"] or 0) for r in trend_rows]
+
         chart_data = {
             "analysis_trend": {
-                "labels": ["Week 1", "Week 2", "Week 3", "Week 4"],
+                "labels": labels,
                 "datasets": [{
                     "label": "Completed Analyses",
-                    "data": [12, 18, 15, 22]
+                    "data": values,
                 }]
             },
             "score_distribution": {
                 "labels": ["0-20", "21-40", "41-60", "61-80", "81-100"],
-                "data": [5, 12, 25, 35, 23]
+                "data": [0, 0, 0, 0, 0],
             },
             "user_activity": {
-                "labels": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-                "data": [45, 52, 48, 61, 55, 32, 28]
+                "labels": labels,
+                "data": values,
             },
-            "generated_at": "2024-01-20T10:00:00Z"
+            "generated_at": datetime.utcnow().isoformat(),
         }
 
         return chart_data

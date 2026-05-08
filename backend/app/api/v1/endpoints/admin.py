@@ -7,6 +7,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from typing import Dict, Any, List, Optional
+from pydantic import BaseModel, Field
 from app.utils.json_utils import json_response_with_datetime
 import asyncpg
 
@@ -20,6 +21,12 @@ from .auth import get_current_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+class DatabaseQueryRequest(BaseModel):
+    query: str = Field(..., min_length=1)
+    params: List[Any] = Field(default_factory=list)
+    limit: int = Field(default=200, ge=1, le=1000)
 
 
 def require_admin(current_user: dict = Depends(get_current_user)):
@@ -337,3 +344,40 @@ async def get_system_logs(
     except Exception as e:
         logger.error(f"Error reading system logs: {e}")
         return {"logs": [], "error": str(e)}
+
+
+@router.post("/database/query")
+async def execute_database_query(
+    request: Request,
+    payload: DatabaseQueryRequest,
+    current_user: dict = Depends(require_admin),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    """Execute a read-only SQL query for admin diagnostics."""
+    query = payload.query.strip()
+    lowered = query.lower()
+    if not lowered.startswith("select"):
+        raise HTTPException(status_code=400, detail="Only SELECT queries are allowed")
+    if ";" in query:
+        raise HTTPException(status_code=400, detail="Multiple statements are not allowed")
+
+    safe_query = f"{query} LIMIT {payload.limit}"
+    try:
+        await audit_logger.log(
+            AuditEventType.ADMIN_ACTION,
+            user_id=current_user.get('id'),
+            username=current_user['username'],
+            ip_address=request.client.host if request.client else None,
+            action_details={"action": "database_query", "limit": payload.limit},
+            db=db,
+        )
+
+        rows = await db.fetch(safe_query, *payload.params)
+        return {
+            "rows": [dict(r) for r in rows],
+            "row_count": len(rows),
+            "limit": payload.limit,
+        }
+    except Exception as e:
+        logger.error("Database query execution failed: %s", e)
+        raise HTTPException(status_code=500, detail=f"Query failed: {e}") from e
