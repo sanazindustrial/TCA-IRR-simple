@@ -1,0 +1,199 @@
+.page {
+  min-height: 100vh;
+  padding: 2rem 1rem;
+  background: radial-gradient(circle at top right, #fef3c7 0%, #fff7ed 35%, #f8fafc 100%);
+  color: #1f2937;
+  font-family: "Segoe UI", "Trebuchet MS", sans-serif;
+}
+
+.container {
+  max-width: 980px;
+  margin: 0 auto;
+  display: grid;
+  gap: 1rem;
+}
+
+.card {
+  border-radius: 18px;
+  padding: 1.25rem;
+  background: #ffffff;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+}
+
+.title {
+  margin: 0;
+  font-size: 1.8rem;
+}
+
+.subtitle {
+  margin: 0.4rem 0 0;
+  color: #4b5563;
+}
+
+.meta {
+  margin: 0.3rem 0 0;
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+
+.scoreArea {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.scoreTrack {
+  height: 12px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  overflow: hidden;
+}
+
+.scoreProgress {
+  width: 100%;
+  height: 12px;
+  appearance: none;
+  border: 0;
+}
+
+.scoreProgress::-webkit-progress-bar {
+  background: #e5e7eb;
+  border-radius: 999px;
+}
+
+.scoreProgress::-webkit-progress-value {
+  background: linear-gradient(90deg, #0ea5e9, #22c55e);
+  border-radius: 999px;
+}
+
+.scoreProgress::-moz-progress-bar {
+  background: linear-gradient(90deg, #0ea5e9, #22c55e);
+  border-radius: 999px;
+}
+
+.scoreFill {
+  height: 100%;
+  background: linear-gradient(90deg, #0ea5e9, #22c55e);
+}
+
+.scoreRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.riskBadge {
+  background: #f3f4f6;
+  border-radius: 999px;
+  padding: 0.2rem 0.7rem;
+  font-weight: 700;
+}
+
+.riskLow {
+  color: #2f855a;
+}
+
+.riskMedium {
+  color: #b7791f;
+}
+
+.riskHigh {
+  color: #c05621;
+}
+
+.riskCritical {
+  color: #c53030;
+}
+
+.sectionTitle {
+  margin-top: 0;
+}
+
+.summaryText {
+  margin-bottom: 0;
+  line-height: 1.65;
+}
+
+.grid3 {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.block {
+  border-radius: 18px;
+  padding: 1rem;
+}
+
+.blockA {
+  background: #ecfeff;
+}
+
+.blockB {
+  background: #fff7ed;
+}
+
+.blockC {
+  background: #f0fdf4;
+}
+
+.block h3 {
+  margin-top: 0;
+}
+
+.block ul {
+  margin: 0;
+  padding-left: 1rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.breakdown {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.breakdownRow {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.7rem 0.8rem;
+  border-radius: 10px;
+  background: #f9fafb;
+}
+
+.muted {
+  margin-top: 0;
+  color: #4b5563;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.btnPrimary {
+  border: none;
+  background: #0f172a;
+  color: #fff;
+  padding: 0.6rem 0.9rem;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.btnSecondary {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #0f172a;
+  padding: 0.6rem 0.9rem;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.success {
+  color: #166534;
+}
+
+.error {
+  color: #b91c1c;
+}
