@@ -69,6 +69,15 @@ type AuditEntry = {
   status: 'success' | 'error' | 'warning';
 };
 
+type ProviderChainInfo = {
+  status: string;
+  mode: string;
+  active_provider: string;
+  providers: Array<{ name: string; configured: boolean; status: string; priority: number }>;
+  chain: string[];
+  guidance?: { policy?: string; steps?: string[] };
+};
+
 const DEFAULT_AGENT_CONFIG: AgentConfig = {
   model: 'gpt-4o',
   temperature: 0.3,
@@ -130,6 +139,8 @@ export default function AdminPage() {
   const [auditLog] = useState<AuditEntry[]>(MOCK_AUDIT);
   const [isSaving, setIsSaving] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
+  const [isProvidersLoading, setIsProvidersLoading] = useState(false);
+  const [providerInfo, setProviderInfo] = useState<ProviderChainInfo | null>(null);
   const [auditFilter, setAuditFilter] = useState('');
 
   const checkSystemStatus = useCallback(async () => {
@@ -153,9 +164,40 @@ export default function AdminPage() {
     setIsChecking(false);
   }, []);
 
+  const fetchProviderChain = useCallback(async () => {
+    setIsProvidersLoading(true);
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      let res = await fetch(`${apiBase}/api/v1/admin/ai/providers`, { headers });
+      if (res.status === 404) {
+        // Compatibility fallback for older deployments without admin-scoped providers route.
+        res = await fetch(`${apiBase}/api/v1/ai/providers`, { headers });
+      }
+      if (!res.ok) throw new Error(`Failed to fetch provider chain: ${res.status}`);
+      const data = await res.json();
+      setProviderInfo(data);
+      setSystemStatus(prev => ({ ...prev, ai: data.status === 'healthy' ? 'online' : 'degraded' }));
+    } catch (e) {
+      console.warn('Provider chain fetch failed:', e);
+      setProviderInfo({
+        status: 'degraded',
+        mode: 'fallback',
+        active_provider: 'Fallback (provider endpoint unavailable)',
+        providers: [],
+        chain: [],
+      });
+      setSystemStatus(prev => ({ ...prev, ai: 'degraded' }));
+    } finally {
+      setIsProvidersLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     checkSystemStatus();
-  }, [checkSystemStatus]);
+    fetchProviderChain();
+  }, [checkSystemStatus, fetchProviderChain]);
 
   const handleSaveAgentConfig = async () => {
     setIsSaving(true);
@@ -339,6 +381,48 @@ export default function AdminPage() {
                 <Button variant="outline" onClick={() => setAgentConfig(DEFAULT_AGENT_CONFIG)}>
                   Reset Defaults
                 </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-2"><Cpu className="size-5" />Provider Setup Help & Guidelines</span>
+                <Button variant="outline" size="sm" onClick={fetchProviderChain} disabled={isProvidersLoading}>
+                  {isProvidersLoading ? <Loader2 className="size-4 animate-spin" /> : 'Refresh'}
+                </Button>
+              </CardTitle>
+              <CardDescription>Current Provider Chain and fallback behavior from live backend status</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="rounded-md border p-3 bg-muted/20 text-sm">
+                Current Provider Chain: {providerInfo?.chain?.length ? providerInfo.chain.join(' -> ') : 'Primary: OpenAI. Fallback: Gemini.'}
+              </div>
+              <div className="rounded-md border p-3 text-sm">
+                Active Provider: <span className="font-medium">{providerInfo?.active_provider || 'Unknown'}</span>
+              </div>
+              <div className="space-y-2">
+                {(providerInfo?.providers || []).map((provider) => (
+                  <div key={provider.name} className="flex items-center justify-between rounded border p-2 text-sm">
+                    <span>{provider.priority}. {provider.name}</span>
+                    <span className="text-muted-foreground">{provider.status}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="rounded-md border p-3 text-sm space-y-2">
+                <div className="font-medium">How To Add More Providers</div>
+                <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
+                  <li>Add provider API keys in App Service environment variables.</li>
+                  <li>Restart backend and refresh provider status here.</li>
+                  <li>Confirm new provider appears in chain and run test analysis.</li>
+                </ul>
+              </div>
+              <div className="rounded-md border p-3 text-sm space-y-2">
+                <div className="font-medium">Recommended Configuration Policy</div>
+                <p className="text-muted-foreground">
+                  {providerInfo?.guidance?.policy || 'Use deterministic settings for scoring and always keep at least one fallback provider available.'}
+                </p>
               </div>
             </CardContent>
           </Card>

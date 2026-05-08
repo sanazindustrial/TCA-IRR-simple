@@ -64,7 +64,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { runAnalysis } from '@/app/analysis/actions';
 import reportsApi from '@/lib/reports-api';
+import azureStorage from '@/lib/azure-storage-service';
 import { externalSourcesConfig } from '@/lib/external-sources-config';
+import { getActiveManagedModuleIds, TRIAGE_SECTION_MODULE_MAP } from '@/lib/module-deck';
 
 const TRIAGE_STEPS = [
   { id: 1, name: 'Upload', icon: Upload, description: 'Upload company documents' },
@@ -131,6 +133,159 @@ const STANDARD_RESTRICTED_STEP_IDS = [5, 6, 7, 8, 10];
 const cleanShortText = (value: unknown): string => {
   if (typeof value !== 'string') return '';
   return value.replace(/\s+/g, ' ').trim();
+};
+
+const toNumberOrNull = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+};
+
+const normalizeScoreToTen = (score: number | null): number | null => {
+  if (score === null) return null;
+  const normalized = score > 10 ? score / 10 : score;
+  return Math.max(0, Math.min(10, normalized));
+};
+
+const averageNumbers = (values: Array<number | null | undefined>): number | null => {
+  const valid = values.filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+  if (valid.length === 0) return null;
+  return valid.reduce((sum, value) => sum + value, 0) / valid.length;
+};
+
+const tierToScore = (tier: number | null): number | null => {
+  if (tier === null) return null;
+  if (tier > 10) return normalizeScoreToTen(tier);
+  if (tier <= 5) {
+    const mapped: Record<number, number> = { 1: 3.5, 2: 5.2, 3: 7.0, 4: 8.4, 5: 9.3 };
+    return mapped[Math.round(tier)] ?? 6;
+  }
+  return tier;
+};
+
+const deriveModuleScoresFromAnalysis = (analysisData: unknown): Record<string, number | null> => {
+  const data = (analysisData ?? {}) as Record<string, unknown>;
+  const tcaData = data.tcaData as {
+    compositeScore?: number;
+    overallScore?: number;
+    categories?: Array<{ rawScore?: number; weightedScore?: number; weight?: number }>;
+  } | undefined;
+  const riskData = data.riskData as { riskFlags?: Array<{ flag?: string }> } | undefined;
+  const macroData = data.macroData as { pestelDashboard?: Record<string, number>; trendOverlayScore?: number } | undefined;
+  const benchmarkData = data.benchmarkData as {
+    benchmarkOverlay?: Array<{ score?: number; percentile?: number }>;
+    overlayScore?: number;
+  } | undefined;
+  const growthData = data.growthData as { tier?: number } | undefined;
+  const founderFitData = data.founderFitData as { readinessScore?: number } | undefined;
+  const teamData = data.teamData as { interpretation?: string } | undefined;
+  const gapData = data.gapData as { heatmap?: Array<{ gap?: number; priority?: string }> } | undefined;
+
+  const tcaCategories = Array.isArray(tcaData?.categories) ? tcaData.categories : [];
+  const tcaFromWeighted = tcaCategories.length > 0
+    ? tcaCategories.reduce((sum, cat) => {
+      const weighted = toNumberOrNull(cat.weightedScore);
+      if (weighted !== null) return sum + weighted;
+      const raw = toNumberOrNull(cat.rawScore);
+      const weight = toNumberOrNull(cat.weight);
+      if (raw === null || weight === null) return sum;
+      return sum + (raw * (weight / 100));
+    }, 0)
+    : null;
+  const tcaScore = normalizeScoreToTen(
+    tcaFromWeighted ?? toNumberOrNull(tcaData?.compositeScore) ?? toNumberOrNull(tcaData?.overallScore)
+  );
+
+  const riskFlagMap: Record<string, number> = { green: 9, yellow: 6, red: 3 };
+  const riskFlags = Array.isArray(riskData?.riskFlags) ? riskData.riskFlags : [];
+  const riskBase = averageNumbers(
+    riskFlags.map((f) => riskFlagMap[(f.flag || '').toLowerCase()])
+  );
+  const redCount = riskFlags.filter((f) => (f.flag || '').toLowerCase() === 'red').length;
+  const riskScore = normalizeScoreToTen(
+    riskBase === null ? null : Math.max(0, riskBase - ((redCount / Math.max(1, riskFlags.length)) * 2.5))
+  );
+
+  const pestelValues = Object.values(macroData?.pestelDashboard ?? {})
+    .map((v) => toNumberOrNull(v))
+    .filter((v): v is number => v !== null);
+  const macroBase = averageNumbers(pestelValues);
+  const trendOverlay = toNumberOrNull(macroData?.trendOverlayScore);
+  const macroScore = normalizeScoreToTen(
+    macroBase === null
+      ? null
+      : macroBase + ((trendOverlay === null ? 0 : trendOverlay) * 20)
+  );
+
+  const benchmarkValues = (benchmarkData?.benchmarkOverlay ?? [])
+    .map((item) => averageNumbers([
+      normalizeScoreToTen(toNumberOrNull(item.score)),
+      normalizeScoreToTen(toNumberOrNull(item.percentile)),
+    ]))
+    .filter((v): v is number => v !== null);
+  const benchmarkOverlay = toNumberOrNull(benchmarkData?.overlayScore);
+  const benchmarkScore = normalizeScoreToTen(
+    averageNumbers([
+      averageNumbers(benchmarkValues),
+      benchmarkOverlay === null ? null : 5 + (benchmarkOverlay * 10),
+    ])
+  );
+
+  const growthScore = normalizeScoreToTen(tierToScore(toNumberOrNull(growthData?.tier)));
+  const founderScore = normalizeScoreToTen(toNumberOrNull(founderFitData?.readinessScore));
+
+  const teamCompletenessMatch = teamData?.interpretation?.match(/team completeness:\s*(\d+(?:\.\d+)?)%/i);
+  const teamScore = normalizeScoreToTen(toNumberOrNull(teamCompletenessMatch?.[1]));
+
+  const gapValues = (gapData?.heatmap ?? [])
+    .map((item) => toNumberOrNull(item.gap))
+    .filter((v): v is number => v !== null);
+  const highPriorityCount = (gapData?.heatmap ?? [])
+    .filter((item) => (item.priority || '').toLowerCase() === 'high').length;
+  const gapPenalty = highPriorityCount * 0.2;
+  const gapScore = normalizeScoreToTen(
+    gapValues.length > 0 ? (10 - ((averageNumbers(gapValues) ?? 0) / 10) - gapPenalty) : null
+  );
+
+  const moduleScores: Record<string, number | null> = {
+    tca: tcaScore,
+    risk: riskScore,
+    growth: growthScore,
+    macro: macroScore,
+    benchmark: benchmarkScore,
+    team: teamScore,
+    founderFit: founderScore,
+    gap: gapScore,
+  };
+
+  const fallback = averageNumbers([tcaScore, riskScore, macroScore, benchmarkScore, growthScore]);
+  TRIAGE_MODULES.forEach((m) => {
+    if (!(m.id in moduleScores) || moduleScores[m.id] === null) {
+      moduleScores[m.id] = fallback;
+    }
+  });
+
+  return moduleScores;
+};
+
+const computeWeightedCompositeScore = (
+  selectedModuleIds: string[],
+  moduleScores: Record<string, number | null>
+): number | null => {
+  const activeModules = TRIAGE_MODULES
+    .filter((m) => selectedModuleIds.includes(m.id))
+    .map((m) => ({ ...m, score: moduleScores[m.id] }))
+    .filter((m): m is (typeof TRIAGE_MODULES)[number] & { score: number } => typeof m.score === 'number' && Number.isFinite(m.score));
+
+  if (activeModules.length === 0) return null;
+  const totalWeight = activeModules.reduce((sum, m) => sum + m.weight, 0);
+  if (totalWeight <= 0) return null;
+
+  const weighted = activeModules.reduce((sum, m) => sum + (m.score * m.weight), 0) / totalWeight;
+  return Math.max(0, Math.min(10, weighted));
 };
 
 const cleanLongText = (value: unknown): string => {
@@ -385,6 +540,37 @@ const DEFAULT_STANDARD_SECTIONS: ReportSection[] = [
   { id: 'final-recommendation', title: 'Page 7: Final Recommendation & Conclusion', active: true, description: 'Investment decision, deep analysis conclusion, and next steps based on company data.' },
 ];
 
+const getDefaultSelectedModulesForRole = (role: 'admin' | 'analyst' | 'standard'): string[] => {
+  const triageModuleIds = new Set(TRIAGE_MODULES.map((module) => module.id));
+  const activeManaged = getActiveManagedModuleIds().filter((id) => triageModuleIds.has(id));
+
+  if (role === 'standard') {
+    const standardModules = activeManaged.filter((id) => id === 'tca' || id === 'risk');
+    return standardModules.length > 0 ? standardModules : ['tca', 'risk'];
+  }
+
+  return activeManaged.length > 0 ? activeManaged : ['tca', 'risk', 'growth', 'macro'];
+};
+
+const applyModuleStateToTriageSections = (
+  sections: ReportSection[],
+  selectedModules: string[]
+): ReportSection[] => {
+  const selectedSet = new Set(selectedModules);
+  return sections.map((section) => {
+    const mappedModules = Object.entries(TRIAGE_SECTION_MODULE_MAP)
+      .filter(([, sectionIds]) => sectionIds.includes(section.id))
+      .map(([moduleId]) => moduleId);
+
+    if (mappedModules.length === 0) {
+      return section;
+    }
+
+    const shouldDisable = mappedModules.every((moduleId) => !selectedSet.has(moduleId));
+    return shouldDisable ? { ...section, active: false } : section;
+  });
+};
+
 interface ExtractedMetric {
   field: string;
   value: string;
@@ -425,6 +611,9 @@ export default function TriageReportWizardPage() {
   const [selectedModules, setSelectedModules] = useState<string[]>(['tca', 'risk', 'growth', 'macro']);
 
   const [selectedSources, setSelectedSources] = useState<string[]>(['hackernews']);
+  const [activeExternalSourceIds, setActiveExternalSourceIds] = useState<string[]>(
+    EXTERNAL_SOURCES.map((s) => s.id)
+  );
   const [externalData, setExternalData] = useState<Array<{ source: string; success: boolean; data: unknown; error?: string }>>([]);
   const [fetchingData, setFetchingData] = useState(false);
 
@@ -436,6 +625,7 @@ export default function TriageReportWizardPage() {
   const [generationStatus, setGenerationStatus] = useState('');
   const [analysisResult, setAnalysisResult] = useState<unknown>(null);
   const [compositeScore, setCompositeScore] = useState<number>(0);
+  const [derivedModuleScores, setDerivedModuleScores] = useState<Record<string, number | null>>({});
 
   // Role-based
   const [userRole, setUserRole] = useState<'admin' | 'analyst' | 'standard'>('standard');
@@ -495,7 +685,7 @@ export default function TriageReportWizardPage() {
     setProductDescription('');
     setFramework('general');
     setSelectedModules(['tca', 'risk', 'growth', 'macro']);
-    setSelectedSources(['hackernews']);
+    setSelectedSources(activeExternalSourceIds.includes('hackernews') ? ['hackernews'] : activeExternalSourceIds.slice(0, 1));
     setExternalData([]);
     setFetchingData(false);
     setSimulatedScores(Object.fromEntries(TRIAGE_MODULES.map((m) => [m.id, 50])));
@@ -504,6 +694,7 @@ export default function TriageReportWizardPage() {
     setGenerationStatus('');
     setAnalysisResult(null);
     setCompositeScore(0);
+    setDerivedModuleScores({});
     setSavedReportId(null);
     setIsSaving(false);
     setSaveError(null);
@@ -529,6 +720,8 @@ export default function TriageReportWizardPage() {
     toast({ title: 'Fresh start ready', description: 'Wizard has been reset. You can begin again from upload.' });
   };
 
+  const visibleExternalSources = EXTERNAL_SOURCES.filter((src) => activeExternalSourceIds.includes(src.id));
+
   useEffect(() => {
     try {
       // Generate client-only tracking ID to avoid SSR/CSR hydration mismatch.
@@ -550,23 +743,68 @@ export default function TriageReportWizardPage() {
       setUserRole(role);
 
       const isPrivileged = role === 'admin' || role === 'analyst';
+      const defaultModules = getDefaultSelectedModulesForRole(role);
+      setSelectedModules(defaultModules);
+
       if (isPrivileged) {
         const saved = localStorage.getItem('report-config-triage-admin');
-        setReportSections(saved ? JSON.parse(saved) : DEFAULT_ADMIN_SECTIONS);
+        const baseSections = saved ? JSON.parse(saved) : DEFAULT_ADMIN_SECTIONS;
+        setReportSections(applyModuleStateToTriageSections(baseSections, defaultModules));
       } else {
-        setReportSections(DEFAULT_STANDARD_SECTIONS);
+        setReportSections(applyModuleStateToTriageSections(DEFAULT_STANDARD_SECTIONS, defaultModules));
       }
     } catch {
       setUserRole('standard');
       setReportOwner('Unknown User');
-      setReportSections(DEFAULT_STANDARD_SECTIONS);
+      const fallbackModules = getDefaultSelectedModulesForRole('standard');
+      setSelectedModules(fallbackModules);
+      setReportSections(applyModuleStateToTriageSections(DEFAULT_STANDARD_SECTIONS, fallbackModules));
     }
   }, []);
 
-    // Auto-set modules for standard users: only TCA and Risk (required modules only)
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadManagedDataSources = async () => {
+      const stored = await azureStorage.getItem<unknown>('data-sources-config');
+      if (!Array.isArray(stored)) {
+        return;
+      }
+
+      const configuredActive = stored
+        .filter((item) => typeof item === 'object' && item !== null)
+        .map((item) => item as { id?: string; active?: boolean })
+        .filter((item) => item.id && item.active)
+        .map((item) => item.id as string);
+
+      const allowed = EXTERNAL_SOURCES
+        .map((src) => src.id)
+        .filter((id) => configuredActive.includes(id));
+
+      if (cancelled || allowed.length === 0) {
+        return;
+      }
+
+      setActiveExternalSourceIds(allowed);
+      setSelectedSources((prev) => {
+        const filtered = prev.filter((id) => allowed.includes(id));
+        return filtered.length > 0 ? filtered : allowed.slice(0, 1);
+      });
+    };
+
+    void loadManagedDataSources();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+    // Keep standard user module set constrained to managed defaults.
     useEffect(() => {
       if (userRole === 'standard') {
-        setSelectedModules(['tca', 'risk']);
+        const defaultModules = getDefaultSelectedModulesForRole('standard');
+        setSelectedModules(defaultModules);
+        setReportSections((prev) => applyModuleStateToTriageSections(prev, defaultModules));
       }
     }, [userRole]);
 
@@ -756,16 +994,17 @@ export default function TriageReportWizardPage() {
       });
       return;
     }
-    if (selectedSources.length === 0) return;
+    const effectiveSources = selectedSources.filter((id) => activeExternalSourceIds.includes(id));
+    if (effectiveSources.length === 0) return;
     setFetchingData(true);
     try {
       const response = await fetch('/api/external-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ company: companyName, sources: selectedSources }),
+        body: JSON.stringify({ company: companyName, sources: effectiveSources }),
       });
       const result = await response.json();
-      const results = selectedSources.map((sourceId) => ({
+      const results = effectiveSources.map((sourceId) => ({
         source: sourceId,
         success: result.data?.[sourceId]?.success ?? false,
         data: result.data?.[sourceId]?.data ?? null,
@@ -1228,8 +1467,12 @@ export default function TriageReportWizardPage() {
       localStorage.setItem('analysisFramework', framework);
 
       const scoreData = (analysisData as { tcaData?: { overallScore?: number; compositeScore?: number } })?.tcaData;
-      const score = scoreData?.compositeScore ?? scoreData?.overallScore ?? 0;
+      const tcaScore = scoreData?.compositeScore ?? scoreData?.overallScore ?? 0;
+      const aiModuleScores = deriveModuleScoresFromAnalysis(analysisData);
+      const weightedComposite = computeWeightedCompositeScore(selectedModules, aiModuleScores);
+      const score = weightedComposite ?? tcaScore;
       setCompositeScore(score);
+      setDerivedModuleScores(aiModuleScores);
       setAnalysisResult(analysisData);
       sessionStorage.setItem('companyData', JSON.stringify({
         companyName, sector, stage, website, location,
@@ -1945,7 +2188,7 @@ export default function TriageReportWizardPage() {
               <div className="space-y-3">
                 <Label className="text-base font-semibold">Data Sources</Label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {EXTERNAL_SOURCES.map((src) => {
+                  {visibleExternalSources.map((src) => {
                     const isSelected = selectedSources.includes(src.id);
                     return (
                       <div
@@ -1986,7 +2229,7 @@ export default function TriageReportWizardPage() {
               <div className="flex items-center gap-3">
                 <Button
                   onClick={fetchExternalData}
-                  disabled={fetchingData || selectedSources.length === 0}
+                  disabled={fetchingData || selectedSources.filter((id) => activeExternalSourceIds.includes(id)).length === 0}
                   className="gap-2"
                 >
                   {fetchingData ? (
@@ -1994,7 +2237,7 @@ export default function TriageReportWizardPage() {
                   ) : (
                     <Database className="size-4" />
                   )}
-                  {fetchingData ? 'Fetching...' : `Fetch ${selectedSources.length} Source(s)`}
+                  {fetchingData ? 'Fetching...' : `Fetch ${selectedSources.filter((id) => activeExternalSourceIds.includes(id)).length} Source(s)`}
                 </Button>
                 {externalData.length > 0 && (
                   <Badge variant="secondary" className="gap-1">
@@ -2515,7 +2758,10 @@ export default function TriageReportWizardPage() {
                           const label = (c.name ?? c.category ?? '').toLowerCase();
                           return label === m.name.toLowerCase();
                         });
-                        const score = backendCat?.score ?? backendCat?.rawScore ?? (simulatedScores[m.id] ?? 50) / 10;
+                        const score = derivedModuleScores[m.id]
+                          ?? backendCat?.score
+                          ?? backendCat?.rawScore
+                          ?? (simulatedScores[m.id] ?? 50) / 10;
                         const maxScore = backendCat?.maxScore ?? 10;
                         return (
                           <div key={m.id} className="flex items-center justify-between rounded-md border p-2 text-sm">

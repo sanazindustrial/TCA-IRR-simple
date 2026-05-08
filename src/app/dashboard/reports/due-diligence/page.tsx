@@ -74,7 +74,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import reportsApi from '@/lib/reports-api';
+import azureStorage from '@/lib/azure-storage-service';
 import { externalSourcesConfig } from '@/lib/external-sources-config';
+import { DD_SECTION_MODULE_MAP, getActiveManagedModuleIds } from '@/lib/module-deck';
 
 // Define workflow steps
 const WORKFLOW_STEPS = [
@@ -149,6 +151,49 @@ const DEFAULT_DD_SECTIONS: ReportSection[] = [
   { id: 'dd-appendix', title: 'Appendix & Data Sources', description: 'Supporting data and references', active: true },
 ];
 
+const DD_AREA_MODULE_MAP: Record<string, string[]> = {
+  financial: ['financial'],
+  legal: ['risk'],
+  operational: ['macro', 'benchmark'],
+  commercial: ['marketing', 'economic', 'benchmark'],
+  management: ['team', 'founderFit', 'analyst'],
+  technology: ['strategicFit', 'strategic'],
+  risk: ['risk', 'environmental', 'social'],
+  valuation: ['economic', 'funder', 'growth'],
+};
+
+const applyManagedModulesToDdSections = (
+  sections: ReportSection[],
+  activeModuleIds: string[]
+): ReportSection[] => {
+  const activeSet = new Set(activeModuleIds);
+  return sections.map((section) => {
+    const mappedModules = Object.entries(DD_SECTION_MODULE_MAP)
+      .filter(([, sectionIds]) => sectionIds.includes(section.id))
+      .map(([moduleId]) => moduleId);
+
+    if (mappedModules.length === 0) {
+      return section;
+    }
+
+    const shouldDisable = mappedModules.every((moduleId) => !activeSet.has(moduleId));
+    return shouldDisable ? { ...section, active: false } : section;
+  });
+};
+
+const deriveDdAreasFromManagedModules = (activeModuleIds: string[]): string[] => {
+  const activeSet = new Set(activeModuleIds);
+  const requiredAreas = new Set(DD_AREAS.filter((a) => a.required).map((a) => a.id));
+
+  Object.entries(DD_AREA_MODULE_MAP).forEach(([areaId, modules]) => {
+    if (modules.some((moduleId) => activeSet.has(moduleId))) {
+      requiredAreas.add(areaId);
+    }
+  });
+
+  return Array.from(requiredAreas);
+};
+
 export default function DueDiligenceWorkflowPage() {
   const router = useRouter();
 
@@ -205,6 +250,9 @@ export default function DueDiligenceWorkflowPage() {
 
   // External data
   const [selectedSources, setSelectedSources] = useState<string[]>(['sec-edgar', 'hackernews']);
+  const [activeExternalSourceIds, setActiveExternalSourceIds] = useState<string[]>(
+    EXTERNAL_SOURCES.map((s) => s.id)
+  );
   const [externalData, setExternalData] = useState<ExternalDataResult[]>([]);
   const [fetchingData, setFetchingData] = useState(false);
 
@@ -236,6 +284,7 @@ export default function DueDiligenceWorkflowPage() {
 
   // Calculate progress
   const progress = Math.round((completedSteps.length / WORKFLOW_STEPS.length) * 100);
+  const visibleExternalSources = EXTERNAL_SOURCES.filter((source) => activeExternalSourceIds.includes(source.id));
 
   // File handling
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -295,7 +344,7 @@ export default function DueDiligenceWorkflowPage() {
       case 2:
         return true; // Documents optional
       case 3:
-        return selectedSources.length > 0;
+        return selectedSources.some((id) => activeExternalSourceIds.includes(id));
       case 4:
         return selectedAreas.length > 0;
       case 5:
@@ -311,7 +360,7 @@ export default function DueDiligenceWorkflowPage() {
       default:
         return false;
     }
-  }, [currentStep, companyName, selectedSources, selectedAreas, reportSections]);
+  }, [currentStep, companyName, selectedSources, selectedAreas, reportSections, activeExternalSourceIds]);
 
   const nextStep = () => {
     if (canProceed() && currentStep < WORKFLOW_STEPS.length) {
@@ -344,8 +393,9 @@ export default function DueDiligenceWorkflowPage() {
     setFetchingData(true);
     const query = companyTicker || companyName;
     const results: ExternalDataResult[] = [];
+    const effectiveSources = selectedSources.filter((id) => activeExternalSourceIds.includes(id));
 
-    for (const sourceId of selectedSources) {
+    for (const sourceId of effectiveSources) {
       try {
         const response = await fetch(`/api/external-data?source=${sourceId}&query=${encodeURIComponent(query)}&limit=5`);
         const data = await response.json();
@@ -371,7 +421,7 @@ export default function DueDiligenceWorkflowPage() {
     const successCount = results.filter(r => r.success).length;
     toast({
       title: 'External data fetched',
-      description: `Successfully retrieved data from ${successCount}/${selectedSources.length} sources.`
+      description: `Successfully retrieved data from ${successCount}/${effectiveSources.length} sources.`
     });
   };
 
@@ -520,8 +570,48 @@ export default function DueDiligenceWorkflowPage() {
   useEffect(() => {
     const role = (localStorage.getItem('userRole') || 'standard') as 'admin' | 'analyst' | 'standard';
     setUserRole(role);
+    const activeModules = getActiveManagedModuleIds();
+    setSelectedAreas(deriveDdAreasFromManagedModules(activeModules));
     const saved = localStorage.getItem('report-config-dd');
-    setReportSections(saved ? JSON.parse(saved) : DEFAULT_DD_SECTIONS);
+    const baseSections = saved ? JSON.parse(saved) : DEFAULT_DD_SECTIONS;
+    setReportSections(applyManagedModulesToDdSections(baseSections, activeModules));
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadManagedDataSources = async () => {
+      const stored = await azureStorage.getItem<unknown>('data-sources-config');
+      if (!Array.isArray(stored)) {
+        return;
+      }
+
+      const configuredActive = stored
+        .filter((item) => typeof item === 'object' && item !== null)
+        .map((item) => item as { id?: string; active?: boolean })
+        .filter((item) => item.id && item.active)
+        .map((item) => item.id as string);
+
+      const allowed = EXTERNAL_SOURCES
+        .map((source) => source.id)
+        .filter((id) => configuredActive.includes(id));
+
+      if (cancelled || allowed.length === 0) {
+        return;
+      }
+
+      setActiveExternalSourceIds(allowed);
+      setSelectedSources((prev) => {
+        const filtered = prev.filter((id) => allowed.includes(id));
+        return filtered.length > 0 ? filtered : allowed.slice(0, 1);
+      });
+    };
+
+    void loadManagedDataSources();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Load draft on mount
@@ -537,7 +627,10 @@ export default function DueDiligenceWorkflowPage() {
           setCompanyDescription(parsed.companyDescription || '');
           setDealType(parsed.dealType || 'acquisition');
           setSelectedAreas(parsed.selectedAreas || []);
-          setSelectedSources(parsed.selectedSources || ['sec', 'news']);
+          const draftSources = Array.isArray(parsed.selectedSources)
+            ? (parsed.selectedSources as string[])
+            : ['sec-edgar', 'hackernews'];
+          setSelectedSources(draftSources.filter((id) => activeExternalSourceIds.includes(id)));
           setCompletedSteps(parsed.completedSteps || []);
           setCurrentStep(parsed.currentStep || 1);
         }
@@ -545,7 +638,7 @@ export default function DueDiligenceWorkflowPage() {
         console.error('Failed to load draft');
       }
     }
-  }, []);
+  }, [activeExternalSourceIds]);
 
   // Load existing companies with triage reports
   const loadExistingCompanies = useCallback(async () => {
@@ -1031,7 +1124,7 @@ ${sectionsHtml}
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {EXTERNAL_SOURCES.map((source) => (
+                {visibleExternalSources.map((source) => (
                   <div
                     key={source.id}
                     className={cn(
@@ -1074,7 +1167,7 @@ ${sectionsHtml}
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-medium">Fetch external data for: <span className="text-primary">{companyName || companyTicker || 'No company set'}</span></p>
-                  <p className="text-sm text-muted-foreground">{selectedSources.length} source(s) selected</p>
+                  <p className="text-sm text-muted-foreground">{selectedSources.filter((id) => activeExternalSourceIds.includes(id)).length} source(s) selected</p>
                 </div>
                 <Button onClick={fetchExternalData} disabled={fetchingData || !companyName}>
                   {fetchingData ? (
@@ -1096,7 +1189,7 @@ ${sectionsHtml}
                           ) : (
                             <AlertTriangle className="size-4 text-amber-500" />
                           )}
-                          <span className="font-medium">{EXTERNAL_SOURCES.find(s => s.id === result.source)?.name || result.source}</span>
+                          <span className="font-medium">{visibleExternalSources.find(s => s.id === result.source)?.name || result.source}</span>
                           {result.success && result.data ? (
                             <Badge variant="secondary" className="ml-2">
                               {String(Array.isArray(result.data) ? result.data.length : Object.keys(result.data as object).length)} items
@@ -1274,7 +1367,7 @@ ${sectionsHtml}
                       <div className="flex flex-wrap gap-2 mt-2">
                         {selectedSources.map(id => (
                           <Badge key={id} variant="secondary">
-                            {EXTERNAL_SOURCES.find(s => s.id === id)?.name}
+                            {visibleExternalSources.find(s => s.id === id)?.name}
                             {externalData.find(d => d.source === id)?.success && (
                               <CheckCircle2 className="size-3 ml-1 text-green-500" />
                             )}
@@ -1395,8 +1488,7 @@ ${sectionsHtml}
                   />
                 ) : (
                   <div
-                    className="rounded-lg border bg-white shadow-sm overflow-y-auto"
-                    style={{ maxHeight: '620px' }}
+                    className="rounded-lg border bg-white shadow-sm overflow-y-auto max-h-[620px]"
                     dangerouslySetInnerHTML={{
                       __html: htmlReportContent || '<p style="padding:1.5rem;color:#94a3b8;font-size:0.875rem;">Report preview will appear here after generation.</p>',
                     }}

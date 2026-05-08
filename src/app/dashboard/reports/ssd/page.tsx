@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import reportsApi from '@/lib/reports-api';
+import azureStorage from '@/lib/azure-storage-service';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -181,6 +182,33 @@ export default function SSDReportPage() {
     }
   }, [router]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadManagedDataSources = async () => {
+      const stored = await azureStorage.getItem<unknown>('data-sources-config');
+      if (!Array.isArray(stored) || cancelled) {
+        return;
+      }
+
+      const activeIds = stored
+        .filter((item) => typeof item === 'object' && item !== null)
+        .map((item) => item as { id?: string; active?: boolean })
+        .filter((item) => item.id && item.active)
+        .map((item) => item.id as string);
+
+      if (activeIds.length > 0) {
+        setActiveExternalSourceIds(activeIds);
+      }
+    };
+
+    void loadManagedDataSources();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const [stats, setStats] = useState<AuditStats | null>(null);
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
@@ -208,6 +236,7 @@ export default function SSDReportPage() {
   const [downloadAfterSubmit, setDownloadAfterSubmit] = useState(false);
   const [savedDbReportId, setSavedDbReportId] = useState<number | null>(null);
   const [pollingStatus, setPollingStatus] = useState<'idle' | 'polling' | 'done' | 'failed'>('idle');
+  const [activeExternalSourceIds, setActiveExternalSourceIds] = useState<string[]>([]);
   const [isAdminOrAnalyst, setIsAdminOrAnalyst] = useState(false);
   const [humanReviewNotes, setHumanReviewNotes] = useState('');
   const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -449,6 +478,7 @@ export default function SSDReportPage() {
                 tracking_id: tid,
                 founder_email: submitForm.founder_email,
                 pages: ssdSections.filter((s) => s.active).map((s) => s.id),
+                active_data_sources: activeExternalSourceIds,
               },
             },
             userId,

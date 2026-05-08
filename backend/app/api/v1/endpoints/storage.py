@@ -10,7 +10,7 @@ from typing import Any, Optional
 import json
 
 from app.db import get_db
-from .auth import get_current_user
+from .auth import get_current_user, get_optional_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ async def _ensure_table(db):
 async def set_value(
     payload: dict,
     db=Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: Optional[dict] = Depends(get_optional_current_user),
 ):
     """Store a key-value pair for the current user"""
     key = payload.get("key")
@@ -57,8 +57,10 @@ async def set_value(
         raise HTTPException(status_code=400, detail="key is required")
 
     value = payload.get("value")
-    user_id = current_user.get("id") or payload.get("user_id")
-    user_email = current_user.get("email") or payload.get("user_email", "")
+    user_id = (current_user or {}).get("id") or payload.get("user_id")
+    user_email = (current_user or {}).get("email") or payload.get("user_email", "")
+    if user_id is None:
+        raise HTTPException(status_code=400, detail="user_id is required")
     metadata = payload.get("metadata")
 
     # Serialize value and metadata to JSON strings if they aren't already
@@ -93,10 +95,12 @@ async def get_value(
     key: str,
     user_id: Optional[int] = Query(None),
     db=Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: Optional[dict] = Depends(get_optional_current_user),
 ):
     """Retrieve a stored value by key"""
-    resolved_user_id = current_user.get("id") or user_id
+    resolved_user_id = (current_user or {}).get("id") or user_id
+    if resolved_user_id is None:
+        raise HTTPException(status_code=400, detail="user_id is required")
 
     await _ensure_table(db)
 
@@ -110,7 +114,12 @@ async def get_value(
         raise HTTPException(status_code=500, detail=f"Failed to retrieve: {str(e)}")
 
     if not row:
-        raise HTTPException(status_code=404, detail="Key not found")
+        return {
+            "key": key,
+            "value": None,
+            "user_email": (current_user or {}).get("email"),
+            "updated_at": None,
+        }
 
     # Try to deserialize value from JSON
     raw_value = row["value"]
@@ -130,18 +139,21 @@ async def get_value(
 @router.delete("/{key}")
 async def delete_value(
     key: str,
+    user_id: Optional[int] = Query(None),
     db=Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: Optional[dict] = Depends(get_optional_current_user),
 ):
     """Delete a stored value by key"""
-    user_id = current_user.get("id")
+    resolved_user_id = (current_user or {}).get("id") or user_id
+    if resolved_user_id is None:
+        raise HTTPException(status_code=400, detail="user_id is required")
 
     await _ensure_table(db)
 
     try:
         result = await db.execute(
             "DELETE FROM key_value_store WHERE key = $1 AND user_id = $2",
-            key, user_id,
+            key, resolved_user_id,
         )
     except Exception as e:
         logger.error(f"Storage delete error: {e}")
