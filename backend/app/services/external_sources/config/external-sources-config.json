@@ -1,0 +1,1121 @@
+{
+    "version": "1.0.0",
+    "name": "external_sources_config",
+    "total_sources": 41,
+    "categories": [{
+            "id": "company_intelligence",
+            "name": "Company Intelligence",
+            "sources": [{
+                    "id": "crunchbase",
+                    "name": "Crunchbase",
+                    "category": "Company Intelligence",
+                    "pricing_model": "freemium",
+                    "pricing_note": "$29/mo",
+                    "monthly_cost": 29.0,
+                    "access_type": "api_key",
+                    "api_available": true,
+                    "base_url": "https://api.crunchbase.com/api/v4",
+                    "auth": {
+                        "type": "api_key",
+                        "location": "query",
+                        "param_name": "user_key"
+                    },
+                    "rate_limit": "200/min",
+                    "documentation_url": "https://data.crunchbase.com/docs/using-the-api",
+                    "access_url": "https://data.crunchbase.com/",
+                    "test": {
+                        "method": "GET",
+                        "url": "https://api.crunchbase.com/api/v4/entities/organizations/microsoft"
+                    },
+                    "enabled": false,
+                    "priority": 1,
+                    "notes": "Company and funding intelligence",
+                    "tca_module": "company_analysis",
+                    "data_points": ["funding_rounds", "investors", "competitors", "employees"]
+                },
+                {
+                    "id": "pitchbook",
+                    "name": "PitchBook",
+                    "category": "Company Intelligence",
+                    "pricing_model": "enterprise",
+                    "pricing_note": "$400/mo",
+                    "monthly_cost": 400.0,
+                    "access_type": "enterprise_contract",
+                    "api_available": true,
+                    "base_url": null,
+                    "auth": {
+                        "type": "enterprise"
+                    },
+                    "rate_limit": null,
+                    "documentation_url": "https://pitchbook.com/request-a-free-trial",
+                    "access_url": "https://pitchbook.com/request-a-free-trial",
+                    "test": null,
+                    "enabled": false,
+                    "priority": 2,
+                    "notes": "Enterprise/private market intelligence",
+                    "tca_module": "valuation_analysis",
+                    "data_points": ["valuations", "deal_flow", "fund_performance"]
+                },
+                {
+                    "id": "cb_insights",
+                    "name": "CB Insights",
+                    "category": "Company Intelligence",
+                    "pricing_model": "premium",
+                    "pricing_note": "$99/mo",
+                    "monthly_cost": 99.0,
+                    "access_type": "paid_platform",
+                    "api_available": true,
+                    "base_url": null,
+                    "auth": {
+                        "type": "paid_account"
+                    },
+                    "rate_limit": null,
+                    "documentation_url": "https://www.cbinsights.com/research/",
+                    "access_url": "https://www.cbinsights.com/research/",
+                    "test": null,
+                    "enabled": false,
+                    "priority": 3,
+                    "notes": "Market maps, competitors, funding signals",
+                    "tca_module": "market_analysis",
+                    "data_points": ["market_maps", "trend_analysis", "company_scoring"]
+                },
+                {
+                    "id": "owler",
+                    "name": "Owler",
+                    "category": "Company Intelligence",
+                    "pricing_model": "freemium",
+                    "pricing_note": "$35/mo",
+                    "monthly_cost": 35.0,
+                    "access_type": "api_key",
+                    "api_available": true,
+                    "base_url": "https://api.owler.com/v1",
+                    "auth": {
+                        "type": "api_key",
+                        "location": "header",
+                        "header_name": "Authorization"
+                    },
+                    "rate_limit": "100/min",
+                    "documentation_url": "https://corp.owler.com/",
+                    "access_url": "https://corp.owler.com/",
+                    "test": {
+                        "method": "GET",
+                        "url": "https://api.owler.com/v1/company"
+                    },
+                    "enabled": false,
+                    "priority": 4,
+                    "notes": "Competitive intelligence",
+                    "tca_module": "company_analysis",
+                    "data_points": ["company_news", "revenue_estimates", "employee_counts"]
+                },
+                {
+                    "id": "similarweb",
+                    "name": "SimilarWeb",
+                    "category": "Company Intelligence",
+                    "pricing_model": "freemium",
+                    "pricing_note": "$199/mo",
+                    "monthly_cost": 199.0,
+                    "access_type": "api_key",
+                    "api_available": true,
+                    "base_url": "https://api.similarweb.com/v1",
+                    "auth": {
+                        "type": "api_key",
+                        "location": "query",
+                        "param_name": "api_key"
+                    },
+                    "rate_limit": "100/hr",
+                    "documentation_url": "https://support.similarweb.com/",
+                    "access_url": "https://www.similarweb.com/",
+                    "test": {
+                        "method": "GET",
+                        "url": "https://api.similarweb.com/v1/website/google.com/total-traffic-and-engagement/visits"
+                    },
+                    "enabled": false,
+                    "priority": 5,
+                    "notes": "Traffic and engagement analytics",
+                    "tca_module": "market_analysis",
+                    "data_points": ["website_traffic", "audience_analysis", "market_share"]
+                }
+            ]
+        },
+        {
+            "id": "technology_sources",
+            "name": "Technology Sources",
+            "sources": [{
+                    "id": "github",
+                    "name": "GitHub",
+                    "category": "Technology Sources",
+                    "pricing_model": "freemium",
+                    "pricing_note": "Free tier: 5000 req/hr",
+                    "monthly_cost": 0.0,
+                    "access_type": "bearer_token",
+                    "api_available": true,
+                    "base_url": "https://api.github.com",
+                    "auth": {
+                        "type": "bearer_token",
+                        "location": "header",
+                        "header_name": "Authorization",
+                        "format": "token ${GITHUB_TOKEN}"
+                    },
+                    "rate_limit": "5000/hr",
+                    "documentation_url": "https://docs.github.com/en/rest",
+                    "access_url": "https://github.com/settings/tokens",
+                    "test": {
+                        "method": "GET",
+                        "url": "https://api.github.com/user"
+                    },
+                    "enabled": true,
+                    "priority": 1,
+                    "notes": "Repo activity, orgs, code signals",
+                    "tca_module": "technology_score",
+                    "data_points": ["repo_stars", "contributors", "commit_frequency", "tech_stack"]
+                },
+                {
+                    "id": "stack_overflow",
+                    "name": "Stack Overflow",
+                    "category": "Technology Sources",
+                    "pricing_model": "freemium",
+                    "pricing_note": "$6/mo",
+                    "monthly_cost": 6.0,
+                    "access_type": "api_key_optional",
+                    "api_available": true,
+                    "base_url": "https://api.stackexchange.com/2.3",
+                    "auth": {
+                        "type": "api_key_optional"
+                    },
+                    "rate_limit": "300/day",
+                    "documentation_url": "https://api.stackexchange.com/docs",
+                    "access_url": "https://stackapps.com/apps/oauth/register",
+                    "test": {
+                        "method": "GET",
+                        "url": "https://api.stackexchange.com/2.3/questions?order=desc&sort=activity&tagged=python&site=stackoverflow"
+                    },
+                    "enabled": true,
+                    "priority": 2,
+                    "notes": "Developer Q&A trends",
+                    "tca_module": "technology_score",
+                    "data_points": ["tag_popularity", "developer_interest"]
+                },
+                {
+                    "id": "techcrunch",
+                    "name": "TechCrunch",
+                    "category": "Technology Sources",
+                    "pricing_model": "free",
+                    "pricing_note": "Free RSS",
+                    "monthly_cost": 0.0,
+                    "access_type": "rss",
+                    "api_available": false,
+                    "base_url": "https://techcrunch.com/feed/",
+                    "auth": {
+                        "type": "none"
+                    },
+                    "rate_limit": null,
+                    "documentation_url": "https://techcrunch.com/feed/",
+                    "access_url": "https://techcrunch.com/",
+                    "test": {
+                        "method": "GET",
+                        "url": "https://techcrunch.com/feed/"
+                    },
+                    "enabled": true,
+                    "priority": 3,
+                    "notes": "Tech news feed",
+                    "tca_module": "market_trends",
+                    "data_points": ["news_mentions", "funding_news"]
+                },
+                {
+                    "id": "product_hunt",
+                    "name": "Product Hunt",
+                    "category": "Technology Sources",
+                    "pricing_model": "freemium",
+                    "pricing_note": "$8/mo",
+                    "monthly_cost": 8.0,
+                    "access_type": "oauth_bearer",
+                    "api_available": true,
+                    "base_url": "https://api.producthunt.com/v2/api/graphql",
+                    "auth": {
+                        "type": "bearer_token",
+                        "location": "header",
+                        "header_name": "Authorization",
+                        "format": "Bearer ${PRODUCTHUNT_TOKEN}"
+                    },
+                    "rate_limit": "500/min",
+                    "documentation_url": "https://api.producthunt.com/v2/docs",
+                    "access_url": "https://www.producthunt.com/v2/oauth/applications",
+                    "test": {
+                        "method": "POST",
+                        "url": "https://api.producthunt.com/v2/api/graphql",
+                        "body": {
+                            "query": "{ posts(first: 5) { edges { node { name tagline } } } }"
+                        }
+                    },
+                    "enabled": true,
+                    "priority": 4,
+                    "notes": "Launch discovery and product traction",
+                    "tca_module": "market_trends",
+                    "data_points": ["product_launches", "upvotes", "user_engagement"]
+                },
+                {
+                    "id": "hacker_news",
+                    "name": "Hacker News",
+                    "category": "Technology Sources",
+                    "pricing_model": "free",
+                    "pricing_note": "Free",
+                    "monthly_cost": 0.0,
+                    "access_type": "public_api",
+                    "api_available": true,
+                    "base_url": "https://hacker-news.firebaseio.com/v0",
+                    "auth": {
+                        "type": "none"
+                    },
+                    "rate_limit": null,
+                    "documentation_url": "https://github.com/HackerNews/API",
+                    "access_url": "https://news.ycombinator.com/",
+                    "test": {
+                        "method": "GET",
+                        "url": "https://hacker-news.firebaseio.com/v0/topstories.json"
+                    },
+                    "enabled": true,
+                    "priority": 5,
+                    "notes": "Open tech/news sentiment",
+                    "tca_module": "market_trends",
+                    "data_points": ["tech_discussions", "community_sentiment"]
+                },
+                {
+                    "id": "google_trends",
+                    "name": "Google Trends",
+                    "category": "Technology Sources",
+                    "pricing_model": "free",
+                    "pricing_note": "Free",
+                    "monthly_cost": 0.0,
+                    "access_type": "library",
+                    "api_available": false,
+                    "base_url": "https://trends.google.com",
+                    "auth": {
+                        "type": "none"
+                    },
+                    "rate_limit": null,
+                    "documentation_url": "https://trends.google.com",
+                    "access_url": "https://trends.google.com",
+                    "test": {
+                        "method": "library",
+                        "library": "pytrends"
+                    },
+                    "enabled": true,
+                    "priority": 6,
+                    "notes": "Search interest trends",
+                    "tca_module": "market_trends",
+                    "data_points": ["search_volume", "geographic_interest", "related_queries"]
+                },
+                {
+                    "id": "wayback_machine",
+                    "name": "Wayback Machine",
+                    "category": "Technology Sources",
+                    "pricing_model": "free",
+                    "pricing_note": "Free",
+                    "monthly_cost": 0.0,
+                    "access_type": "public_api",
+                    "api_available": true,
+                    "base_url": "https://archive.org/wayback/available",
+                    "auth": {
+                        "type": "none"
+                    },
+                    "rate_limit": null,
+                    "documentation_url": "https://archive.org/help/wayback_api.php",
+                    "access_url": "https://archive.org/",
+                    "test": {
+                        "method": "GET",
+                        "url": "https://archive.org/wayback/available?url=google.com"
+                    },
+                    "enabled": true,
+                    "priority": 7,
+                    "notes": "Historical snapshots",
+                    "tca_module": "company_analysis",
+                    "data_points": ["domain_age", "historical_presence"]
+                }
+            ]
+        },
+        {
+            "id": "ai_ml_sources",
+            "name": "AI & ML Sources",
+            "sources": [{
+                    "id": "hugging_face",
+                    "name": "Hugging Face",
+                    "category": "AI & ML Sources",
+                    "pricing_model": "freemium",
+                    "pricing_note": "Free tier available",
+                    "monthly_cost": 0.0,
+                    "access_type": "bearer_token",
+                    "api_available": true,
+                    "base_url": "https://huggingface.co/api",
+                    "auth": {
+                        "type": "bearer_token",
+                        "location": "header",
+                        "header_name": "Authorization",
+                        "format": "Bearer ${HUGGINGFACE_TOKEN}"
+                    },
+                    "rate_limit": "1000/hr",
+                    "documentation_url": "https://huggingface.co/docs/api-inference",
+                    "access_url": "https://huggingface.co/settings/tokens",
+                    "test": {
+                        "method": "GET",
+                        "url": "https://huggingface.co/api/models?limit=5"
+                    },
+                    "enabled": true,
+                    "priority": 1,
+                    "notes": "Models, datasets, AI ecosystem",
+                    "tca_module": "technology_score",
+                    "data_points": ["model_downloads", "model_popularity"]
+                },
+                {
+                    "id": "papers_with_code",
+                    "name": "Papers With Code",
+                    "category": "AI & ML Sources",
+                    "pricing_model": "free",
+                    "pricing_note": "Free",
+                    "monthly_cost": 0.0,
+                    "access_type": "dataset",
+                    "api_available": false,
+                    "base_url": "https://paperswithcode.com/api/v1",
+                    "auth": {
+                        "type": "none"
+                    },
+                    "rate_limit": null,
+                    "documentation_url": "https://github.com/paperswithcode/paperswithcode-data",
+                    "access_url": "https://paperswithcode.com/",
+                    "test": {
+                        "method": "GET",
+                        "url": "https://paperswithcode.com/api/v1/papers/"
+                    },
+                    "enabled": true,
+                    "priority": 2,
+                    "notes": "Research benchmarks and papers",
+                    "tca_module": "technology_score",
+                    "data_points": ["research_citations", "benchmarks"]
+                }
+            ]
+        },
+        {
+            "id": "financial_data",
+            "name": "Financial Data",
+            "sources": [{
+                    "id": "sec_edgar",
+                    "name": "SEC EDGAR",
+                    "category": "Financial Data",
+                    "pricing_model": "free",
+                    "pricing_note": "Free",
+                    "monthly_cost": 0.0,
+                    "access_type": "public_api_with_header",
+                    "api_available": true,
+                    "base_url": "https://data.sec.gov/submissions/",
+                    "auth": {
+                        "type": "required_header",
+                        "header_name": "User-Agent",
+                        "format": "TCA-IRR-App/1.0 contact@tca-irr.com"
+                    },
+                    "rate_limit": "10/sec",
+                    "documentation_url": "https://www.sec.gov/edgar/sec-api-documentation",
+                    "access_url": "https://www.sec.gov/edgar/searchedgar/companysearch",
+                    "test": {
+                        "method": "GET",
+                        "url": "https://data.sec.gov/submissions/CIK0000320193.json"
+                    },
+                    "enabled": true,
+                    "priority": 1,
+                    "notes": "SEC filings and company submissions",
+                    "tca_module": "financial_score",
+                    "data_points": ["10k_filings", "8k_filings", "revenue", "net_income"]
+                },
+                {
+                    "id": "yahoo_finance",
+                    "name": "Yahoo Finance",
+                    "category": "Financial Data",
+                    "pricing_model": "freemium",
+                    "pricing_note": "$15/mo via RapidAPI",
+                    "monthly_cost": 15.0,
+                    "access_type": "rapidapi_key",
+                    "api_available": true,
+                    "base_url": "https://yahoo-finance1.p.rapidapi.com",
+                    "auth": {
+                        "type": "api_key",
+                        "location": "header",
+                        "header_name": "X-RapidAPI-Key"
+                    },
+                    "rate_limit": "500/mo",
+                    "documentation_url": "https://rapidapi.com/apidojo/api/yahoo-finance1",
+                    "access_url": "https://rapidapi.com/apidojo/api/yahoo-finance1",
+                    "test": {
+                        "method": "GET",
+                        "url": "https://yahoo-finance1.p.rapidapi.com/stock/v2/get-summary?symbol=AAPL"
+                    },
+                    "enabled": false,
+                    "priority": 2,
+                    "notes": "Market and stock data",
+                    "tca_module": "financial_score",
+                    "data_points": ["stock_price", "market_cap", "pe_ratio"]
+                },
+                {
+                    "id": "alpha_vantage",
+                    "name": "Alpha Vantage",
+                    "category": "Financial Data",
+                    "pricing_model": "freemium",
+                    "pricing_note": "Free: 25 req/day",
+                    "monthly_cost": 0.0,
+                    "access_type": "api_key",
+                    "api_available": true,
+                    "base_url": "https://www.alphavantage.co/query",
+                    "auth": {
+                        "type": "api_key",
+                        "location": "query",
+                        "param_name": "apikey"
+                    },
+                    "rate_limit": "25/day",
+                    "documentation_url": "https://www.alphavantage.co/documentation/",
+                    "access_url": "https://www.alphavantage.co/support/#api-key",
+                    "test": {
+                        "method": "GET",
+                        "url": "https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=AAPL"
+                    },
+                    "enabled": true,
+                    "priority": 3,
+                    "notes": "Stock prices and market series",
+                    "tca_module": "financial_score",
+                    "data_points": ["stock_price", "daily_volume", "price_change"]
+                }
+            ]
+        },
+        {
+            "id": "economic_data",
+            "name": "Economic Data",
+            "sources": [{
+                    "id": "fred",
+                    "name": "FRED",
+                    "category": "Economic Data",
+                    "pricing_model": "free",
+                    "pricing_note": "Free",
+                    "monthly_cost": 0.0,
+                    "access_type": "api_key",
+                    "api_available": true,
+                    "base_url": "https://api.stlouisfed.org/fred",
+                    "auth": {
+                        "type": "api_key",
+                        "location": "query",
+                        "param_name": "api_key"
+                    },
+                    "rate_limit": "120/min",
+                    "documentation_url": "https://fred.stlouisfed.org/docs/api/fred/",
+                    "access_url": "https://fred.stlouisfed.org/docs/api/api_key.html",
+                    "test": {
+                        "method": "GET",
+                        "url": "https://api.stlouisfed.org/fred/series?series_id=GDP&file_type=json"
+                    },
+                    "enabled": true,
+                    "priority": 1,
+                    "notes": "Macroeconomic indicators",
+                    "tca_module": "market_analysis",
+                    "data_points": ["gdp", "inflation", "interest_rates", "unemployment"]
+                },
+                {
+                    "id": "world_bank",
+                    "name": "World Bank",
+                    "category": "Economic Data",
+                    "pricing_model": "free",
+                    "pricing_note": "Free",
+                    "monthly_cost": 0.0,
+                    "access_type": "public_api",
+                    "api_available": true,
+                    "base_url": "https://api.worldbank.org/v2",
+                    "auth": {
+                        "type": "none"
+                    },
+                    "rate_limit": null,
+                    "documentation_url": "https://datahelpdesk.worldbank.org/knowledgebase/articles/889392-api-documentation",
+                    "access_url": "https://data.worldbank.org/",
+                    "test": {
+                        "method": "GET",
+                        "url": "https://api.worldbank.org/v2/country/US/indicator/NY.GDP.MKTP.CD?format=json"
+                    },
+                    "enabled": true,
+                    "priority": 2,
+                    "notes": "Global country indicators",
+                    "tca_module": "market_analysis",
+                    "data_points": ["country_gdp", "population", "growth_rate"]
+                },
+                {
+                    "id": "bea",
+                    "name": "BEA",
+                    "category": "Economic Data",
+                    "pricing_model": "free",
+                    "pricing_note": "Free",
+                    "monthly_cost": 0.0,
+                    "access_type": "api_key",
+                    "api_available": true,
+                    "base_url": "https://apps.bea.gov/api/data",
+                    "auth": {
+                        "type": "api_key",
+                        "location": "query",
+                        "param_name": "UserID"
+                    },
+                    "rate_limit": "100/day",
+                    "documentation_url": "https://apps.bea.gov/API/signup/",
+                    "access_url": "https://apps.bea.gov/API/signup/",
+                    "test": {
+                        "method": "GET",
+                        "url": "https://apps.bea.gov/api/data?method=GetData&DataSetName=NIPA&TableName=T10101&Frequency=Q&Year=2023"
+                    },
+                    "enabled": true,
+                    "priority": 3,
+                    "notes": "US economic analysis data",
+                    "tca_module": "market_analysis",
+                    "data_points": ["gdp_components", "industry_statistics"]
+                },
+                {
+                    "id": "bls",
+                    "name": "BLS",
+                    "category": "Economic Data",
+                    "pricing_model": "free",
+                    "pricing_note": "Free",
+                    "monthly_cost": 0.0,
+                    "access_type": "api_key_optional",
+                    "api_available": true,
+                    "base_url": "https://api.bls.gov/publicAPI/v2",
+                    "auth": {
+                        "type": "api_key_optional",
+                        "location": "body",
+                        "param_name": "registrationkey"
+                    },
+                    "rate_limit": "500/day",
+                    "documentation_url": "https://www.bls.gov/developers/",
+                    "access_url": "https://www.bls.gov/developers/home.htm",
+                    "test": {
+                        "method": "POST",
+                        "url": "https://api.bls.gov/publicAPI/v2/timeseries/data/",
+                        "body": {
+                            "seriesid": ["CUUR0000SA0"]
+                        }
+                    },
+                    "enabled": true,
+                    "priority": 4,
+                    "notes": "Labor and inflation statistics",
+                    "tca_module": "market_analysis",
+                    "data_points": ["employment", "wages", "cpi"]
+                }
+            ]
+        },
+        {
+            "id": "clinical_trial_databases",
+            "name": "Clinical Trial Databases",
+            "sources": [{
+                    "id": "clinicaltrials_gov",
+                    "name": "ClinicalTrials.gov",
+                    "category": "Clinical Trial Databases",
+                    "pricing_model": "free",
+                    "pricing_note": "Free",
+                    "monthly_cost": 0.0,
+                    "access_type": "public_api",
+                    "api_available": true,
+                    "base_url": "https://clinicaltrials.gov/api/v2",
+                    "auth": {
+                        "type": "none"
+                    },
+                    "rate_limit": "3/sec",
+                    "documentation_url": "https://clinicaltrials.gov/data-api/api",
+                    "access_url": "https://clinicaltrials.gov/",
+                    "test": {
+                        "method": "GET",
+                        "url": "https://clinicaltrials.gov/api/v2/studies?query.term=cancer&pageSize=5"
+                    },
+                    "enabled": true,
+                    "priority": 1,
+                    "notes": "Clinical trial registry",
+                    "tca_module": "regulatory_risk",
+                    "data_points": ["trial_phases", "enrollment", "study_status"]
+                },
+                {
+                    "id": "eu_clinical_trials",
+                    "name": "EU Clinical Trials Register",
+                    "category": "Clinical Trial Databases",
+                    "pricing_model": "free",
+                    "pricing_note": "Free",
+                    "monthly_cost": 0.0,
+                    "access_type": "scraping",
+                    "api_available": false,
+                    "base_url": "https://www.clinicaltrialsregister.eu",
+                    "auth": {
+                        "type": "none"
+                    },
+                    "rate_limit": null,
+                    "documentation_url": "https://www.clinicaltrialsregister.eu",
+                    "access_url": "https://www.clinicaltrialsregister.eu",
+                    "test": null,
+                    "enabled": false,
+                    "priority": 2,
+                    "notes": "Requires scraping",
+                    "tca_module": "regulatory_risk",
+                    "data_points": ["eu_trials", "study_protocols"]
+                },
+                {
+                    "id": "who_ictrp",
+                    "name": "WHO ICTRP",
+                    "category": "Clinical Trial Databases",
+                    "pricing_model": "free",
+                    "pricing_note": "Free",
+                    "monthly_cost": 0.0,
+                    "access_type": "dataset_download",
+                    "api_available": false,
+                    "base_url": "https://trialsearch.who.int",
+                    "auth": {
+                        "type": "none"
+                    },
+                    "rate_limit": null,
+                    "documentation_url": "https://trialsearch.who.int/AdvSearch.aspx",
+                    "access_url": "https://trialsearch.who.int",
+                    "test": null,
+                    "enabled": false,
+                    "priority": 3,
+                    "notes": "Download datasets as CSV/XML",
+                    "tca_module": "regulatory_risk",
+                    "data_points": ["global_trials", "registry_network"]
+                }
+            ]
+        },
+        {
+            "id": "drug_regulatory",
+            "name": "Drug & Regulatory",
+            "sources": [{
+                    "id": "fda_orange_book",
+                    "name": "FDA Orange Book",
+                    "category": "Drug & Regulatory",
+                    "pricing_model": "free",
+                    "pricing_note": "Free",
+                    "monthly_cost": 0.0,
+                    "access_type": "file_download",
+                    "api_available": false,
+                    "base_url": "https://www.fda.gov/drugs/drug-approvals-and-databases/orange-book-data-files",
+                    "auth": {
+                        "type": "none"
+                    },
+                    "rate_limit": null,
+                    "documentation_url": "https://www.fda.gov/drugs/drug-approvals-and-databases/orange-book-data-files",
+                    "access_url": "https://www.fda.gov/drugs/drug-approvals-and-databases/orange-book-data-files",
+                    "test": {
+                        "method": "GET",
+                        "url": "https://www.fda.gov/media/76860/download"
+                    },
+                    "enabled": true,
+                    "priority": 1,
+                    "notes": "Drug approvals and patent files",
+                    "tca_module": "regulatory_risk",
+                    "data_points": ["approved_drugs", "patent_info", "generic_equivalents"]
+                },
+                {
+                    "id": "fda_purple_book",
+                    "name": "FDA Purple Book",
+                    "category": "Drug & Regulatory",
+                    "pricing_model": "free",
+                    "pricing_note": "Free",
+                    "monthly_cost": 0.0,
+                    "access_type": "public_api",
+                    "api_available": true,
+                    "base_url": "https://purplebooksearch.fda.gov/api/v1",
+                    "auth": {
+                        "type": "none"
+                    },
+                    "rate_limit": null,
+                    "documentation_url": "https://purplebooksearch.fda.gov",
+                    "access_url": "https://purplebooksearch.fda.gov",
+                    "test": {
+                        "method": "GET",
+                        "url": "https://purplebooksearch.fda.gov/api/v1/products?productName=insulin"
+                    },
+                    "enabled": true,
+                    "priority": 2,
+                    "notes": "Biologics and biosimilars",
+                    "tca_module": "regulatory_risk",
+                    "data_points": ["biological_products", "biosimilars", "licensing_info"]
+                },
+                {
+                    "id": "ema_clinical_data",
+                    "name": "EMA Clinical Data",
+                    "category": "Drug & Regulatory",
+                    "pricing_model": "free",
+                    "pricing_note": "Free",
+                    "monthly_cost": 0.0,
+                    "access_type": "portal_access",
+                    "api_available": false,
+                    "base_url": "https://clinicaldata.ema.europa.eu",
+                    "auth": {
+                        "type": "none"
+                    },
+                    "rate_limit": null,
+                    "documentation_url": "https://clinicaldata.ema.europa.eu",
+                    "access_url": "https://clinicaldata.ema.europa.eu",
+                    "test": null,
+                    "enabled": false,
+                    "priority": 3,
+                    "notes": "Portal-based access, no public API",
+                    "tca_module": "regulatory_risk",
+                    "data_points": ["european_approvals", "safety_info"]
+                }
+            ]
+        },
+        {
+            "id": "research_medical",
+            "name": "Research & Medical",
+            "sources": [{
+                "id": "pubmed",
+                "name": "PubMed",
+                "category": "Research & Medical",
+                "pricing_model": "free",
+                "pricing_note": "Free",
+                "monthly_cost": 0.0,
+                "access_type": "api_key_optional",
+                "api_available": true,
+                "base_url": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils",
+                "auth": {
+                    "type": "api_key_optional",
+                    "location": "query",
+                    "param_name": "api_key"
+                },
+                "rate_limit": "10/sec with key, 3/sec without",
+                "documentation_url": "https://www.ncbi.nlm.nih.gov/books/NBK25497/",
+                "access_url": "https://www.ncbi.nlm.nih.gov/account/settings/#accountSettingsApiKeyManagement",
+                "test": {
+                    "method": "GET",
+                    "url": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=cancer&retmax=5&retmode=json"
+                },
+                "enabled": true,
+                "priority": 1,
+                "notes": "Biomedical literature",
+                "tca_module": "technology_score",
+                "data_points": ["publications", "citations", "research_quality"]
+            }]
+        },
+        {
+            "id": "professional_networks",
+            "name": "Professional Networks",
+            "sources": [{
+                    "id": "linkedin",
+                    "name": "LinkedIn",
+                    "category": "Professional Networks",
+                    "pricing_model": "freemium",
+                    "pricing_note": "$30/mo",
+                    "monthly_cost": 30.0,
+                    "access_type": "restricted_partner_api",
+                    "api_available": true,
+                    "base_url": null,
+                    "auth": {
+                        "type": "oauth_restricted"
+                    },
+                    "rate_limit": null,
+                    "documentation_url": "https://developer.linkedin.com/",
+                    "access_url": "https://developer.linkedin.com/",
+                    "test": null,
+                    "enabled": false,
+                    "priority": 1,
+                    "notes": "Restricted API access",
+                    "tca_module": "team_analysis",
+                    "data_points": ["employee_count", "executive_profiles", "company_growth"]
+                },
+                {
+                    "id": "wellfound",
+                    "name": "AngelList (Wellfound)",
+                    "category": "Professional Networks",
+                    "pricing_model": "freemium",
+                    "pricing_note": "$25/mo",
+                    "monthly_cost": 25.0,
+                    "access_type": "limited_api_or_web",
+                    "api_available": false,
+                    "base_url": "https://wellfound.com",
+                    "auth": {
+                        "type": "account"
+                    },
+                    "rate_limit": null,
+                    "documentation_url": "https://wellfound.com",
+                    "access_url": "https://wellfound.com",
+                    "test": null,
+                    "enabled": false,
+                    "priority": 2,
+                    "notes": "Limited API, mostly web access",
+                    "tca_module": "team_analysis",
+                    "data_points": ["startup_jobs", "hiring_data"]
+                }
+            ]
+        },
+        {
+            "id": "social_media_sentiment",
+            "name": "Social Media & Sentiment",
+            "sources": [{
+                    "id": "reddit",
+                    "name": "Reddit",
+                    "category": "Social Media & Sentiment",
+                    "pricing_model": "freemium",
+                    "pricing_note": "Free tier: 100 req/min",
+                    "monthly_cost": 0.0,
+                    "access_type": "oauth2",
+                    "api_available": true,
+                    "base_url": "https://oauth.reddit.com",
+                    "auth": {
+                        "type": "oauth2_client_credentials",
+                        "token_url": "https://www.reddit.com/api/v1/access_token"
+                    },
+                    "rate_limit": "100/min",
+                    "documentation_url": "https://www.reddit.com/dev/api",
+                    "access_url": "https://www.reddit.com/prefs/apps",
+                    "test": {
+                        "method": "GET",
+                        "url": "https://oauth.reddit.com/r/technology/hot"
+                    },
+                    "enabled": true,
+                    "priority": 1,
+                    "notes": "Community sentiment and discussion",
+                    "tca_module": "market_trends",
+                    "data_points": ["sentiment_score", "mention_count", "engagement"]
+                },
+                {
+                    "id": "twitter_x",
+                    "name": "Twitter (X)",
+                    "category": "Social Media & Sentiment",
+                    "pricing_model": "freemium",
+                    "pricing_note": "$100/mo basic",
+                    "monthly_cost": 100.0,
+                    "access_type": "bearer_token",
+                    "api_available": true,
+                    "base_url": "https://api.twitter.com/2",
+                    "auth": {
+                        "type": "bearer_token",
+                        "location": "header",
+                        "header_name": "Authorization",
+                        "format": "Bearer ${TWITTER_BEARER_TOKEN}"
+                    },
+                    "rate_limit": "300/15min",
+                    "documentation_url": "https://developer.twitter.com/en/docs",
+                    "access_url": "https://developer.twitter.com",
+                    "test": {
+                        "method": "GET",
+                        "url": "https://api.twitter.com/2/tweets/search/recent?query=bitcoin"
+                    },
+                    "enabled": false,
+                    "priority": 2,
+                    "notes": "Real-time sentiment stream",
+                    "tca_module": "market_trends",
+                    "data_points": ["tweet_volume", "sentiment", "influencer_mentions"]
+                }
+            ]
+        },
+        {
+            "id": "intellectual_property",
+            "name": "Intellectual Property",
+            "sources": [{
+                    "id": "uspto_patents",
+                    "name": "USPTO Patents",
+                    "category": "Intellectual Property",
+                    "pricing_model": "free",
+                    "pricing_note": "Free",
+                    "monthly_cost": 0.0,
+                    "access_type": "public_api",
+                    "api_available": true,
+                    "base_url": "https://developer.uspto.gov/ibd-api",
+                    "auth": {
+                        "type": "none"
+                    },
+                    "rate_limit": "5/sec",
+                    "documentation_url": "https://developer.uspto.gov/api-catalog",
+                    "access_url": "https://developer.uspto.gov/",
+                    "test": {
+                        "method": "GET",
+                        "url": "https://developer.uspto.gov/ibd-api/v1/patent/application?searchText=machine%20learning&start=0&rows=5"
+                    },
+                    "enabled": true,
+                    "priority": 1,
+                    "notes": "Patent applications and search",
+                    "tca_module": "ip_strength",
+                    "data_points": ["patent_count", "patent_citations", "tech_claims"]
+                },
+                {
+                    "id": "google_patents",
+                    "name": "Google Patents",
+                    "category": "Intellectual Property",
+                    "pricing_model": "free",
+                    "pricing_note": "Free",
+                    "monthly_cost": 0.0,
+                    "access_type": "bigquery_or_scraping",
+                    "api_available": false,
+                    "base_url": "https://patents.google.com",
+                    "auth": {
+                        "type": "none"
+                    },
+                    "rate_limit": null,
+                    "documentation_url": "https://patents.google.com",
+                    "access_url": "https://patents.google.com",
+                    "test": null,
+                    "enabled": false,
+                    "priority": 2,
+                    "notes": "Use BigQuery or scraping",
+                    "tca_module": "ip_strength",
+                    "data_points": ["global_patents", "patent_families"]
+                },
+                {
+                    "id": "wipo",
+                    "name": "WIPO",
+                    "category": "Intellectual Property",
+                    "pricing_model": "free",
+                    "pricing_note": "Free",
+                    "monthly_cost": 0.0,
+                    "access_type": "public_web_service",
+                    "api_available": true,
+                    "base_url": "https://www.wipo.int/web-services/",
+                    "auth": {
+                        "type": "none"
+                    },
+                    "rate_limit": null,
+                    "documentation_url": "https://www.wipo.int/web-services/",
+                    "access_url": "https://branddb.wipo.int",
+                    "test": {
+                        "method": "GET",
+                        "url": "https://branddb.wipo.int/branddb/en/textSearch?text=apple"
+                    },
+                    "enabled": true,
+                    "priority": 3,
+                    "notes": "Trademark and IP data",
+                    "tca_module": "ip_strength",
+                    "data_points": ["international_trademarks", "brand_protection"]
+                }
+            ]
+        },
+        {
+            "id": "vc_investment",
+            "name": "VC & Investment",
+            "sources": [{
+                    "id": "angellist_venture",
+                    "name": "AngelList Venture",
+                    "category": "VC & Investment",
+                    "pricing_model": "free",
+                    "pricing_note": "Free",
+                    "monthly_cost": 0.0,
+                    "access_type": "web_platform",
+                    "api_available": false,
+                    "base_url": "https://venture.angellist.com",
+                    "auth": {
+                        "type": "account"
+                    },
+                    "rate_limit": null,
+                    "documentation_url": "https://venture.angellist.com",
+                    "access_url": "https://venture.angellist.com",
+                    "test": null,
+                    "enabled": false,
+                    "priority": 1,
+                    "notes": "Investor/startup web platform",
+                    "tca_module": "valuation_analysis",
+                    "data_points": ["syndicate_data", "vc_rankings"]
+                },
+                {
+                    "id": "gust",
+                    "name": "Gust",
+                    "category": "VC & Investment",
+                    "pricing_model": "free",
+                    "pricing_note": "Free",
+                    "monthly_cost": 0.0,
+                    "access_type": "web_platform",
+                    "api_available": false,
+                    "base_url": "https://gust.com",
+                    "auth": {
+                        "type": "account"
+                    },
+                    "rate_limit": null,
+                    "documentation_url": "https://gust.com",
+                    "access_url": "https://gust.com",
+                    "test": null,
+                    "enabled": false,
+                    "priority": 2,
+                    "notes": "Startup-investor platform",
+                    "tca_module": "valuation_analysis",
+                    "data_points": ["angel_networks", "deal_flow"]
+                }
+            ]
+        },
+        {
+            "id": "news_media",
+            "name": "News & Media",
+            "sources": [{
+                    "id": "reuters",
+                    "name": "Reuters",
+                    "category": "News & Media",
+                    "pricing_model": "freemium",
+                    "pricing_note": "$40/mo",
+                    "monthly_cost": 40.0,
+                    "access_type": "enterprise_sales",
+                    "api_available": true,
+                    "base_url": null,
+                    "auth": {
+                        "type": "enterprise"
+                    },
+                    "rate_limit": null,
+                    "documentation_url": null,
+                    "access_url": "https://www.reuters.com/",
+                    "test": null,
+                    "enabled": false,
+                    "priority": 1,
+                    "notes": "Enterprise/API access via sales",
+                    "tca_module": "market_trends",
+                    "data_points": ["news_coverage", "market_news"]
+                },
+                {
+                    "id": "wall_street_journal",
+                    "name": "Wall Street Journal",
+                    "category": "News & Media",
+                    "pricing_model": "premium",
+                    "pricing_note": "$39/mo",
+                    "monthly_cost": 39.0,
+                    "access_type": "subscription",
+                    "api_available": false,
+                    "base_url": "https://www.wsj.com",
+                    "auth": {
+                        "type": "subscription"
+                    },
+                    "rate_limit": null,
+                    "documentation_url": null,
+                    "access_url": "https://www.wsj.com",
+                    "test": null,
+                    "enabled": false,
+                    "priority": 2,
+                    "notes": "Subscription content, no public API",
+                    "tca_module": "market_trends",
+                    "data_points": ["business_news", "industry_analysis"]
+                }
+            ]
+        }
+    ],
+    "starter_pack": [
+        "github",
+        "sec_edgar",
+        "world_bank",
+        "hacker_news",
+        "reddit",
+        "alpha_vantage",
+        "fred",
+        "pubmed",
+        "clinicaltrials_gov",
+        "uspto_patents"
+    ],
+    "tca_module_mapping": {
+        "company_analysis": ["crunchbase", "owler", "wayback_machine"],
+        "technology_score": ["github", "stack_overflow", "hugging_face", "papers_with_code", "pubmed"],
+        "financial_score": ["sec_edgar", "yahoo_finance", "alpha_vantage"],
+        "market_analysis": ["cb_insights", "similarweb", "fred", "world_bank", "bea", "bls"],
+        "market_trends": ["techcrunch", "product_hunt", "hacker_news", "google_trends", "reddit", "twitter_x", "reuters", "wall_street_journal"],
+        "regulatory_risk": ["clinicaltrials_gov", "eu_clinical_trials", "who_ictrp", "fda_orange_book", "fda_purple_book", "ema_clinical_data"],
+        "ip_strength": ["uspto_patents", "google_patents", "wipo"],
+        "team_analysis": ["linkedin", "wellfound"],
+        "valuation_analysis": ["pitchbook", "angellist_venture", "gust"]
+    },
+    "auth_groups": {
+        "no_auth": ["hacker_news", "world_bank", "clinicaltrials_gov", "wayback_machine", "uspto_patents", "fda_orange_book", "fda_purple_book", "wipo"],
+        "api_key": ["crunchbase", "similarweb", "alpha_vantage", "fred", "bea", "owler"],
+        "api_key_optional": ["stack_overflow", "bls", "pubmed"],
+        "bearer_token": ["github", "hugging_face", "product_hunt", "twitter_x"],
+        "oauth2": ["reddit"],
+        "header_required": ["sec_edgar"],
+        "scraping_or_dataset": ["techcrunch", "google_trends", "papers_with_code", "eu_clinical_trials", "who_ictrp", "google_patents"],
+        "enterprise_or_restricted": ["pitchbook", "cb_insights", "linkedin", "reuters"],
+        "web_only_or_subscription": ["wellfound", "angellist_venture", "gust", "wall_street_journal", "ema_clinical_data"]
+    }
+}

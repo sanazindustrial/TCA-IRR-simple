@@ -1,0 +1,276 @@
+{
+  "report_type": "triage",
+  "company_name": "Min's Company",
+  "founder_email": "minimal@example.com",
+  "founder_name": "Min Test",
+  "tracking_id": "3057fe78-e7b7-4e94-bf29-f1210e526dcc",
+  "generated_at": "2026-03-03T10:26:39.769166",
+  "final_tca_score": 4.9,
+  "recommendation": "PASS \u2014 Risk/reward profile not aligned",
+  "total_pages": 6,
+  "report_meta": {
+    "report_type": "triage",
+    "version": "2.0.0",
+    "total_pages": 6,
+    "branding": {
+      "title_prefix": "TCA Investment Risk Rating",
+      "subtitle": "Triage Report \u2014 SSD Integration",
+      "logo_path": null,
+      "footer_text": "Confidential \u2014 TCA TIRR Platform",
+      "color_primary": "#1E3A5F",
+      "color_accent": "#2F855A"
+    },
+    "generated_by": "TCA TIRR Analysis Engine v2.0"
+  },
+  "page_1_executive_summary": {
+    "title": "Triage Report \u2014 Min's Company",
+    "overall_score": 4.9,
+    "score_interpretation": "Significant concerns identified",
+    "investment_recommendation": "PASS \u2014 Risk/reward profile not aligned",
+    "analysis_completeness": 100.0,
+    "modules_run": 9
+  },
+  "page_2_tca_scorecard": {
+    "title": "TCA Scorecard \u2014 Category Breakdown",
+    "composite_score": 4.8,
+    "categories": [
+      {
+        "category": "Market Potential",
+        "raw_score": 5.0,
+        "weight": 20,
+        "flag": "yellow",
+        "strengths": "N/A",
+        "concerns": "Revenue $0 \u00e2\u20ac\u201d product-market fit not yet proven"
+      },
+      {
+        "category": "Technology Innovation",
+        "raw_score": 5.0,
+        "weight": 15,
+        "flag": "yellow",
+        "strengths": "No specific tech differentiators identified",
+        "concerns": "Limited technology differentiation signals"
+      },
+      {
+        "category": "Team Capability",
+        "raw_score": 5.0,
+        "weight": 25,
+        "flag": "yellow",
+        "strengths": "Team size not provided",
+        "concerns": "Detailed team background needs verification"
+      },
+      {
+        "category": "Business Model",
+        "raw_score": 5.0,
+        "weight": 20,
+        "flag": "yellow",
+        "strengths": "Revenue model data not provided",
+        "concerns": "Unit economics at scale need validation"
+      },
+      {
+        "category": "Financial Health",
+        "raw_score": 4.0,
+        "weight": 20,
+        "flag": "red",
+        "strengths": "Runway not provided",
+        "concerns": "Monitor cash efficiency"
+      }
+    ],
+    "top_strengths": [],
+    "areas_of_concern": [
+      "Market Potential",
+      "Technology Innovation",
+      "Team Capability"
+    ]
+  },
+  "page_3_risk_assessment": {
+    "title": "Risk Assessment & Flags",
+    "overall_risk_score": 6.0,
+    "total_flags": 7,
+    "high_risk_count": 5,
+    "risk_flags": [
+      {
+        "domain": "financial_risk",
+        "flag": "yellow",
+        "severity": 5.0,
+        "trigger": "Financial data incomplete",
+        "impact": "High \u00e2\u20ac\u201d limited runway",
+        "mitigation": "Raise follow-on or cut burn"
+      },
+      {
+        "domain": "market_risk",
+        "flag": "red",
+        "severity": 6.0,
+        "trigger": "0 customers \u00e2\u20ac\u201d concentration risk",
+        "impact": "High \u00e2\u20ac\u201d customer concentration",
+        "mitigation": "Expand customer base"
+      },
+      {
+        "domain": "team_risk",
+        "flag": "red",
+        "severity": 6.0,
+        "trigger": "Team size unknown",
+        "impact": "High \u00e2\u20ac\u201d very small team",
+        "mitigation": "Cross-train and hire for gaps"
+      },
+      {
+        "domain": "technology_risk",
+        "flag": "red",
+        "severity": 7.0,
+        "trigger": "Limited tech differentiation signals",
+        "impact": "Medium",
+        "mitigation": "Invest in IP protection and tech stack"
+      },
+      {
+        "domain": "execution_risk",
+        "flag": "yellow",
+        "severity": 5.0,
+        "trigger": "Growth metrics not provided",
+        "impact": "Medium",
+        "mitigation": "Improve delivery processes"
+      },
+      {
+        "domain": "regulatory_risk",
+        "flag": "red",
+        "severity": 6.0,
+        "trigger": "No compliance certifications mentioned",
+        "impact": "Medium",
+        "mitigation": "Pursue relevant compliance certifications"
+      },
+      {
+        "domain": "competitive_risk",
+        "flag": "red",
+        "severity": 7.0,
+        "trigger": "Limited competitive moats",
+        "impact": "Medium-high",
+        "mitigation": "Build partnerships and strengthen moat"
+      }
+    ],
+    "risk_domains": {
+      "financial_risk": {
+        "score": 5.0,
+        "level": "yellow",
+        "trigger": "Financial data incomplete",
+        "impact": "High \u00e2\u20ac\u201d limited runway",
+        "mitigation": "Raise follow-on or cut burn"
+      },
+      "market_risk": {
+        "score": 6.0,
+        "level": "red",
+        "trigger": "0 customers \u00e2\u20ac\u201d concentration risk",
+        "impact": "High \u00e2\u20ac\u201d customer concentration",
+        "mitigation": "Expand customer base"
+      },
+      "team_risk": {
+        "score": 6.0,
+        "level": "red",
+        "trigger": "Team size unknown",
+        "impact": "High \u00e2\u20ac\u201d very small team",
+        "mitigation": "Cross-train and hire for gaps"
+      },
+      "technology_risk": {
+        "score": 7.0,
+        "level": "red",
+        "trigger": "Limited tech differentiation signals",
+        "impact": "Medium",
+        "mitigation": "Invest in IP protection and tech stack"
+      },
+      "execution_risk": {
+        "score": 5.0,
+        "level": "yellow",
+        "trigger": "Growth metrics not provided",
+        "impact": "Medium",
+        "mitigation": "Improve delivery processes"
+      },
+      "regulatory_risk": {
+        "score": 6.0,
+        "level": "red",
+        "trigger": "No compliance certifications mentioned",
+        "impact": "Medium",
+        "mitigation": "Pursue relevant compliance certifications"
+      },
+      "competitive_risk": {
+        "score": 7.0,
+        "level": "red",
+        "trigger": "Limited competitive moats",
+        "impact": "Medium-high",
+        "mitigation": "Build partnerships and strengthen moat"
+      }
+    }
+  },
+  "page_4_market_and_team": {
+    "title": "Market Opportunity & Team Assessment",
+    "market_score": 5.0,
+    "tam": "Not provided",
+    "sam": "Not provided",
+    "som": "Not provided",
+    "growth_rate": "Not provided",
+    "competitive_position": "Emerging",
+    "competitive_advantages": [
+      "Not identified from submitted data"
+    ],
+    "team_score": 5.5,
+    "team_completeness": 0,
+    "founders": [
+      {
+        "role": "Team member",
+        "description": "Min Test",
+        "experience_score": 60
+      }
+    ],
+    "team_gaps": [
+      "CEO",
+      "CTO",
+      "VP Sales",
+      "CFO",
+      "VP Engineering"
+    ]
+  },
+  "page_5_financials_and_tech": {
+    "title": "Financial Health & Technology Assessment",
+    "financial_score": 5.0,
+    "revenue": 0.0,
+    "mrr": 0.0,
+    "burn_rate": 0.0,
+    "runway_months": 0.0,
+    "ltv_cac_ratio": 0,
+    "gross_margin": 0.0,
+    "technology_score": 5.0,
+    "trl": 5,
+    "ip_strength": "Weak \u00e2\u20ac\u201d no IP signals found \u00e2\u20ac\u201d No patent data found",
+    "tech_stack": [
+      "Not identified from submitted data"
+    ]
+  },
+  "page_6_recommendations": {
+    "title": "Investment Recommendation & Next Steps",
+    "final_decision": "PASS \u2014 Risk/reward profile not aligned",
+    "business_model_score": 5.3,
+    "business_model_type": "marketplace",
+    "growth_potential_score": 5.0,
+    "growth_projections": {
+      "year1": "N/A \u00e2\u20ac\u201d growth data not providedx",
+      "year2": "N/Ax",
+      "year3": "N/Ax"
+    },
+    "investment_readiness_score": 5.0,
+    "exit_potential": {
+      "timeline": "7+ years",
+      "strategic_fit": "Moderate"
+    },
+    "funding_recommendation": {
+      "round": "Pre-Seed",
+      "ask": "Not specified",
+      "valuation": "Not specified",
+      "arr_multiple": "N/A",
+      "valuation_range": "Insufficient data"
+    },
+    "next_steps": [
+      "1. Conduct management team interviews and reference checks",
+      "2. Verify financial projections with audited statements",
+      "3. Commission independent market sizing analysis",
+      "4. Perform detailed competitive landscape mapping",
+      "5. Engage technical due diligence on IP and architecture",
+      "6. Negotiate term sheet based on analysis findings"
+    ]
+  }
+}
