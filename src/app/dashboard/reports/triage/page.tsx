@@ -64,7 +64,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { runAnalysis } from '@/app/analysis/actions';
 import reportsApi from '@/lib/reports-api';
-import azureStorage from '@/lib/azure-storage-service';
+import { azureStorage } from '@/lib/azure-storage-service';
 import { externalSourcesConfig } from '@/lib/external-sources-config';
 import { getActiveManagedModuleIds, TRIAGE_SECTION_MODULE_MAP } from '@/lib/module-deck';
 
@@ -542,7 +542,7 @@ const DEFAULT_STANDARD_SECTIONS: ReportSection[] = [
 
 const getDefaultSelectedModulesForRole = (role: 'admin' | 'analyst' | 'standard'): string[] => {
   const triageModuleIds = new Set(TRIAGE_MODULES.map((module) => module.id));
-  const activeManaged = getActiveManagedModuleIds().filter((id) => triageModuleIds.has(id));
+  const activeManaged = getActiveManagedModuleIds(role).filter((id) => triageModuleIds.has(id));
 
   if (role === 'standard') {
     const standardModules = activeManaged.filter((id) => id === 'tca' || id === 'risk');
@@ -843,22 +843,9 @@ export default function TriageReportWizardPage() {
     if (step === 1) return !!pitchDeckFile; // Pitch deck is required for triage flow
     if (step === 2) return true; // Data Extraction is optional
     if (step === 3) {
-      const requiredChecks = [
-        companyName.trim().length > 0,
-        sector.length > 0,
-        stage.length > 0,
-        businessModel.trim().length > 0,
-        country.trim().length > 0,
-        stateRegion.trim().length > 0,
-        city.trim().length > 0,
-        oneLineDescription.trim().length > 0,
-        companyDescription.trim().length > 0,
-        productDescription.trim().length > 0,
-        pitchDeckPath.trim().length > 0,
-        isPositiveNumberText(annualRevenue),
-        isPositiveNumberText(preMoneyValuation),
-      ];
-      return requiredChecks.every(Boolean);
+      // Keep flow unblocked: only company name is required to continue.
+      // SSD completeness remains visible as guidance in the step panel.
+      return companyName.trim().length > 0;
     }
     if (step === 4) return pitchSummary.trim().length > 0;
     if (step === 5) return true;
@@ -1562,6 +1549,7 @@ export default function TriageReportWizardPage() {
                     <input
                       id="pitch-deck-input"
                       type="file"
+                      title="Select pitch deck file"
                       className="hidden"
                       accept=".pdf,.ppt,.pptx,.doc,.docx"
                       onChange={(e) => {
@@ -1955,6 +1943,8 @@ export default function TriageReportWizardPage() {
                       className="hidden"
                       multiple
                       accept=".pdf,.docx,.pptx,.xlsx,.txt,.csv"
+                      aria-label="Upload supporting documents (PDF, Word, PowerPoint, Excel, or CSV files)"
+                      title="Upload supporting documents"
                       onChange={(e) => {
                         const files = Array.from(e.target.files || []);
                         setSupportingFiles(prev => [...prev, ...files]);

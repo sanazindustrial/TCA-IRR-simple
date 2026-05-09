@@ -114,6 +114,14 @@ const EXTERNAL_SOURCES = externalSourcesConfig
     free: s.pricing === 'Free' || s.pricing === 'Freemium',
   }));
 
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
 interface ExternalDataResult {
   source: string;
   success: boolean;
@@ -745,8 +753,8 @@ export default function DueDiligenceWorkflowPage() {
           ? sectionData
           : `${s.description} — Pending analyst review.`;
         return `<section style="margin-bottom:2.25rem;page-break-inside:avoid;">
-  <h2 style="font-size:1.05rem;font-weight:700;color:#1e3a5f;border-bottom:2px solid #e2e8f0;padding-bottom:0.4rem;margin-bottom:0.75rem;">${s.title}</h2>
-  <p style="color:#374151;font-size:0.9rem;line-height:1.75;">${bodyText}</p>
+  <h2 style="font-size:1.05rem;font-weight:700;color:#1e3a5f;border-bottom:2px solid #e2e8f0;padding-bottom:0.4rem;margin-bottom:0.75rem;">${escapeHtml(s.title)}</h2>
+  <p style="color:#374151;font-size:0.9rem;line-height:1.75;">${escapeHtml(bodyText)}</p>
 </section>`;
       })
       .join('\n');
@@ -760,9 +768,9 @@ export default function DueDiligenceWorkflowPage() {
 <body style="font-family:Georgia,'Times New Roman',serif;max-width:860px;margin:0 auto;padding:2.5rem 2rem;color:#1e293b;line-height:1.75;">
   <header style="text-align:center;border-bottom:3px solid #1e3a5f;padding-bottom:1.5rem;margin-bottom:2.5rem;">
     <p style="font-size:0.75rem;letter-spacing:0.12em;text-transform:uppercase;color:#94a3b8;margin:0 0 0.4rem;">Confidential — Not for Distribution</p>
-    <h1 style="font-size:1.9rem;font-weight:800;color:#1e3a5f;margin:0 0 0.4rem;">${companyName}</h1>
-    <p style="font-size:1rem;color:#475569;margin:0 0 0.5rem;">${dealLabel} Due Diligence Report</p>
-    <p style="font-size:0.8rem;color:#94a3b8;margin:0;">${companyIndustry ? companyIndustry + '&nbsp;&middot;&nbsp;' : ''}${now}</p>
+    <h1 style="font-size:1.9rem;font-weight:800;color:#1e3a5f;margin:0 0 0.4rem;">${escapeHtml(companyName)}</h1>
+    <p style="font-size:1rem;color:#475569;margin:0 0 0.5rem;">${escapeHtml(dealLabel)} Due Diligence Report</p>
+    <p style="font-size:0.8rem;color:#94a3b8;margin:0;">${companyIndustry ? escapeHtml(companyIndustry) + '&nbsp;&middot;&nbsp;' : ''}${now}</p>
   </header>
 ${sectionsHtml}
   <footer style="border-top:1px solid #e2e8f0;padding-top:1rem;margin-top:2rem;text-align:center;color:#94a3b8;font-size:0.72rem;">

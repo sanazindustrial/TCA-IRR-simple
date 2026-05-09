@@ -689,7 +689,7 @@ export default function UserManagementPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.detail || 'Failed to invite user');
+        throw new Error(data.detail || data.message || 'Failed to invite user');
       }
 
       toast({

@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import Dict, Any, List, Optional
 import asyncpg
 
-from app.db import get_db, db_manager
+from app.db import get_db, db_manager  # type: ignore[import]
 from .auth import get_current_user
 
 logger = logging.getLogger(__name__)
@@ -30,6 +30,71 @@ router = APIRouter()
 def _as_dict(record: Optional[asyncpg.Record]) -> Dict[str, Any]:
     """Convert asyncpg.Record to a plain dict for safe access."""
     return dict(record) if record else {}
+
+
+async def _safe_fetch_user_activity(
+    db: asyncpg.Connection,
+    start_dt: datetime,
+    end_dt: datetime,
+) -> List[asyncpg.Record]:
+    """Return user activity while tolerating schema variations in users table."""
+    if not (await _table_exists(db, 'users') and await _table_exists(db, 'company_analyses')):
+        return []
+
+    candidate_queries = [
+        """
+            SELECT
+                u.username,
+                u.email,
+                COUNT(ca.id) as analysis_count
+            FROM users u
+            LEFT JOIN company_analyses ca ON ca.user_id = u.id
+                AND ca.created_at >= $1 AND ca.created_at <= $2
+            WHERE u.is_active = true
+            GROUP BY u.id, u.username, u.email
+            ORDER BY analysis_count DESC
+            LIMIT 10
+        """,
+        """
+            SELECT
+                COALESCE(u.full_name, u.email) as username,
+                u.email,
+                COUNT(ca.id) as analysis_count
+            FROM users u
+            LEFT JOIN company_analyses ca ON ca.user_id = u.id
+                AND ca.created_at >= $1 AND ca.created_at <= $2
+            WHERE u.is_active = true
+            GROUP BY u.id, u.full_name, u.email
+            ORDER BY analysis_count DESC
+            LIMIT 10
+        """,
+        """
+            SELECT
+                u.email as username,
+                u.email,
+                COUNT(ca.id) as analysis_count
+            FROM users u
+            LEFT JOIN company_analyses ca ON ca.user_id = u.id
+                AND ca.created_at >= $1 AND ca.created_at <= $2
+            WHERE u.is_active = true
+            GROUP BY u.id, u.email
+            ORDER BY analysis_count DESC
+            LIMIT 10
+        """,
+    ]
+
+    for query in candidate_queries:
+        try:
+            return await db.fetch(query, start_dt, end_dt)
+        except (asyncpg.exceptions.UndefinedColumnError, asyncpg.exceptions.GroupingError):
+            continue
+        except asyncpg.exceptions.UndefinedTableError:
+            return []
+        except Exception as exc:
+            logger.warning("User activity query failed; using empty fallback: %s", exc)
+            return []
+
+    return []
 
 
 @router.get("/summary")
@@ -84,20 +149,8 @@ async def get_cost_summary(
                 WHERE created_at >= $1 AND created_at <= $2
             """, start_dt, end_dt))
         
-        # Get user activity
-        user_activity = await db.fetch("""
-            SELECT 
-                u.username,
-                u.email,
-                COUNT(ca.id) as analysis_count
-            FROM users u
-            LEFT JOIN company_analyses ca ON ca.user_id = u.id 
-                AND ca.created_at >= $1 AND ca.created_at <= $2
-            WHERE u.is_active = true
-            GROUP BY u.id, u.username, u.email
-            ORDER BY analysis_count DESC
-            LIMIT 10
-        """, start_dt, end_dt)
+        # Get user activity (schema-safe)
+        user_activity = await _safe_fetch_user_activity(db, start_dt, end_dt)
         
         # Calculate estimated costs based on usage
         total_analyses = int(analysis_stats.get('total_analyses', 0) or 0)
@@ -133,21 +186,23 @@ async def get_cost_summary(
         ]
         
         # Get daily cost trends
-        daily_trends = await db.fetch("""
-            SELECT 
-                DATE(created_at) as date,
-                COUNT(*) as analyses
-            FROM company_analyses
-            WHERE created_at >= $1 AND created_at <= $2
-            GROUP BY DATE(created_at)
-            ORDER BY date DESC
-            LIMIT 7
-        """, start_dt, end_dt)
+        daily_trends = []
+        if await _table_exists(db, 'company_analyses'):
+            daily_trends = await db.fetch("""
+                SELECT
+                    DATE(created_at) as date,
+                    COUNT(*) as analyses
+                FROM company_analyses
+                WHERE created_at >= $1 AND created_at <= $2
+                GROUP BY DATE(created_at)
+                ORDER BY date DESC
+                LIMIT 7
+            """, start_dt, end_dt)
         
         trends = [
             {
-                "date": row['date'].strftime("%m/%d/%Y"),
-                "cost": round(row['analyses'] * ai_cost_per_analysis, 2)
+                "date": row['date'].strftime("%m/%d/%Y") if hasattr(row['date'], 'strftime') else str(row['date']),
+                "cost": round(int(row['analyses'] or 0) * ai_cost_per_analysis, 2)
             }
             for row in daily_trends
         ]
@@ -274,7 +329,7 @@ async def get_budget_status(
             WHERE created_at >= $1
         """, start_of_month)
         
-        monthly_cost = monthly_analyses * 0.45
+        monthly_cost = int(monthly_analyses or 0) * 0.45
         monthly_budget = 500.00  # Default budget
         
         return {
@@ -304,12 +359,13 @@ async def get_budget_status(
 async def _table_exists(db: asyncpg.Connection, table_name: str) -> bool:
     """Check if a table exists in the database"""
     try:
-        return await db.fetchval("""
+        result = await db.fetchval("""
             SELECT EXISTS (
                 SELECT FROM information_schema.tables 
                 WHERE table_name = $1
             )
         """, table_name)
+        return bool(result)
     except Exception:
         return False
 

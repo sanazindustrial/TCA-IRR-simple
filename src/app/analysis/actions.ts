@@ -303,6 +303,16 @@ export async function runAnalysis(
       framework,
       sector: backendSectorMap[framework],
       legacySector: sectorMap[framework],
+      // Backend validates snake_case aliases at top level.
+      company_name: userData?.companyName || extractedCompany.company_name || '',
+      industry_vertical:
+        extractedCompany.industry_vertical ||
+        userData?.sector ||
+        backendSectorMap[framework],
+      industry:
+        extractedCompany.industry_vertical ||
+        userData?.sector ||
+        backendSectorMap[framework],
 
       // Company data — real data from uploaded documents
       company_data: {
@@ -481,7 +491,7 @@ export async function runAnalysis(
 
     // Add timeout to the fetch request
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 second timeout
 
     let response: Response;
 

@@ -1190,17 +1190,41 @@ const normalizeSectorValue = (value: unknown): string => {
     saas: 'Technology / SaaS',
     technology: 'Technology / SaaS',
     tech: 'Technology / SaaS',
+    software: 'Technology / SaaS',
     medtech: 'Healthcare / MedTech',
     healthcare: 'Healthcare / MedTech',
+    health: 'Healthcare / MedTech',
     biotech: 'Biotechnology',
+    bio: 'Biotechnology',
     fintech: 'FinTech',
+    finance: 'FinTech',
+    financial: 'FinTech',
     cleantech: 'CleanTech / Energy',
+    energy: 'CleanTech / Energy',
+    green: 'CleanTech / Energy',
     ecommerce: 'E-commerce / Retail',
+    retail: 'E-commerce / Retail',
+    commerce: 'E-commerce / Retail',
     ai: 'AI / Deep Tech',
     deeptech: 'AI / Deep Tech',
+    ml: 'AI / Deep Tech',
+    transportation: 'Other',
+    mobility: 'Other',
+    logistics: 'Other',
+    marketplace: 'Other',
+    platform: 'Other',
+    parking: 'Other',
+    realestate: 'Other',
+    proptech: 'Other',
+    edtech: 'Other',
+    legaltech: 'Other',
+    hrtech: 'Other',
+    food: 'Other',
+    agtech: 'Other',
   };
 
-  return aliases[compact] ?? '';
+  // Fall back to 'Other' so the field is never left blank from extraction
+  return aliases[compact] ?? 'Other';
 };
 
 const parseHumanNumberText = (value: string): number | null => {
@@ -1696,22 +1720,8 @@ export default function TriageReportWizardPage() {
     if (step === 1) return !!pitchDeckFile; // Pitch deck is required for triage flow
     if (step === 2) return true; // Data Extraction is optional
     if (step === 3) {
-      const requiredChecks = [
-        companyName.trim().length > 0,
-        sector.length > 0,
-        stage.length > 0,
-        businessModel.trim().length > 0,
-        country.trim().length > 0,
-        stateRegion.trim().length > 0,
-        city.trim().length > 0,
-        oneLineDescription.trim().length > 0,
-        companyDescription.trim().length > 0,
-        productDescription.trim().length > 0,
-        pitchDeckPath.trim().length > 0 || !!pitchDeckFile,
-        annualRevenue.trim().length > 0,
-        preMoneyValuation.trim().length > 0,
-      ];
-      return requiredChecks.every(Boolean);
+      // Only company name is required to advance; other fields are optional
+      return companyName.trim().length > 0;
     }
     if (step === 4) return pitchSummary.trim().length > 0;
     if (step === 5) return true;
@@ -2704,6 +2714,8 @@ export default function TriageReportWizardPage() {
                       id="pitch-deck-input"
                       type="file"
                       className="hidden"
+                      aria-label="Upload pitch deck file"
+                      title="Upload pitch deck file"
                       accept=".pdf,.ppt,.pptx,.doc,.docx"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
@@ -3096,6 +3108,8 @@ export default function TriageReportWizardPage() {
                       type="file"
                       className="hidden"
                       multiple
+                      aria-label="Upload supporting company documents"
+                      title="Upload supporting company documents"
                       accept=".pdf,.docx,.pptx,.xlsx,.txt,.csv"
                       onChange={(e) => {
                         const files = Array.from(e.target.files as unknown as File[] || []);
