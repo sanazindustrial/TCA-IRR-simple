@@ -564,6 +564,20 @@ export default function SimulationPage() {
         if (data) {
           setAnalysisData(data);
 
+          let selectedModulesFromTriage: string[] = [];
+          try {
+            const rawSelected = localStorage.getItem('triageSelectedModules');
+            if (rawSelected) {
+              const parsed = JSON.parse(rawSelected);
+              if (Array.isArray(parsed)) {
+                selectedModulesFromTriage = parsed.filter((item): item is string => typeof item === 'string');
+              }
+            }
+          } catch (e) {
+            console.warn('Failed to parse triageSelectedModules:', e);
+          }
+          const selectedModuleSet = new Set(selectedModulesFromTriage);
+
           const initialScores: Record<string, ScoreRow[]> = {};
 
           // Module 1: TCA Scorecard - Use REAL data from analysis
@@ -750,11 +764,12 @@ export default function SimulationPage() {
             const def = MODULE_DEFINITIONS[moduleId] || { name: moduleId, description: '' };
             // Use saved config if available, otherwise default values
             const savedConfig = savedConfigs[moduleId];
+            const enabledBySelection = selectedModuleSet.size === 0 || selectedModuleSet.has(moduleId);
             configs[moduleId] = {
               id: moduleId,
               name: def.name,
               description: def.description,
-              enabled: savedConfig?.enabled ?? true,
+              enabled: savedConfig?.enabled ?? enabledBySelection,
               simulated: savedConfig?.simulated ?? true, // Default to simulating all modules
             };
           });
@@ -905,7 +920,22 @@ export default function SimulationPage() {
           locked: true,
           settingsVersionId: selectedVersion?.id,
           settingsVersionName: selectedVersion?.version_name
-        }
+        },
+        triageConfig: {
+          selectedModules: Object.entries(moduleConfigs)
+            .filter(([, config]) => config.enabled)
+            .map(([moduleId]) => moduleId),
+          reportSections: (() => {
+            try {
+              const rawSections = localStorage.getItem('triageReportSections');
+              if (!rawSections) return [];
+              const parsed = JSON.parse(rawSections);
+              return Array.isArray(parsed) ? parsed : [];
+            } catch {
+              return [];
+            }
+          })(),
+        },
       };
 
       // Save to localStorage
@@ -913,6 +943,7 @@ export default function SimulationPage() {
       localStorage.setItem('simulationAdjusted', 'true');
       localStorage.setItem('triageReportReady', 'true');
       localStorage.setItem('currentSimulationId', simId);
+      localStorage.setItem('triageSelectedModules', JSON.stringify(finalData.triageConfig.selectedModules));
 
       // Update unified record with simulation results
       unifiedRecordTracking.addSimulationResults(
