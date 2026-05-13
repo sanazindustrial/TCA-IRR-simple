@@ -40,6 +40,15 @@ const defaultTriageSectionsAdmin = [
     { id: 'market-team-analysis', title: 'Page 8: Market & Team', active: true, description: 'Market opportunity and team strength analysis' },
     { id: 'ceo-questions', title: 'Page 9: CEO Questions', active: true, description: 'Strategic questions for the CEO' },
     { id: 'final-recommendation', title: 'Page 10: Final Recommendation', active: true, description: 'Investment decision and next steps' },
+    { id: 'financial-analysis', title: 'Financial Analysis Module', active: true, description: 'Revenue model, unit economics, financial projections, and funding requirements' },
+    { id: 'economic-analysis', title: 'Economic Analysis Module', active: true, description: 'Industry structure, pricing power, macro indicators, and cycle resilience' },
+    { id: 'social-analysis', title: 'Social Analysis Module', active: true, description: 'Social impact, demographic fit, cultural adoption, and stakeholder trust' },
+    { id: 'marketing-analysis', title: 'Marketing Analysis Module', active: true, description: 'Positioning, digital presence, spend efficiency, and GTM execution' },
+    { id: 'environmental-analysis', title: 'Environmental Analysis Module', active: true, description: 'Environmental impact, climate risk, certification, and ESG alignment' },
+    { id: 'strategic-fit', title: 'Strategic Fit Module', active: true, description: 'Investor alignment, corporate synergy, market timing, and ecosystem fit' },
+    { id: 'founder-fit', title: 'Founder Fit Module', active: true, description: 'Vision, domain expertise, leadership, execution, and investor readiness' },
+    { id: 'funder-readiness', title: 'Funder Readiness Module', active: true, description: 'Investor compatibility, funding stage alignment, and readiness score' },
+    { id: 'competitive-landscape', title: 'Competitive Landscape Module', active: true, description: 'Long-term moat, expansion strategy, platform potential, and defensibility' },
 ];
 
 const defaultTriageSectionsStandard = [
@@ -53,6 +62,15 @@ const defaultTriageSectionsStandard = [
     { id: 'market-team-analysis', title: 'Page 8: Market & Team', active: true, description: 'Market opportunity and team strength analysis' },
     { id: 'ceo-questions', title: 'Page 9: CEO Questions', active: true, description: 'Strategic questions for the CEO' },
     { id: 'final-recommendation', title: 'Page 10: Final Recommendation', active: true, description: 'Investment decision and next steps' },
+    { id: 'financial-analysis', title: 'Financial Analysis Module', active: true, description: 'Revenue model, unit economics, financial projections, and funding requirements' },
+    { id: 'economic-analysis', title: 'Economic Analysis Module', active: true, description: 'Industry structure, pricing power, macro indicators, and cycle resilience' },
+    { id: 'social-analysis', title: 'Social Analysis Module', active: true, description: 'Social impact, demographic fit, cultural adoption, and stakeholder trust' },
+    { id: 'marketing-analysis', title: 'Marketing Analysis Module', active: true, description: 'Positioning, digital presence, spend efficiency, and GTM execution' },
+    { id: 'environmental-analysis', title: 'Environmental Analysis Module', active: true, description: 'Environmental impact, climate risk, certification, and ESG alignment' },
+    { id: 'strategic-fit', title: 'Strategic Fit Module', active: true, description: 'Investor alignment, corporate synergy, market timing, and ecosystem fit' },
+    { id: 'founder-fit', title: 'Founder Fit Module', active: true, description: 'Vision, domain expertise, leadership, execution, and investor readiness' },
+    { id: 'funder-readiness', title: 'Funder Readiness Module', active: true, description: 'Investor compatibility, funding stage alignment, and readiness score' },
+    { id: 'competitive-landscape', title: 'Competitive Landscape Module', active: true, description: 'Long-term moat, expansion strategy, platform potential, and defensibility' },
 ];
 
 const defaultDdSections = [
@@ -650,6 +668,23 @@ export default function ReportConfigurationPage() {
         });
     };
 
+    const handleBulkAction = (reportType: 'triageAdmin' | 'triageStandard' | 'dd' | 'startupSteroid', action: 'select' | 'deselect') => {
+        const newActive = action === 'select';
+        if (reportType === 'triageAdmin') {
+            setTriageSectionsAdmin(triageSectionsAdmin.map(s => ({ ...s, active: newActive })));
+        } else if (reportType === 'triageStandard') {
+            setTriageSectionsStandard(triageSectionsStandard.map(s => ({ ...s, active: newActive })));
+        } else if (reportType === 'dd') {
+            setDdSections(ddSections.map(s => ({ ...s, active: newActive })));
+        } else if (reportType === 'startupSteroid') {
+            setStartupSteroidSections(startupSteroidSections.map(s => ({ ...s, active: newActive })));
+        }
+        toast({
+            title: `Bulk Action: ${action === 'select' ? 'Selected' : 'Deselected'} All`,
+            description: `All sections have been ${action === 'select' ? 'enabled' : 'disabled'}.`,
+        });
+    };
+
     const handleSsdTest = async () => {
         setSsdTestStatus('testing');
         setSsdTestResult('');
@@ -748,13 +783,21 @@ export default function ReportConfigurationPage() {
                                 </TabsList>
                                 <TabsContent value="admin" className="mt-4">
                                     <div className="flex justify-end mb-4">
-                                        <Button variant="ghost" onClick={() => handleReset('triageAdmin')}><RotateCcw className="mr-2" /> Reset to Default</Button>
+                                            <div className="flex gap-2">
+                                                <Button size="sm" variant="outline" onClick={() => handleBulkAction('triageAdmin', 'select')}>Select All</Button>
+                                                <Button size="sm" variant="outline" onClick={() => handleBulkAction('triageAdmin', 'deselect')}>Deselect All</Button>
+                                                <Button variant="ghost" onClick={() => handleReset('triageAdmin')}><RotateCcw className="mr-2" /> Reset to Default</Button>
+                                            </div>
                                     </div>
                                     <ReportConfigTable sections={triageSectionsAdmin} onUpdate={(id, field, value) => handleUpdate('triageAdmin', id, field, value)} onRemove={(id) => handleRemove('triageAdmin', id)} setSections={setTriageSectionsAdmin} />
                                 </TabsContent>
                                 <TabsContent value="standard" className="mt-4">
                                     <div className="flex justify-end mb-4">
-                                        <Button variant="ghost" onClick={() => handleReset('triageStandard')}><RotateCcw className="mr-2" /> Reset to Default</Button>
+                                            <div className="flex gap-2">
+                                                <Button size="sm" variant="outline" onClick={() => handleBulkAction('triageStandard', 'select')}>Select All</Button>
+                                                <Button size="sm" variant="outline" onClick={() => handleBulkAction('triageStandard', 'deselect')}>Deselect All</Button>
+                                                <Button variant="ghost" onClick={() => handleReset('triageStandard')}><RotateCcw className="mr-2" /> Reset to Default</Button>
+                                            </div>
                                     </div>
                                     <ReportConfigTable sections={triageSectionsStandard} onUpdate={(id, field, value) => handleUpdate('triageStandard', id, field, value)} onRemove={(id) => handleRemove('triageStandard', id)} setSections={setTriageSectionsStandard} />
                                 </TabsContent>
@@ -780,7 +823,11 @@ export default function ReportConfigurationPage() {
                                     <CardTitle>Due Diligence Report Sections</CardTitle>
                                     <CardDescription>Enable, disable, edit, add, or remove sections for the Due Diligence report. Drag to reorder.</CardDescription>
                                 </div>
-                                <Button variant="ghost" onClick={() => handleReset('dd')}><RotateCcw className="mr-2" /> Reset to Default</Button>
+                                    <div className="flex gap-2">
+                                        <Button size="sm" variant="outline" onClick={() => handleBulkAction('dd', 'select')}>Select All</Button>
+                                        <Button size="sm" variant="outline" onClick={() => handleBulkAction('dd', 'deselect')}>Deselect All</Button>
+                                        <Button variant="ghost" onClick={() => handleReset('dd')}><RotateCcw className="mr-2" /> Reset to Default</Button>
+                                    </div>
                             </div>
                         </CardHeader>
                         <CardContent>
@@ -868,7 +915,11 @@ export default function ReportConfigurationPage() {
                                         <CardTitle>Startup Steroid Triage Report Sections (10-Page Format)</CardTitle>
                                         <CardDescription>Configure sections included in the automated Startup Steroid triage report</CardDescription>
                                     </div>
-                                    <Button variant="ghost" onClick={() => handleReset('startupSteroid')}><RotateCcw className="mr-2" /> Reset to Default</Button>
+                                        <div className="flex gap-2">
+                                            <Button size="sm" variant="outline" onClick={() => handleBulkAction('startupSteroid', 'select')}>Select All</Button>
+                                            <Button size="sm" variant="outline" onClick={() => handleBulkAction('startupSteroid', 'deselect')}>Deselect All</Button>
+                                            <Button variant="ghost" onClick={() => handleReset('startupSteroid')}><RotateCcw className="mr-2" /> Reset to Default</Button>
+                                        </div>
                                 </div>
                             </CardHeader>
                             <CardContent>

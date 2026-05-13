@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useAiInsight } from '@/hooks/use-ai-insight';
+import { AiInsightPanel, AiErrorExplainer } from '@/components/shared/AiInsightPanel';
 import { useRouter } from 'next/navigation';
 import reportsApi from '@/lib/reports-api';
 import { Button } from '@/components/ui/button';
@@ -212,6 +214,9 @@ export default function SSDReportPage() {
   const [humanReviewNotes, setHumanReviewNotes] = useState('');
   const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // AI Insight
+  const { insight: aiInsight, status: aiStatus, fetch: fetchAiInsight } = useAiInsight();
+
   // Tunnel / file-upload state
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [tunnelStatusCheck, setTunnelStatusCheck] = useState<'checking' | 'connected' | 'degraded' | 'disconnected' | null>(null);
@@ -369,6 +374,23 @@ export default function SSDReportPage() {
       if (!res.ok) throw new Error(`Report fetch failed: ${res.status}`);
       const data = await res.json();
       setReportContent(data);
+
+      // Trigger AI insight on report load
+      const finalScore = (data as { final_score?: number }).final_score;
+      const rec = (data as { recommendation?: string }).recommendation;
+      const companyForPrompt = submitForm.company_name || trackingId;
+      const ssdPrompt = [
+        `SSD (Startup Screening Document) report for ${companyForPrompt}.`,
+        finalScore != null ? `Final score: ${finalScore.toFixed(1)}/10.` : '',
+        rec ? `Initial recommendation: ${rec}.` : '',
+        'Provide: brief investment quality summary, key risks identified, confidence (0-1), and 3 suggested next steps for the reviewer.',
+      ].filter(Boolean).join(' ');
+      fetchAiInsight('recommend', ssdPrompt, {
+        company: companyForPrompt,
+        trackingId,
+        finalScore,
+        recommendation: rec,
+      });
     } catch (err) {
       toast({
         variant: 'destructive',
@@ -1069,12 +1091,8 @@ export default function SSDReportPage() {
               ))}
             </div>
           ) : logsError ? (
-            <div className="py-8 text-center">
-              <XCircle className="size-10 text-destructive mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground">{logsError}</p>
-              <Button variant="outline" size="sm" onClick={fetchLogs} className="mt-3">
-                Retry
-              </Button>
+            <div className="py-4 space-y-3">
+              <AiErrorExplainer context="ssd" error={logsError} onRetry={fetchLogs} />
             </div>
           ) : logs.length === 0 ? (
             <div className="py-12 text-center">
@@ -1192,6 +1210,18 @@ export default function SSDReportPage() {
                   )}
                 </div>
               )}
+
+              {/* AI Insight for this SSD report */}
+              <AiInsightPanel
+                status={aiStatus}
+                insight={aiInsight}
+                title="AI Report Quality Summary"
+                onRetry={() => {
+                  const finalScore = (reportContent as { final_score?: number }).final_score;
+                  const prompt = `Re-analyze SSD report for ${submitForm.company_name || viewingReport}. Score: ${finalScore?.toFixed(1) ?? 'unknown'}/10.`;
+                  fetchAiInsight('recommend', prompt, { company: submitForm.company_name, trackingId: viewingReport });
+                }}
+              />
               {/* Raw JSON for other fields */}
               <div className="space-y-1">
                 <p className="text-sm font-semibold">Full Report Data</p>

@@ -226,14 +226,13 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
             )}
 
             <SidebarGroup>
-                <SidebarGroupLabel>Analysis Modules</SidebarGroupLabel>
                 <SidebarMenu>
                     <Collapsible open={modulesOpen} onOpenChange={setModulesOpen} className="group/collapsible">
                         <SidebarMenuItem>
                             <CollapsibleTrigger asChild>
                                 <SidebarMenuButton tooltip="Analysis Modules">
                                     <Layers />
-                                    <span>Modules</span>
+                                        <span>Analysis Modules</span>
                                     <ChevronDown className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
                                 </SidebarMenuButton>
                             </CollapsibleTrigger>
@@ -279,18 +278,6 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
                                         <SidebarMenuSubButton href="/analysis/modules/gap" isActive={pathname === '/analysis/modules/gap'}>
                                             <Calculator className="size-4" />
                                             <span>Gap Analysis</span>
-                                        </SidebarMenuSubButton>
-                                    </SidebarMenuSubItem>
-                                    <SidebarMenuSubItem>
-                                        <SidebarMenuSubButton href="/analysis/modules/founderFit" isActive={pathname === '/analysis/modules/founderFit'}>
-                                            <UserIcon className="size-4" />
-                                            <span>Founder Fit Analysis</span>
-                                        </SidebarMenuSubButton>
-                                    </SidebarMenuSubItem>
-                                    <SidebarMenuSubItem>
-                                        <SidebarMenuSubButton href="/analysis/modules/strategicFit" isActive={pathname === '/analysis/modules/strategicFit'}>
-                                            <Target className="size-4" />
-                                            <span>Strategic Fit Matrix</span>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
                                     <SidebarMenuSubItem>
@@ -412,6 +399,14 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
                                     <SidebarMenuButton href="/dashboard/user-requests" isActive={pathname === '/dashboard/user-requests'} tooltip="User Requests">
                                         <MessageSquare />
                                         <span>User Requests</span>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            )}
+                            {isAdmin && (
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton href="/dashboard/ai-management" isActive={pathname === '/dashboard/ai-management'} tooltip="AI Management">
+                                        <BrainCircuit />
+                                        <span>AI Management</span>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
                             )}

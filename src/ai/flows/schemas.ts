@@ -39,6 +39,22 @@ const TcaScorecardCategorySchema = z.object({
   concerns: z
     .string()
     .describe('Key concerns or weaknesses identified for this category.'),
+  confidence: z
+    .number()
+    .min(0)
+    .max(1)
+    .optional()
+    .describe('AI confidence score between 0 and 1 for this category assessment.'),
+  evidence: z
+    .string()
+    .optional()
+    .describe('Specific evidence extracted from submitted data that supports the score.'),
+  benchmarkPercentile: z
+    .number()
+    .min(0)
+    .max(100)
+    .optional()
+    .describe('Estimated benchmark percentile relative to comparable startups.'),
   aiRecommendation: z.string().describe("A concise, actionable recommendation from the AI for this specific category."),
 });
 
@@ -236,6 +252,31 @@ export const GenerateGrowthClassifierOutputSchema = z.object({
     contribution: z.string().describe('Model contribution description'),
   })).optional(),
   interpretation: z.string().optional(),
+  structuredOutput: z.object({
+    model_predictions: z.object({
+      linear: z.number(),
+      tree: z.number(),
+      rf: z.number(),
+      xgb: z.number(),
+      lstm: z.number(),
+      heuristic: z.number(),
+    }),
+    model_weights: z.object({
+      linear: z.number(),
+      tree: z.number(),
+      rf: z.number(),
+      xgb: z.number(),
+      lstm: z.number(),
+      heuristic: z.number(),
+    }),
+    composite_growth_score: z.number(),
+    risk_adjustment: z.number(),
+    final_growth_score: z.number(),
+    growth_module_score: z.number(),
+    tier: z.enum(['Tier 1', 'Tier 2', 'Tier 3']),
+    meaning: z.enum(['High Growth', 'Moderate Growth', 'Low Growth']),
+    interpretation: z.string(),
+  }).optional(),
 });
 export type GenerateGrowthClassifierOutput = z.infer<typeof GenerateGrowthClassifierOutputSchema>;
 
@@ -257,6 +298,24 @@ export const GenerateGapAnalysisOutputSchema = z.object({
     type: z.enum(['Priority Area', 'Quick Win', 'Improvement Roadmap']),
   })),
   interpretation: z.string(),
+  structuredOutput: z.object({
+    gap_severity_table: z.array(z.object({
+      category: z.string(),
+      actual_score: z.number(),
+      target_score: z.number(),
+      delta: z.number(),
+      severity: z.enum(['Critical', 'Major', 'Minor', 'No material gap']),
+      weighted_gap: z.number(),
+      mitigation_required: z.boolean(),
+    })),
+    critical_count: z.number(),
+    major_count: z.number(),
+    gap_composite: z.number(),
+    readiness_index: z.number(),
+    readiness: z.enum(['Investment Ready', 'Prescreen Ready', 'Early Stage', 'Reject Candidate']),
+    module_score: z.number(),
+    interpretation: z.string(),
+  }).optional(),
 }).describe('Output for Gap Analysis.');
 export type GenerateGapAnalysisOutput = z.infer<typeof GenerateGapAnalysisOutputSchema>;
 
@@ -272,6 +331,28 @@ export const GenerateFounderFitAnalysisOutputSchema = z.object({
     stage: z.string().describe("Typical investment stage (e.g., Seed, Series A)."),
   })),
   interpretation: z.string().describe("AI-driven analysis of funding readiness and investor fit."),
+  structuredOutput: z.object({
+    dimension_scores: z.object({
+      stage_fit: z.number(),
+      check_fit: z.number(),
+      sector_fit: z.number(),
+      geo_fit: z.number(),
+      thesis_fit: z.number(),
+    }),
+    fit_level: z.enum(['Strong Fit', 'Moderate Fit', 'Weak Fit']),
+    top_matches: z.array(z.object({
+      investor_name: z.string(),
+      fit_score: z.number(),
+      stage_match: z.string(),
+      sector_focus: z.string(),
+    })),
+    routing_priority: z.string(),
+    recommendation_language: z.object({
+      headline: z.string(),
+      guidance: z.string(),
+      next_steps: z.array(z.string()),
+    }),
+  }).optional(),
 }).describe('Output for Funder Fit Analysis.');
 export type GenerateFounderFitAnalysisOutput = z.infer<typeof GenerateFounderFitAnalysisOutputSchema>;
 

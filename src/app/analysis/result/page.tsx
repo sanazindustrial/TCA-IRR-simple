@@ -318,9 +318,33 @@ function ReportView({
     visibleSections: ReportSection[];
     wizardResult?: WizardResult | null;
 }) {
-    const visibleComponents = allReportComponents.filter(comp =>
-        visibleSections.some(section => section.id === comp.id && section.active)
-    );
+    const hasRenderableData = (id: string): boolean => {
+        const sectionData = getComponentData(id, analysisData);
+        if (id === 'analyst-ai-deviation') {
+            return Boolean(wizardResult?.aiScoresMap && wizardResult?.humanScoresMap);
+        }
+        if (id === 'analyst-comments') {
+            return Boolean(
+                (wizardResult?.comments && wizardResult.comments.length > 0)
+                || wizardResult?.comments
+            );
+        }
+        if (id === 'gap-analysis') {
+            return Boolean(
+                (wizardResult?.gaps && wizardResult.gaps.length > 0)
+                || (analysisData.gapData && Object.keys(analysisData.gapData as Record<string, unknown>).length > 0)
+            );
+        }
+        if (sectionData === null || sectionData === undefined) return false;
+        if (Array.isArray(sectionData)) return sectionData.length > 0;
+        if (typeof sectionData === 'object') return Object.keys(sectionData as Record<string, unknown>).length > 0;
+        return true;
+    };
+
+    const visibleComponents = allReportComponents.filter((comp) => {
+        const sectionEnabled = visibleSections.some((section) => section.id === comp.id && section.active);
+        return sectionEnabled && hasRenderableData(comp.id);
+    });
 
     // Helper to render component with proper props
     const renderComponent = (id: string, Component: React.ComponentType<any>) => {
@@ -363,8 +387,8 @@ function ReportView({
                     <AlertTriangle className="size-12 text-orange-500 mx-auto mb-4" />
                     <h3 className="text-xl font-semibold mb-2">No Report Sections Available</h3>
                     <p className="text-muted-foreground mb-4">
-                        There are no visible sections configured for this report type.
-                        Please check your report configuration or contact an administrator.
+                        No active sections have renderable real data.
+                        Go back, add missing inputs, and regenerate the report.
                     </p>
                     <Button asChild variant="default">
                         <Link href="/dashboard/evaluation">Start New Analysis</Link>
@@ -572,34 +596,25 @@ export default function AnalysisResultPage({
 
                         setAnalysisData(parsedAnalysis);
                         // If backend was unreachable, actions.ts marks the result with _isFallbackData.
-                        // Never display fallback/sample data — redirect the user to run a real analysis.
+                        // Never display fallback/sample data.
                         if ((parsedAnalysis as any)._isFallbackData) {
-                            if (!isPreview) {
-                                setIsLoading(false);
-                                redirectToRunAnalysis('The analysis could not reach the backend and returned no real data. Please run a new analysis with your company details.');
-                                return;
-                            }
-                            // In preview mode with fallback data, show sample data with warning
-                            setIsUsingSampleData(true);
-                        } else {
-                            setIsUsingSampleData(false);
+                            setIsLoading(false);
+                            redirectToRunAnalysis('The analysis could not reach the backend and returned no real data. Please run a new analysis with your company details.');
+                            return;
                         }
+                        setIsUsingSampleData(false);
                         console.log('Loaded analysis data with composite score:', parsedAnalysis.tcaData?.compositeScore);
                     } catch (e) {
                         console.error('Failed to parse analysis data:', e);
-                        if (!isPreview) {
-                            redirectToRunAnalysis('Stored analysis data is invalid. Please run the analysis again.');
-                            return;
-                        }
-                        // Preview mode with invalid data — show sample data with warning
-                        setIsUsingSampleData(true);
+                        redirectToRunAnalysis('Stored analysis data is invalid. Please run the analysis again.');
+                        return;
                     }
                 } else if (!isPreview) {
                     redirectToRunAnalysis('No real analysis results were found. Please run analysis first.');
                     return;
                 } else {
-                    // Preview mode with no real data — display sample data but flag it clearly
-                    setIsUsingSampleData(true);
+                    redirectToRunAnalysis('No real analysis results were found. Please run analysis first.');
+                    return;
                 }
 
                 // Load analyst wizard computed results (persisted by analyst wizard page)
@@ -775,6 +790,42 @@ export default function AnalysisResultPage({
         }
     }, [role, reportType, isPreview]);
 
+    // AI Agent: fetch insight once analysis data is ready (non-blocking)
+    useEffect(() => {
+        if (!analysisData || isUsingSampleData || aiInsightLoading || aiInsight) return;
+        setAiInsightLoading(true);
+        const tcaScore = analysisData.tcaData?.compositeScore ?? 0;
+        const companyLabel = (analysisData as unknown as Record<string, unknown>).companyName as string || companyName || 'the company';
+        const prompt = `Investment triage analysis for ${companyLabel}. TCA composite score: ${tcaScore.toFixed(2)}/10.`;
+        const context = JSON.stringify({
+            tcaScore,
+            categories: analysisData.tcaData?.categories?.slice(0, 6) ?? [],
+            topRisk: analysisData.riskData?.riskFlags?.[0]?.domain ?? 'Unknown',
+        });
+        fetch('/api/ai-agent', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ task: 'recommend', prompt, context }),
+            signal: AbortSignal.timeout(35000),
+        })
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+                if (data?.result && typeof data.result === 'object') {
+                    const r = data.result as Record<string, unknown>;
+                    setAiInsight({
+                        summary: (r.summary as string) || '',
+                        recommendation: (r.recommendation as string) || '',
+                        confidence: typeof r.confidence === 'number' ? r.confidence : 0,
+                        provider: data.provider || 'AI',
+                        model: data.model || '',
+                    });
+                }
+            })
+            .catch(() => { /* silently ignore if AI not configured */ })
+            .finally(() => setAiInsightLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [analysisData, isUsingSampleData]);
+
     const handleRunAnalysis = async () => {
         // Clear all analysis-related localStorage data before starting fresh
         const keysToRemove = [
@@ -794,6 +845,9 @@ export default function AnalysisResultPage({
 
     // Handle save to reports and redirect
     const [isSaving, setIsSaving] = useState(false);
+    // AI Agent insight state (non-blocking — loads after main content)
+    const [aiInsight, setAiInsight] = useState<{ summary: string; recommendation: string; confidence: number; provider: string; model: string } | null>(null);
+    const [aiInsightLoading, setAiInsightLoading] = useState(false);
     const handleSaveToReports = async () => {
         if (!analysisData || isPreview) {
             toast({
@@ -1067,6 +1121,42 @@ export default function AnalysisResultPage({
                                         <Link href="/dashboard/evaluation">Run Analysis</Link>
                                     </Button>
                                 </div>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {/* AI Agent Insight Banner (shows when AI providers are configured) */}
+                    {(aiInsight || aiInsightLoading) && !isUsingSampleData && (
+                        <Card className="mb-6 border-violet-500/40 bg-gradient-to-r from-violet-500/5 to-indigo-500/5">
+                            <CardContent className="py-4">
+                                {aiInsightLoading && !aiInsight ? (
+                                    <div className="flex items-center gap-3 text-muted-foreground text-sm">
+                                        <Loader2 className="h-4 w-4 animate-spin text-violet-500" />
+                                        AI agent generating investment recommendation…
+                                    </div>
+                                ) : aiInsight ? (
+                                    <div className="space-y-2">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs font-semibold uppercase tracking-wider text-violet-600">
+                                                AI Insight · {aiInsight.provider}
+                                                {aiInsight.model ? ` (${aiInsight.model})` : ''}
+                                            </span>
+                                            {aiInsight.confidence > 0 && (
+                                                <span className="text-xs text-muted-foreground">
+                                                    — {Math.round(aiInsight.confidence * 100)}% confidence
+                                                </span>
+                                            )}
+                                        </div>
+                                        {aiInsight.summary && (
+                                            <p className="text-sm text-foreground">{aiInsight.summary}</p>
+                                        )}
+                                        {aiInsight.recommendation && (
+                                            <p className="text-sm font-medium text-violet-700 dark:text-violet-300">
+                                                Recommendation: {aiInsight.recommendation}
+                                            </p>
+                                        )}
+                                    </div>
+                                ) : null}
                             </CardContent>
                         </Card>
                     )}

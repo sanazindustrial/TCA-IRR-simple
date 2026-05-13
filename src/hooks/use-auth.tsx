@@ -12,6 +12,7 @@ import {
 import { useRouter, usePathname } from 'next/navigation';
 
 // Mock users for demonstration
+const AUTH_EXPIRY_KEY = 'authTokenExpiry';
 const mockUsers: User[] = [
     {
         id: '1',
@@ -102,8 +103,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         };
                         setCurrentUser(user);
                         setIsAuthenticated(true);
+                        localStorage.removeItem('authSessionBroken');
                         localStorage.setItem('loggedInUser', JSON.stringify(response.user));
                         localStorage.setItem('authToken', response.access_token);
+                        if (response.expires_in) {
+                            localStorage.setItem(AUTH_EXPIRY_KEY, String(Date.now() + (Number(response.expires_in) * 1000)));
+                        }
                         if (response.refresh_token) localStorage.setItem('refreshToken', response.refresh_token);
                         // Trigger immediate health sweep now that we have a token
                         import('@/lib/health-service').then(({ healthService }) => healthService.sweep());
@@ -135,6 +140,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem('loggedInUser');
         localStorage.removeItem('currentUser');
         localStorage.removeItem('authToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem(AUTH_EXPIRY_KEY);
+        localStorage.removeItem('authSessionBroken');
         router.push('/login');
     };
 

@@ -127,11 +127,19 @@ export default function LoginPage() {
               )}
             </Button>
           </form>
-          <div className="mt-6 text-center text-sm">
-            Don't have an account?{' '}
-            <Link href="/signup" className="font-semibold text-primary hover:underline">
-              Sign up for free
-            </Link>
+          <div className="mt-6 space-y-2 text-center text-sm">
+            <div>
+              Don&apos;t have an account?{' '}
+              <Link href="/signup" className="font-semibold text-primary hover:underline">
+                Sign up (standard user)
+              </Link>
+            </div>
+            <div className="text-muted-foreground text-xs">
+              Admin or analyst?{' '}
+              <Link href="/accept-invite" className="text-primary hover:underline">
+                Use your invitation link
+              </Link>
+            </div>
           </div>
         </CardContent>
       </Card>

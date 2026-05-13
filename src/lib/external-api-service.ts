@@ -558,7 +558,8 @@ class ExternalAPIService {
                 return {
                     success: false,
                     data: null,
-                    error: 'Company not found',
+                        error: `Company ticker "${ticker}" not found in SEC database. Please verify the ticker symbol is correct (e.g., AAPL for Apple). If using a company name instead of a ticker, try using a public stock ticker symbol.`,
+                        suggestion: 'Visit sec.gov to search for the company ticker',
                     source: 'SEC EDGAR',
                     timestamp: new Date().toISOString(),
                 };

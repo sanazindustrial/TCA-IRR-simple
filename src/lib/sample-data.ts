@@ -77,6 +77,31 @@ export type ComprehensiveAnalysisOutput = {
             contribution: string;
         }>;
         interpretation: string;
+        structuredOutput?: {
+            model_predictions: {
+                linear: number;
+                tree: number;
+                rf: number;
+                xgb: number;
+                lstm: number;
+                heuristic: number;
+            };
+            model_weights: {
+                linear: number;
+                tree: number;
+                rf: number;
+                xgb: number;
+                lstm: number;
+                heuristic: number;
+            };
+            composite_growth_score: number;
+            risk_adjustment: number;
+            final_growth_score: number;
+            growth_module_score: number;
+            tier: 'Tier 1' | 'Tier 2' | 'Tier 3';
+            meaning: 'High Growth' | 'Moderate Growth' | 'Low Growth';
+            interpretation: string;
+        };
     };
     gapData: {
         heatmap: Array<{
@@ -92,6 +117,24 @@ export type ComprehensiveAnalysisOutput = {
             type: 'Priority Area' | 'Quick Win' | 'Improvement Roadmap';
         }>;
         interpretation: string;
+        structuredOutput?: {
+            gap_severity_table: Array<{
+                category: string;
+                actual_score: number;
+                target_score: number;
+                delta: number;
+                severity: 'Critical' | 'Major' | 'Minor' | 'No material gap';
+                weighted_gap: number;
+                mitigation_required: boolean;
+            }>;
+            critical_count: number;
+            major_count: number;
+            gap_composite: number;
+            readiness_index: number;
+            readiness: 'Investment Ready' | 'Prescreen Ready' | 'Early Stage' | 'Reject Candidate';
+            module_score: number;
+            interpretation: string;
+        };
     };
     founderFitData: {
         readinessScore: number;
@@ -102,6 +145,28 @@ export type ComprehensiveAnalysisOutput = {
             stage: string;
         }>;
         interpretation: string;
+        structuredOutput?: {
+            dimension_scores: {
+                stage_fit: number;
+                check_fit: number;
+                sector_fit: number;
+                geo_fit: number;
+                thesis_fit: number;
+            };
+            fit_level: 'Strong Fit' | 'Moderate Fit' | 'Weak Fit';
+            top_matches: Array<{
+                investor_name: string;
+                fit_score: number;
+                stage_match: string;
+                sector_focus: string;
+            }>;
+            routing_priority: string;
+            recommendation_language: {
+                headline: string;
+                guidance: string;
+                next_steps: string[];
+            };
+        };
     };
     teamData: {
         teamScore: number;

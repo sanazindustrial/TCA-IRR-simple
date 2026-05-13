@@ -35,7 +35,8 @@ $DEPLOY_URL = 'https://tca-irr.scm.azurewebsites.net/api/publish?type=zip'
 $SITE_URL   = 'https://tca-irr.azurewebsites.net'
 $API_URL    = 'https://tcairrapiccontainer.azurewebsites.net'
 $ProjectRoot = $PSScriptRoot
-$ZIP_PATH   = Join-Path $ProjectRoot 'deploy-now.zip'
+$stamp = Get-Date -Format 'yyyyMMddHHmmss'
+$ZIP_PATH   = Join-Path $ProjectRoot "deploy-now-$stamp.zip"
 $STANDALONE = Join-Path $ProjectRoot '.next\standalone'
 $STANDALONE_NESTED = Join-Path $ProjectRoot '.next\standalone\.actual-ui'
 $STANDALONE_ROOT = $null
@@ -109,7 +110,7 @@ try {
 }
 
 $zipMB = [math]::Round((Get-Item $ZIP_PATH).Length / 1MB, 2)
-Write-OK "Created deploy-now.zip ($zipMB MB)"
+Write-OK "Created $(Split-Path $ZIP_PATH -Leaf) ($zipMB MB)"
 
 if ($ZipOnly) {
     Write-Warn "Zip-only mode. Deploy skipped."
@@ -143,7 +144,10 @@ try {
         exit 1
     }
 } catch {
-    $code = $_.Exception.Response?.StatusCode.value__
+    $code = $null
+    if ($_.Exception -and $_.Exception.Response -and $_.Exception.Response.StatusCode) {
+        $code = $_.Exception.Response.StatusCode.value__
+    }
     Write-Fail "Request failed: $_"
     if ($code) { Write-Host "HTTP: $code" }
     exit 1

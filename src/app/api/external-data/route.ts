@@ -41,7 +41,12 @@ async function fetchSECFilings(ticker: string) {
         );
 
         if (!company) {
-            return { success: false, error: 'Company not found in SEC database' };
+                return { 
+                    success: false, 
+                    error: `Company ticker "${ticker}" not found in SEC database. Please verify the ticker symbol is correct (e.g., AAPL for Apple, MSFT for Microsoft). If using a company name instead of a ticker, try using a public ticker symbol.`,
+                    suggestion: 'Please provide a valid stock ticker symbol. Visit sec.gov to search for the company ticker.',
+                    source: 'SEC EDGAR'
+                };
         }
 
         const cik = String(company.cik_str).padStart(10, '0');

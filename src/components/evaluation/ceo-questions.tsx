@@ -1,6 +1,6 @@
 'use client';
 import { DashboardCard } from '@/components/shared/dashboard-card';
-import { Lightbulb, Edit3 } from 'lucide-react';
+import { Lightbulb, Edit3, AlertTriangle } from 'lucide-react';
 import { useEvaluationContext } from './evaluation-provider';
 import { useState } from 'react';
 import { Textarea } from '../ui/textarea';
@@ -30,6 +30,12 @@ export function CEOQuestions() {
       description="Critical, AI-generated questions for the leadership team based on the analysis."
     >
       <div className="space-y-4">
+        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2.5">
+          <AlertTriangle className="size-4 text-amber-500 mt-0.5 shrink-0" />
+          <p className="text-xs text-amber-700">
+            <span className="font-semibold">Suggested questions only.</span> Review and customise these for the specific company and leadership team before use in due diligence meetings.
+          </p>
+        </div>
         {questions.map((q, index) => (
           <div key={index} className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
             <Edit3 className="size-5 mt-1 text-primary flex-shrink-0" />

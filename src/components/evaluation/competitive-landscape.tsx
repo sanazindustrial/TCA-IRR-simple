@@ -16,18 +16,30 @@ import { Textarea } from '../ui/textarea';
 
 const initialCompetitiveData = {
   competitors: [
-    { name: 'Legacy Systems Inc.', category: 'Incumbent', valuation: '$5B', weakness: 'Slow to innovate, poor UI/UX' },
-    { name: 'Agile Solutions Co.', category: 'Direct Competitor', valuation: '$50M', weakness: 'Lacks enterprise-grade features' },
-    { name: 'NichePlayer AI', category: 'Niche Specialist', valuation: '$20M', weakness: 'Limited market scope' },
+    { name: 'Competitor A', category: 'Incumbent', valuation: '—', weakness: 'Awaiting analysis data' },
+    { name: 'Competitor B', category: 'Direct Competitor', valuation: '—', weakness: 'Awaiting analysis data' },
+    { name: 'Competitor C', category: 'Niche Specialist', valuation: '—', weakness: 'Awaiting analysis data' },
   ],
-  positioning: "Innovate Inc. positions itself as a premium, AI-native solution contrasting with Legacy Systems' outdated technology. Compared to Agile Solutions, it offers a more robust feature set for enterprise clients. Its main value proposition is its superior AI-driven optimization engine.",
-  ma_insights: "Potential acquirers include larger enterprise software companies like Oracle or SAP looking to integrate AI into their supply chain offerings. Legacy Systems Inc. could also be a strategic acquirer to modernize their tech stack, though an acqui-hire is more likely.",
-  defensibility_insights: "The primary moat is the patent-pending AI algorithm. Network effects from a growing customer base will further strengthen this position. A key risk is the ability of larger, well-funded competitors to replicate the AI capabilities over time."
+  positioning: "Run the analysis to generate competitive positioning insights.",
+  ma_insights: "Run the analysis to generate M&A insights.",
+  defensibility_insights: "Run the analysis to generate defensibility insights."
 };
 
-export function CompetitiveLandscape() {
+interface CompetitiveLandscapeProps {
+  companyName?: string;
+  positioning?: string;
+  maInsights?: string;
+  defensibilityInsights?: string;
+}
+
+export function CompetitiveLandscape({ companyName, positioning, maInsights, defensibilityInsights }: CompetitiveLandscapeProps = {}) {
   const { isEditable } = useEvaluationContext();
-  const [data, setData] = useState(initialCompetitiveData);
+  const [data, setData] = useState({
+    ...initialCompetitiveData,
+    positioning: positioning ?? initialCompetitiveData.positioning,
+    ma_insights: maInsights ?? initialCompetitiveData.ma_insights,
+    defensibility_insights: defensibilityInsights ?? initialCompetitiveData.defensibility_insights,
+  });
   
   const handleTextChange = (field: 'positioning' | 'ma_insights' | 'defensibility_insights', value: string) => {
     setData(prev => ({...prev, [field]: value}));

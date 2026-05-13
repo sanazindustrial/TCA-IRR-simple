@@ -11,7 +11,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
-import { Users } from 'lucide-react';
+import { Users, AlertTriangle } from 'lucide-react';
 import Image from 'next/image';
 import { Separator } from '../ui/separator';
 import { useState } from 'react';
@@ -64,6 +64,12 @@ export function TeamAssessment() {
       description="Deep dive into human capital and founder analysis."
     >
       <div className="w-full overflow-x-auto space-y-6">
+        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2.5">
+          <AlertTriangle className="size-4 text-amber-500 mt-0.5 shrink-0" />
+          <p className="text-xs text-amber-700">
+            <span className="font-semibold">Analyst input required.</span> The member data below is a template — replace with the actual company&apos;s leadership team before finalising the report. The AI interpretation field is editable.
+          </p>
+        </div>
         <Table>
           <TableHeader>
             <TableRow>

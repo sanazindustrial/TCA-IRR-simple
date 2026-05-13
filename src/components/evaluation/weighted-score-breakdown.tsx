@@ -19,20 +19,20 @@ const getScoreColor = (score: number) => {
     return 'text-destructive';
 };
 
-// Updated sample data with 12 categories and scores out of 10
+// Canonical fallback sample using the standardized TCA 12-factor model.
 const sampleData: GenerateTcaScorecardOutput['categories'] = [
-    { category: 'Leadership', rawScore: 8.5, weight: 15, weightedScore: 1.28, flag: 'green', pestel: '', description: '', strengths: '', concerns: '', interpretation: '', aiRecommendation: '' },
-    { category: 'Regulatory/Compliance', rawScore: 7.0, weight: 15, weightedScore: 1.05, flag: 'yellow', pestel: '', description: '', strengths: '', concerns: '', interpretation: '', aiRecommendation: '' },
-    { category: 'Product-Market Fit', rawScore: 9.0, weight: 15, weightedScore: 1.35, flag: 'green', pestel: '', description: '', strengths: '', concerns: '', interpretation: '', aiRecommendation: '' },
-    { category: 'Team Strength', rawScore: 7.5, weight: 10, weightedScore: 0.75, flag: 'yellow', pestel: '', description: '', strengths: '', concerns: '', interpretation: '', aiRecommendation: '' },
-    { category: 'Technology & IP', rawScore: 8.0, weight: 10, weightedScore: 0.80, flag: 'green', pestel: '', description: '', strengths: '', concerns: '', interpretation: '', aiRecommendation: '' },
-    { category: 'Business Model & Financials', rawScore: 7.0, weight: 10, weightedScore: 0.70, flag: 'yellow', pestel: '', description: '', strengths: '', concerns: '', interpretation: '', aiRecommendation: '' },
-    { category: 'Go-to-Market Strategy', rawScore: 6.5, weight: 5, weightedScore: 0.33, flag: 'red', pestel: '', description: '', strengths: '', concerns: '', interpretation: '', aiRecommendation: '' },
-    { category: 'Competition & Moat', rawScore: 7.8, weight: 5, weightedScore: 0.39, flag: 'yellow', pestel: '', description: '', strengths: '', concerns: '', interpretation: '', aiRecommendation: '' },
-    { category: 'Market Potential', rawScore: 8.8, weight: 5, weightedScore: 0.44, flag: 'green', pestel: '', description: '', strengths: '', concerns: '', interpretation: '', aiRecommendation: '' },
-    { category: 'Traction', rawScore: 7.2, weight: 5, weightedScore: 0.36, flag: 'yellow', pestel: '', description: '', strengths: '', concerns: '', interpretation: '', aiRecommendation: '' },
-    { category: 'Scalability', rawScore: 6.8, weight: 2.5, weightedScore: 0.17, flag: 'yellow', pestel: '', description: '', strengths: '', concerns: '', interpretation: '', aiRecommendation: '' },
-    { category: 'Risk Assessment', rawScore: 7.5, weight: 2.5, weightedScore: 0.19, flag: 'yellow', pestel: '', description: '', strengths: '', concerns: '', interpretation: '', aiRecommendation: '' },
+    { category: 'Market Opportunity', rawScore: 8.4, weight: 15, weightedScore: 1.26, flag: 'green', pestel: '', description: '', strengths: '', concerns: '', interpretation: '', aiRecommendation: '' },
+    { category: 'Problem-Solution Fit', rawScore: 7.8, weight: 10, weightedScore: 0.78, flag: 'yellow', pestel: '', description: '', strengths: '', concerns: '', interpretation: '', aiRecommendation: '' },
+    { category: 'Product / Technology', rawScore: 8.2, weight: 10, weightedScore: 0.82, flag: 'green', pestel: '', description: '', strengths: '', concerns: '', interpretation: '', aiRecommendation: '' },
+    { category: 'Business Model', rawScore: 7.3, weight: 9, weightedScore: 0.66, flag: 'yellow', pestel: '', description: '', strengths: '', concerns: '', interpretation: '', aiRecommendation: '' },
+    { category: 'Competitive Advantage', rawScore: 7.1, weight: 8, weightedScore: 0.57, flag: 'yellow', pestel: '', description: '', strengths: '', concerns: '', interpretation: '', aiRecommendation: '' },
+    { category: 'Team & Founder Fit', rawScore: 8.0, weight: 13, weightedScore: 1.04, flag: 'green', pestel: '', description: '', strengths: '', concerns: '', interpretation: '', aiRecommendation: '' },
+    { category: 'Financial Health & Projection', rawScore: 6.9, weight: 10, weightedScore: 0.69, flag: 'yellow', pestel: '', description: '', strengths: '', concerns: '', interpretation: '', aiRecommendation: '' },
+    { category: 'Go-To-Market Strategy', rawScore: 7.0, weight: 8, weightedScore: 0.56, flag: 'yellow', pestel: '', description: '', strengths: '', concerns: '', interpretation: '', aiRecommendation: '' },
+    { category: 'Traction & Validation', rawScore: 7.5, weight: 10, weightedScore: 0.75, flag: 'yellow', pestel: '', description: '', strengths: '', concerns: '', interpretation: '', aiRecommendation: '' },
+    { category: 'Risk & Compliance', rawScore: 6.8, weight: 7, weightedScore: 0.48, flag: 'yellow', pestel: '', description: '', strengths: '', concerns: '', interpretation: '', aiRecommendation: '' },
+    { category: 'Strategic & Macro Alignment', rawScore: 7.4, weight: 5, weightedScore: 0.37, flag: 'yellow', pestel: '', description: '', strengths: '', concerns: '', interpretation: '', aiRecommendation: '' },
+    { category: 'Growth Potential / Scalability', rawScore: 7.6, weight: 5, weightedScore: 0.38, flag: 'yellow', pestel: '', description: '', strengths: '', concerns: '', interpretation: '', aiRecommendation: '' },
 ];
 
 type WeightedScoreBreakdownProps = {

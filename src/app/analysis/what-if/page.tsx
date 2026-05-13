@@ -1,5 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
+import { useAiInsight } from '@/hooks/use-ai-insight';
+import { AiInsightPanel } from '@/components/shared/AiInsightPanel';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
@@ -22,7 +24,6 @@ import { useToast } from '@/hooks/use-toast';
 import type { ComprehensiveAnalysisOutput } from '@/ai/flows/schemas';
 import Loading from '@/app/loading';
 import { ArrowLeft, Calculator, Check, Eye, Lock, Play, SkipForward, SlidersHorizontal, ToggleLeft, ToggleRight, FileText, Settings } from 'lucide-react';
-import Link from 'next/link';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -269,35 +270,10 @@ const SummaryCard = ({ scores, moduleConfigs, enabledCount, totalCount, editable
   editableScores: Record<string, ScoreRow[]>,
   simulationHistory: number[]
 }) => {
-  // Calculate weighted average based on module weights
-  let totalWeightedScore = 0;
-  let totalWeight = 0;
-
-  Object.entries(editableScores).forEach(([moduleId, rows]) => {
-    const config = moduleConfigs[moduleId];
-    if (config?.enabled) {
-      const moduleWeight = MODULE_DEFINITIONS[moduleId]?.weight || 10;
-      const moduleAvg = rows.length > 0 ? rows.reduce((sum, r) => sum + r.score, 0) / rows.length : 0;
-      totalWeightedScore += moduleAvg * moduleWeight;
-      totalWeight += moduleWeight;
-    }
-  });
-
-  const weightedAverage = totalWeight > 0 ? totalWeightedScore / totalWeight : 0;
-
-  // Simple average for comparison
-  const enabledScores = Object.entries(editableScores)
-    .filter(([moduleId]) => moduleConfigs[moduleId]?.enabled)
-    .flatMap(([_, rows]) => rows.map(r => r.score));
-  const simpleAverage = enabledScores.length > 0 ? enabledScores.reduce((a, b) => a + b, 0) / enabledScores.length : 0;
-  const stdDev = enabledScores.length > 0 ? Math.sqrt(enabledScores.map(x => Math.pow(x - simpleAverage, 2)).reduce((a, b) => a + b, 0) / enabledScores.length) : 0;
+  // Keep summary centered on real module values only (no synthetic weighted fallback).
 
   const simulatedCount = Object.values(moduleConfigs).filter(m => m.enabled && m.simulated).length;
   const skippedCount = Object.values(moduleConfigs).filter(m => !m.enabled).length;
-
-  // Calculate 30-run average from simulation history
-  const runCount = simulationHistory.length;
-  const avgOverRuns = runCount > 0 ? simulationHistory.reduce((a, b) => a + b, 0) / runCount : weightedAverage;
 
   // Calculate individual module scores
   const moduleScores: Record<string, number> = {};
@@ -310,6 +286,10 @@ const SummaryCard = ({ scores, moduleConfigs, enabledCount, totalCount, editable
 
   // TCA Score is the primary outcome for simulation
   const tcaScore = moduleScores['tca'] || 0;
+
+  // Calculate 30-run average from simulation history (TCA-only runs)
+  const runCount = simulationHistory.length;
+  const avgOverRuns = runCount > 0 ? simulationHistory.reduce((a, b) => a + b, 0) / runCount : tcaScore;
 
   return (
     <Card className="sticky top-4">
@@ -338,17 +318,11 @@ const SummaryCard = ({ scores, moduleConfigs, enabledCount, totalCount, editable
 
         <hr className="my-2" />
 
-        {/* Weighted Score for comparison */}
-        <div className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
-          <p className="text-sm">Weighted Average</p>
-          <p className="font-bold">{weightedAverage.toFixed(2)}/10</p>
-        </div>
-
         {runCount > 0 && (
           <div className="flex items-center justify-between p-3 rounded-lg bg-green-50 border border-green-200">
             <div>
-              <p className="font-medium text-green-700">Avg over {runCount} Runs</p>
-              <p className="text-xs text-green-600">Simulation history</p>
+              <p className="font-medium text-green-700">TCA Avg over {runCount} Runs</p>
+              <p className="text-xs text-green-600">Last 30 What-If runs (TCA only)</p>
             </div>
             <p className="text-xl font-bold text-green-700">{avgOverRuns.toFixed(2)}</p>
           </div>
@@ -381,6 +355,9 @@ export default function SimulationPage() {
   const [showWelcome, setShowWelcome] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [simulationHistory, setSimulationHistory] = useState<number[]>([]);
+
+  // AI Insight
+  const { insight: aiInsight, status: aiStatus, fetch: fetchAiInsight } = useAiInsight();
 
   // Tracking info state for header
   const [trackingInfo, setTrackingInfo] = useState<{
@@ -564,6 +541,23 @@ export default function SimulationPage() {
         if (data) {
           setAnalysisData(data);
 
+          // Fire AI insight after analysis data loads
+          const company = (data as Record<string, unknown> & { companyData?: { companyName?: string } }).companyData?.companyName
+            || (typeof localStorage !== 'undefined' ? localStorage.getItem('analysisCompanyName') : '')
+            || 'the company';
+          const tcaCategories = ((data.tcaData?.categories) ?? [])
+            .slice()
+            .sort((a, b) => (b.rawScore ?? 0) - (a.rawScore ?? 0))
+            .slice(0, 5)
+            .map((c) => `${c.category} ${c.rawScore?.toFixed(1) ?? '?'}`)
+            .join(', ');
+          const prompt = [
+            `What-If Simulation for ${company}.`,
+            tcaCategories ? `Top TCA categories: ${tcaCategories}.` : '',
+            'Suggest which modules to adjust to maximize investment readiness, list key risk factors, and provide a confidence score (0-1).',
+          ].filter(Boolean).join(' ');
+          fetchAiInsight('recommend', prompt, { company, source: 'what-if' });
+
           const initialScores: Record<string, ScoreRow[]> = {};
 
           // Module 1: TCA Scorecard - Use REAL data from analysis
@@ -571,7 +565,7 @@ export default function SimulationPage() {
             initialScores['tca'] = data.tcaData.categories.map(c => ({
               id: c.category,
               category: c.category,
-              score: c.rawScore || 5.0
+              score: typeof c.rawScore === 'number' ? c.rawScore : 0
             }));
             console.log(`Loaded ${initialScores.tca.length} TCA categories with real scores`);
           } else {
@@ -593,44 +587,37 @@ export default function SimulationPage() {
               score: r.flag === 'green' ? 8 : r.flag === 'yellow' ? 6 : 4
             }));
             console.log(`Loaded ${initialScores.risk.length} risk factors`);
-          } else {
-            // Generate calculated risk assessment based on TCA scores
-            const avgTcaScore = initialScores.tca.reduce((sum, cat) => sum + cat.score, 0) / initialScores.tca.length;
-            const riskScore = avgTcaScore >= 8 ? 8 : avgTcaScore >= 6.5 ? 6 : 4;
-            initialScores['risk'] = [
-              { id: 'calculated-risk', category: 'Calculated Risk Level', score: riskScore }
-            ];
           }
 
-          // Module 3: Macro Trend Analysis - Calculate from TCA base
+          // Module 3: Macro Trend Analysis - real PESTEL data only
           if (data.macroData?.pestelDashboard) {
-            initialScores['macro'] = Object.entries(data.macroData.pestelDashboard).map(([k, v]) => ({
+            const macroRows = Object.entries(data.macroData.pestelDashboard)
+              .filter(([, v]) => typeof v === 'number')
+              .map(([k, v]) => ({
               id: k,
               category: k.charAt(0).toUpperCase() + k.slice(1),
-              score: typeof v === 'number' ? v : 7.0
+              score: v as number
             }));
-          } else {
-            // Calculate macro trends based on TCA composite score
-            const baseScore = Math.min((data.tcaData?.compositeScore || 50) / 10, 10);
-            initialScores['macro'] = [
-              { id: 'political', category: 'Political', score: Math.max(0, baseScore * 0.9) },
-              { id: 'economic', category: 'Economic', score: Math.max(0, baseScore * 0.85) },
-              { id: 'social', category: 'Social', score: Math.max(0, baseScore * 1.1) },
-              { id: 'technological', category: 'Technological', score: Math.max(0, baseScore * 1.15) },
-              { id: 'environmental', category: 'Environmental', score: Math.max(0, baseScore) },
-              { id: 'legal', category: 'Legal', score: Math.max(0, baseScore * 0.95) }
-            ];
+            if (macroRows.length > 0) {
+              initialScores['macro'] = macroRows;
+            }
           }
+          // No synthetic macro fallback — triage AI score used if PESTEL data unavailable
 
           // Additional modules based on available analysis data
           if (data.benchmarkData && Object.keys(data.benchmarkData).length > 0) {
             const benchmarkEntries = Object.entries(data.benchmarkData);
             if (benchmarkEntries.length > 0) {
-              initialScores['benchmark'] = benchmarkEntries.map(([k, v]) => ({
+              const benchmarkRows = benchmarkEntries
+                .filter(([, v]) => typeof v === 'number')
+                .map(([k, v]) => ({
                 id: k,
                 category: k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-                score: typeof v === 'number' ? Math.min(Math.max(v, 0), 10) : 7.0
+                score: Math.min(Math.max(v as number, 0), 10)
               }));
+              if (benchmarkRows.length > 0) {
+                initialScores['benchmark'] = benchmarkRows;
+              }
             }
           }
 
@@ -667,43 +654,7 @@ export default function SimulationPage() {
             ];
           }
 
-          // New modules — derive from TCA composite score as base
-          const tcaBase = Math.min(data.tcaData?.compositeScore || 5, 10);
-
-          // Module: Financial Analysis
-          initialScores['financial'] = [
-            { id: 'revenue-model', category: 'Revenue Model', score: +(tcaBase * 0.95).toFixed(2) },
-            { id: 'burn-rate', category: 'Burn Rate', score: +(tcaBase * 0.90).toFixed(2) },
-            { id: 'financial-health', category: 'Financial Health', score: +(tcaBase * 1.00).toFixed(2) },
-          ];
-
-          // Module: Economic Analysis
-          initialScores['economic'] = [
-            { id: 'market-size', category: 'Market Size', score: +(tcaBase * 1.05).toFixed(2) },
-            { id: 'pricing-power', category: 'Pricing Power', score: +(tcaBase * 0.90).toFixed(2) },
-            { id: 'economic-viability', category: 'Economic Viability', score: +(tcaBase * 1.00).toFixed(2) },
-          ];
-
-          // Module: Social Impact Analysis
-          initialScores['social'] = [
-            { id: 'esg-score', category: 'ESG Score', score: +(tcaBase * 0.85).toFixed(2) },
-            { id: 'social-impact', category: 'Social Impact', score: +(tcaBase * 0.90).toFixed(2) },
-          ];
-
-          // Module: Marketing Analysis
-          initialScores['marketing'] = [
-            { id: 'gtm-strategy', category: 'GTM Strategy', score: +(tcaBase * 0.95).toFixed(2) },
-            { id: 'brand-positioning', category: 'Brand Positioning', score: +(tcaBase * 0.85).toFixed(2) },
-            { id: 'channel-effectiveness', category: 'Channel Effectiveness', score: +(tcaBase * 0.90).toFixed(2) },
-          ];
-
-          // Module: Environmental Analysis
-          initialScores['environmental'] = [
-            { id: 'environmental-compliance', category: 'Environmental Compliance', score: +(tcaBase * 0.90).toFixed(2) },
-            { id: 'sustainability', category: 'Sustainability', score: +(tcaBase * 0.85).toFixed(2) },
-          ];
-
-          // Module: Funder Fit Analysis
+          // Module: Funder Fit Analysis — real readinessScore only
           if (data.founderFitData?.readinessScore) {
             const funderBase = data.founderFitData.readinessScore / 10;
             initialScores['funder'] = [
@@ -711,27 +662,54 @@ export default function SimulationPage() {
               { id: 'funding-readiness', category: 'Funding Readiness', score: +(funderBase * 0.95).toFixed(2) },
               { id: 'round-size-fit', category: 'Round Size Fit', score: +(funderBase * 0.90).toFixed(2) },
             ];
-          } else {
-            initialScores['funder'] = [
-              { id: 'investor-alignment', category: 'Investor Alignment', score: +(tcaBase * 0.95).toFixed(2) },
-              { id: 'funding-readiness', category: 'Funding Readiness', score: +(tcaBase * 0.90).toFixed(2) },
-              { id: 'round-size-fit', category: 'Round Size Fit', score: +(tcaBase * 0.85).toFixed(2) },
-            ];
+          }
+          // No synthetic fallback for other optional modules — triage AI scores used instead
+
+          // Restrict What-If page to active modules selected in triage.
+          let activeModuleIds = Object.keys(initialScores);
+          let triageModuleScores: Record<string, number | null> = {};
+          try {
+            const triageSnapshotRaw = localStorage.getItem('triage-wizard-autosave-v1');
+            if (triageSnapshotRaw) {
+              const triageSnapshot = JSON.parse(triageSnapshotRaw) as { selectedModules?: unknown; moduleScores?: unknown };
+              if (Array.isArray(triageSnapshot.selectedModules)) {
+                const selected = triageSnapshot.selectedModules
+                  .filter((id): id is string => typeof id === 'string');
+                if (selected.length > 0) {
+                  activeModuleIds = selected;
+                }
+              }
+              if (triageSnapshot.moduleScores && typeof triageSnapshot.moduleScores === 'object') {
+                triageModuleScores = triageSnapshot.moduleScores as Record<string, number | null>;
+              }
+            }
+          } catch {
+            // keep fallback to available modules if triage snapshot is unavailable
           }
 
-          // Module: Strategic Analysis
-          initialScores['strategic'] = [
-            { id: 'competitive-positioning', category: 'Competitive Positioning', score: +(tcaBase * 1.00).toFixed(2) },
-            { id: 'strategic-roadmap', category: 'Strategic Roadmap', score: +(tcaBase * 0.95).toFixed(2) },
-          ];
+          const filteredScores: Record<string, ScoreRow[]> = Object.fromEntries(
+            activeModuleIds
+              .filter((moduleId) => {
+                if (moduleId === 'tca') return (initialScores.tca?.length ?? 0) > 0;
+                const triageScore = triageModuleScores[moduleId];
+                if (typeof triageScore === 'number' && Number.isFinite(triageScore)) return true;
+                return (initialScores[moduleId]?.length ?? 0) > 0;
+              })
+              .map((moduleId) => {
+                if (moduleId === 'tca' && initialScores.tca?.length) {
+                  return [moduleId, initialScores.tca];
+                }
+                const triageScore = triageModuleScores[moduleId];
+                if (typeof triageScore === 'number' && Number.isFinite(triageScore)) {
+                  return [moduleId, [{ id: `${moduleId}-ai-score`, category: 'AI Raw Score', score: Math.max(0, Math.min(10, triageScore)) }]];
+                }
+                return [moduleId, initialScores[moduleId]!];
+              })
+          );
 
-          // Module: Analyst Review
-          initialScores['analyst'] = [
-            { id: 'analyst-score', category: 'Analyst Score', score: +(tcaBase * 1.00).toFixed(2) },
-            { id: 'ai-deviation', category: 'AI Deviation Review', score: +(tcaBase * 0.95).toFixed(2) },
-          ];
+          activeModuleIds = Object.keys(filteredScores);
 
-          // Initialize module configs for all modules
+          // Initialize module configs for active modules only
           const configs: Record<string, ModuleConfig> = {};
 
           // Try to load saved configs from localStorage
@@ -746,7 +724,7 @@ export default function SimulationPage() {
             console.warn('Failed to parse saved module configs:', e);
           }
 
-          Object.keys(initialScores).forEach((moduleId) => {
+          activeModuleIds.forEach((moduleId) => {
             const def = MODULE_DEFINITIONS[moduleId] || { name: moduleId, description: '' };
             // Use saved config if available, otherwise default values
             const savedConfig = savedConfigs[moduleId];
@@ -760,11 +738,11 @@ export default function SimulationPage() {
           });
 
           // Set the scores, configs, and show the analysis
-          setEditableScores(initialScores);
+          setEditableScores(filteredScores);
           setModuleConfigs(configs);
-          setActiveModule(Object.keys(initialScores)[0] || 'tca');
+          setActiveModule(activeModuleIds[0] || 'tca');
           setShowWelcome(false);
-          console.log('Analysis data loaded successfully with', Object.keys(initialScores).length, 'modules');
+          console.log('Analysis data loaded successfully with', activeModuleIds.length, 'active modules');
         } else {
           console.error('No analysis data available');
           toast({
@@ -908,11 +886,36 @@ export default function SimulationPage() {
         }
       };
 
-      // Save to localStorage
-      localStorage.setItem('analysisResult', JSON.stringify(finalData));
-      localStorage.setItem('simulationAdjusted', 'true');
-      localStorage.setItem('triageReportReady', 'true');
-      localStorage.setItem('currentSimulationId', simId);
+      // Save to localStorage (with quota error handling)
+      try {
+        localStorage.setItem('analysisResult', JSON.stringify(finalData));
+        localStorage.setItem('simulationAdjusted', 'true');
+        localStorage.setItem('triageReportReady', 'true');
+        localStorage.setItem('currentSimulationId', simId);
+      } catch (storageError) {
+        // QuotaExceededError — strip large arrays and retry
+        console.warn('localStorage quota exceeded, saving compact version:', storageError);
+        try {
+          const compactData = {
+            ...finalData,
+            // Remove large optional arrays to save space
+            gapData: finalData.gapData ? { ...finalData.gapData, heatmap: finalData.gapData.heatmap?.slice(0, 20) } : finalData.gapData,
+          };
+          localStorage.setItem('analysisResult', JSON.stringify(compactData));
+          localStorage.setItem('simulationAdjusted', 'true');
+          localStorage.setItem('triageReportReady', 'true');
+          localStorage.setItem('currentSimulationId', simId);
+        } catch (retryError) {
+          console.error('Failed to save simulation to localStorage:', retryError);
+          toast({
+            variant: 'destructive',
+            title: 'Storage Full',
+            description: 'Could not save simulation — please clear browser storage and try again.',
+          });
+          setIsLoading(false);
+          return;
+        }
+      }
 
       // Update unified record with simulation results
       unifiedRecordTracking.addSimulationResults(
@@ -1025,17 +1028,27 @@ export default function SimulationPage() {
     <>
       <div className="container mx-auto p-4 md:p-8">
         <header className="mb-6">
-          <Link href="/dashboard/evaluation" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary mb-4">
+          <button
+            type="button"
+            onClick={() => {
+              if (typeof window !== 'undefined' && window.history.length > 1) {
+                router.back();
+              } else {
+                router.push('/dashboard/reports/triage');
+              }
+            }}
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary mb-4"
+          >
             <ArrowLeft className="size-4" />
-            Back to Analysis Setup
-          </Link>
+            Back to Previous Page
+          </button>
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-4xl font-bold font-headline text-primary tracking-tight">
-                Simulation
+                What-If Simulation
               </h1>
               <p className="mt-2 text-lg text-muted-foreground max-w-3xl">
-                Adjust scores from {moduleCount} active modules. TCA score (12 categories) is the primary outcome.
+                Adjust scores from {moduleCount} active modules only. TCA score (12 categories) is the primary outcome.
               </p>
             </div>
             <div className="flex gap-3 items-center">
@@ -1080,7 +1093,7 @@ export default function SimulationPage() {
                 <Switch checked={isAdmin} onCheckedChange={setIsAdmin} />
               </div>
               <Button variant="outline" size="lg" onClick={handleSkip} disabled={isLoading}>
-                <SkipForward className="mr-2" /> Skip Simulation
+                <SkipForward className="mr-2" /> Skip What-If
               </Button>
               <Button size="lg" onClick={handleProceed} disabled={isLoading}>
                 <FileText className="mr-2" /> Generate Report
@@ -1174,39 +1187,44 @@ export default function SimulationPage() {
               editableScores={editableScores}
               simulationHistory={simulationHistory}
             />
+            {/* AI Insight Panel */}
+            <div className="mt-4">
+              <AiInsightPanel
+                status={aiStatus}
+                insight={aiInsight}
+                title="AI Simulation Guidance"
+                compact={false}
+                onRetry={() => {
+                  const company = trackingInfo.companyName || 'the company';
+                  fetchAiInsight('recommend', `What-If guidance for ${company}: suggest module adjustments to improve investment score.`, { company });
+                }}
+              />
+            </div>
             {/* Run Simulation Button */}
             <Button
               className="w-full mt-4"
               variant="outline"
               onClick={() => {
-                // Calculate current weighted score
-                let totalWeightedScore = 0;
-                let totalWeight = 0;
-                Object.entries(editableScores).forEach(([moduleId, rows]) => {
-                  const config = moduleConfigs[moduleId];
-                  if (config?.enabled) {
-                    const moduleWeight = MODULE_DEFINITIONS[moduleId]?.weight || 10;
-                    const moduleAvg = rows.length > 0 ? rows.reduce((sum, r) => sum + r.score, 0) / rows.length : 0;
-                    totalWeightedScore += moduleAvg * moduleWeight;
-                    totalWeight += moduleWeight;
-                  }
-                });
-                const weightedAverage = totalWeight > 0 ? totalWeightedScore / totalWeight : 0;
+                // Record TCA score only (12 categories) for What-If run history.
+                const tcaRows = editableScores.tca || [];
+                const tcaRunScore = tcaRows.length > 0
+                  ? tcaRows.reduce((sum, r) => sum + r.score, 0) / tcaRows.length
+                  : 0;
 
                 // Add to history (max 30 runs)
                 setSimulationHistory(prev => {
-                  const newHistory = [...prev, weightedAverage];
+                  const newHistory = [...prev, tcaRunScore];
                   return newHistory.slice(-30); // Keep last 30
                 });
 
                 toast({
-                  title: 'Simulation Recorded',
-                  description: `Score ${weightedAverage.toFixed(2)} added to history (${Math.min(simulationHistory.length + 1, 30)}/30 runs)`,
+                  title: 'What-If Run Recorded',
+                  description: `TCA score ${tcaRunScore.toFixed(2)} added to history (${Math.min(simulationHistory.length + 1, 30)}/30 runs)`,
                 });
               }}
             >
               <Play className="mr-2 size-4" />
-              Record Simulation ({simulationHistory.length}/30)
+              Record What-If ({simulationHistory.length}/30)
             </Button>
             {simulationHistory.length > 0 && (
               <Button
@@ -1224,9 +1242,9 @@ export default function SimulationPage() {
       <AlertDialog open={showWelcome} onOpenChange={setShowWelcome}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2"><Eye /> Welcome to Simulation</AlertDialogTitle>
+            <AlertDialogTitle className="flex items-center gap-2"><Eye /> Welcome to What-If Simulation</AlertDialogTitle>
             <AlertDialogDescription>
-              This page displays all {moduleCount} analysis modules. Each module is calculated separately.
+              This page displays only active analysis modules ({moduleCount}). Each module is calculated separately.
               TCA Score (12 categories) is the primary outcome for simulation.
               {isAdmin && " As an admin, you can skip modules or toggle settings."}
               When ready, click "Generate Report" to finalize your analysis.

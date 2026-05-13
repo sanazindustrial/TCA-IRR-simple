@@ -1,7 +1,7 @@
 
 'use client';
 import { DashboardCard } from '@/components/shared/dashboard-card';
-import { TrendingUp, Lock } from 'lucide-react';
+import { TrendingUp, Lock, AlertTriangle } from 'lucide-react';
 import { GrowthChart } from './growth-chart';
 import {
   Accordion,
@@ -58,6 +58,12 @@ export function GrowthClassifier() {
       description="Ensemble model prediction of growth potential."
     >
       <div className="space-y-6">
+        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2.5">
+          <AlertTriangle className="size-4 text-amber-500 mt-0.5 shrink-0" />
+          <p className="text-xs text-amber-700">
+            <span className="font-semibold">Model output pending.</span> The scores and scenarios shown are illustrative placeholders. Run the full ML pipeline or update the analysis text fields below with actual model results before finalising the report.
+          </p>
+        </div>
         <div className="flex justify-around text-center">
           <div>
             <p className="text-sm text-muted-foreground">Growth Tier</p>

@@ -20,7 +20,6 @@ import { ExportButtons } from '@/components/evaluation/export-buttons';
 import { EvaluationProvider, useEvaluationContext } from '@/components/evaluation/evaluation-provider';
 import Link from 'next/link';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { useRouter } from 'next/navigation';
 import { ConsistencyCheck } from '@/components/evaluation/consistency-check';
 import { AnalystComments } from '@/components/evaluation/analyst-comments';
 import { FinalRecommendation } from '@/components/evaluation/final-recommendation';
@@ -153,6 +152,35 @@ const sampleAnalysisData: ComprehensiveAnalysisOutput = {
 };
 // --- End of Sample Data ---
 
+const defaultDdHelpSections: ReportSection[] = [
+    { id: 'dd-executive-summary', title: 'Executive Summary', active: true },
+    { id: 'dd-tca-scorecard', title: 'TCA Scorecard', active: true },
+    { id: 'dd-weighted-score-breakdown', title: 'Weighted Score Breakdown', active: true },
+    { id: 'dd-risk-flags', title: 'Risk Flags', active: true },
+    { id: 'dd-macro-trend', title: 'Macro Trend Alignment', active: true },
+    { id: 'dd-benchmark', title: 'Benchmark Comparison', active: true },
+    { id: 'dd-growth-classifier', title: 'Growth Classifier', active: true },
+    { id: 'dd-strategic-fit', title: 'Strategic Fit Matrix', active: true },
+    { id: 'dd-consistency-check', title: 'Consistency Check', active: true },
+    { id: 'dd-gap-analysis', title: 'Gap Analysis', active: true },
+    { id: 'dd-founder-fit', title: 'Founder Fit Analysis', active: true },
+    { id: 'dd-team-assessment', title: 'Team Assessment', active: true },
+    { id: 'dd-competitive-landscape', title: 'Competitive Landscape', active: true },
+    { id: 'dd-regulatory-compliance', title: 'Regulatory Compliance Review', active: true },
+    { id: 'dd-gtm-strategy', title: 'Go-to-Market Strategy', active: true },
+    { id: 'dd-ip-tech-review', title: 'IP & Technology Review', active: true },
+    { id: 'dd-financials-burn-rate', title: 'Financials & Burn Rate', active: true },
+    { id: 'dd-exit-strategy', title: 'Exit Strategy Roadmap', active: true },
+    { id: 'dd-term-sheet', title: 'Term Sheet Trigger Analysis', active: true },
+    { id: 'dd-final-risk-summary', title: 'Final Risk Summary', active: true },
+    { id: 'dd-Analyst-comments', title: 'Analyst Comments', active: true },
+    { id: 'dd-Analyst-ai-deviation', title: 'Analyst–AI Deviation', active: true },
+    { id: 'dd-final-recommendation', title: 'Final Recommendation', active: true },
+    { id: 'dd-conclusion', title: 'Conclusion', active: true },
+    { id: 'dd-appendix', title: 'Appendix', active: true },
+    { id: 'dd-export-links', title: 'Export & Approval', active: true },
+];
+
 function ReportView({ analysisData, isPreview = false, visibleSections }: { analysisData: ComprehensiveAnalysisOutput, isPreview?: boolean, visibleSections: ReportSection[] }) {
     const sectionIsVisible = (id: string) => {
         return visibleSections.some(s => s.id === id && s.active);
@@ -228,42 +256,31 @@ function ReportView({ analysisData, isPreview = false, visibleSections }: { anal
 }
 
 export default function DetailedReportGuidePage() {
-    const router = useRouter();
     const { toast } = useToast();
     const [visibleSections, setVisibleSections] = useState<ReportSection[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        const storedUser = localStorage.getItem('loggedInUser');
-        if (storedUser) {
-            const user = JSON.parse(storedUser);
-            const role = user.role?.toLowerCase();
-            if (role !== 'admin' && role !== 'analyst') {
-                router.push('/unauthorized');
-                return;
-            }
-        } else {
-            router.push('/login');
-            return;
-        }
-
         try {
             const savedConfig = localStorage.getItem('report-config-dd');
             if (savedConfig) {
-                setVisibleSections(JSON.parse(savedConfig));
+                const parsed: ReportSection[] = JSON.parse(savedConfig);
+                if (parsed.length > 0) {
+                    setVisibleSections(parsed);
+                } else {
+                    setVisibleSections(defaultDdHelpSections);
+                }
+            } else {
+                setVisibleSections(defaultDdHelpSections);
             }
         } catch (e) {
             console.error("Failed to load DD report configuration", e);
+            setVisibleSections(defaultDdHelpSections);
         }
-        setIsLoading(false);
-
-    }, [router]);
+    }, []);
 
     const handleRunAnalysis = async () => {
         toast({ title: 'Navigating to New Analysis' });
     };
-
-    if (isLoading) return null;
 
     return (
         <EvaluationProvider

@@ -3,11 +3,17 @@ export class BackendAPIClient {
     private baseURL: string;
     private authToken: string | null;
     private refreshToken: string | null;
+    private refreshInFlight: Promise<boolean> | null;
+
+    private static readonly AUTH_EXPIRY_KEY = 'authTokenExpiry';
+    private static readonly AUTH_SESSION_BROKEN_KEY = 'authSessionBroken';
+    private static readonly AUTH_REFRESH_SKEW_MS = 60_000;
 
     constructor() {
         this.baseURL = process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
         this.authToken = null;
         this.refreshToken = null;
+        this.refreshInFlight = null;
 
         // Restore tokens from localStorage on construction
         if (typeof window !== 'undefined') {
@@ -26,6 +32,51 @@ export class BackendAPIClient {
         }
 
         return headers;
+    }
+
+    private clearStoredTokens() {
+        this.authToken = null;
+        this.refreshToken = null;
+        if (typeof window !== 'undefined') {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('refreshToken');
+            localStorage.removeItem(BackendAPIClient.AUTH_EXPIRY_KEY);
+            localStorage.removeItem(BackendAPIClient.AUTH_SESSION_BROKEN_KEY);
+        }
+    }
+
+    private markAuthSessionBroken() {
+        if (typeof window !== 'undefined') {
+            localStorage.setItem(BackendAPIClient.AUTH_SESSION_BROKEN_KEY, '1');
+        }
+    }
+
+    private isAuthSessionBroken(): boolean {
+        if (typeof window === 'undefined') return false;
+        return localStorage.getItem(BackendAPIClient.AUTH_SESSION_BROKEN_KEY) === '1';
+    }
+
+    private getTokenExpiryMs(): number | null {
+        if (typeof window === 'undefined') return null;
+        const raw = localStorage.getItem(BackendAPIClient.AUTH_EXPIRY_KEY);
+        if (!raw) return null;
+        const expiry = Number(raw);
+        return Number.isFinite(expiry) ? expiry : null;
+    }
+
+    private isTokenExpiredOrNearExpiry(): boolean {
+        const expiry = this.getTokenExpiryMs();
+        if (!expiry) return false;
+        return Date.now() >= (expiry - BackendAPIClient.AUTH_REFRESH_SKEW_MS);
+    }
+
+    private async ensureFreshToken(): Promise<boolean> {
+        if (typeof window === 'undefined') return true;
+        if (this.isAuthSessionBroken()) return false;
+        this.authToken = localStorage.getItem('authToken');
+        this.refreshToken = localStorage.getItem('refreshToken');
+        if (this.authToken && !this.isTokenExpiredOrNearExpiry()) return true;
+        return this.tryRefreshToken();
     }
 
     /** Persist tokens + expiry to localStorage and to instance fields. */
@@ -52,14 +103,20 @@ export class BackendAPIClient {
      * Returns true if a new access token was obtained.
      */
     private async tryRefreshToken(): Promise<boolean> {
+        if (this.refreshInFlight) return this.refreshInFlight;
         const storedRefresh =
             this.refreshToken ||
             (typeof window !== 'undefined'
                 ? localStorage.getItem('refreshToken')
                 : null);
 
-        if (!storedRefresh) return false;
+        if (!storedRefresh) {
+            this.clearStoredTokens();
+            this.markAuthSessionBroken();
+            return false;
+        }
 
+        this.refreshInFlight = (async () => {
         try {
             const res = await fetch(`${this.baseURL}/api/v1/auth/refresh`, {
                 method: 'POST',
@@ -67,17 +124,30 @@ export class BackendAPIClient {
                 body: JSON.stringify({ refresh_token: storedRefresh }),
             });
 
-            if (!res.ok) return false;
+            if (!res.ok) {
+                this.clearStoredTokens();
+                this.markAuthSessionBroken();
+                return false;
+            }
 
             const data = await res.json();
             if (data.access_token) {
                 this.storeTokens(data.access_token, data.refresh_token, data.expires_in);
                 return true;
             }
+            this.clearStoredTokens();
+            this.markAuthSessionBroken();
             return false;
         } catch {
+            this.clearStoredTokens();
+            this.markAuthSessionBroken();
             return false;
+        } finally {
+            this.refreshInFlight = null;
         }
+        })();
+
+        return this.refreshInFlight;
     }
 
     /**
@@ -88,6 +158,9 @@ export class BackendAPIClient {
         url: string,
         options: RequestInit = {}
     ): Promise<Response> {
+        if (!(await this.ensureFreshToken())) {
+            return new Response(null, { status: 401, statusText: 'Authentication expired' });
+        }
         const makeRequest = () =>
             fetch(url, {
                 ...options,
@@ -104,6 +177,9 @@ export class BackendAPIClient {
             if (refreshed) {
                 // Retry once with the new token
                 response = await makeRequest();
+            } else {
+                this.clearStoredTokens();
+                this.markAuthSessionBroken();
             }
         }
 
@@ -285,10 +361,11 @@ export class BackendAPIClient {
     }
 
     async getDashboardStats() {
+        await this.ensureFreshToken();
         const response = await fetch(`${this.baseURL}/api/v1/dashboard/stats`, {
             method: 'GET',
             headers: {
-                'Content-Type': 'application/json',
+                ...this.getHeaders(),
             },
         });
 
@@ -300,6 +377,7 @@ export class BackendAPIClient {
     }
 
     async getHealthCheck() {
+        await this.ensureFreshToken();
         const response = await fetch(`${this.baseURL}/health`, {
             method: 'GET',
         });
@@ -312,6 +390,7 @@ export class BackendAPIClient {
     }
 
     async getTCASystemStatus() {
+        await this.ensureFreshToken();
         const response = await fetch(`${this.baseURL}/api/v1/tca/system-status`, {
             method: 'GET',
         });

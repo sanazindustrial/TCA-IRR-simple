@@ -686,17 +686,44 @@ export default function UserManagementPage() {
         }),
       });
 
-      const data = await response.json();
+      // Safely parse response — backend may return non-JSON on some errors
+      let data: Record<string, unknown> = {};
+      try {
+        const text = await response.text();
+        if (text) data = JSON.parse(text);
+      } catch { /* ignore parse error */ }
 
       if (!response.ok) {
-        throw new Error(data.detail || 'Failed to invite user');
+        const rawDetail = data.detail;
+        let msg = 'Failed to send invitation';
+        if (typeof rawDetail === 'string') {
+          msg = rawDetail;
+        } else if (typeof rawDetail === 'object' && rawDetail !== null) {
+          msg = JSON.stringify(rawDetail);
+        } else if (typeof data.message === 'string') {
+          msg = data.message as string;
+        } else if (response.status === 400) {
+          msg = 'Unable to invite this email. The user may already exist or have a pending invitation.';
+        } else if (response.status === 403) {
+          msg = 'Only administrators can invite users.';
+        } else if (response.status === 401) {
+          msg = 'Session expired. Please log out and log back in.';
+        }
+        throw new Error(msg);
       }
+
+      const inviteToken = typeof data.invite_token === 'string' ? data.invite_token : null;
+      const inviteLink = inviteToken
+        ? `${window.location.origin}/accept-invite?token=${inviteToken}`
+        : null;
 
       toast({
         title: '✉️ Invitation Sent',
         description: data.email_sent
-          ? `An invitation has been sent to ${inviteEmail}. They will receive a link to create their account.`
-          : `Invitation created for ${inviteEmail}. Note: Email service may not be configured - share the invite link manually.`,
+          ? `An invitation email has been sent to ${inviteEmail}. They will receive a secure link to create their ${inviteRole} account.`
+          : inviteLink
+            ? `Invite created for ${inviteEmail}. Email not sent — share this link manually: ${inviteLink}`
+            : `Invite created for ${inviteEmail}. Ask them to check their email or contact an admin for the link.`,
       });
       setInviteDialogOpen(false);
       setInviteEmail('');

@@ -38,20 +38,48 @@ export async function generateTcaScorecard(
   Financials: {{{financials}}}
   Framework: {{{framework}}}
 
-  Generate a scorecard with the following 12 categories. For each category, provide:
-  - A raw score (1-10), a weighted score, a color flag (green: >=8.0, yellow: 6.5-7.9, red: <6.5), and other details.
-  - A concise, actionable AI-driven recommendation ('aiRecommendation') for each category.
+  Generate a scorecard with this exact 12-factor model. For each category, provide:
+  - rawScore (1-10)
+  - weight (percentage)
+  - weightedScore = rawScore * (weight / 100)
+  - flag (green/yellow/red)
+  - confidence (0-1)
+  - evidence (specific proof from the provided documents/data)
+  - benchmarkPercentile (0-100, estimated if exact benchmark not available)
+  - concise interpretation and actionable aiRecommendation
 
-  Use these exact weights.
-  - If 'framework' is 'general':
-    - Leadership: 20%, Product-Market Fit / Product Quality: 20%, Team Strength: 10%, Technology & IP: 10%, Business Model & Financials: 10%, Go-to-Market Strategy: 10%, Competition & Moat: 5%, Market Potential: 5%, Traction: 5%, Scalability: 2.5%, Risk Assessment: 2.5%, Exit Potential: 0%
-  - If 'framework' is 'medtech':
-    - Leadership: 15%, Regulatory: 15%, Product-Market Fit / Product Quality: 15%, Team Strength: 10%, Tech/IP: 10%, Financials: 10%, GTM: 5%, Competition & Moat: 5%, Market Potential: 5%, Traction/Testimonials: 5%, Scalability: 0%, Risk Assessment: 0%
+  Use this exact 12-factor list and weights (must sum to 100):
+  1) Market Opportunity (15)
+  2) Problem-Solution Fit (10)
+  3) Product / Technology (10)
+  4) Business Model (9)
+  5) Competitive Advantage (8)
+  6) Team & Founder Fit (13)
+  7) Financial Health & Projection (10)
+  8) Go-To-Market Strategy (8)
+  9) Traction & Validation (10)
+  10) Risk & Compliance (7)
+  11) Strategic & Macro Alignment (5)
+  12) Growth Potential / Scalability (5)
+
+  Scoring band logic:
+  - 9-10: Exceptional / investment-ready
+  - 7-8: Strong but needs refinement
+  - 5-6: Moderate / concerns exist
+  - 3-4: Weak / high risk
+  - 1-2: Critical failure / insufficient evidence
+
+  Flag mapping by raw score:
+  - green: rawScore >= 8.5
+  - yellow: rawScore >= 7 and < 8.5
+  - red: rawScore < 7
+
+  Quality requirements:
+  - Do not invent evidence; tie each score to concrete provided signals.
+  - Avoid generic midpoint scoring unless evidence truly supports a mid-range score.
+  - Ensure weightedScore values are mathematically correct and compositeScore = sum(weightedScore).
   
-  Ensure all 12 categories below are present, with weights summing to 100%:
-  - Product Quality, Market Potential, Team Strength, Financial Viability, Technology, Traction, Competitive Advantage, Scalability, Business Model, Risk Assessment, Leadership, Go-to-Market Strategy
-  
-  After evaluating all 12 categories, provide an overall composite score and a final summary.
+  After evaluating all 12 categories, provide compositeScore (0-10), overallScore (same value), and a final summary.
   `,
   });
 

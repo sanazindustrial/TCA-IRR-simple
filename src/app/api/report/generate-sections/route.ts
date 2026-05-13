@@ -15,10 +15,23 @@ export async function POST(req: NextRequest) {
     const companyName = String(company_data?.company_name ?? body.companyName ?? 'the company');
     const sector = String(company_data?.sector ?? body.sector ?? 'Technology');
     const stage = String(company_data?.stage ?? body.stage ?? 'Early Stage');
-    const results: Array<{ module: string; score: number; risk: string; explanation: string }> = module_results ?? body.moduleResults ?? [];
+    const results: Array<{ module: string; score: number; risk: string; explanation: string; confidence?: number }> = module_results ?? body.moduleResults ?? [];
     const sections: string[] = selected_sections ?? body.selectedSections ?? [];
 
     const now = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+    const scoreToOutcome = (value: number): string => {
+      if (value >= 8.5) return 'Advanced Screening / DD';
+      if (value >= 7) return 'Prescreening';
+      if (value >= 5) return 'Early Stage';
+      return 'Reject';
+    };
+
+    const scoreToRiskBand = (value: number): 'GREEN' | 'YELLOW' | 'RED' => {
+      if (value >= 8.5) return 'GREEN';
+      if (value >= 7) return 'YELLOW';
+      return 'RED';
+    };
 
     // Build content for each selected section
     const buildSection = (sectionId: string): { title: string; content: string } => {
@@ -39,11 +52,31 @@ export async function POST(req: NextRequest) {
         },
         tca_scorecard: {
           title: 'TCA Scorecard',
-          content: `**Composite TCA Score: ${score.toFixed(1)}/10**\n\nModule Scores:\n${results.map((r) => `• **${r.module.toUpperCase()}**: ${r.score.toFixed(1)}/10 (${r.risk})`).join('\n')}\n\nOverall Risk Rating: ${score >= 6.5 ? 'GREEN' : score >= 4.5 ? 'YELLOW' : 'RED'}`,
+          content: `**Composite TCA Score: ${score.toFixed(1)}/10**\n\nModule Scores:\n${results.map((r) => `• **${r.module.toUpperCase()}**: ${r.score.toFixed(1)}/10 (${r.risk})`).join('\n')}\n\nOverall Risk Rating: ${scoreToRiskBand(score)}`,
         },
         financial_analysis: {
           title: 'Financial Analysis',
-          content: `**Financial Module Score: ${s('financial')}/10**\n\n${e('financial') || `Financial analysis for ${companyName} reveals ${score >= 6.5 ? 'solid' : 'developing'} revenue foundations. Key financial indicators assessed include revenue growth trajectory, burn rate, unit economics, and path to profitability.`}\n\n**Key Financial Indicators:**\n• Revenue model viability assessed\n• Unit economics reviewed\n• Burn rate and runway analyzed\n• Capital efficiency evaluated`,
+          content: `**Financial Module Score: ${s('financial')}/10**\n\n${e('financial') || `Financial analysis for ${companyName} reveals ${score >= 7 ? 'solid' : 'developing'} revenue foundations. Key financial indicators assessed include revenue growth trajectory, burn rate, unit economics, and path to profitability.`}\n\n**Key Financial Indicators:**\n• Revenue model viability assessed\n• Unit economics reviewed\n• Burn rate and runway analyzed\n• Capital efficiency evaluated`,
+        },
+        'financial-analysis': {
+          title: 'Financial Analysis',
+          content: `**Financial Module Score: ${s('financial')}/10**\n\n${e('financial') || 'Evaluates scalability, capital efficiency, forecast realism, and funding discipline.'}\n\n**Framework Weights:**\n• Revenue Model 30%\n• Unit Economics 30%\n• Projections 20%\n• Funding Requirements 20%`,
+        },
+        'economic-analysis': {
+          title: 'Economic Analysis',
+          content: `**Economic Module Score: ${s('economic')}/10**\n\n${e('economic') || 'Assesses macro durability and recession resilience.'}\n\n**Framework Weights:**\n• Industry Structure 30%\n• Pricing Power 25%\n• Macro Indicators 25%\n• Cycle Resilience 20%`,
+        },
+        'social-analysis': {
+          title: 'Social Analysis',
+          content: `**Social Module Score: ${s('social')}/10**\n\n${e('social') || 'Measures social trust, adoption readiness, and stakeholder acceptance.'}\n\n**Framework Weights:**\n• Social Impact 30%\n• Demographic Fit 25%\n• Cultural Adoption 25%\n• Stakeholder Trust 20%`,
+        },
+        'marketing-analysis': {
+          title: 'Marketing Analysis',
+          content: `**Marketing Module Score: ${s('marketing')}/10**\n\n${e('marketing') || 'Evaluates positioning, demand generation quality, and GTM execution.'}\n\n**Framework Weights:**\n• Positioning 25%\n• Digital Presence 20%\n• Spend Efficiency 30%\n• GTM Execution 25%`,
+        },
+        'environmental-analysis': {
+          title: 'Environmental Analysis',
+          content: `**Environmental Module Score: ${s('environmental')}/10**\n\n${e('environmental') || 'Assesses environmental sustainability, climate risk, and ESG alignment.'}\n\n**Framework Weights:**\n• Environmental Impact 30%\n• Climate Risk 25%\n• Certification 15%\n• ESG Alignment 30%`,
         },
         risk_assessment: {
           title: 'Risk Assessment',
@@ -75,11 +108,15 @@ export async function POST(req: NextRequest) {
         },
         investment_recommendation: {
           title: 'Investment Recommendation',
-          content: recommendation?.recommendation ?? `Based on the TCA-IRR analysis, the composite score of ${score.toFixed(1)}/10 supports a **${score >= 7.5 ? 'Proceed' : score >= 6 ? 'Conditional' : score >= 4.5 ? 'Monitor' : 'Pass'}** recommendation.\n\n**Next Steps:**\n${(recommendation?.action_items ?? []).map((a: string) => `• ${a}`).join('\n')}`,
+          content: recommendation?.recommendation ?? `Based on the TCA-IRR analysis, the composite score of ${score.toFixed(1)}/10 supports a **${scoreToOutcome(score)}** recommendation.\n\n**Next Steps:**\n${(recommendation?.action_items ?? []).map((a: string) => `• ${a}`).join('\n')}`,
         },
         founder_fit: {
           title: 'Founder Fit Assessment',
           content: `**Founder Fit Score: ${s('founderFit')}/10**\n\n${e('founderFit') || `Founder fit analysis for the ${companyName} leadership team.`}\n\n**Assessment Dimensions:**\n• Domain expertise alignment\n• Prior startup experience\n• Market understanding\n• Coachability indicators\n• Mission-founder alignment`,
+        },
+        'founder-fit': {
+          title: 'Founder Fit Assessment',
+          content: `**Founder Fit Score: ${s('founderFit')}/10**\n\n${e('founderFit') || `Founder fit analysis for the ${companyName} leadership team.`}`,
         },
         gap_analysis: {
           title: 'Gap Analysis',
@@ -88,6 +125,14 @@ export async function POST(req: NextRequest) {
         funder_readiness: {
           title: 'Funder Readiness Assessment',
           content: `**Funder Readiness Score: ${s('funder')}/10**\n\n${e('funder') || `Assessment of ${companyName}'s readiness for investor engagement.`}\n\n**Readiness Checklist:**\n• Investment materials\n• Data room completeness\n• Due diligence preparation\n• Board governance\n• Cap table clarity`,
+        },
+        'funder-readiness': {
+          title: 'Funder Readiness Assessment',
+          content: `**Funder Readiness Score: ${s('funder')}/10**\n\n${e('funder') || `Assessment of ${companyName}'s readiness for investor engagement.`}`,
+        },
+        'strategic-fit': {
+          title: 'Strategic Fit Matrix',
+          content: `**Strategic Fit Score: ${s('strategicFit')}/10**\n\n${e('strategicFit') || `Strategic fit assessment for ${companyName} against investor mandate and portfolio pathways.`}`,
         },
         simulation_results: {
           title: 'Simulation Results',

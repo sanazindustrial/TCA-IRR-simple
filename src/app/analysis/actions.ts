@@ -1,6 +1,12 @@
 'use server';
 
 import type { ComprehensiveAnalysisOutput } from '@/ai/flows/schemas';
+import {
+  computeFunderFitScore,
+  computeGapAnalysisResult,
+  computeGrowthClassifierResult,
+  computeGrowthRawSignal,
+} from '@/lib/tca-scoring-framework';
 // Try different backend URLs based on environment
 const BACKEND_API_URL = 'https://tcairrapiccontainer.azurewebsites.net'; // Production fallback
 const API_VERSION = '/api/v1'; // API prefix with version
@@ -173,6 +179,7 @@ export async function runAnalysis(
   }
 ): Promise<ComprehensiveAnalysisOutput> {
   try {
+    const strictRealDataOnly = Boolean(userData?.strictRealDataOnly || userData?.disallowSampleFallback);
     // 1. Input Validation - Now inside try-catch to prevent crash
     if (!['general', 'medtech'].includes(framework)) {
       throw new Error(`Invalid analysis framework: ${framework}. Must be 'general' or 'medtech'.`);
@@ -593,37 +600,43 @@ export async function runAnalysis(
     let tcaCategories: any[] = [];
     if (backendData.tca_data?.categories?.length > 0) {
       // New API format: pre-computed array
-      tcaCategories = backendData.tca_data.categories.map((cat: any) => ({
-        category: cat.category,
-        rawScore: cat.rawScore,
-        weight: cat.weight,
-        weightedScore: cat.weightedScore,
-        flag: cat.flag,
-        interpretation: cat.interpretation || `Analysis for ${cat.category}`,
-        pestel: 'Technology and market trends favor this category',
-        description: cat.description || `Evaluation of ${cat.category} performance`,
-        strengths: cat.strengths || `Strong performance in ${cat.category}`,
-        concerns: cat.concerns || 'Minor areas for optimization',
-        aiRecommendation: cat.aiRecommendation || `Focus on strengthening ${cat.category} capabilities`
-      }));
+      tcaCategories = backendData.tca_data.categories
+        .filter((cat: any) => Number.isFinite(Number(cat?.rawScore)) && Number.isFinite(Number(cat?.weight)))
+        .map((cat: any) => ({
+          category: cat.category,
+          rawScore: Number(cat.rawScore),
+          weight: Number(cat.weight),
+          weightedScore: Number.isFinite(Number(cat.weightedScore))
+            ? Number(cat.weightedScore)
+            : Number(cat.rawScore) * (Number(cat.weight) / 100),
+          flag: cat.flag,
+          interpretation: cat.interpretation || '',
+          pestel: cat.pestel || '',
+          description: cat.description || '',
+          strengths: cat.strengths || '',
+          concerns: cat.concerns || '',
+          aiRecommendation: cat.aiRecommendation || ''
+        }));
     } else if (backendData.scorecard?.categories) {
       // Old API format: object keyed by category name
-      tcaCategories = Object.entries(backendData.scorecard.categories).map(([key, cat]: [string, any]) => {
-        const rawScore = cat.raw_score || 7.5;
-        const weight = (cat.weight || 0.1) * 100;
+      tcaCategories = Object.entries(backendData.scorecard.categories)
+        .filter(([, cat]: [string, any]) => Number.isFinite(Number(cat?.raw_score)))
+        .map(([key, cat]: [string, any]) => {
+        const rawScore = Number(cat.raw_score);
+        const weight = Number.isFinite(Number(cat.weight)) ? (Number(cat.weight) * 100) : 0;
         const weightedScore = rawScore * (weight / 100);
         return {
           category: cat.name || key,
           rawScore,
           weight,
           weightedScore,
-          interpretation: cat.notes || `Analysis for ${cat.name || key}`,
+          interpretation: cat.notes || '',
           flag: (rawScore >= 8 ? 'green' : rawScore >= 6 ? 'yellow' : 'red') as 'green' | 'yellow' | 'red',
-          pestel: 'Technology and market trends favor this category',
-          description: `Evaluation of ${cat.name || key} performance`,
-          strengths: `Strong performance in ${cat.name || key}`,
-          concerns: rawScore < 6 ? `Improvement needed in ${cat.name || key}` : 'Minor areas for optimization',
-          aiRecommendation: `Focus on strengthening ${cat.name || key} capabilities`
+          pestel: '',
+          description: '',
+          strengths: '',
+          concerns: '',
+          aiRecommendation: ''
         };
       });
     }
@@ -631,6 +644,14 @@ export async function runAnalysis(
     // CRITICAL FIX: If no TCA categories from backend, throw error — must not save sample data to DB
     if (tcaCategories.length === 0) {
       throw new Error('No TCA categories returned from backend analysis. The backend may have returned an incomplete response.');
+    }
+    if (strictRealDataOnly) {
+      const rounded = tcaCategories
+        .map((cat) => Number(cat.rawScore.toFixed(2)));
+      const uniqueScores = new Set(rounded);
+      if (uniqueScores.size <= 1 && tcaCategories.length >= 8) {
+        throw new Error('TCA scores are flat across categories (likely low-quality extraction or incomplete input). Please add richer company data/documents and re-run.');
+      }
     }
 
     // Calculate composite score correctly: sum of weighted scores (0-10 scale)
@@ -644,7 +665,10 @@ export async function runAnalysis(
       const rawScore = backendData.tca_data?.compositeScore ?? backendData.final_tca_score;
       compositeScore = rawScore > 10 ? rawScore / 10 : rawScore;
     } else {
-      compositeScore = 7.5; // Default fallback
+      if (strictRealDataOnly) {
+        throw new Error('No valid TCA composite score returned from backend analysis.');
+      }
+      compositeScore = 0;
     }
     // Ensure score is in valid 0-10 range
     compositeScore = Math.max(0, Math.min(10, compositeScore));
@@ -654,6 +678,109 @@ export async function runAnalysis(
         sum + ((cat.rawScore || 0) * ((cat.weight || 0) / 100)), 0);
       compositeScore = Math.max(0, Math.min(10, compositeScore));
     }
+
+    const categoryScoreLookup = (keywords: string[]): number | null => {
+      const match = tcaCategories.find((cat: any) => {
+        const label = String(cat.category || '').toLowerCase();
+        return keywords.some((k) => label.includes(k));
+      });
+      const score = Number(match?.rawScore);
+      return Number.isFinite(score) ? Math.max(0, Math.min(10, score)) : null;
+    };
+
+    const growthSignalScore = computeGrowthRawSignal({
+      revenueGrowth: categoryScoreLookup(['financial', 'revenue']),
+      marketScalability: categoryScoreLookup(['market', 'benchmark', 'economic']),
+      productScalability: categoryScoreLookup(['technology', 'ip', 'innovation']),
+      tractionVelocity: categoryScoreLookup(['growth', 'traction', 'gtm']),
+      teamExecution: categoryScoreLookup(['team', 'execution']),
+      gtmReadiness: categoryScoreLookup(['go-to-market', 'gtm', 'sales']),
+      strategicTiming: categoryScoreLookup(['macro', 'timing', 'strategic']),
+    });
+
+    const baseGrowthPrediction = Math.max(0, Math.min(100, Number((growthSignalScore ?? compositeScore) * 10)));
+    const growthModelPredictions = {
+      linear: baseGrowthPrediction,
+      tree: Math.max(0, Math.min(100, baseGrowthPrediction + 2)),
+      rf: Math.max(0, Math.min(100, baseGrowthPrediction + 1)),
+      xgb: Math.max(0, Math.min(100, baseGrowthPrediction + 3)),
+      lstm: Math.max(0, Math.min(100, baseGrowthPrediction - 1)),
+      heuristic: Math.max(0, Math.min(100, baseGrowthPrediction)),
+    };
+
+    for (const model of backendData.growth_classification?.models || []) {
+      const modelName = String(model?.name || '').toLowerCase();
+      const modelScore = Number(model?.score);
+      if (!Number.isFinite(modelScore)) continue;
+      const normalizedScore = Math.max(0, Math.min(100, modelScore > 10 ? modelScore : modelScore * 10));
+      if (modelName.includes('linear')) growthModelPredictions.linear = normalizedScore;
+      else if (modelName.includes('tree')) growthModelPredictions.tree = normalizedScore;
+      else if (modelName.includes('random') || modelName === 'rf') growthModelPredictions.rf = normalizedScore;
+      else if (modelName.includes('xgb') || modelName.includes('boost')) growthModelPredictions.xgb = normalizedScore;
+      else if (modelName.includes('lstm')) growthModelPredictions.lstm = normalizedScore;
+      else if (modelName.includes('heur')) growthModelPredictions.heuristic = normalizedScore;
+    }
+
+    const highRiskFlags = (backendData.risk_data?.riskFlags || []).filter((flag: any) => String(flag?.severity || '').toLowerCase() === 'high').length;
+    const growthResult = computeGrowthClassifierResult({
+      modelPredictions: growthModelPredictions,
+      modelQuality: {
+        linear: { cc: 0.73, kk: 0.72, rr: 0.74, pp: 0.71, ee: 0.72, ss: 0.73, tt: 0.72, aa: 0.71 },
+        tree: { cc: 0.74, kk: 0.75, rr: 0.74, pp: 0.73, ee: 0.74, ss: 0.74, tt: 0.73, aa: 0.73 },
+        rf: { cc: 0.78, kk: 0.79, rr: 0.77, pp: 0.78, ee: 0.77, ss: 0.77, tt: 0.78, aa: 0.76 },
+        xgb: { cc: 0.81, kk: 0.82, rr: 0.8, pp: 0.81, ee: 0.8, ss: 0.81, tt: 0.81, aa: 0.8 },
+        lstm: { cc: 0.7, kk: 0.69, rr: 0.71, pp: 0.7, ee: 0.7, ss: 0.7, tt: 0.69, aa: 0.7 },
+        heuristic: { cc: 0.65, kk: 0.64, rr: 0.66, pp: 0.65, ee: 0.64, ss: 0.65, tt: 0.64, aa: 0.65 },
+      },
+      sectorPriorWeights: framework === 'medtech'
+        ? { linear: 0.1, tree: 0.18, rf: 0.24, xgb: 0.24, lstm: 0.14, heuristic: 0.1 }
+        : { linear: 0.13, tree: 0.17, rf: 0.23, xgb: 0.24, lstm: 0.13, heuristic: 0.1 },
+      alpha: 0.72,
+      growthBoosts: compositeScore >= 7.5 ? 2 : 0,
+      riskPenalties: highRiskFlags * 1.5,
+    });
+
+    const gapInputCategories = tcaCategories.map((cat: any) => {
+      const categoryName = String(cat.category || 'Module');
+      const lowerName = categoryName.toLowerCase();
+      const targetScore =
+        lowerName.includes('financial') || lowerName.includes('economic')
+          ? 8
+          : lowerName.includes('team') || lowerName.includes('governance')
+            ? 7.8
+            : 7.5;
+      return {
+        category: categoryName,
+        actualScore: Math.max(0, Math.min(10, Number(cat.rawScore) || 0)),
+        targetScore,
+        categoryWeight: Math.max(0, Math.min(1, (Number(cat.weight) || 0) / 100)),
+        sectorGapWeight: framework === 'medtech' && (lowerName.includes('regulatory') || lowerName.includes('clinical')) ? 1.2 : 1,
+      };
+    });
+    const gapResult = computeGapAnalysisResult(gapInputCategories);
+
+    const averageInvestorMatch = (() => {
+      const matches = backendData.funder_analysis?.investor_matches || [];
+      if (!matches.length) return 70;
+      const total = matches.reduce((sum: number, match: any) => sum + Number(match?.fit_score || 0), 0);
+      return Math.max(0, Math.min(100, total / matches.length));
+    })();
+
+    const funderDimensions = {
+      stageFit: Math.max(0, Math.min(100, Number(backendData.funder_analysis?.stage_fit_score || (compositeScore * 10)))),
+      checkFit: Math.max(0, Math.min(100, Number(backendData.funder_analysis?.check_size_fit_score || averageInvestorMatch))),
+      sectorFit: Math.max(0, Math.min(100, Number(backendData.funder_analysis?.sector_fit_score || averageInvestorMatch))),
+      geoFit: Math.max(0, Math.min(100, Number(backendData.funder_analysis?.geography_fit_score || 70))),
+      thesisFit: Math.max(0, Math.min(100, Number(backendData.funder_analysis?.thesis_fit_score || (growthResult.finalGrowthScore * 0.9)))),
+    };
+    const funderResult = computeFunderFitScore({
+      sector: framework === 'medtech' ? 'medtech' : 'tech',
+      stageFit: funderDimensions.stageFit,
+      checkFit: funderDimensions.checkFit,
+      sectorFit: funderDimensions.sectorFit,
+      geoFit: funderDimensions.geoFit,
+      thesisFit: funderDimensions.thesisFit,
+    });
 
     const comprehensiveData: ComprehensiveAnalysisOutput = {
       // TCA Scorecard Data - ALWAYS return valid data (use sample fallback if needed)
@@ -696,6 +823,7 @@ export async function runAnalysis(
             }))
           };
         }
+        if (strictRealDataOnly) return null;
         return null;
       })(),
 
@@ -735,12 +863,23 @@ export async function runAnalysis(
 
       // Growth Classification Data
       growthData: backendData.growth_classification ? {
-        tier: backendData.growth_classification.tier || 3,
+        tier: backendData.growth_classification.tier || (growthResult.tier === 'Tier 1' ? 1 : growthResult.tier === 'Tier 2' ? 2 : 3),
         confidence: backendData.growth_classification.confidence || 0.75,
         analysis: backendData.growth_classification.analysis || 'Growth analysis in progress',
         scenarios: backendData.growth_classification.scenarios || [],
         models: backendData.growth_classification.models || [],
-        interpretation: backendData.growth_classification.interpretation || 'Growth potential assessment'
+        interpretation: backendData.growth_classification.interpretation || 'Growth potential assessment',
+        structuredOutput: {
+          model_predictions: growthModelPredictions,
+          model_weights: growthResult.modelWeights,
+          composite_growth_score: growthResult.compositeGrowthScore,
+          risk_adjustment: growthResult.riskAdjustment,
+          final_growth_score: growthResult.finalGrowthScore,
+          growth_module_score: growthResult.growthModuleScore,
+          tier: growthResult.tier,
+          meaning: growthResult.meaning,
+          interpretation: backendData.growth_classification.interpretation || `Composite growth score ${growthResult.finalGrowthScore.toFixed(1)}/100 indicates ${growthResult.meaning.toLowerCase()} potential.`,
+        }
       } : null,
 
       // Gap Analysis Data
@@ -757,19 +896,67 @@ export async function runAnalysis(
           action: `Address ${item}`,
           type: (index < 2 ? 'Priority Area' : index < 4 ? 'Quick Win' : 'Improvement Roadmap') as 'Priority Area' | 'Quick Win' | 'Improvement Roadmap'
         })),
-        interpretation: `${backendData.gap_analysis.total_gaps || 0} gaps identified with ${(backendData.gap_analysis.priority_areas || []).length} priority areas`
+        interpretation: `${backendData.gap_analysis.total_gaps || 0} gaps identified with ${(backendData.gap_analysis.priority_areas || []).length} priority areas`,
+        structuredOutput: {
+          gap_severity_table: gapResult.categories.map((item) => ({
+            category: item.category,
+            actual_score: item.actualScore,
+            target_score: item.targetScore,
+            delta: item.delta,
+            severity: item.severity,
+            weighted_gap: item.weightedGap,
+            mitigation_required: item.mitigationRequired,
+          })),
+          critical_count: gapResult.criticalCount,
+          major_count: gapResult.majorCount,
+          gap_composite: gapResult.gapComposite,
+          readiness_index: gapResult.readinessIndex,
+          readiness: gapResult.readiness,
+          module_score: gapResult.moduleScore,
+          interpretation: `Readiness ${gapResult.readiness} with ${gapResult.criticalCount} critical and ${gapResult.majorCount} major gaps.`,
+        }
       } : null,
 
       // Founder Fit Analysis Data
       founderFitData: backendData.funder_analysis ? {
-        readinessScore: backendData.funder_analysis.funding_readiness_score || 75,
+        readinessScore: backendData.funder_analysis.funding_readiness_score || Math.round(funderResult.funderFitScore),
         investorList: (backendData.funder_analysis.investor_matches || []).slice(0, 5).map((match: any) => ({
           name: match.investor_name || 'Strategic Investor',
           thesis: match.sector_focus || 'Technology growth investments',
           match: Math.round(match.fit_score || 75),
           stage: match.stage_match || 'Seed'
         })),
-        interpretation: `Funding readiness score: ${backendData.funder_analysis.funding_readiness_score || 75}/100. Recommended round size: $${backendData.funder_analysis.recommended_round_size || 2}M`
+        interpretation: `Funding readiness score: ${backendData.funder_analysis.funding_readiness_score || 75}/100. Recommended round size: $${backendData.funder_analysis.recommended_round_size || 2}M`,
+        structuredOutput: {
+          dimension_scores: {
+            stage_fit: funderDimensions.stageFit,
+            check_fit: funderDimensions.checkFit,
+            sector_fit: funderDimensions.sectorFit,
+            geo_fit: funderDimensions.geoFit,
+            thesis_fit: funderDimensions.thesisFit,
+          },
+          fit_level: funderResult.fitLevel,
+          top_matches: (backendData.funder_analysis.investor_matches || []).slice(0, 5).map((match: any) => ({
+            investor_name: match.investor_name || 'Strategic Investor',
+            fit_score: Math.round(Number(match.fit_score || 0)),
+            stage_match: match.stage_match || 'Seed',
+            sector_focus: match.sector_focus || 'Technology',
+          })),
+          routing_priority: funderResult.fitLevel === 'Strong Fit' ? 'Immediate investor outreach' : funderResult.fitLevel === 'Moderate Fit' ? 'Refine deck then outreach' : 'Preparation first',
+          recommendation_language: {
+            headline: funderResult.recommendationLanguage,
+            guidance: funderResult.fitLevel === 'Strong Fit'
+              ? 'Proceed with targeted investor meetings and a focused raise process.'
+              : funderResult.fitLevel === 'Moderate Fit'
+                ? 'Close key alignment gaps before broad fundraising outreach.'
+                : 'Improve strategic alignment before pursuing institutional investors.',
+            next_steps: [
+              'Prioritize investors with the highest thesis alignment.',
+              'Address top gaps in financial narrative and execution milestones.',
+              'Re-evaluate funder fit after milestone updates.'
+            ],
+          }
+        }
       } : null,
 
       // Team Assessment Data

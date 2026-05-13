@@ -31,6 +31,10 @@ export const getApiUrl = (path: string): string => {
     return `${API_CONFIG.BASE_URL}${path}`;
 };
 
+const AUTH_EXPIRY_KEY = 'authTokenExpiry';
+const AUTH_SESSION_BROKEN_KEY = 'authSessionBroken';
+const AUTH_REFRESH_SKEW_MS = 60_000;
+
 // API Response Types
 export interface ApiResponse<T = any> {
     success?: boolean;
@@ -43,6 +47,7 @@ export interface ApiResponse<T = any> {
 export class ApiClient {
     private baseUrl: string;
     private token: string | null = null;
+    private refreshInFlight: Promise<boolean> | null = null;
 
     constructor(baseUrl: string = API_CONFIG.BASE_URL) {
         this.baseUrl = baseUrl;
@@ -62,6 +67,55 @@ export class ApiClient {
                 localStorage.removeItem('authToken');
             }
         }
+    }
+
+    private clearAuthState() {
+        this.token = null;
+        if (typeof window !== 'undefined') {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('refreshToken');
+            localStorage.removeItem(AUTH_EXPIRY_KEY);
+            localStorage.removeItem(AUTH_SESSION_BROKEN_KEY);
+        }
+    }
+
+    private markAuthSessionBroken() {
+        if (typeof window !== 'undefined') {
+            localStorage.setItem(AUTH_SESSION_BROKEN_KEY, '1');
+        }
+    }
+
+    private isAuthSessionBroken(): boolean {
+        if (typeof window === 'undefined') return false;
+        return localStorage.getItem(AUTH_SESSION_BROKEN_KEY) === '1';
+    }
+
+    private getTokenExpiryMs(): number | null {
+        if (typeof window === 'undefined') return null;
+        const raw = localStorage.getItem(AUTH_EXPIRY_KEY);
+        if (!raw) return null;
+        const expiry = Number(raw);
+        return Number.isFinite(expiry) ? expiry : null;
+    }
+
+    private isTokenExpiredOrNearExpiry(): boolean {
+        const expiry = this.getTokenExpiryMs();
+        if (!expiry) return false;
+        return Date.now() >= (expiry - AUTH_REFRESH_SKEW_MS);
+    }
+
+    private async ensureFreshAuthToken(): Promise<boolean> {
+        if (typeof window === 'undefined') return true;
+        if (this.isAuthSessionBroken()) return false;
+
+        const freshToken = localStorage.getItem('authToken');
+        if (freshToken) this.token = freshToken;
+
+        if (this.token && !this.isTokenExpiredOrNearExpiry()) {
+            return true;
+        }
+
+        return this.tryRefreshToken();
     }
 
     private getHeaders(): HeadersInit {
@@ -86,8 +140,16 @@ export class ApiClient {
     // Attempt to refresh the auth token. Returns true if successful.
     private async tryRefreshToken(): Promise<boolean> {
         if (typeof window === 'undefined') return false;
+        if (this.refreshInFlight) return this.refreshInFlight;
+
         const refreshToken = localStorage.getItem('refreshToken');
-        if (!refreshToken) return false;
+        if (!refreshToken) {
+            this.clearAuthState();
+            this.markAuthSessionBroken();
+            return false;
+        }
+
+        this.refreshInFlight = (async () => {
         try {
             const res = await fetch(`${this.baseUrl}/api/v1/auth/refresh`, {
                 method: 'POST',
@@ -95,25 +157,39 @@ export class ApiClient {
                 body: JSON.stringify({ refresh_token: refreshToken }),
             });
             if (!res.ok) {
-                localStorage.removeItem('authToken');
-                localStorage.removeItem('refreshToken');
-                if (typeof window !== 'undefined') window.location.href = '/login';
+                this.clearAuthState();
+                this.markAuthSessionBroken();
                 return false;
             }
             const data = await res.json();
             if (data.access_token) {
                 this.setToken(data.access_token);
                 if (data.refresh_token) localStorage.setItem('refreshToken', data.refresh_token);
+                if (data.expires_in) {
+                    localStorage.setItem(AUTH_EXPIRY_KEY, String(Date.now() + (Number(data.expires_in) * 1000)));
+                }
                 return true;
             }
+            this.clearAuthState();
+            this.markAuthSessionBroken();
             return false;
         } catch {
+            this.clearAuthState();
+            this.markAuthSessionBroken();
             return false;
+        } finally {
+            this.refreshInFlight = null;
         }
+        })();
+
+        return this.refreshInFlight;
     }
 
     async get<T = any>(path: string): Promise<ApiResponse<T>> {
         try {
+            if (!(await this.ensureFreshAuthToken())) {
+                return { success: false, error: 'Authentication expired' };
+            }
             const url = `${this.baseUrl}${path}`;
             console.log('API GET Request:', url);
 
@@ -135,6 +211,9 @@ export class ApiClient {
                         mode: 'cors',
                         credentials: 'omit',
                     });
+                } else {
+                    this.clearAuthState();
+                    this.markAuthSessionBroken();
                 }
             }
 
@@ -158,6 +237,9 @@ export class ApiClient {
 
     async post<T = any>(path: string, body: any = {}): Promise<ApiResponse<T>> {
         try {
+            if (!(await this.ensureFreshAuthToken())) {
+                return { success: false, error: 'Authentication expired' };
+            }
             let response = await fetch(`${this.baseUrl}${path}`, {
                 method: 'POST',
                 headers: this.getHeaders(),
@@ -172,6 +254,9 @@ export class ApiClient {
                         headers: this.getHeaders(),
                         body: JSON.stringify(body),
                     });
+                } else {
+                    this.clearAuthState();
+                    this.markAuthSessionBroken();
                 }
             }
 
@@ -192,6 +277,9 @@ export class ApiClient {
 
     async put<T = any>(path: string, body: any = {}): Promise<ApiResponse<T>> {
         try {
+            if (!(await this.ensureFreshAuthToken())) {
+                return { success: false, error: 'Authentication expired' };
+            }
             let response = await fetch(`${this.baseUrl}${path}`, {
                 method: 'PUT',
                 headers: this.getHeaders(),
@@ -206,6 +294,9 @@ export class ApiClient {
                         headers: this.getHeaders(),
                         body: JSON.stringify(body),
                     });
+                } else {
+                    this.clearAuthState();
+                    this.markAuthSessionBroken();
                 }
             }
 
@@ -226,6 +317,9 @@ export class ApiClient {
 
     async delete<T = any>(path: string): Promise<ApiResponse<T>> {
         try {
+            if (!(await this.ensureFreshAuthToken())) {
+                return { success: false, error: 'Authentication expired' };
+            }
             let response = await fetch(`${this.baseUrl}${path}`, {
                 method: 'DELETE',
                 headers: this.getHeaders(),
@@ -238,6 +332,9 @@ export class ApiClient {
                         method: 'DELETE',
                         headers: this.getHeaders(),
                     });
+                } else {
+                    this.clearAuthState();
+                    this.markAuthSessionBroken();
                 }
             }
 

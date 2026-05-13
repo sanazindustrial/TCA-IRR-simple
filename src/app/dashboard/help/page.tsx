@@ -57,6 +57,7 @@ const allGuides = [
   { title: "Configuring Modules", description: "Customize module weights, scoring, and logic.", icon: SlidersHorizontal, href: "/dashboard/help/admin-configuration", roles: ['analyst', 'admin'] },
   { title: "Add a New Data Source", description: "Connect new external data sources to the platform.", icon: PlusCircle, href: "/dashboard/help/add-new-source", roles: ['analyst', 'admin'] },
   { title: "Cost Management & Analytics", description: "Understand and manage platform costs.", icon: DollarSign, href: "/dashboard/help/cost-analysis", roles: ['analyst', 'admin'] },
+  { title: "AI Agent System Guide", description: "Configure OpenAI & Gemini providers, manage AI quality, and understand security protection.", icon: ShieldCheck, href: "/dashboard/help/ai-management", roles: ['analyst', 'admin'] },
 ];
 
 

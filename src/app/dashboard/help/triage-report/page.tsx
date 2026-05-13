@@ -169,7 +169,7 @@ function ReportView({ analysisData, visibleSections }: { analysisData: Comprehen
         'strategic-fit': analysisData.strategicFitData && Object.keys(analysisData.strategicFitData).length > 0 && <StrategicFitMatrix />,
         'consistency-check': <ConsistencyCheck />,
         'gap-analysis': analysisData.gapData && Object.keys(analysisData.gapData).length > 0 && <GapAnalysis />,
-        'funder-fit-analysis': analysisData.founderFitData && Object.keys(analysisData.founderFitData).length > 0 && <FunderFitAnalysis />,
+        'founder-fit-analysis': analysisData.founderFitData && Object.keys(analysisData.founderFitData).length > 0 && <FunderFitAnalysis />,
         'team-assessment': analysisData.teamData && Object.keys(analysisData.teamData).length > 0 && <TeamAssessment />,
         'Analyst-comments': <AnalystComments />,
         'final-recommendation': <FinalRecommendation />,

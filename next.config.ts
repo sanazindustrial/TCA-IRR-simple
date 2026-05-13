@@ -87,6 +87,15 @@ const nextConfig: NextConfig = {
   // Performance optimizations
   compress: true,
   poweredByHeader: false,
+
+    // CSS optimization to prevent unused preload warnings
+    experimental: {
+      optimizePackageImports: ["@radix-ui/react-dialog", "@radix-ui/react-dropdown-menu", "@radix-ui/react-tabs", "@radix-ui/react-collapsible"],
+    },
+    onDemandEntries: {
+      maxInactiveAge: 60 * 60 * 1000, // 1 hour
+      pagesBufferLength: 5,
+    },
 };
 
 export default nextConfig;

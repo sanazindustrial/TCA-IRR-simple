@@ -3,25 +3,20 @@
 import { DashboardCard } from '@/components/shared/dashboard-card';
 import { Badge } from '../ui/badge';
 import { useEvaluationContext } from './evaluation-provider';
-import { CheckCircle, SlidersHorizontal, BarChart, FileDiff, TrendingUp } from 'lucide-react';
+import { CheckCircle, BarChart, FileDiff } from 'lucide-react';
 import { Progress } from '../ui/progress';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 
-const consistencyData = {
-  scoring: {
-    distribution: { score: 88, status: 'High' },
-    outliers: { score: 95, status: 'High' },
-    interModule: { score: 75, status: 'Medium' },
-  },
-  narrative: {
-    textCoherence: { score: 92, status: 'High' },
-    scoreCommentMatch: { score: 85, status: 'High' },
-    pitchVsScoreStability: { score: 78, status: 'Medium' },
-  },
-  data: {
-    completeness: { score: 95, status: 'High' },
-    freshness: { score: 99, status: 'High' },
-  },
+type ConsistencyCheckProps = {
+  moduleScores?: Record<string, number | null>;
+  pitchSummary?: string;
+  dataCompleteness?: number;
+};
+
+const toStatus = (score: number): 'High' | 'Medium' | 'Low' => {
+  if (score >= 85) return 'High';
+  if (score >= 65) return 'Medium';
+  return 'Low';
 };
 
 const getStatusVariant = (status: string) => {
@@ -40,8 +35,46 @@ const MetricRow = ({ label, score, status }: { label: string, score: number, sta
 );
 
 
-export function ConsistencyCheck() {
+export function ConsistencyCheck({ moduleScores = {}, pitchSummary = '', dataCompleteness = 0 }: ConsistencyCheckProps) {
   const { isPrivilegedUser } = useEvaluationContext();
+
+  const numericScores = Object.values(moduleScores).filter((s): s is number => typeof s === 'number');
+  const moduleCount = numericScores.length;
+  const avg = moduleCount > 0 ? numericScores.reduce((a, b) => a + b, 0) / moduleCount : 0;
+  const stdDev = moduleCount > 0
+    ? Math.sqrt(numericScores.map((x) => Math.pow(x - avg, 2)).reduce((a, b) => a + b, 0) / moduleCount)
+    : 0;
+  const outlierCount = numericScores.filter((s) => Math.abs(s - avg) > 2).length;
+
+  const distributionScore = moduleCount <= 1
+    ? 40
+    : Math.max(0, Math.min(100, Math.round(100 - (stdDev * 15))));
+  const outlierScore = moduleCount <= 1
+    ? 40
+    : Math.max(0, Math.min(100, Math.round(100 - ((outlierCount / Math.max(1, moduleCount)) * 100))));
+  const interModuleScore = Math.max(0, Math.min(100, Math.round((distributionScore * 0.6) + (outlierScore * 0.4))));
+
+  const pitchLength = pitchSummary.trim().length;
+  const textCoherenceScore = Math.max(0, Math.min(100, Math.round(Math.min(1, pitchLength / 1200) * 100)));
+  const scoreCommentMatchScore = Math.max(0, Math.min(100, Math.round((textCoherenceScore * 0.5) + (dataCompleteness * 0.5))));
+  const pitchVsScoreStabilityScore = Math.max(0, Math.min(100, Math.round((interModuleScore * 0.7) + (textCoherenceScore * 0.3))));
+
+  const consistencyData = {
+    scoring: {
+      distribution: { score: distributionScore, status: toStatus(distributionScore) },
+      outliers: { score: outlierScore, status: toStatus(outlierScore) },
+      interModule: { score: interModuleScore, status: toStatus(interModuleScore) },
+    },
+    narrative: {
+      textCoherence: { score: textCoherenceScore, status: toStatus(textCoherenceScore) },
+      scoreCommentMatch: { score: scoreCommentMatchScore, status: toStatus(scoreCommentMatchScore) },
+      pitchVsScoreStability: { score: pitchVsScoreStabilityScore, status: toStatus(pitchVsScoreStabilityScore) },
+    },
+    data: {
+      completeness: { score: Math.round(dataCompleteness), status: toStatus(dataCompleteness) },
+      freshness: { score: 100, status: 'High' as const },
+    },
+  };
 
   if (!isPrivilegedUser) {
     return null;

@@ -68,12 +68,17 @@ export async function GET() {
         message: openaiKey.length > 10 ? 'API key configured' : 'API key not configured — set OPENAI_API_KEY env var',
     };
 
-    // Test SMTP — check if host is configured
+    // Test SMTP — check for a usable SMTP configuration
     const smtpHost = process.env.SMTP_HOST || '';
+    const smtpUser = process.env.SMTP_USER || '';
+    const smtpPassword = process.env.SMTP_PASSWORD || '';
+    const smtpConfigured = smtpHost.length > 0 && smtpUser.length > 0 && smtpPassword.length > 0;
     results.smtp = {
-        connected: smtpHost.length > 0,
+        connected: smtpConfigured,
         latency_ms: 0,
-        message: smtpHost.length > 0 ? `Host: ${smtpHost}` : 'SMTP not configured — set SMTP_HOST env var',
+        message: smtpConfigured
+            ? `Host: ${smtpHost}, User: ${smtpUser}`
+            : 'SMTP not configured — set SMTP_HOST, SMTP_USER, and SMTP_PASSWORD env vars',
     };
 
     // Test AI Services — check local env-var capability (no backend round-trip needed)

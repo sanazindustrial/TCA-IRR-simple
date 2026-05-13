@@ -14,11 +14,18 @@ export async function POST(req: NextRequest) {
     const bestScore = Math.min(10, base * 1.15);
     const worstScore = Math.max(0, base * 0.80);
 
+    const scoreToOutcome = (score: number): string => {
+      if (score >= 8.5) return 'Advanced Screening / DD';
+      if (score >= 7) return 'Prescreening';
+      if (score >= 5) return 'Early Stage';
+      return 'Reject';
+    };
+
     const buildScenario = (score: number, label: string) => ({
       label,
       score: Math.round(score * 10) / 10,
       risk: scoreToRisk(score),
-      recommendation: score >= 7.5 ? 'Proceed' : score >= 6 ? 'Conditional' : score >= 4.5 ? 'Monitor' : 'Pass',
+      recommendation: scoreToOutcome(score),
       narrative: label === 'Base Case'
         ? `Under base-case assumptions, ${companyName} achieves a score of ${score.toFixed(1)}/10. Core metrics hold at current projections and market conditions remain stable.`
         : label === 'Best Case'

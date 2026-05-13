@@ -20,7 +20,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useEvaluationContext } from './evaluation-provider';
 import { Textarea } from '../ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
@@ -41,6 +41,10 @@ export function TcaScorecard({ initialData }: TcaScorecardProps) {
   const { reportType, isPrivilegedUser, isEditable } = useEvaluationContext();
   const [data, setData] = useState(initialData);
   const [isDeepDiveOpen, setDeepDiveOpen] = useState(false);
+
+  useEffect(() => {
+    setData(initialData);
+  }, [initialData]);
 
   if (!data) {
     return null;

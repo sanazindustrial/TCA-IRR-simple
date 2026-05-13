@@ -1,6 +1,8 @@
 
 'use client';
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useAiInsight } from '@/hooks/use-ai-insight';
+import { AiInsightPanel, AiErrorExplainer } from '@/components/shared/AiInsightPanel';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
@@ -231,6 +233,12 @@ export default function DueDiligenceWorkflowPage() {
   const [htmlReportContent, setHtmlReportContent] = useState('');
   const [previewEditMode, setPreviewEditMode] = useState<'view' | 'edit'>('view');
 
+  // AI Insight
+  const { insight: aiInsight, status: aiStatus, fetch: fetchAiInsight } = useAiInsight();
+
+  // DD-specific error state
+  const [ddError, setDdError] = useState<string | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -411,6 +419,20 @@ export default function DueDiligenceWorkflowPage() {
       localStorage.setItem('analysisResult', JSON.stringify(comprehensiveData));
       localStorage.setItem('analysisFramework', 'general');
 
+      // Fire AI insight after analysis completes
+      const ddPrompt = [
+        `Due Diligence analysis for ${companyName} (${companyIndustry || 'unspecified industry'}, deal type: ${dealType}).`,
+        `${selectedAreas.length} DD areas analyzed.`,
+        companyDescription ? `Company: ${companyDescription.slice(0, 400)}` : '',
+        'Provide: executive summary of DD findings, key risk flags, confidence level (0-1), and 3 recommended next steps for the investment committee.',
+      ].filter(Boolean).join(' ');
+      fetchAiInsight('recommend', ddPrompt, {
+        companyName, companyIndustry, dealType,
+        areasAnalyzed: selectedAreas,
+        dataSourcesUsed: uploadedFiles.length + importedUrls.length + submittedTexts.length,
+      });
+      setDdError(null);
+
       // Try to save to backend — non-blocking: proceed even if save fails
       try {
         const savedReport = await reportsApi.createReport({
@@ -429,10 +451,12 @@ export default function DueDiligenceWorkflowPage() {
       toast({ title: 'Report Generated', description: 'Your due diligence report has been generated.' });
     } catch (error) {
       console.error('Failed to run DD analysis:', error);
+      const errMsg = error instanceof Error ? error.message : 'An unknown error occurred.';
+      setDdError(errMsg);
       toast({
         variant: 'destructive',
         title: 'Analysis Failed',
-        description: error instanceof Error ? error.message : 'An unknown error occurred.',
+        description: errMsg,
       });
     } finally {
       setIsLoading(false);
@@ -1356,6 +1380,23 @@ ${sectionsHtml}
               </div>
             </CardHeader>
             <CardContent className="space-y-5">
+              {/* AI Insight Panel */}
+              <AiInsightPanel
+                status={aiStatus}
+                insight={aiInsight}
+                title="AI Due Diligence Insight"
+                onRetry={() => {
+                  if (!companyName) return;
+                  const prompt = `Re-analyze due diligence for ${companyName} (${companyIndustry || 'unspecified industry'}, deal: ${dealType}).`;
+                  fetchAiInsight('recommend', prompt, { companyName, companyIndustry, dealType });
+                }}
+              />
+
+              {/* DD error display */}
+              {ddError && (
+                <AiErrorExplainer context="due-diligence" error={ddError} onRetry={() => setCurrentStep(6)} />
+              )}
+
               {/* Summary stats */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="rounded-lg border bg-muted/30 p-4 space-y-1">

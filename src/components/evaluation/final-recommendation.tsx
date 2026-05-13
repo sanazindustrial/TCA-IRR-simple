@@ -9,8 +9,7 @@ import { useEvaluationContext } from './evaluation-provider';
 import { useState } from 'react';
 import { Textarea } from '../ui/textarea';
 
-const initialRec = "The AI analysis indicates a strong investment opportunity. The startup scores highly on Product-Market Fit and Team Strength. While there are moderate risks in the GTM strategy, the potential for high growth outweighs the concerns. The recommendation is to proceed to the next stage of due diligence.";
-const initialAnalystRec = "I concur with the AI. The founding team is exceptional, and their traction is impressive for a seed-stage company. The market is large and growing. We should schedule a follow-up meeting with the founders to dive deeper into their financial projections.";
+const initialAnalystRec = "Add analyst commentary here.";
 const initialActionPlan = `**Immediate (Next 7 Days):**
 - [HIGH] Schedule follow-up meeting with founders to deep-dive on Go-to-Market strategy and customer acquisition channels.
 - [HIGH] Request detailed, 24-month financial model including burn-down chart and key hiring plan.
@@ -20,15 +19,40 @@ const initialActionPlan = `**Immediate (Next 7 Days):**
 - [HIGH] Conduct 3-5 independent customer reference calls to validate product value and support quality.
 - [MEDIUM] Complete legal review of corporate structure and IP filings.
 - [LOW] Begin preliminary market checks with potential strategic partners or acquirers.`;
-const initialConclusion = 'Summary of Risk: The primary risks are market competition and a high burn rate. The GTM strategy, while flagged, is considered a manageable execution risk.\n\nPoints of Improvement: The company must diversify its customer acquisition channels and secure a longer financial runway.\n\nTCA Recommendation: With a composite score of 8.17, the TCA recommendation is to "Proceed to Full Screening".\n\nDetailed Conclusion: Both AI and human review align on a "Recommend" verdict. The company demonstrates strong fundamentals and high growth potential. The primary risks identified are considered manageable with active oversight. The recommended action plan focuses on validating the GTM execution and financial modeling. Overall, the opportunity is robust and warrants proceeding to the next stage.';
 
-export function FinalRecommendation() {
+interface FinalRecommendationProps {
+  aiRecommendation?: string;
+  compositeScore?: number;
+  companyName?: string;
+}
+
+export function FinalRecommendation({ aiRecommendation, compositeScore, companyName }: FinalRecommendationProps = {}) {
   const { isEditable } = useEvaluationContext();
 
-  const [aiRec, setAiRec] = useState(initialRec);
+  const verdict = compositeScore !== undefined
+    ? compositeScore >= 7 ? 'Proceed to Full Screening' : compositeScore >= 5.5 ? 'Conditional — Further Review' : 'Pass'
+    : 'Pending Analysis';
+
+  const derivedRec = aiRecommendation ?? (
+    compositeScore !== undefined && companyName
+      ? `${companyName} achieved a composite TCA score of ${compositeScore.toFixed(2)}. ${
+          compositeScore >= 7
+            ? 'The analysis indicates a strong investment opportunity. The recommendation is to proceed to the next stage of due diligence.'
+            : compositeScore >= 5.5
+            ? 'The analysis indicates a moderate opportunity with areas requiring further review before proceeding.'
+            : 'The analysis indicates significant risk factors. The recommendation is to pass at this stage.'
+        }`
+      : 'Analysis complete. Review the composite score and module breakdowns for investment recommendation.'
+  );
+
+  const derivedConclusion = compositeScore !== undefined
+    ? `TCA Recommendation: With a composite score of ${compositeScore.toFixed(2)}, the TCA recommendation is to "${verdict}".\n\nAdd detailed analyst notes and conclusion here.`
+    : 'Run the analysis to generate the final conclusion.';
+
+  const [aiRec, setAiRec] = useState(derivedRec);
   const [AnalystRec, setAnalystRec] = useState(initialAnalystRec);
   const [actionPlan, setActionPlan] = useState(initialActionPlan);
-  const [conclusion, setConclusion] = useState(initialConclusion);
+  const [conclusion, setConclusion] = useState(derivedConclusion);
 
   return (
     <DashboardCard
@@ -39,7 +63,7 @@ export function FinalRecommendation() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div className="p-6 bg-muted/50 rounded-lg">
           <h3 className="font-semibold text-lg flex items-center gap-2">
-            <ThumbsUp className="text-success" /> AI Recommendation: Recommend
+            <ThumbsUp className="text-success" /> AI Recommendation: {verdict}
           </h3>
           {isEditable ? (
               <Textarea value={aiRec} onChange={(e) => setAiRec(e.target.value)} rows={6} className="mt-2 text-base"/>
@@ -49,7 +73,7 @@ export function FinalRecommendation() {
         </div>
         <div className="p-6 bg-muted/50 rounded-lg">
           <h3 className="font-semibold text-lg flex items-center gap-2">
-            <ThumbsUp className="text-success" /> Analyst Recommendation: Recommend
+            <ThumbsUp className="text-success" /> Analyst Recommendation: {verdict}
           </h3>
            {isEditable ? (
               <Textarea value={AnalystRec} onChange={(e) => setAnalystRec(e.target.value)} rows={6} className="mt-2 text-base"/>
