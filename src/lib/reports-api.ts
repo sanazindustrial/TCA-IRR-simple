@@ -23,6 +23,9 @@ export interface UserInfo {
 
 export interface Report {
     id: number;
+    report_id?: string;
+    evaluation_id?: string;
+    analysis_id?: string;
     company_name: string;
     company_id?: number;
     type: string;
@@ -33,6 +36,7 @@ export interface Report {
     confidence?: number;
     recommendation?: string;
     module_scores?: Record<string, any>;
+    analysis_data?: Record<string, any>;
     settings_version_id?: number;
     simulation_run_id?: number;
     missing_sections?: string[];
@@ -109,6 +113,9 @@ export interface ReportFilters {
     approval_status?: string;
     report_type?: string;
     company_name?: string;
+    evaluation_id?: string;
+    analysis_id?: string;
+    report_id?: string;
     search?: string;  // Alias for company_name search
     user_id?: number;
     settings_version_id?: number;
@@ -144,6 +151,9 @@ export const reportsApi = {
                 if (filters.approval_status) params.append('approval_status', filters.approval_status);
                 if (filters.report_type) params.append('report_type', filters.report_type);
                 if (filters.company_name) params.append('company_name', filters.company_name);
+                if (filters.evaluation_id) params.append('evaluation_id', filters.evaluation_id);
+                if (filters.analysis_id) params.append('analysis_id', filters.analysis_id);
+                if (filters.report_id) params.append('report_id', filters.report_id);
                 if (filters.search) params.append('company_name', filters.search);  // Map search to company_name
                 if (filters.user_id) params.append('user_id', filters.user_id.toString());
                 if (filters.settings_version_id) params.append('settings_version_id', filters.settings_version_id.toString());
