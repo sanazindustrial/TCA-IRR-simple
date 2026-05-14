@@ -1,8 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useAiInsight } from '@/hooks/use-ai-insight';
-import { AiInsightPanel, AiErrorExplainer } from '@/components/shared/AiInsightPanel';
+import { useState, useEffect, useMemo, useRef, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
@@ -48,7 +46,10 @@ import {
   SlidersHorizontal,
   Sparkles,
   Upload,
+  UploadCloud,
   X,
+  Link as LinkIcon,
+  Type,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
@@ -58,76 +59,43 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { Label } from '@/components/ui/label';
+import { ExportButtons } from '@/components/evaluation/export-buttons';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
-import { runAnalysis } from '@/app/analysis/actions';
 import reportsApi from '@/lib/reports-api';
+import { azureStorage } from '@/lib/azure-storage-service';
 import { externalSourcesConfig } from '@/lib/external-sources-config';
-import { EvaluationProvider } from '@/components/evaluation/evaluation-provider';
-import { normalizeAnalysisData } from '@/lib/normalize-tca-data';
-import type { ComprehensiveAnalysisOutput } from '@/lib/sample-data';
-import {
-  RAW_MODULE_CONFIG,
-  MODULE_WEIGHT_MAP,
-  computeAnalystSynthesisResult,
-  computeBenchmarkCompositeScore,
-  computeEconomicModuleResult,
-  computeEnvironmentalModuleResult,
-  computeFinancialModuleResult,
-  computeFounderFitModuleResult,
-  computeFunderFitScore,
-  computeGapAnalysisResult,
-  computeGrowthClassifierResult,
-  computeGrowthRawSignal,
-  computeMacroCompositeScore,
-  computeMarketingModuleResult,
-  computeSocialModuleResult,
-  computeStrategicFitModuleResult,
-  computeStrategicModuleResult,
-  inferMacroSector,
-  type ConfidenceBand,
-} from '@/lib/tca-scoring-framework';
-import { ExecutiveSummary } from '@/components/evaluation/executive-summary';
-import { QuickSummary } from '@/components/evaluation/quick-summary';
-import { TcaScorecard } from '@/components/evaluation/tca-scorecard';
-import { TcaSummaryCard } from '@/components/evaluation/tca-summary-card';
-import { TcaAiTable } from '@/components/evaluation/tca-ai-table';
-import { TcaInterpretationSummary } from '@/components/evaluation/tca-interpretation-summary';
-import { WeightedScoreBreakdown } from '@/components/evaluation/weighted-score-breakdown';
-import { RiskFlagSummaryTable } from '@/components/evaluation/risk-flag-summary-table';
-import { FlagAnalysisNarrative } from '@/components/evaluation/flag-analysis-narrative';
-import { GapAnalysis } from '@/components/evaluation/gap-analysis';
-import { MacroTrendAlignment } from '@/components/evaluation/macro-trend-alignment';
-import { BenchmarkComparison } from '@/components/evaluation/benchmark-comparison';
-import { CompetitiveLandscape } from '@/components/evaluation/competitive-landscape';
-import { GrowthClassifier } from '@/components/evaluation/growth-classifier';
-import { TeamAssessment } from '@/components/evaluation/team-assessment';
-import { CEOQuestions } from '@/components/evaluation/ceo-questions';
-import { ConsistencyCheck } from '@/components/evaluation/consistency-check';
-import { AnalystComments } from '@/components/evaluation/analyst-comments';
-import { AnalystAIDeviation } from '@/components/evaluation/analyst-ai-deviation';
-import { FinalRecommendation } from '@/components/evaluation/final-recommendation';
-import { ExportButtons } from '@/components/evaluation/export-buttons';
+import { getActiveManagedModuleIds, TRIAGE_SECTION_MODULE_MAP } from '@/lib/module-deck';
+import { settingsApi } from '@/lib/settings-api';
+import TriageWizard from '@/components/triage/TriageWizard';
+import { WorkflowStepWithStatus, formatEta, withInvestorTerminology } from '@/components/triage/Evaluationsteps';
 
-const TRIAGE_STEPS = [
+const TRIAGE_STEPS = withInvestorTerminology([
   { id: 1, name: 'Upload', icon: Upload, description: 'Upload company documents' },
-  { id: 2, name: 'Data Extraction', icon: FileSearch, description: 'Extract data from documents' },
+  { id: 2, name: 'Data Extraction', icon: FileSearch, description: 'Extract data from uploaded materials' },
   { id: 3, name: 'Company Info', icon: Building2, description: 'Basic company details' },
-  { id: 4, name: 'Data Input', icon: ClipboardList, description: 'Pitch summary & key metrics' },
   { id: 5, name: 'External Data', icon: Database, description: 'Fetch external sources' },
-  { id: 6, name: 'Modules', icon: Layers, description: 'Select analysis modules' },
+  { id: 6, name: 'Modules', icon: Layers, description: 'Configure analysis engines and weighting scope' },
   { id: 7, name: 'Report Sections', icon: Settings, description: 'Configure report sections' },
-  { id: 9, name: 'Generate', icon: BrainCircuit, description: 'Run triage analysis' },
-  { id: 10, name: 'What-If Simulation', icon: SlidersHorizontal, description: 'Simple manual score simulation' },
+  { id: 9, name: 'Generate', icon: BrainCircuit, description: 'Run institutional investment analysis' },
+  { id: 10, name: 'What-If Analysis', icon: LineChart, description: 'Simulate scenario outcomes before finalizing' },
   { id: 11, name: 'Preview Report', icon: Eye, description: 'Review analysis results' },
-  { id: 12, name: 'Storage & Export', icon: Download, description: 'Save & download report' },
   { id: 13, name: 'Report Complete', icon: CheckCircle2, description: 'Analysis complete' },
   { id: 14, name: 'Prior Results', icon: LineChart, description: 'Previous report results' },
   { id: 15, name: 'Run Review', icon: UserCheck, description: 'Analysis run review' },
+]);
+
+const TRIAGE_WORKFLOW_STEPS = [
+  { id: 101, name: 'Document Upload', icon: Upload, description: 'Add company documents and source material.', stepIds: [1, 2] },
+  { id: 102, name: 'Company Setup', icon: Building2, description: 'Complete company details and required investment inputs.', stepIds: [3] },
+  { id: 103, name: 'External Data', icon: Database, description: 'Pull external company and market context.', stepIds: [5] },
+  { id: 104, name: 'Evaluation Setup', icon: Layers, description: 'Choose engines and report scope.', stepIds: [6, 7] },
+  { id: 105, name: 'Review & Generate', icon: BrainCircuit, description: 'Run the triage analysis and validate real AI output.', stepIds: [9] },
+  { id: 106, name: 'Preview Report', icon: Eye, description: 'Review, export, and access completed results.', stepIds: [10, 11, 13, 14, 15] },
 ];
 
 const EXTERNAL_SOURCES = externalSourcesConfig
@@ -139,690 +107,42 @@ const EXTERNAL_SOURCES = externalSourcesConfig
     free: s.pricing === 'Free' || s.pricing === 'Freemium',
   }));
 
+const PREFERRED_EXTERNAL_SOURCE_IDS = ['angellist-venture', 'gust'];
+
+const getPreferredExternalSourceSelection = (allowedIds: string[]): string[] => {
+  const preferred = PREFERRED_EXTERNAL_SOURCE_IDS.filter((id) => allowedIds.includes(id));
+  if (preferred.length > 0) return preferred;
+  return allowedIds.slice(0, Math.min(2, allowedIds.length));
+};
+
 const TRIAGE_MODULES = [
-  { id: 'tca', name: 'TCA Scorecard', description: 'Core 12-category investment scoring', icon: Target, required: true, weight: MODULE_WEIGHT_MAP.tca },
-  { id: 'risk', name: 'Risk Flags', description: '14-domain risk flag assessment', icon: Shield, required: true, weight: MODULE_WEIGHT_MAP.risk },
-  { id: 'growth', name: 'Growth Classifier', description: 'Revenue trajectory and growth tier', icon: TrendingUp, required: false, weight: MODULE_WEIGHT_MAP.growth },
-  { id: 'macro', name: 'Macro Trend Alignment', description: 'PESTEL market context analysis', icon: BarChart3, required: false, weight: MODULE_WEIGHT_MAP.macro },
-  { id: 'benchmark', name: 'Benchmark Comparison', description: 'Industry peer benchmarking', icon: Layers, required: false, weight: MODULE_WEIGHT_MAP.benchmark },
-  { id: 'team', name: 'Team Assessment', description: 'Founder & team quality signals', icon: Users, required: false, weight: MODULE_WEIGHT_MAP.team },
-  { id: 'analyst', name: 'Analyst Report', description: 'Human analyst scoring and commentary', icon: FileSearch, required: false, weight: MODULE_WEIGHT_MAP.analyst },
-  { id: 'funder', name: 'Funder Analysis', description: 'Investment readiness and funder matching', icon: DollarSign, required: false, weight: MODULE_WEIGHT_MAP.funder },
-  { id: 'gap', name: 'Gap Analysis', description: 'Performance gaps and improvement roadmap', icon: Activity, required: false, weight: MODULE_WEIGHT_MAP.gap },
-  { id: 'strategic', name: 'Strategic Analysis', description: 'Competitive positioning and moat strength', icon: Briefcase, required: false, weight: MODULE_WEIGHT_MAP.strategic },
-  { id: 'economic', name: 'Economic Analysis', description: 'Market size and macro-economic indicators', icon: LineChart, required: false, weight: MODULE_WEIGHT_MAP.economic },
-  { id: 'financial', name: 'Financial Analysis', description: 'Revenue model, burn rate and projections', icon: BarChart3, required: false, weight: MODULE_WEIGHT_MAP.financial },
-  { id: 'environmental', name: 'Environmental Analysis', description: 'ESG alignment and climate risk', icon: Globe, required: false, weight: MODULE_WEIGHT_MAP.environmental },
-  { id: 'marketing', name: 'Marketing Analysis', description: 'Brand positioning and GTM execution', icon: Zap, required: false, weight: MODULE_WEIGHT_MAP.marketing },
-  { id: 'social', name: 'Social Impact Analysis', description: 'ESG scoring and social impact metrics', icon: Users, required: false, weight: MODULE_WEIGHT_MAP.social },
-  { id: 'founderFit', name: 'Founder Fit', description: 'Founder background and team capabilities', icon: UserCheck, required: false, weight: MODULE_WEIGHT_MAP.founderFit },
-  { id: 'strategicFit', name: 'Strategic Fit', description: 'Alignment with investor thesis and portfolio', icon: BrainCircuit, required: false, weight: MODULE_WEIGHT_MAP.strategicFit },
+  { id: 'tca', name: 'TCA Scorecard', description: 'Core 12-category investment scoring', icon: Target, required: true, weight: 20 },
+  { id: 'risk', name: 'Risk Flags', description: '14-domain risk flag assessment', icon: Shield, required: true, weight: 15 },
+  { id: 'growth', name: 'Growth Classifier', description: 'Revenue trajectory and growth tier', icon: TrendingUp, required: false, weight: 10 },
+  { id: 'macro', name: 'Macro Trend Alignment', description: 'PESTEL market context analysis', icon: BarChart3, required: false, weight: 8 },
+  { id: 'benchmark', name: 'Benchmark Comparison', description: 'Industry peer benchmarking', icon: Layers, required: false, weight: 5 },
+  { id: 'team', name: 'Team Assessment', description: 'Founder & team quality signals', icon: Users, required: false, weight: 5 },
+  { id: 'analyst', name: 'Analyst Report', description: 'Human analyst scoring and commentary', icon: FileSearch, required: false, weight: 5 },
+  { id: 'funder', name: 'Funder Analysis', description: 'Investment readiness and funder matching', icon: DollarSign, required: false, weight: 5 },
+  { id: 'gap', name: 'Gap Analysis', description: 'Performance gaps and improvement roadmap', icon: Activity, required: false, weight: 5 },
+  { id: 'strategic', name: 'Strategic Analysis', description: 'Competitive positioning and moat strength', icon: Briefcase, required: false, weight: 5 },
+  { id: 'economic', name: 'Economic Analysis', description: 'Market size and macro-economic indicators', icon: LineChart, required: false, weight: 4 },
+  { id: 'financial', name: 'Financial Analysis', description: 'Revenue model, burn rate and projections', icon: BarChart3, required: false, weight: 4 },
+  { id: 'environmental', name: 'Environmental Analysis', description: 'ESG alignment and climate risk', icon: Globe, required: false, weight: 3 },
+  { id: 'marketing', name: 'Marketing Analysis', description: 'Brand positioning and GTM execution', icon: Zap, required: false, weight: 3 },
+  { id: 'social', name: 'Social Impact Analysis', description: 'ESG scoring and social impact metrics', icon: Users, required: false, weight: 3 },
+  { id: 'founderFit', name: 'Founder Fit', description: 'Founder background and team capabilities', icon: UserCheck, required: false, weight: 3 },
+  { id: 'strategicFit', name: 'Strategic Fit', description: 'Alignment with investor thesis and portfolio', icon: BrainCircuit, required: false, weight: 2 },
 ];
 
-const REQUIRED_MODULE_IDS = TRIAGE_MODULES.filter((m) => m.required).map((m) => m.id);
-
-const DEFAULT_WHAT_IF_SCORE = 5;
-const TRIAGE_AUTOSAVE_KEY = 'triage-wizard-autosave-v1';
-
-const MODULE_FORMULA_MAP: Record<string, string> = Object.fromEntries(
-  RAW_MODULE_CONFIG.map((config) => [config.id, config.formula])
-);
-
-const getDefaultWhatIfScores = (sourceScores?: Record<string, number | null>): Record<string, number> =>
-  Object.fromEntries(
-    TRIAGE_MODULES.map((m) => {
-      const source = sourceScores?.[m.id];
-      const normalized = typeof source === 'number' && Number.isFinite(source)
-        ? Math.max(0, Math.min(10, source))
-        : DEFAULT_WHAT_IF_SCORE;
-      return [m.id, normalized];
-    })
-  );
-
-const getDefaultSelectedModulesForRole = (_role: 'admin' | 'analyst' | 'standard'): string[] =>
-  [...REQUIRED_MODULE_IDS];
-
-const clampScoreToTen = (score: number): number => Math.max(0, Math.min(10, score));
-
-const clampToOneToTen = (score: number): number => Math.max(1, Math.min(10, score));
-
-const getOutcomeLabel = (score: number): 'Advanced Screening / DD' | 'Prescreening' | 'Early Stage' | 'Reject' => {
-  if (score >= 8.5) return 'Advanced Screening / DD';
-  if (score >= 7) return 'Prescreening';
-  if (score >= 5) return 'Early Stage';
-  return 'Reject';
-};
-
-const getOutcomeTone = (score: number): 'green' | 'yellow' | 'orange' | 'red' => {
-  if (score >= 8.5) return 'green';
-  if (score >= 7) return 'yellow';
-  if (score >= 5) return 'orange';
-  return 'red';
-};
-
-const getOutcomeTextClass = (score: number): string => {
-  const tone = getOutcomeTone(score);
-  if (tone === 'green') return 'text-green-600';
-  if (tone === 'yellow') return 'text-yellow-600';
-  if (tone === 'orange') return 'text-orange-600';
-  return 'text-red-600';
-};
-
-const getOutcomeBadgeVariant = (score: number): 'default' | 'secondary' | 'destructive' => {
-  const tone = getOutcomeTone(score);
-  return tone === 'green' ? 'default' : tone === 'red' ? 'destructive' : 'secondary';
-};
-
-const averageNonNull = (values: Array<number | null | undefined>): number | null => {
-  const nums = values.filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
-  if (nums.length === 0) return null;
-  return nums.reduce((sum, value) => sum + value, 0) / nums.length;
-};
-
-const weightedAverageNonNull = (
-  values: Array<{ value: number | null | undefined; weight: number }>
-): number | null => {
-  const valid = values.filter(
-    (item): item is { value: number; weight: number } =>
-      typeof item.value === 'number' && Number.isFinite(item.value) && item.weight > 0
-  );
-  if (valid.length === 0) return null;
-  const totalWeight = valid.reduce((sum, item) => sum + item.weight, 0);
-  if (totalWeight <= 0) return null;
-  const weightedSum = valid.reduce((sum, item) => sum + (item.value * item.weight), 0);
-  return weightedSum / totalWeight;
-};
-
-const normalizeConfidence = (value: number | null): number | null => {
-  if (value === null || !Number.isFinite(value)) return null;
-  const normalized = value > 1 ? value / 100 : value;
-  return Math.max(0, Math.min(1, normalized));
-};
-
-const toNumberOrNull = (value: unknown): number | null => {
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (typeof value === 'string') {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed)) return parsed;
-  }
-  return null;
-};
-
-const normalizeModuleScore = (raw: number | null): number | null => {
-  if (raw === null) return null;
-  return clampToOneToTen(raw > 10 ? raw / 10 : raw);
-};
-
-const getConfidenceModifier = (confidence: number | null): number => {
-  if (confidence === null) return 0.92;
-  return 0.88 + (confidence * 0.12);
-};
-
-const getRiskModifier = (riskPenalty: number): number => {
-  const boundedPenalty = Math.max(0, Math.min(0.35, riskPenalty * 0.12));
-  return 1 - boundedPenalty;
-};
-
-const getTrendModifier = (macroTrendScore: number | null): number => {
-  if (macroTrendScore === null) return 1;
-  if (macroTrendScore >= 9) return 1.05;
-  if (macroTrendScore >= 8) return 1.03;
-  if (macroTrendScore >= 6) return 1;
-  if (macroTrendScore >= 4) return 0.97;
-  return 0.95;
-};
-
-const composeModuleScore = (
-  baseScore: number | null,
-  _confidence: number | null,
-  _riskPenalty: number,
-  _macroTrendScore: number | null
-): number | null => {
-  if (baseScore === null) return null;
-  return clampToOneToTen(baseScore);
-};
-
-const average = (values: number[]): number | null => {
-  if (values.length === 0) return null;
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
-};
-
-const deriveRiskScore = (analysisData: Record<string, unknown>): number | null => {
-  const riskData = analysisData.riskData as { riskFlags?: Array<{ flag?: string }> } | undefined;
-  const flags = Array.isArray(riskData?.riskFlags) ? riskData.riskFlags : [];
-  if (flags.length === 0) return null;
-
-  const flagToScore: Record<string, number> = {
-    green: 9,
-    yellow: 6,
-    red: 3,
-  };
-
-  const scores = flags
-    .map((f) => flagToScore[(f.flag || '').toLowerCase()])
-    .filter((s): s is number => Number.isFinite(s));
-
-  const avg = average(scores);
-  if (avg === null) return null;
-
-  const redCount = flags.filter((f) => (f.flag || '').toLowerCase() === 'red').length;
-  const redRatioPenalty = (redCount / Math.max(1, flags.length)) * 2.5;
-  return clampToOneToTen(avg - redRatioPenalty);
-};
-
-const getRiskSeverityPenalty = (analysisData: Record<string, unknown>): number => {
-  const riskData = analysisData.riskData as { riskFlags?: Array<{ flag?: string }> } | undefined;
-  const flags = Array.isArray(riskData?.riskFlags) ? riskData.riskFlags : [];
-  if (flags.length === 0) return 0;
-
-  const red = flags.filter((f) => (f.flag || '').toLowerCase() === 'red').length;
-  const yellow = flags.filter((f) => (f.flag || '').toLowerCase() === 'yellow').length;
-  return (red * 0.25) + (yellow * 0.08);
-};
-
-const getRiskDomainScore = (analysisData: Record<string, unknown>, domainKeywords: string[]): number | null => {
-  const riskData = analysisData.riskData as { riskFlags?: Array<{ domain?: string; flag?: string }> } | undefined;
-  const flags = Array.isArray(riskData?.riskFlags) ? riskData.riskFlags : [];
-  if (flags.length === 0) return null;
-
-  const matches = flags.filter((f) => {
-    const domain = (f.domain || '').toLowerCase();
-    return domainKeywords.some((k) => domain.includes(k));
-  });
-  if (matches.length === 0) return null;
-
-  const flagToScore: Record<string, number> = { green: 9, yellow: 6, red: 3 };
-  const avg = average(
-    matches
-      .map((m) => flagToScore[(m.flag || '').toLowerCase()])
-      .filter((score): score is number => Number.isFinite(score))
-  );
-  return avg === null ? null : clampToOneToTen(avg);
-};
-
-const getTcaCategoryScore = (
-  tcaData: { categories?: Array<{ category?: string; rawScore?: number }> } | undefined,
-  categoryKeywords: string[]
-): number | null => {
-  const categories = Array.isArray(tcaData?.categories) ? tcaData.categories : [];
-  const matches = categories
-    .filter((c) => {
-      const name = (c.category || '').toLowerCase();
-      return categoryKeywords.some((k) => name.includes(k));
-    })
-    .map((c) => normalizeModuleScore(toNumberOrNull(c.rawScore)))
-    .filter((s): s is number => s !== null);
-
-  const avg = average(matches);
-  return avg === null ? null : clampToOneToTen(avg);
-};
-
-const estimateDataCompleteness = (analysisData: Record<string, unknown>): number => {
-  const keyBlocks = [
-    analysisData.tcaData,
-    analysisData.riskData,
-    analysisData.macroData,
-    analysisData.benchmarkData,
-    analysisData.growthData,
-    analysisData.teamData,
-    analysisData.founderFitData,
-    analysisData.gapData,
-    analysisData.strategicFitData,
-  ];
-  const available = keyBlocks.filter((x) => x !== null && x !== undefined).length;
-  return available / keyBlocks.length;
-};
-
-const deriveModuleScore = (moduleId: string, analysisResult: unknown): number | null => {
-  const data = (analysisResult || {}) as Record<string, unknown>;
-  const tcaData = data.tcaData as {
-    compositeScore?: number;
-    overallScore?: number;
-    categories?: Array<{ category?: string; rawScore?: number }>;
-  } | undefined;
-  const macroData = data.macroData as { pestelDashboard?: Record<string, number>; trendOverlayScore?: number } | undefined;
-  const benchmarkData = data.benchmarkData as {
-    benchmarkOverlay?: Array<{ score?: number; percentile?: number }>;
-  } | undefined;
-  const growthData = data.growthData as { tier?: number; confidence?: number } | undefined;
-  const founderFitData = data.founderFitData as { readinessScore?: number } | undefined;
-  const teamData = data.teamData as { teamScore?: number } | undefined;
-  const gapData = data.gapData as { heatmap?: Array<{ gap?: number; priority?: string }> } | undefined;
-  const strategicFitData = data.strategicFitData;
-
-  const tcaLegacyScore = normalizeModuleScore(toNumberOrNull(tcaData?.compositeScore) ?? toNumberOrNull(tcaData?.overallScore));
-  const riskScore = deriveRiskScore(data);
-  const riskPenalty = getRiskSeverityPenalty(data);
-  const globalConfidence = estimateDataCompleteness(data);
-  const confidenceBand: ConfidenceBand = globalConfidence >= 0.8 ? 'high' : globalConfidence >= 0.6 ? 'medium' : 'low';
-
-  const marketOpportunity = getTcaCategoryScore(tcaData, ['market opportunity', 'market potential']);
-  const problemSolutionFit = getTcaCategoryScore(tcaData, ['problem', 'solution fit', 'product-market fit', 'pmf']);
-  const productTechnology = getTcaCategoryScore(tcaData, ['product', 'technology', 'tech']);
-  const businessModel = getTcaCategoryScore(tcaData, ['business model']);
-  const competitiveAdvantage = getTcaCategoryScore(tcaData, ['competitive advantage', 'competition', 'moat']);
-  const teamFounderFit = getTcaCategoryScore(tcaData, ['team', 'founder', 'leadership']);
-  const financialHealth = getTcaCategoryScore(tcaData, ['financial', 'financial health', 'financial viability']);
-  const gtmStrategy = getTcaCategoryScore(tcaData, ['go-to-market', 'gtm', 'marketing']);
-  const tractionValidation = getTcaCategoryScore(tcaData, ['traction', 'validation']);
-  const riskCompliance = getTcaCategoryScore(tcaData, ['risk', 'compliance']);
-  const strategicMacroAlignment = getTcaCategoryScore(tcaData, ['strategic', 'macro']);
-  const growthPotential = getTcaCategoryScore(tcaData, ['growth potential', 'scalability', 'exit']);
-
-  const tca12Composite = weightedAverageNonNull([
-    { value: marketOpportunity, weight: 0.15 },
-    { value: problemSolutionFit, weight: 0.1 },
-    { value: productTechnology, weight: 0.1 },
-    { value: businessModel, weight: 0.09 },
-    { value: competitiveAdvantage, weight: 0.08 },
-    { value: teamFounderFit, weight: 0.14 },
-    { value: financialHealth, weight: 0.1 },
-    { value: gtmStrategy, weight: 0.08 },
-    { value: tractionValidation, weight: 0.11 },
-    { value: riskCompliance, weight: 0.06 },
-    { value: strategicMacroAlignment, weight: 0.05 },
-    { value: growthPotential, weight: 0.04 },
-  ]);
-  const tcaScore = normalizeModuleScore(tca12Composite ?? tcaLegacyScore);
-
-  const pestelValues = Object.values(macroData?.pestelDashboard ?? {})
-    .map((v) => toNumberOrNull(v))
-    .filter((v): v is number => v !== null);
-  const macroAvg = average(pestelValues);
-  const sectorHint = String(
-    (data as { sector?: string }).sector
-    ?? ((data as { companyData?: { sector?: string } }).companyData?.sector)
-    ?? ''
-  );
-  const macroSector = inferMacroSector(sectorHint);
-  const macroFromFramework = computeMacroCompositeScore(
-    {
-      political: toNumberOrNull((macroData?.pestelDashboard as Record<string, unknown> | undefined)?.political),
-      economic: toNumberOrNull((macroData?.pestelDashboard as Record<string, unknown> | undefined)?.economic),
-      social: toNumberOrNull((macroData?.pestelDashboard as Record<string, unknown> | undefined)?.social),
-      technological: toNumberOrNull((macroData?.pestelDashboard as Record<string, unknown> | undefined)?.technological),
-      environmental: toNumberOrNull((macroData?.pestelDashboard as Record<string, unknown> | undefined)?.environmental),
-      legal: toNumberOrNull((macroData?.pestelDashboard as Record<string, unknown> | undefined)?.legal),
-    },
-    macroSector,
-    confidenceBand
-  );
-  const trendOverlay = toNumberOrNull(macroData?.trendOverlayScore);
-  const trendBoost = trendOverlay === null ? 0 : trendOverlay * 20;
-  const macroLegacy = macroAvg === null ? null : normalizeModuleScore(macroAvg + trendBoost);
-  const macroScore = averageNonNull([macroLegacy, macroFromFramework]);
-
-  const environmentalMacro = normalizeModuleScore(toNumberOrNull((macroData?.pestelDashboard as Record<string, unknown> | undefined)?.environmental));
-  const socialMacro = normalizeModuleScore(toNumberOrNull((macroData?.pestelDashboard as Record<string, unknown> | undefined)?.social));
-  const economicMacro = normalizeModuleScore(toNumberOrNull((macroData?.pestelDashboard as Record<string, unknown> | undefined)?.economic));
-
-  const benchmarkValues = (benchmarkData?.benchmarkOverlay ?? [])
-    .map((item) => {
-      const scorePart = normalizeModuleScore(toNumberOrNull(item.score));
-      const percentilePart = normalizeModuleScore(toNumberOrNull(item.percentile));
-      return averageNonNull([scorePart, percentilePart]);
-    })
-    .filter((v): v is number => v !== null);
-  const benchmarkScore = computeBenchmarkCompositeScore(benchmarkValues, null, null, confidenceBand)
-    ?? normalizeModuleScore(average(benchmarkValues));
-
-  const growthTier = toNumberOrNull(growthData?.tier);
-  const growthConfidence = normalizeConfidence(toNumberOrNull(growthData?.confidence));
-  let growthScore: number | null = null;
-  if (growthTier !== null) {
-    const tierScore = growthTier <= 5
-      ? ({ 1: 3.5, 2: 5.2, 3: 7.0, 4: 8.4, 5: 9.3 } as Record<number, number>)[Math.round(growthTier)] ?? 6
-      : growthTier > 10 ? growthTier / 10 : growthTier;
-    growthScore = normalizeModuleScore(tierScore);
-  }
-
-  const founderScore = normalizeModuleScore(toNumberOrNull(founderFitData?.readinessScore));
-  const teamScore = normalizeModuleScore(toNumberOrNull(teamData?.teamScore));
-
-  const gapValues = (gapData?.heatmap ?? [])
-    .map((item) => toNumberOrNull(item.gap))
-    .filter((v): v is number => v !== null);
-  const avgGap = average(gapValues);
-  const highPriorityCount = (gapData?.heatmap ?? []).filter((item) => (item.priority || '').toLowerCase() === 'high').length;
-  const gapPenalty = highPriorityCount * 0.2;
-  const gapScore = avgGap === null ? null : clampToOneToTen((10 - (avgGap / 10)) - gapPenalty);
-
-  const strategicScore = strategicFitData
-    ? averageNonNull([competitiveAdvantage, strategicMacroAlignment, benchmarkScore, tcaScore])
-    : null;
-
-  const environmentRisk = getRiskDomainScore(data, ['environment', 'esg']);
-  const socialRisk = getRiskDomainScore(data, ['ethical', 'societal', 'adoption', 'retention', 'social']);
-  const regulatoryRisk = getRiskDomainScore(data, ['regulatory', 'compliance', 'legal']);
-  const financialRiskDomain = getRiskDomainScore(data, ['financial', 'burn', 'runway']);
-  const marketRiskDomain = getRiskDomainScore(data, ['market', 'adoption', 'retention', 'gtm']);
-  const technicalRiskDomain = getRiskDomainScore(data, ['technical', 'technology', 'security', 'cyber']);
-
-  const macroSignal = averageNonNull([macroScore, strategicMacroAlignment]);
-
-  const growthRawSignal = computeGrowthRawSignal({
-    revenueGrowth: growthScore,
-    marketScalability: marketOpportunity,
-    productScalability: growthPotential,
-    tractionVelocity: tractionValidation,
-    teamExecution: teamScore,
-    gtmReadiness: gtmStrategy,
-    strategicTiming: macroSignal,
-  });
-
-  const growthBoosts =
-    (typeof tractionValidation === 'number' && tractionValidation >= 8 ? 4 : 0)
-    + (typeof teamScore === 'number' && teamScore >= 8 ? 3 : 0);
-  const growthPenalties =
-    (typeof tractionValidation === 'number' && tractionValidation < 5 ? 10 : 0)
-    + (typeof financialHealth === 'number' && financialHealth < 5.5 ? 5 : 0)
-    + (typeof founderScore === 'number' && founderScore < 5.5 ? 5 : 0)
-    + (riskPenalty * 3);
-
-  const toGrowthPrediction = (value: number | null): number | null =>
-    value === null ? null : Math.max(0, Math.min(100, value * 10));
-
-  const growthResult = computeGrowthClassifierResult({
-    modelPredictions: {
-      linear: toGrowthPrediction(averageNonNull([financialHealth, businessModel, tractionValidation])),
-      tree: toGrowthPrediction(averageNonNull([riskScore, riskCompliance, regulatoryRisk])),
-      rf: toGrowthPrediction(averageNonNull([growthPotential, macroSignal, tca12Composite])),
-      xgb: toGrowthPrediction(averageNonNull([benchmarkScore, competitiveAdvantage, marketOpportunity])),
-      lstm: toGrowthPrediction(averageNonNull([growthScore, tractionValidation, economicMacro])),
-      heuristic: toGrowthPrediction(growthRawSignal),
-    },
-    modelQuality: {
-      linear: { cc: globalConfidence, kk: globalConfidence, rr: globalConfidence, pp: globalConfidence, ee: 0.78, ss: 0.8, tt: 0.85, aa: 0.82 },
-      tree: { cc: globalConfidence, kk: globalConfidence, rr: globalConfidence, pp: globalConfidence, ee: 0.82, ss: 0.78, tt: 0.82, aa: 0.8 },
-      rf: { cc: globalConfidence, kk: globalConfidence, rr: globalConfidence, pp: globalConfidence, ee: 0.76, ss: 0.84, tt: 0.83, aa: 0.85 },
-      xgb: { cc: globalConfidence, kk: globalConfidence, rr: globalConfidence, pp: globalConfidence, ee: 0.74, ss: 0.86, tt: 0.86, aa: 0.87 },
-      lstm: { cc: growthConfidence ?? globalConfidence, kk: globalConfidence, rr: globalConfidence, pp: globalConfidence, ee: 0.7, ss: 0.82, tt: 0.88, aa: 0.83 },
-      heuristic: { cc: globalConfidence, kk: globalConfidence, rr: globalConfidence, pp: globalConfidence, ee: 0.9, ss: 0.75, tt: 0.9, aa: 0.86 },
-    },
-    alpha: 0.7,
-    growthBoosts,
-    riskPenalties: growthPenalties,
-  });
-
-  const sectorGapWeight = macroSector === 'medtech' || macroSector === 'biotech'
-    ? { regulatory: 1.4, ip: 1.3, product: 1.1, gtm: 0.95, traction: 0.95, team: 1.05, financial: 1.1 }
-    : { regulatory: 0.9, ip: 1.05, product: 1.2, gtm: 1.2, traction: 1.2, team: 1.05, financial: 1.1 };
-
-  const gapResult = computeGapAnalysisResult([
-    {
-      category: 'Product & Technology',
-      actualScore: productTechnology ?? 5,
-      targetScore: macroSector === 'medtech' || macroSector === 'biotech' ? 8.8 : 8.5,
-      categoryWeight: 0.14,
-      sectorGapWeight: sectorGapWeight.product,
-    },
-    {
-      category: 'Go-To-Market Strategy',
-      actualScore: gtmStrategy ?? 5,
-      targetScore: macroSector === 'medtech' || macroSector === 'biotech' ? 7.8 : 8.5,
-      categoryWeight: 0.1,
-      sectorGapWeight: sectorGapWeight.gtm,
-    },
-    {
-      category: 'Traction & Adoption',
-      actualScore: tractionValidation ?? 5,
-      targetScore: 8.2,
-      categoryWeight: 0.12,
-      sectorGapWeight: sectorGapWeight.traction,
-    },
-    {
-      category: 'Financial Viability',
-      actualScore: financialHealth ?? 5,
-      targetScore: 8.0,
-      categoryWeight: 0.1,
-      sectorGapWeight: sectorGapWeight.financial,
-    },
-    {
-      category: 'Team & Execution',
-      actualScore: averageNonNull([teamScore, founderScore]) ?? 5,
-      targetScore: 8.2,
-      categoryWeight: 0.1,
-      sectorGapWeight: sectorGapWeight.team,
-    },
-    {
-      category: 'Regulatory / Compliance',
-      actualScore: averageNonNull([riskCompliance, regulatoryRisk]) ?? 5,
-      targetScore: macroSector === 'medtech' || macroSector === 'biotech' ? 9.0 : 7.5,
-      categoryWeight: 0.08,
-      sectorGapWeight: sectorGapWeight.regulatory,
-    },
-    {
-      category: 'IP & Defensibility',
-      actualScore: competitiveAdvantage ?? 5,
-      targetScore: macroSector === 'medtech' || macroSector === 'biotech' ? 8.8 : 8.0,
-      categoryWeight: 0.08,
-      sectorGapWeight: sectorGapWeight.ip,
-    },
-  ]);
-
-  const funderResult = computeFunderFitScore({
-    sector: macroSector,
-    stageFit: (growthPotential ?? 5) * 10,
-    checkFit: (averageNonNull([financialHealth, businessModel]) ?? 5) * 10,
-    sectorFit: (averageNonNull([benchmarkScore, competitiveAdvantage]) ?? 5) * 10,
-    geoFit: (averageNonNull([marketOpportunity, macroScore]) ?? 5) * 10,
-    thesisFit: (averageNonNull([strategicScore, strategicMacroAlignment]) ?? 5) * 10,
-  });
-
-  const financialResult = computeFinancialModuleResult({
-    revenueModel: averageNonNull([businessModel, gtmStrategy, tractionValidation]),
-    unitEconomics: averageNonNull([financialHealth, benchmarkScore, tractionValidation]),
-    financialProjections: averageNonNull([strategicScore, marketOpportunity, growthScore]),
-    fundingRequirements: averageNonNull([financialHealth, founderScore, strategicScore]),
-    confidence: confidenceBand,
-    penalty: riskPenalty,
-    burnMultiple: toNumberOrNull((data as { financialData?: { burnMultiple?: number; burn_multiple?: number } }).financialData?.burnMultiple)
-      ?? toNumberOrNull((data as { financialData?: { burnMultiple?: number; burn_multiple?: number } }).financialData?.burn_multiple),
-    runwayMonths: toNumberOrNull((data as { financialData?: { runwayMonths?: number; runway_months?: number } }).financialData?.runwayMonths)
-      ?? toNumberOrNull((data as { financialData?: { runwayMonths?: number; runway_months?: number } }).financialData?.runway_months),
-    milestoneMappingScore: averageNonNull([strategicScore, founderScore]),
-  });
-
-  const economicResult = computeEconomicModuleResult({
-    industryStructure: averageNonNull([marketOpportunity, benchmarkScore, competitiveAdvantage]),
-    pricingPower: averageNonNull([businessModel, competitiveAdvantage, financialHealth]),
-    macroIndicators: averageNonNull([economicMacro, macroScore, strategicMacroAlignment]),
-    cycleResilience: averageNonNull([financialHealth, growthPotential, riskScore]),
-    confidence: confidenceBand,
-    penalty: riskPenalty * 0.6,
-    recessionSensitive: (marketRiskDomain ?? 10) < 5,
-    burnHighWithMacroWeak: (financialRiskDomain ?? 10) < 5.5 && (economicMacro ?? 10) < 5.5,
-  });
-
-  const socialResult = computeSocialModuleResult({
-    socialImpact: averageNonNull([socialMacro, strategicMacroAlignment, growthPotential]),
-    demographicFit: averageNonNull([marketOpportunity, benchmarkScore, gtmStrategy]),
-    culturalAdoption: averageNonNull([gtmStrategy, tractionValidation, teamScore]),
-    stakeholderTrust: averageNonNull([teamFounderFit, founderScore, riskScore]),
-    confidence: confidenceBand,
-    penalty: riskPenalty * 0.5,
-    adoptionResistanceHigh: (socialRisk ?? 10) < 5,
-    backlashRiskDetected: (socialRisk ?? 10) < 4.5,
-  });
-
-  const marketingResult = computeMarketingModuleResult({
-    positioning: averageNonNull([strategicScore, businessModel, competitiveAdvantage]),
-    digitalPresence: averageNonNull([tractionValidation, benchmarkScore, growthScore]),
-    spendEfficiency: averageNonNull([financialHealth, benchmarkScore, tractionValidation]),
-    gtmExecution: averageNonNull([gtmStrategy, tractionValidation, teamScore]),
-    confidence: confidenceBand,
-    penalty: riskPenalty * 0.7,
-    cacWorsening: (financialRiskDomain ?? 10) < 5.2,
-    churnHigh: (marketRiskDomain ?? 10) < 5,
-    burnHighWithWeakDigital: (financialRiskDomain ?? 10) < 5.5 && (benchmarkScore ?? 10) < 5.5,
-  });
-
-  const environmentalResult = computeEnvironmentalModuleResult({
-    environmentalImpact: averageNonNull([environmentalMacro, strategicMacroAlignment, riskScore]),
-    climateRisk: averageNonNull([environmentalMacro, macroScore, riskCompliance]),
-    certification: averageNonNull([strategicScore, benchmarkScore, teamScore]),
-    esgAlignment: averageNonNull([environmentalMacro, socialMacro, strategicMacroAlignment]),
-    confidence: confidenceBand,
-    penalty: riskPenalty * 0.4,
-    institutionalFundingTarget: true,
-    sustainabilityClaimsUnverified: (environmentRisk ?? 10) < 5.5,
-  });
-
-  const founderFitResult = computeFounderFitModuleResult({
-    vision: averageNonNull([strategicScore, competitiveAdvantage, strategicMacroAlignment]),
-    passion: averageNonNull([founderScore, teamFounderFit]),
-    domainExpertise: averageNonNull([founderScore, teamScore, benchmarkScore]),
-    leadership: averageNonNull([teamFounderFit, teamScore, founderScore]),
-    execution: averageNonNull([tractionValidation, gtmStrategy, teamScore]),
-    investorReadiness: averageNonNull([founderScore, financialHealth, businessModel]),
-    credibility: averageNonNull([founderScore, teamScore, riskCompliance]),
-    confidence: confidenceBand,
-    penalty: riskPenalty * 0.5,
-    readinessScoreOverride: founderScore,
-  });
-
-  const strategicResult = computeStrategicModuleResult({
-    longTermMoat: averageNonNull([competitiveAdvantage, strategicScore, benchmarkScore]),
-    expansionStrategy: averageNonNull([growthPotential, marketOpportunity, strategicScore]),
-    platformPotential: averageNonNull([productTechnology, growthPotential, competitiveAdvantage]),
-    defensibility: averageNonNull([competitiveAdvantage, riskCompliance, strategicScore]),
-    competitiveDurability: averageNonNull([benchmarkScore, competitiveAdvantage, marketOpportunity]),
-    strategicTiming: averageNonNull([macroSignal, strategicMacroAlignment, growthScore]),
-    confidence: confidenceBand,
-    penalty: riskPenalty * 0.5,
-  });
-
-  const strategicFitResult = computeStrategicFitModuleResult({
-    investorAlignment: averageNonNull([strategicScore, tca12Composite, founderScore]),
-    corporateSynergy: averageNonNull([benchmarkScore, competitiveAdvantage, strategicScore]),
-    marketTiming: averageNonNull([macroSignal, growthScore, tractionValidation]),
-    geographicFit: averageNonNull([macroScore, marketOpportunity, strategicMacroAlignment]),
-    ecosystemFit: averageNonNull([benchmarkScore, competitiveAdvantage, tca12Composite]),
-    acquisitionPotential: averageNonNull([growthPotential, competitiveAdvantage, founderScore]),
-    confidence: confidenceBand,
-    penalty: riskPenalty * 0.4,
-  });
-
-  const analystResult = computeAnalystSynthesisResult({
-    tcaComposite: tca12Composite,
-    riskScore,
-    benchmarkScore,
-    macroScore,
-    teamScore,
-    founderScore,
-    growthScore,
-    confidence: confidenceBand,
-    penalty: riskPenalty * 0.3,
-  });
-
-  switch (moduleId) {
-    case 'tca':
-      return composeModuleScore(
-        tcaScore,
-        globalConfidence,
-        riskPenalty,
-        macroSignal
-      );
-    case 'risk':
-      return composeModuleScore(
-        weightedAverageNonNull([
-          { value: riskScore, weight: 0.5 },
-          { value: regulatoryRisk, weight: 0.2 },
-          { value: financialRiskDomain, weight: 0.15 },
-          { value: technicalRiskDomain, weight: 0.15 },
-        ]),
-        globalConfidence,
-        riskPenalty * 1.25,
-        macroSignal
-      );
-    case 'growth':
-      return composeModuleScore(
-        growthResult.growthModuleScore,
-        growthConfidence ?? globalConfidence,
-        riskPenalty,
-        macroSignal
-      );
-    case 'macro':
-      return composeModuleScore(
-        weightedAverageNonNull([
-          { value: macroScore, weight: 0.75 },
-          { value: strategicMacroAlignment, weight: 0.25 },
-        ]),
-        globalConfidence,
-        riskPenalty * 0.7,
-        macroSignal
-      );
-    case 'benchmark':
-      return composeModuleScore(
-        weightedAverageNonNull([
-          { value: benchmarkScore, weight: 0.5 },
-          { value: competitiveAdvantage, weight: 0.25 },
-          { value: tractionValidation, weight: 0.25 },
-        ]),
-        globalConfidence,
-        riskPenalty * 0.8,
-        macroSignal
-      );
-    case 'team':
-      return composeModuleScore(
-        weightedAverageNonNull([
-          { value: teamScore, weight: 0.4 },
-          { value: founderScore, weight: 0.25 },
-          { value: teamFounderFit, weight: 0.35 },
-        ]),
-        globalConfidence,
-        riskPenalty,
-        macroSignal
-      );
-    case 'founderFit':
-      return composeModuleScore(founderFitResult.finalScore, globalConfidence, riskPenalty * 0.5, macroSignal);
-    case 'analyst':
-      return composeModuleScore(analystResult.finalScore, globalConfidence, riskPenalty * 0.3, macroSignal);
-    case 'funder':
-      return composeModuleScore(
-        funderResult.moduleScore,
-        globalConfidence,
-        riskPenalty,
-        macroSignal
-      );
-    case 'financial':
-      return composeModuleScore(financialResult.finalScore, globalConfidence, riskPenalty * 0.6, macroSignal);
-    case 'gap':
-      return composeModuleScore(gapResult.moduleScore ?? gapScore, globalConfidence, riskPenalty, macroSignal);
-    case 'strategic':
-      return composeModuleScore(strategicResult.finalScore, globalConfidence, riskPenalty * 0.5, macroSignal);
-    case 'economic':
-      return composeModuleScore(economicResult.finalScore, globalConfidence, riskPenalty * 0.5, macroSignal);
-    case 'environmental':
-      return composeModuleScore(environmentalResult.finalScore, globalConfidence, riskPenalty * 0.3, macroSignal);
-    case 'marketing':
-      return composeModuleScore(marketingResult.finalScore, globalConfidence, riskPenalty * 0.4, macroSignal);
-    case 'social':
-      return composeModuleScore(socialResult.finalScore, globalConfidence, riskPenalty * 0.3, macroSignal);
-    case 'strategicFit':
-      return composeModuleScore(strategicFitResult.finalScore, globalConfidence, riskPenalty * 0.4, macroSignal
-      );
-    default:
-      return null;
-  }
-};
-
-const computeWeightedCompositeScore = (
-  selectedModules: string[],
-  moduleScores: Record<string, number | null>
-): number | null => {
-  const active = TRIAGE_MODULES
-    .filter((module) => selectedModules.includes(module.id))
-    .map((module) => ({ ...module, score: moduleScores[module.id] }))
-    .filter((module): module is (typeof TRIAGE_MODULES)[number] & { score: number } => module.score !== null);
-
-  if (active.length === 0) return null;
-
-  const totalWeight = active.reduce((sum, module) => sum + module.weight, 0);
-  if (totalWeight <= 0) return null;
-
-  const weighted = active.reduce((sum, module) => sum + (module.score * module.weight), 0) / totalWeight;
-  return clampScoreToTen(weighted);
+const inferSectionArtifacts = (title: string): string => {
+  const lower = title.toLowerCase();
+  const hasTable = lower.includes('table') || lower.includes('matrix') || lower.includes('scorecard');
+  const hasDiagram = lower.includes('chart') || lower.includes('diagram') || lower.includes('trend') || lower.includes('comparison');
+  if (hasTable && hasDiagram) return 'Table + Diagram';
+  if (hasTable) return 'Table';
+  if (hasDiagram) return 'Diagram';
+  return 'Narrative';
 };
 
 const SECTORS = [
@@ -838,11 +158,420 @@ const SECTORS = [
 ];
 
 const STAGES = ['Pre-seed', 'Seed', 'Series A', 'Series B', 'Series C+', 'Growth'];
-const STANDARD_RESTRICTED_STEP_IDS = [5, 6, 7, 10];
+const STANDARD_RESTRICTED_STEP_IDS = [5, 6, 7, 8, 10];
+const TRIAGE_AUTOSAVE_KEY = 'triage-wizard-autosave-v2';
+
+const formatBytes = (bytes: number, decimals = 1) => {
+  if (bytes === 0) return '0 B';
+  const unit = 1024;
+  const precision = decimals < 0 ? 0 : decimals;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const index = Math.floor(Math.log(bytes) / Math.log(unit));
+  return `${parseFloat((bytes / Math.pow(unit, index)).toFixed(precision))} ${sizes[index]}`;
+};
 
 const cleanShortText = (value: unknown): string => {
   if (typeof value !== 'string') return '';
   return value.replace(/\s+/g, ' ').trim();
+};
+
+const toNumberOrNull = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+};
+
+const normalizeScoreToTen = (score: number | null): number | null => {
+  if (score === null) return null;
+  const normalized = score > 10 ? score / 10 : score;
+  return Math.max(0, Math.min(10, normalized));
+};
+
+const averageNumbers = (values: Array<number | null | undefined>): number | null => {
+  const valid = values.filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+  if (valid.length === 0) return null;
+  return valid.reduce((sum, value) => sum + value, 0) / valid.length;
+};
+
+const tierToScore = (tier: number | null): number | null => {
+  if (tier === null) return null;
+  if (tier > 10) return normalizeScoreToTen(tier);
+  if (tier <= 5) {
+    const mapped: Record<number, number> = { 1: 3.5, 2: 5.2, 3: 7.0, 4: 8.4, 5: 9.3 };
+    return mapped[Math.round(tier)] ?? 6;
+  }
+  return tier;
+};
+
+const deriveModuleScoresFromAnalysis = (analysisData: unknown): Record<string, number | null> => {
+  const data = (analysisData ?? {}) as Record<string, unknown>;
+  const tcaData = data.tcaData as {
+    compositeScore?: number;
+    overallScore?: number;
+    categories?: Array<{ rawScore?: number; weightedScore?: number; weight?: number }>;
+  } | undefined;
+  const riskData = data.riskData as { riskFlags?: Array<{ flag?: string }> } | undefined;
+  const macroData = data.macroData as { pestelDashboard?: Record<string, number>; trendOverlayScore?: number } | undefined;
+  const benchmarkData = data.benchmarkData as {
+    benchmarkOverlay?: Array<{ score?: number; percentile?: number }>;
+    overlayScore?: number;
+  } | undefined;
+  const growthData = data.growthData as { tier?: number } | undefined;
+  const founderFitData = data.founderFitData as { readinessScore?: number } | undefined;
+  const teamData = data.teamData as { interpretation?: string } | undefined;
+  const gapData = data.gapData as { heatmap?: Array<{ gap?: number; priority?: string }> } | undefined;
+
+  const tcaCategories = Array.isArray(tcaData?.categories) ? tcaData.categories : [];
+  const tcaFromWeighted = tcaCategories.length > 0
+    ? tcaCategories.reduce((sum, cat) => {
+      const weighted = toNumberOrNull(cat.weightedScore);
+      if (weighted !== null) return sum + weighted;
+      const raw = toNumberOrNull(cat.rawScore);
+      const weight = toNumberOrNull(cat.weight);
+      if (raw === null || weight === null) return sum;
+      return sum + (raw * (weight / 100));
+    }, 0)
+    : null;
+  const tcaScore = normalizeScoreToTen(
+    tcaFromWeighted ?? toNumberOrNull(tcaData?.compositeScore) ?? toNumberOrNull(tcaData?.overallScore)
+  );
+
+  const riskFlagMap: Record<string, number> = { green: 9, yellow: 6, red: 3 };
+  const riskFlags = Array.isArray(riskData?.riskFlags) ? riskData.riskFlags : [];
+  const riskBase = averageNumbers(
+    riskFlags.map((f) => riskFlagMap[(f.flag || '').toLowerCase()])
+  );
+  const redCount = riskFlags.filter((f) => (f.flag || '').toLowerCase() === 'red').length;
+  const riskScore = normalizeScoreToTen(
+    riskBase === null ? null : Math.max(0, riskBase - ((redCount / Math.max(1, riskFlags.length)) * 2.5))
+  );
+
+  const pestelValues = Object.values(macroData?.pestelDashboard ?? {})
+    .map((v) => toNumberOrNull(v))
+    .filter((v): v is number => v !== null);
+  const macroBase = averageNumbers(pestelValues);
+  const trendOverlay = toNumberOrNull(macroData?.trendOverlayScore);
+  const macroScore = normalizeScoreToTen(
+    macroBase === null
+      ? null
+      : macroBase + ((trendOverlay === null ? 0 : trendOverlay) * 20)
+  );
+
+  const benchmarkValues = (benchmarkData?.benchmarkOverlay ?? [])
+    .map((item) => averageNumbers([
+      normalizeScoreToTen(toNumberOrNull(item.score)),
+      normalizeScoreToTen(toNumberOrNull(item.percentile)),
+    ]))
+    .filter((v): v is number => v !== null);
+  const benchmarkOverlay = toNumberOrNull(benchmarkData?.overlayScore);
+  const benchmarkScore = normalizeScoreToTen(
+    averageNumbers([
+      averageNumbers(benchmarkValues),
+      benchmarkOverlay === null ? null : 5 + (benchmarkOverlay * 10),
+    ])
+  );
+
+  const growthScore = normalizeScoreToTen(tierToScore(toNumberOrNull(growthData?.tier)));
+  const founderScore = normalizeScoreToTen(toNumberOrNull(founderFitData?.readinessScore));
+
+  const teamCompletenessMatch = teamData?.interpretation?.match(/team completeness:\s*(\d+(?:\.\d+)?)%/i);
+  const teamScore = normalizeScoreToTen(toNumberOrNull(teamCompletenessMatch?.[1]));
+
+  const gapValues = (gapData?.heatmap ?? [])
+    .map((item) => toNumberOrNull(item.gap))
+    .filter((v): v is number => v !== null);
+  const highPriorityCount = (gapData?.heatmap ?? [])
+    .filter((item) => (item.priority || '').toLowerCase() === 'high').length;
+  const gapPenalty = highPriorityCount * 0.2;
+  const gapScore = normalizeScoreToTen(
+    gapValues.length > 0 ? (10 - ((averageNumbers(gapValues) ?? 0) / 10) - gapPenalty) : null
+  );
+
+  const moduleScores: Record<string, number | null> = {
+    tca: tcaScore,
+    risk: riskScore,
+    growth: growthScore,
+    macro: macroScore,
+    benchmark: benchmarkScore,
+    team: teamScore,
+    founderFit: founderScore,
+    gap: gapScore,
+  };
+
+  const fallback = averageNumbers([tcaScore, riskScore, macroScore, benchmarkScore, growthScore]);
+  TRIAGE_MODULES.forEach((m) => {
+    if (!(m.id in moduleScores) || moduleScores[m.id] === null) {
+      moduleScores[m.id] = fallback;
+    }
+  });
+
+  return moduleScores;
+};
+
+const computeWeightedCompositeScore = (
+  selectedModuleIds: string[],
+  moduleScores: Record<string, number | null>,
+  weightOverrides?: Record<string, number>
+): number | null => {
+  const activeModules = TRIAGE_MODULES
+    .filter((m) => selectedModuleIds.includes(m.id))
+    .map((m) => ({
+      ...m,
+      weight: (weightOverrides && typeof weightOverrides[m.id] === 'number' && weightOverrides[m.id] > 0)
+        ? weightOverrides[m.id]
+        : m.weight,
+      score: moduleScores[m.id],
+    }))
+    .filter((m): m is (typeof TRIAGE_MODULES)[number] & { score: number } => typeof m.score === 'number' && Number.isFinite(m.score));
+
+  if (activeModules.length === 0) return null;
+  const totalWeight = activeModules.reduce((sum, m) => sum + m.weight, 0);
+  if (totalWeight <= 0) return null;
+
+  const weighted = activeModules.reduce((sum, m) => sum + (m.score * m.weight), 0) / totalWeight;
+  return Math.max(0, Math.min(10, weighted));
+};
+
+type ModuleQualityAssessment = {
+  moduleId: string;
+  moduleName: string;
+  score: number | null;
+  quality: 'high' | 'standard' | 'low' | 'missing';
+  penalty: number;
+};
+
+type QualityTier = 'high' | 'standard' | 'low';
+
+type TriageQualityAssessment = {
+  hasComputedAnalysis: boolean;
+  evidenceCoveragePct: number;
+  moduleCoveragePct: number;
+  moduleQualityDetails: ModuleQualityAssessment[];
+  averageModuleQuality: number;
+  verificationScore: number;
+  consistencyScore: number;
+  qualityScore: number;
+  qualityTier: QualityTier;
+  gatePassed: boolean;
+  canExport: boolean;
+  blockers: string[];
+  recommendationLabel: string;
+  reportNarrative: {
+    executiveSummary: string;
+    analysisNarrative: string;
+    recommendationNarrative: string;
+  };
+};
+
+const getModuleQualityTier = (score: number | null): 'high' | 'standard' | 'low' | 'missing' => {
+  if (score === null || score === 0) return 'missing';
+  if (score >= 7.5) return 'high';
+  if (score >= 5.5) return 'standard';
+  return 'low';
+};
+
+const getRecommendationLabel = (score: number, qualityTier: QualityTier): string => {
+  if (!Number.isFinite(score) || score <= 0) return 'Not computed';
+  if (qualityTier === 'high') {
+    if (score >= 7) return 'Proceed';
+    if (score >= 5.5) return 'Conditional';
+    return 'Pass';
+  }
+  if (qualityTier === 'standard') {
+    if (score >= 7) return 'Conditional';
+    return 'Pass';
+  }
+  return 'Manual Review Required';
+};
+
+const evaluateTriageQuality = (params: {
+  analysisData: unknown;
+  selectedModuleIds: string[];
+  moduleScores: Record<string, number | null>;
+  compositeScore: number;
+  companyName: string;
+  sector: string;
+  stage: string;
+  website: string;
+  country: string;
+  stateRegion: string;
+  city: string;
+  pitchSummary: string;
+  keyMetrics: string;
+  teamInfo: string;
+  productDescription: string;
+  annualRevenue: string;
+  preMoneyValuation: string;
+  allModulesMetadata?: typeof TRIAGE_MODULES;
+}): TriageQualityAssessment => {
+  const {
+    analysisData,
+    selectedModuleIds,
+    moduleScores,
+    compositeScore,
+    companyName,
+    sector,
+    stage,
+    website,
+    country,
+    stateRegion,
+    city,
+    pitchSummary,
+    keyMetrics,
+    teamInfo,
+    productDescription,
+    annualRevenue,
+    preMoneyValuation,
+  } = params;
+
+  const requiredEvidenceFields = [
+    companyName,
+    sector,
+    stage,
+    website,
+    country,
+    stateRegion,
+    city,
+    pitchSummary,
+    keyMetrics,
+    teamInfo,
+    productDescription,
+    annualRevenue,
+    preMoneyValuation,
+  ];
+  const requiredEvidenceFilled = requiredEvidenceFields.filter((value) => value.trim().length > 0).length;
+  const evidenceCoveragePct = Math.round((requiredEvidenceFilled / Math.max(requiredEvidenceFields.length, 1)) * 100);
+
+  const activeModuleCount = Math.max(selectedModuleIds.length, 1);
+  const scoredModuleCount = selectedModuleIds.filter((id) => {
+    const score = moduleScores[id];
+    return typeof score === 'number' && Number.isFinite(score) && score > 0;
+  }).length;
+  const moduleCoveragePct = Math.round((scoredModuleCount / activeModuleCount) * 100);
+
+  const moduleMetadata = params.allModulesMetadata ?? TRIAGE_MODULES;
+  const moduleQualityDetails: ModuleQualityAssessment[] = selectedModuleIds.map((modId) => {
+    const moduleMeta = moduleMetadata.find((m) => m.id === modId);
+    const moduleScore = moduleScores[modId];
+    const quality = getModuleQualityTier(moduleScore);
+    let penalty = 0;
+    if (quality === 'low') penalty = 15;
+    if (quality === 'standard') penalty = 5;
+    if (quality === 'missing') penalty = 25;
+    return {
+      moduleId: modId,
+      moduleName: moduleMeta?.name || modId,
+      score: moduleScore ?? null,
+      quality,
+      penalty,
+    };
+  });
+  const totalModulePenalty = moduleQualityDetails.reduce((sum, m) => sum + m.penalty, 0);
+  const averageModuleQuality = Math.max(0, 100 - (totalModulePenalty / Math.max(selectedModuleIds.length, 1)));
+
+  const parsed = (analysisData ?? {}) as {
+    keyFindings?: string[];
+    riskData?: { riskFlags?: unknown[] };
+  };
+  const keyFindingsCount = Array.isArray(parsed.keyFindings) ? parsed.keyFindings.length : 0;
+  const hasRiskSignals = Array.isArray(parsed.riskData?.riskFlags) && parsed.riskData.riskFlags.length > 0;
+
+  const scoredValues = Object.values(moduleScores)
+    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0);
+  const maxScore = scoredValues.length > 0 ? Math.max(...scoredValues) : 0;
+  const minScore = scoredValues.length > 0 ? Math.min(...scoredValues) : 0;
+  const scoreSpread = maxScore - minScore;
+
+  const verificationChecks = [
+    compositeScore >= 5.5,
+    evidenceCoveragePct >= 100,
+    moduleCoveragePct >= 100,
+    keyFindingsCount >= 5,
+    hasRiskSignals,
+  ];
+  const verificationScore = Math.round(
+    (verificationChecks.filter(Boolean).length / Math.max(verificationChecks.length, 1)) * 100
+  );
+
+  let consistencyPenalty = 0;
+  if (compositeScore <= 0) consistencyPenalty += 35;
+  if (moduleCoveragePct < 100) consistencyPenalty += 25;
+  if (evidenceCoveragePct < 100) consistencyPenalty += 22;
+  if (keyFindingsCount < 5) consistencyPenalty += 15;
+  if (!hasRiskSignals) consistencyPenalty += 12;
+  if (scoreSpread > 3.0) consistencyPenalty += 15;
+  if (averageModuleQuality < 90) consistencyPenalty += 18;
+  const consistencyScore = Math.max(0, 100 - consistencyPenalty);
+
+  const qualityScore = Math.round(
+    (evidenceCoveragePct * 0.25)
+    + (moduleCoveragePct * 0.25)
+    + (averageModuleQuality * 0.20)
+    + (verificationScore * 0.15)
+    + (consistencyScore * 0.15)
+  );
+
+  const qualityTier: QualityTier = qualityScore >= 90 ? 'high' : qualityScore >= 75 ? 'standard' : 'low';
+
+  const hasComputedAnalysis = Boolean(analysisData)
+    || compositeScore > 0
+    || scoredValues.length > 0;
+
+  const blockers: string[] = [];
+  const warnings: string[] = [];
+  if (hasComputedAnalysis) {
+    if (evidenceCoveragePct < 100) blockers.push(`Evidence coverage ${evidenceCoveragePct}% below 100% minimum; complete all required company fields.`);
+    if (moduleCoveragePct < 100) blockers.push(`Module coverage ${moduleCoveragePct}% below 100% minimum; rerun analysis to ensure every selected engine scores.`);
+    if (verificationScore < 80) warnings.push(`Verification score ${verificationScore}% is below 80%; improve findings and risk data quality.`);
+    if (consistencyScore < 75) blockers.push(`Consistency score ${consistencyScore}% is weak; module disagreement or scoring gaps detected.`);
+    if (compositeScore <= 0) blockers.push('Composite score is not available from analysis output.');
+    if (averageModuleQuality < 90) blockers.push(`Average module quality ${Math.round(averageModuleQuality)}% is below 90%; improve individual module scoring.`);
+    if (qualityTier !== 'high') warnings.push(`Quality tier is ${qualityTier}; analysis may require manual review before final recommendation.`);
+  }
+
+  const canExport = hasComputedAnalysis && blockers.length === 0 && qualityTier === 'high';
+  const gatePassed = hasComputedAnalysis && blockers.length === 0 && qualityTier === 'high';
+  const recommendationLabel = !hasComputedAnalysis
+    ? 'Not computed'
+    : gatePassed
+    ? getRecommendationLabel(compositeScore, qualityTier)
+    : 'Manual Review Required';
+
+  const executiveSummary = !hasComputedAnalysis
+    ? 'Analysis has not been executed yet. Complete generation to produce an evidence-backed executive summary.'
+    : `${companyName || 'This company'} received a composite score of ${compositeScore.toFixed(1)}/10 with ${qualityTier} quality (${qualityScore}%). Evidence: ${evidenceCoveragePct}% | Modules: ${moduleCoveragePct}% | Avg Module Quality: ${Math.round(averageModuleQuality)}%. ${canExport ? `Recommendation: ${recommendationLabel}` : 'Quality gates require manual analyst review before final recommendation.'}`
+
+  const analysisNarrative = !hasComputedAnalysis
+    ? 'No analytical narrative is available before engines run. Upload evidence and execute analysis to generate validated module findings.'
+    : `Analysis produced ${qualityTier.toUpperCase()} quality (${qualityScore}%) based on: Evidence Coverage ${evidenceCoveragePct}%, Module Coverage ${moduleCoveragePct}%, Verification ${verificationScore}%, Consistency ${consistencyScore}%, Avg Module Quality ${Math.round(averageModuleQuality)}%. Sector (${sector || 'Not set'}) · Stage (${stage || 'Not set'}) · Location (${[city, stateRegion, country].filter((v) => v.trim().length > 0).join(', ') || 'Not set'}). Key Findings: ${keyFindingsCount} | Risk Signals: ${hasRiskSignals ? 'Yes' : 'No'}. ${moduleQualityDetails.filter((m) => m.quality === 'high').length}/${selectedModuleIds.length} modules at high quality.`
+
+  const recommendationNarrative = gatePassed
+    ? `Final recommendation: ${recommendationLabel}. 100% quality gate passed: High tier (${qualityScore}%) with full evidence backing, complete module coverage, and strong cross-module consistency. Safe to export and archive.`
+    : `Final recommendation is withheld pending manual review. Quality blockers: ${blockers.join(' ')} Warnings: ${warnings.join(' ')} To reach 100% quality: maximize evidence coverage to 100%, ensure 100% module completion, strengthen module agreement, and achieve 90%+ average module quality.`;
+
+  return {
+    hasComputedAnalysis,
+    evidenceCoveragePct,
+    moduleCoveragePct,
+    moduleQualityDetails,
+    averageModuleQuality,
+    verificationScore,
+    consistencyScore,
+    qualityScore,
+    qualityTier,
+    gatePassed,
+    canExport,
+    blockers,
+    recommendationLabel,
+    reportNarrative: {
+      executiveSummary,
+      analysisNarrative,
+      recommendationNarrative,
+    },
+  };
 };
 
 const cleanLongText = (value: unknown): string => {
@@ -898,89 +627,109 @@ const cleanCompanyName = (value: unknown): string => {
     }
   }
 
+  if (/\b(pitch\s*deck|deck|executive\s*summary|company\s*overview|financials?|problem\s*&?\s*solution|confidential)\b/i.test(candidate)) {
+    return '';
+  }
+
+  const genericTokens = new Set([
+    'company', 'startup', 'overview', 'summary', 'introduction', 'information', 'details', 'required', 'review', 'extracted', 'fields',
+    'pitch', 'deck', 'problem', 'solution', 'traction', 'financial', 'financials', 'market', 'team',
+  ]);
+  const normalized = candidate.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').trim();
+  const words = normalized.split(/\s+/).filter(Boolean);
+  if (words.length > 0 && words.every((w) => genericTokens.has(w))) {
+    return '';
+  }
+
+  if (/\b(company\s*information|required\s*company\s*fields|review\s*extracted\s*company\s*details|company\s*details|company\s+info)\b/i.test(candidate)) {
+    return '';
+  }
+
+  if (/^[A-Z\s0-9&.'-]{3,}$/.test(candidate) && candidate.split(/\s+/).length >= 3) {
+    return '';
+  }
+
   return candidate;
 };
 
-const extractDomainCompanyName = (websiteOrDomain: string): string => {
-  const raw = cleanShortText(websiteOrDomain).toLowerCase();
-  if (!raw) return '';
-  const withoutProtocol = raw.replace(/^https?:\/\//, '').replace(/^www\./, '');
-  const host = withoutProtocol.split('/')[0] ?? '';
-  const root = host.split('.')[0] ?? '';
-  if (!root || root.length < 2) return '';
-  const cleaned = root.replace(/[-_]+/g, ' ').replace(/\d+/g, ' ').trim();
-  if (!cleaned) return '';
-  return cleaned
-    .split(/\s+/)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ')
-    .trim();
+const isLikelyInvalidExistingCompanyName = (value: unknown): boolean => {
+  const text = cleanShortText(value);
+  if (!text) return true;
+  if (!cleanCompanyName(text)) return true;
+
+  const normalized = text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').trim();
+  const words = normalized.split(/\s+/).filter(Boolean);
+  if (words.length === 1 && new Set(['review', 'details', 'information', 'required', 'company']).has(words[0])) {
+    return true;
+  }
+
+  return false;
 };
 
-const scoreCompanyNameCandidate = (candidate: string): number => {
-  const c = cleanCompanyName(candidate);
-  if (!c) return -100;
-  let score = 0;
-  const words = c.split(/\s+/).filter(Boolean);
-  if (words.length >= 1 && words.length <= 4) score += 4;
-  if (c.length >= 3 && c.length <= 36) score += 3;
-  if (/^(the|a|an)\s/i.test(c)) score -= 1;
-  if (/(inc|llc|ltd|corp|company|technologies|technology|solutions)$/i.test(c)) score += 1;
-  if (/(startup|platform|solution|business|market|industry|company\s+description|overview)/i.test(c)) score -= 3;
-  if (/[,:;.!?]/.test(c)) score -= 3;
-  if (c.split(/\s+/).length > 5) score -= 3;
-  return score;
+const isCompanyMismatchedWithWebsite = (companyValue: unknown, websiteValue: unknown): boolean => {
+  const cleanedCompany = cleanCompanyName(companyValue);
+  const fromWebsite = extractDomainCompanyName(websiteValue);
+  if (!cleanedCompany || !fromWebsite) return false;
+  return cleanedCompany.toLowerCase() !== fromWebsite.toLowerCase();
 };
 
-const resolveBestCompanyName = (input: {
-  aiCandidate?: string;
-  legalName?: string;
-  website?: string;
-  fromText?: string;
+const extractDomainCompanyName = (websiteValue: unknown): string => {
+  const website = cleanShortText(websiteValue);
+  if (!website) return '';
+
+  try {
+    const parsed = new URL(/^https?:\/\//i.test(website) ? website : `https://${website}`);
+    const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+    const base = host.split('.')[0] ?? '';
+    if (!base) return '';
+
+    const generic = new Set(['app', 'web', 'site', 'home', 'portal', 'company', 'startup']);
+    if (generic.has(base)) return '';
+
+    const words = base
+      .replace(/[-_]+/g, ' ')
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1));
+
+    return cleanCompanyName(words.join(' '));
+  } catch {
+    return '';
+  }
+};
+
+const resolveCompanyNameCandidate = (input: {
+  aiCandidate?: unknown;
+  legalName?: unknown;
+  website?: unknown;
+  inferredFromText?: string;
   existing?: string;
 }): string => {
-  const candidates = [
-    cleanCompanyName(input.legalName),
+  const options = [
     cleanCompanyName(input.aiCandidate),
-    cleanCompanyName(input.fromText),
-    cleanCompanyName(extractDomainCompanyName(input.website || '')),
+    cleanCompanyName(input.legalName),
+    cleanCompanyName(input.inferredFromText),
+    extractDomainCompanyName(input.website),
     cleanCompanyName(input.existing),
   ].filter(Boolean);
 
-  const ranked = candidates
-    .map((candidate) => ({ candidate, score: scoreCompanyNameCandidate(candidate) }))
-    .sort((a, b) => b.score - a.score);
-
-  return ranked[0]?.candidate ?? '';
+  return options[0] ?? '';
 };
 
 const inferCompanyNameFromText = (text: string): string => {
-  const domainMatch = text.match(/(?:https?:\/\/)?(?:www\.)?([a-z0-9-]{2,})\.(?:com|io|ai|co|net|org|tech|app|vc|finance|health|bio)\b/i);
-  const emailDomainMatch = text.match(/[a-z0-9._%+-]+@([a-z0-9-]{2,})\.(?:com|io|ai|co|net|org|tech|app|vc|finance|health|bio)\b/i);
-  const fromDomain = cleanCompanyName(extractDomainCompanyName(domainMatch?.[0] ?? emailDomainMatch?.[1] ?? ''));
-  if (fromDomain && scoreCompanyNameCandidate(fromDomain) >= 3) return fromDomain;
-
   const patterns: RegExp[] = [
     /(?:company|startup|organization|legal)\s*(?:name)?\s*[:\-]\s*([^\n]{2,100})/i,
-    /(?:our\s+company|business\s+name|issuer|entity)\s*[:\-]\s*([^\n]{2,100})/i,
     /\b([A-Z][A-Za-z0-9&.'-]*(?:\s+[A-Z][A-Za-z0-9&.'-]*){0,3})\s*,\s*(?:[A-Z][a-z]+ing\b[^\n]*)/,
     /(?:^|\n)\s*([A-Z][A-Za-z0-9&.'-]*(?:\s+[A-Z][A-Za-z0-9&.'-]*){0,3})\s*(?:\n|$)/m,
   ];
 
-  let best = '';
-  let bestScore = -100;
   for (const re of patterns) {
     const m = text.match(re);
     const cleaned = cleanCompanyName(m?.[1]);
-    if (!cleaned) continue;
-    const score = scoreCompanyNameCandidate(cleaned);
-    if (score > bestScore) {
-      best = cleaned;
-      bestScore = score;
-    }
+    if (cleaned) return cleaned;
   }
 
-  return bestScore >= 2 ? best : '';
+  return '';
 };
 
 const cleanOneLineDescription = (value: unknown): string => {
@@ -990,6 +739,35 @@ const cleanOneLineDescription = (value: unknown): string => {
     .replace(/^company\s+name\s*:\s*/i, '')
     .replace(/^startup\s+name\s*:\s*/i, '')
     .trim();
+};
+
+const cleanBusinessModelValue = (value: unknown): string => {
+  const text = cleanShortText(value);
+  if (!text) return '';
+  if (/\b(pitch\s*deck|company\s*overview|financials?|executive\s*summary|problem\s*&?\s*solution)\b/i.test(text)) return '';
+  return text;
+};
+
+const cleanMoneyValue = (value: unknown): string => {
+  const text = cleanShortText(value);
+  if (!text) return '';
+  const match = text.match(/\$?\s*([\d,.]+)\s*(million|billion|thousand|m|b|k)?/i);
+  if (!match) return '';
+  const amount = match[1].replace(/,/g, '');
+  const unit = (match[2] ?? '').toLowerCase();
+  if (!unit) return `$${amount}`;
+  if (unit === 'million' || unit === 'm') return `$${amount}M`;
+  if (unit === 'billion' || unit === 'b') return `$${amount}B`;
+  if (unit === 'thousand' || unit === 'k') return `$${amount}K`;
+  return `$${amount}`;
+};
+
+const cleanPitchDeckPathValue = (value: unknown): string => {
+  const text = cleanShortText(value);
+  if (!text) return '';
+  if (/\b(pitch\s*deck|deck)\b/i.test(text) && !/[\\/.]/.test(text)) return '';
+  if (/(\.pdf|\.pptx?|\.docx?|\.key)$/i.test(text) || /[\\/]/.test(text)) return text;
+  return '';
 };
 
 const pickFirstText = (obj: Record<string, unknown>, keys: string[]): string => {
@@ -1043,6 +821,18 @@ const extractAnnualRevenueText = (sourceText: string): string => {
   return `$${amount}${unit}`;
 };
 
+const extractPreMoneyValuationText = (sourceText: string): string => {
+  const match = sourceText.match(/(?:pre[-\s]?money\s+valuation|valuation|company\s+valuation)[:\s]*\$?([\d,.]+)\s*(million|m|k|thousand|billion|b)?/i);
+  if (!match) return '';
+  const amount = match[1].replace(/\s+/g, '');
+  const unit = (match[2] ?? '').toUpperCase();
+  if (!unit) return `$${amount}`;
+  if (unit === 'MILLION') return `$${amount}M`;
+  if (unit === 'THOUSAND') return `$${amount}K`;
+  if (unit === 'BILLION') return `$${amount}B`;
+  return `$${amount}${unit}`;
+};
+
 const extractEmployeesText = (sourceText: string): string => {
   const match = sourceText.match(/(?:team\s+size|employees?|headcount|staff)[:\s]*(\d{1,6})/i);
   return match?.[1] ?? '';
@@ -1050,11 +840,39 @@ const extractEmployeesText = (sourceText: string): string => {
 
 const splitLocationParts = (locationText: string): { city: string; state: string; country: string } => {
   const parts = cleanShortText(locationText).split(',').map((p) => p.trim()).filter(Boolean);
+  const stateCandidate = parts[1] ?? '';
+  const isUsStateLike = /^[A-Z]{2}$/.test(stateCandidate) || /^(Alabama|Alaska|Arizona|Arkansas|California|Colorado|Connecticut|Delaware|Florida|Georgia|Hawaii|Idaho|Illinois|Indiana|Iowa|Kansas|Kentucky|Louisiana|Maine|Maryland|Massachusetts|Michigan|Minnesota|Mississippi|Missouri|Montana|Nebraska|Nevada|New\s+Hampshire|New\s+Jersey|New\s+Mexico|New\s+York|North\s+Carolina|North\s+Dakota|Ohio|Oklahoma|Oregon|Pennsylvania|Rhode\s+Island|South\s+Carolina|South\s+Dakota|Tennessee|Texas|Utah|Vermont|Virginia|Washington|West\s+Virginia|Wisconsin|Wyoming)$/i.test(stateCandidate);
+  const fallbackCountry = parts[2] ?? (isUsStateLike ? 'United States' : '');
+
   return {
     city: parts[0] ?? '',
-    state: parts[1] ?? '',
-    country: parts[2] ?? '',
+    state: stateCandidate,
+    country: fallbackCountry,
   };
+};
+
+const inferStageFromText = (sourceText: string): string => {
+  const lower = sourceText.toLowerCase();
+  if (/pre[-\s]?seed/.test(lower)) return 'Pre-seed';
+  if (/\bseed\b/.test(lower)) return 'Seed';
+  if (/series\s*a\b/.test(lower)) return 'Series A';
+  if (/series\s*b\b/.test(lower)) return 'Series B';
+  if (/series\s*c\b|series\s*d\b|series\s*e\b|late\s*stage/.test(lower)) return 'Series C+';
+  if (/\bgrowth\b/.test(lower)) return 'Growth';
+  return '';
+};
+
+const inferSectorFromText = (sourceText: string): string => {
+  const lower = sourceText.toLowerCase();
+  if (/\bsaas\b|software|technology|enterprise\s+software/.test(lower)) return 'Technology / SaaS';
+  if (/medtech|healthcare|medical/.test(lower)) return 'Healthcare / MedTech';
+  if (/biotech|biotechnology|pharma/.test(lower)) return 'Biotechnology';
+  if (/fintech|financial\s+technology|payments/.test(lower)) return 'FinTech';
+  if (/cleantech|clean\s+energy|climate\s+tech|renewable/.test(lower)) return 'CleanTech / Energy';
+  if (/e-?commerce|retail|marketplace/.test(lower)) return 'E-commerce / Retail';
+  if (/manufacturing|industrial/.test(lower)) return 'Manufacturing';
+  if (/\bai\b|machine\s+learning|deep\s+tech/.test(lower)) return 'AI / Deep Tech';
+  return '';
 };
 
 const deriveProductDescription = (oneLine: string, companyDesc: string): string => {
@@ -1063,35 +881,75 @@ const deriveProductDescription = (oneLine: string, companyDesc: string): string 
   return firstSentence;
 };
 
-const buildExecutiveSummaryText = (input: {
-  companyName: string;
-  sector: string;
-  stage: string;
-  framework: Framework;
-  compositeScore: number;
-  moduleScores: Record<string, number | null>;
-  pitchSummary: string;
-  analysisSummary?: string;
-}): string => {
-  const analysisSummary = cleanLongText(input.analysisSummary);
-  if (analysisSummary && analysisSummary.length >= 120) return analysisSummary;
+const inferBusinessModelFromText = (sourceText: string): string => {
+  const lower = sourceText.toLowerCase();
+  if (/subscription|arr|mrr|saas|license/.test(lower)) return 'B2B SaaS subscription';
+  if (/marketplace|take\s*rate|buyer|seller/.test(lower)) return 'Marketplace';
+  if (/enterprise|pilot|contracts|procurement|credit\s*union|bank/.test(lower)) return 'B2B enterprise sales';
+  if (/consumer|d2c|direct-to-consumer|retail/.test(lower)) return 'D2C / Consumer';
+  return '';
+};
 
-  const active = TRIAGE_MODULES
-    .map((m) => ({ name: m.name, score: input.moduleScores[m.id] }))
-    .filter((m): m is { name: string; score: number } => typeof m.score === 'number')
-    .sort((a, b) => b.score - a.score);
+const buildComprehensiveCompanyDescription = (sourceText: string, oneLine: string, sectorValue: string, stageValue: string): string => {
+  const normalized = cleanLongText(sourceText).replace(/\s+/g, ' ').trim();
+  const excerpt = normalized.slice(0, 900);
+  const summary = cleanOneLineDescription(oneLine) || 'The company is building a focused solution for a well-defined market need.';
+  const sectorText = sectorValue || 'N/A';
+  const stageText = stageValue || 'N/A';
 
-  const topStrengths = active.slice(0, 3).map((m) => `${m.name} (${m.score.toFixed(1)}/10)`);
-  const topRisks = active.slice(-2).map((m) => `${m.name} (${m.score.toFixed(1)}/10)`);
-  const summarySnippet = cleanLongText(input.pitchSummary).slice(0, 420);
+  const paragraphs = [
+    `Overview: ${summary}`,
+    `Context: This startup operates in ${sectorText} and is currently at the ${stageText} stage. It demonstrates execution momentum, product-market direction, and a go-to-market narrative based on available deck evidence.`,
+    `Evidence Extract: ${excerpt || 'N/A'}`,
+  ];
 
-  return [
-    `${input.companyName || 'This company'} is assessed under the ${input.framework === 'medtech' ? 'MedTech/Life Sciences' : 'General Tech'} framework in ${input.sector || 'its target sector'} at ${input.stage || 'its current'} stage.`,
-    `Overall triage composite score is ${input.compositeScore.toFixed(2)}/10, corresponding to ${getOutcomeLabel(input.compositeScore)} based on current module-weighted evidence.`,
-    topStrengths.length ? `Leading strengths: ${topStrengths.join(', ')}.` : 'Leading strengths are still being consolidated from available module outputs.',
-    topRisks.length ? `Primary risk watch areas: ${topRisks.join(', ')}.` : 'Primary risk watch areas are not yet fully available from current module outputs.',
-    summarySnippet ? `Business context extracted from source material: ${summarySnippet}` : 'Business context is limited in current source text; additional documents and verified metrics are recommended for deeper confidence.',
-  ].join('\n\n');
+  return cleanLongText(paragraphs.join('\n\n')).slice(0, 1800);
+};
+
+const buildComprehensiveProductDescription = (sourceText: string, oneLine: string, companyDesc: string): string => {
+  const normalized = cleanLongText(sourceText).replace(/\s+/g, ' ').trim();
+  const productHint = cleanLongText(
+    normalized.match(/(?:solution|product|platform|how\s+it\s+works)[:\s-]*([^.!?]{40,300})/i)?.[1] ?? ''
+  );
+  const companySentence = cleanLongText(companyDesc)
+    .split(/[.!?\n]/)
+    .map((sentence) => sentence.trim())
+    .find((sentence) => sentence.length >= 30 && !/(revenue|valuation|funding|raising|asking|arr|mrr)/i.test(sentence)) ?? '';
+  const baseline = [productHint, deriveProductDescription(oneLine, companyDesc), companySentence]
+    .map((value) => cleanLongText(value))
+    .find((value) => value.length >= 24 && !/(revenue|valuation|funding|raising|asking|arr|mrr)/i.test(value)) ?? '';
+  const detail = normalized
+    .split(/[.!?]/)
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => sentence.length >= 24 && !/(revenue|valuation|funding|raising|asking|arr|mrr)/i.test(sentence))
+    .slice(0, 3)
+    .join('. ');
+
+  const paragraphs = [
+    `Product Summary (AI-generated): ${baseline || 'The company offers a focused product built to solve a concrete customer workflow problem with practical operational value.'}`,
+    'Functional Detail: The product is positioned as a workflow-oriented solution that helps users complete critical tasks faster, with lower friction, stronger consistency, and clearer measurable outcomes. Its value comes from usability, embedded automation, and fit within the customer\'s existing operating environment.',
+    'Value Proposition: The solution is designed to improve customer efficiency, reduce manual effort, and create repeatable business value through easier adoption, stronger engagement, and scalable expansion over time. The product narrative supports commercial adoption rather than serving only as a conceptual technology showcase.',
+    `Supporting Evidence: ${detail || cleanLongText(companyDesc).slice(0, 500) || 'N/A'}`,
+  ];
+
+  return cleanLongText(paragraphs.join('\n\n')).slice(0, 1800);
+};
+
+const normalizeRequiredText = (value: string, fallback = 'N/A'): string => {
+  const text = cleanLongText(value);
+  return text || fallback;
+};
+
+const normalizeRequiredShortText = (value: string, fallback = 'N/A'): string => {
+  const text = cleanShortText(value);
+  return text || fallback;
+};
+
+const normalizeRequiredMoneyText = (value: string, fallback = 'N/A'): string => {
+  const text = cleanShortText(value);
+  if (!text) return fallback;
+  if (/^n\/?a$/i.test(text)) return 'N/A';
+  return cleanMoneyValue(text) || text;
 };
 
 const normalizeStageValue = (value: unknown): string => {
@@ -1142,10 +1000,121 @@ const normalizeSectorValue = (value: unknown): string => {
   return aliases[compact] ?? '';
 };
 
+const parseMoneyToNumber = (value: string): number | null => {
+  const input = value.trim();
+  if (!input) return null;
+
+  const match = input.match(/^\$?\s*([\d,.]+)\s*([kmb])?$/i);
+  if (!match) return null;
+
+  const base = Number(match[1].replace(/,/g, ''));
+  if (!Number.isFinite(base)) return null;
+
+  const unit = (match[2] ?? '').toLowerCase();
+  const multiplier = unit === 'k' ? 1_000 : unit === 'm' ? 1_000_000 : unit === 'b' ? 1_000_000_000 : 1;
+  return base * multiplier;
+};
+
 const isPositiveNumberText = (value: string): boolean => {
-  const normalized = value.replace(/[$,\s]/g, '');
-  const num = Number(normalized);
-  return Number.isFinite(num) && num > 0;
+  const num = parseMoneyToNumber(value);
+  return num !== null && Number.isFinite(num) && num > 0;
+};
+
+const isProvidedMoneyOrNA = (value: string): boolean => {
+  const text = cleanShortText(value);
+  if (!text) return false;
+  if (/^n\/?a$/i.test(text)) return true;
+  if (/^\$?\s*0+(?:\.0+)?$/.test(text.replace(/,/g, ''))) return true;
+  return isPositiveNumberText(text);
+};
+
+const MIN_AUTOFILL_CONFIDENCE = 0.68;
+const MIN_REQUIREMENT_MATCH_SCORE = 0.65;
+const MIN_EMPTY_REQUIRED_CONFIDENCE = 0.58;
+const MIN_EMPTY_REQUIRED_REQUIREMENT_SCORE = 0.35;
+const MIN_LOCATION_FIELD_CONFIDENCE = 0.35; // Location fields: more lenient
+const MIN_FINANCIAL_FIELD_CONFIDENCE = 0.40; // Financial fields: more lenient
+
+const confidenceForKeys = (map: unknown, keys: string[]): number => {
+  if (!map || typeof map !== 'object') return 0;
+  const rec = map as Record<string, unknown>;
+  return keys.reduce((best, key) => {
+    const val = rec[key];
+    return typeof val === 'number' && Number.isFinite(val) ? Math.max(best, val) : best;
+  }, 0);
+};
+
+const shouldApplyByConfidence = (map: unknown, keys: string[], min = MIN_AUTOFILL_CONFIDENCE): boolean => {
+  return confidenceForKeys(map, keys) >= min;
+};
+
+const shouldApplyLocationField = (confidenceMap: unknown, keys: string[]): boolean => {
+  // For location fields (country, state, city), use much lower confidence threshold when field is empty
+  return confidenceForKeys(confidenceMap, keys) >= MIN_LOCATION_FIELD_CONFIDENCE;
+};
+
+const shouldApplyFinancialField = (confidenceMap: unknown, keys: string[]): boolean => {
+  // For financial fields (revenue, valuation), use lower confidence threshold when field is empty
+  return confidenceForKeys(confidenceMap, keys) >= MIN_FINANCIAL_FIELD_CONFIDENCE;
+};
+
+const requirementScoreForKeys = (map: unknown, keys: string[]): number => {
+  if (!map || typeof map !== 'object') return 0;
+  const rec = map as Record<string, unknown>;
+  return keys.reduce((best, key) => {
+    const entry = rec[key];
+    if (!entry || typeof entry !== 'object') return best;
+    const score = (entry as Record<string, unknown>).score;
+    return typeof score === 'number' && Number.isFinite(score) ? Math.max(best, score) : best;
+  }, 0);
+};
+
+const shouldApplyByRequirement = (map: unknown, keys: string[], min = MIN_REQUIREMENT_MATCH_SCORE): boolean => {
+  return requirementScoreForKeys(map, keys) >= min;
+};
+
+const shouldApplyField = (confidenceMap: unknown, requirementMap: unknown, keys: string[]): boolean => {
+  return shouldApplyByConfidence(confidenceMap, keys) && shouldApplyByRequirement(requirementMap, keys);
+};
+
+const shouldApplyFieldForEmptyRequired = (confidenceMap: unknown, requirementMap: unknown, keys: string[]): boolean => {
+  return shouldApplyField(confidenceMap, requirementMap, keys)
+    || (
+      shouldApplyByConfidence(confidenceMap, keys, MIN_EMPTY_REQUIRED_CONFIDENCE)
+      && shouldApplyByRequirement(requirementMap, keys, MIN_EMPTY_REQUIRED_REQUIREMENT_SCORE)
+    );
+};
+
+const hasLowConfidenceCriticalFields = (map: unknown): boolean => {
+  const critical: string[][] = [
+    ['company_name', 'companyName', 'legal_name', 'legalName'],
+    ['website'],
+    ['sector', 'industryVertical'],
+    ['stage', 'developmentStage'],
+    ['business_model', 'businessModel'],
+    ['country'],
+    ['state'],
+    ['city'],
+    ['annual_revenue', 'annualRevenue'],
+    ['pre_money_valuation', 'preMoneyValuation'],
+  ];
+  return critical.some((keys) => confidenceForKeys(map, keys) > 0 && !shouldApplyByConfidence(map, keys));
+};
+
+const hasWeakRequirementCriticalFields = (map: unknown): boolean => {
+  const critical: string[][] = [
+    ['company_name', 'companyName', 'legal_name', 'legalName'],
+    ['website'],
+    ['sector', 'industryVertical'],
+    ['stage', 'developmentStage'],
+    ['business_model', 'businessModel'],
+    ['country'],
+    ['state'],
+    ['city'],
+    ['annual_revenue', 'annualRevenue'],
+    ['pre_money_valuation', 'preMoneyValuation'],
+  ];
+  return critical.some((keys) => requirementScoreForKeys(map, keys) > 0 && !shouldApplyByRequirement(map, keys));
 };
 
 type Framework = 'general' | 'medtech';
@@ -1173,14 +1142,6 @@ const DEFAULT_ADMIN_SECTIONS: ReportSection[] = [
   { id: 'competitive-landscape', title: 'Page 7: Competitive Landscape', active: true, description: 'Competitor positioning and market differentiation' },
   { id: 'growth-classifier', title: 'Page 8: Growth Classifier', active: true, description: 'Growth tier classification and trajectory projection' },
   { id: 'team-assessment', title: 'Page 8: Team Assessment', active: true, description: 'Founder profiles, team completeness, and leadership gaps' },
-  { id: 'financial-analysis', title: 'Page 8: Financial Analysis', active: true, description: 'Capital efficiency, forecast credibility, and survivability' },
-  { id: 'economic-analysis', title: 'Page 8: Economic Analysis', active: true, description: 'Macro durability, pricing power, and cycle resilience' },
-  { id: 'social-analysis', title: 'Page 9: Social Analysis', active: true, description: 'Social trust, adoption readiness, and stakeholder alignment' },
-  { id: 'marketing-analysis', title: 'Page 9: Marketing Analysis', active: true, description: 'Positioning, CAC efficiency, and GTM execution quality' },
-  { id: 'environmental-analysis', title: 'Page 9: Environmental Analysis', active: true, description: 'ESG alignment, climate resilience, and sustainability posture' },
-  { id: 'founder-fit', title: 'Page 9: Founder Fit Analysis', active: true, description: 'Founder-market fit, leadership readiness, and credibility' },
-  { id: 'funder-readiness', title: 'Page 9: Funder Readiness', active: true, description: 'Investor fit, fundability, and routing readiness' },
-  { id: 'strategic-fit', title: 'Page 9: Strategic Fit Matrix', active: true, description: 'Strategic alignment with investor mandate and portfolio pathways' },
   { id: 'ceo-questions', title: 'Page 9: CEO Questions', active: true, description: 'Strategic questions for the CEO and leadership team' },
   { id: 'consistency-check', title: 'Page 9: Consistency Check', active: true, description: 'Cross-validation of data consistency across modules' },
   { id: 'analyst-comments', title: 'Page 9: Analyst Comments', active: true, description: 'Human analyst review, sentiment, and qualitative notes' },
@@ -1198,14 +1159,57 @@ const DEFAULT_STANDARD_SECTIONS: ReportSection[] = [
   { id: 'weighted-score-breakdown', title: 'Page 4: Weighted Score Breakdown', active: true, description: 'Weighted score breakdown by category' },
   { id: 'risk-flag-summary-table', title: 'Page 5: Risk Flag Summary', active: true, description: 'Risk flag summary table with severity levels' },
   { id: 'flag-analysis-narrative', title: 'Page 5: Flag Analysis Narrative', active: true, description: 'Detailed narrative analysis of risk flags' },
-  { id: 'financial-analysis', title: 'Page 6: Financial Analysis', active: true, description: 'Capital efficiency, forecast credibility, and survivability' },
-  { id: 'economic-analysis', title: 'Page 6: Economic Analysis', active: true, description: 'Macro durability, pricing power, and cycle resilience' },
-  { id: 'social-analysis', title: 'Page 6: Social Analysis', active: true, description: 'Social trust, adoption readiness, and stakeholder alignment' },
-  { id: 'marketing-analysis', title: 'Page 6: Marketing Analysis', active: true, description: 'Positioning, CAC efficiency, and GTM execution quality' },
-  { id: 'environmental-analysis', title: 'Page 6: Environmental Analysis', active: true, description: 'ESG alignment, climate resilience, and sustainability posture' },
   { id: 'ceo-questions', title: 'Page 6: CEO Questions', active: true, description: 'Strategic questions for the CEO and leadership team' },
   { id: 'final-recommendation', title: 'Page 7: Final Recommendation & Conclusion', active: true, description: 'Investment decision, deep analysis conclusion, and next steps based on company data.' },
 ];
+
+const ALWAYS_AVAILABLE_TRIAGE_SECTION_IDS = new Set([
+  'analyst-comments',
+  'analyst-ai-deviation',
+  'final-recommendation',
+]);
+
+const ensureAlwaysAvailableTriageSections = (sections: ReportSection[]): ReportSection[] =>
+  sections.map((section) =>
+    ALWAYS_AVAILABLE_TRIAGE_SECTION_IDS.has(section.id)
+      ? { ...section, active: true }
+      : section
+  );
+
+const getDefaultSelectedModulesForRole = (role: 'admin' | 'analyst' | 'standard'): string[] => {
+  const triageModuleIds = new Set(TRIAGE_MODULES.map((module) => module.id));
+  const activeManaged = getActiveManagedModuleIds().filter((id: string) => triageModuleIds.has(id));
+
+  if (role === 'standard') {
+    const standardModules = activeManaged.filter((id: string) => id === 'tca' || id === 'risk');
+    return standardModules.length > 0 ? standardModules : ['tca', 'risk'];
+  }
+
+  return activeManaged.length > 0 ? activeManaged : ['tca', 'risk', 'growth', 'macro'];
+};
+
+const applyModuleStateToTriageSections = (
+  sections: ReportSection[],
+  selectedModules: string[]
+): ReportSection[] => {
+  const selectedSet = new Set(selectedModules);
+  return ensureAlwaysAvailableTriageSections(sections).map((section) => {
+    if (ALWAYS_AVAILABLE_TRIAGE_SECTION_IDS.has(section.id)) {
+      return section;
+    }
+
+    const mappedModules = Object.entries(TRIAGE_SECTION_MODULE_MAP as Record<string, string[]>)
+      .filter(([, sectionIds]) => sectionIds.includes(section.id))
+      .map(([moduleId]) => moduleId);
+
+    if (mappedModules.length === 0) {
+      return section;
+    }
+
+    const shouldDisable = mappedModules.every((moduleId) => !selectedSet.has(moduleId));
+    return shouldDisable ? { ...section, active: false } : section;
+  });
+};
 
 interface ExtractedMetric {
   field: string;
@@ -1213,6 +1217,12 @@ interface ExtractedMetric {
   source: string;
   verified: boolean;
 }
+
+const applyStringValue =
+  (setter: (value: string) => void) =>
+  (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setter(e.target.value);
+  };
 
 export default function TriageReportWizardPage() {
   const router = useRouter();
@@ -1244,24 +1254,43 @@ export default function TriageReportWizardPage() {
   const [productDescription, setProductDescription] = useState('');
 
   const [framework, setFramework] = useState<Framework>('general');
-  const [selectedModules, setSelectedModules] = useState<string[]>(getDefaultSelectedModulesForRole('standard'));
+  const [selectedModules, setSelectedModules] = useState<string[]>(['tca', 'risk', 'growth', 'macro']);
 
-  const [selectedSources, setSelectedSources] = useState<string[]>(['hackernews']);
+  const [selectedSources, setSelectedSources] = useState<string[]>(
+    getPreferredExternalSourceSelection(EXTERNAL_SOURCES.map((source) => source.id))
+  );
+  const [activeExternalSourceIds, setActiveExternalSourceIds] = useState<string[]>(
+    EXTERNAL_SOURCES.map((s) => s.id)
+  );
   const [externalData, setExternalData] = useState<Array<{ source: string; success: boolean; data: unknown; error?: string }>>([]);
   const [fetchingData, setFetchingData] = useState(false);
 
-  const [whatIfScores, setWhatIfScores] = useState<Record<string, number>>(getDefaultWhatIfScores());
+  const [simulatedScores, setSimulatedScores] = useState<Record<string, number>>(
+    Object.fromEntries(TRIAGE_MODULES.map(m => [m.id, 50]))
+  );
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [generationStatus, setGenerationStatus] = useState('');
-  const [analysisError, setAnalysisError] = useState<{
-    message: string;
-    type: 'ai-timeout' | 'backend-error' | 'module-inactive' | 'validation' | 'unknown';
-    detail: string;
-  } | null>(null);
   const [analysisResult, setAnalysisResult] = useState<unknown>(null);
-  const [moduleScores, setModuleScores] = useState<Record<string, number | null>>({});
   const [compositeScore, setCompositeScore] = useState<number>(0);
+  const [derivedModuleScores, setDerivedModuleScores] = useState<Record<string, number | null>>({});
+  const [savedModuleWeights, setSavedModuleWeights] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    settingsApi.getActiveVersion().then((version) => {
+      if (cancelled || !version?.module_settings) return;
+      const weights: Record<string, number> = {};
+      for (const setting of version.module_settings) {
+        const w = Number(setting.weight);
+        if (Number.isFinite(w) && w > 0 && setting.is_enabled !== false) {
+          weights[setting.module_id] = w;
+        }
+      }
+      setSavedModuleWeights(weights);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   // Role-based
   const [userRole, setUserRole] = useState<'admin' | 'analyst' | 'standard'>('standard');
@@ -1273,13 +1302,10 @@ export default function TriageReportWizardPage() {
   const [savedReportId, setSavedReportId] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-
-  // AI Insight
-  const { insight: aiInsight, status: aiStatus, fetch: fetchAiInsight } = useAiInsight();
-  const [showHumanReviewModal, setShowHumanReviewModal] = useState(false);
   const [humanReviewNotes, setHumanReviewNotes] = useState('');
   const [isAutoFilling, setIsAutoFilling] = useState(false);
   const [autoFillText, setAutoFillText] = useState('');
+  const lastAutoFetchedExternalKeyRef = useRef('');
   const [showAutoFill, setShowAutoFill] = useState(false);
 
   // Upload & Extraction
@@ -1298,6 +1324,46 @@ export default function TriageReportWizardPage() {
   const [supportingDocsMetrics, setSupportingDocsMetrics] = useState<ExtractedMetric[]>([]);
   const [supportingDocsExtractionStatus, setSupportingDocsExtractionStatus] = useState('');
   const [supportingDocsExtractionError, setSupportingDocsExtractionError] = useState<string | null>(null);
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [hasRestoredAutosave, setHasRestoredAutosave] = useState(false);
+
+  const qualityAssessment = useMemo(() => evaluateTriageQuality({
+    analysisData: analysisResult,
+    selectedModuleIds: selectedModules,
+    moduleScores: derivedModuleScores,
+    compositeScore,
+    companyName,
+    sector,
+    stage,
+    website,
+    country,
+    stateRegion,
+    city,
+    pitchSummary,
+    keyMetrics,
+    teamInfo,
+    productDescription,
+    annualRevenue,
+    preMoneyValuation,
+  }), [
+    analysisResult,
+    selectedModules,
+    derivedModuleScores,
+    compositeScore,
+    companyName,
+    sector,
+    stage,
+    website,
+    country,
+    stateRegion,
+    city,
+    pitchSummary,
+    keyMetrics,
+    teamInfo,
+    productDescription,
+    annualRevenue,
+    preMoneyValuation,
+  ]);
 
   const resetWizard = () => {
     localStorage.removeItem(TRIAGE_AUTOSAVE_KEY);
@@ -1324,21 +1390,20 @@ export default function TriageReportWizardPage() {
     setTeamInfo('');
     setProductDescription('');
     setFramework('general');
-    setSelectedModules(getDefaultSelectedModulesForRole(userRole));
-    setSelectedSources(['hackernews']);
+    setSelectedModules(['tca', 'risk', 'growth', 'macro']);
+    setSelectedSources(getPreferredExternalSourceSelection(activeExternalSourceIds));
     setExternalData([]);
     setFetchingData(false);
-    setWhatIfScores(getDefaultWhatIfScores());
+    setSimulatedScores(Object.fromEntries(TRIAGE_MODULES.map((m) => [m.id, 50])));
     setIsGenerating(false);
     setGenerationProgress(0);
     setGenerationStatus('');
     setAnalysisResult(null);
-    setModuleScores({});
     setCompositeScore(0);
+    setDerivedModuleScores({});
     setSavedReportId(null);
     setIsSaving(false);
     setSaveError(null);
-    setShowHumanReviewModal(false);
     setHumanReviewNotes('');
     setIsAutoFilling(false);
     setAutoFillText('');
@@ -1356,9 +1421,17 @@ export default function TriageReportWizardPage() {
     setSupportingDocsMetrics([]);
     setSupportingDocsExtractionStatus('');
     setSupportingDocsExtractionError(null);
-    setReportSections(isAdminOrAnalyst ? DEFAULT_ADMIN_SECTIONS : DEFAULT_STANDARD_SECTIONS);
+    setReportSections(
+      ensureAlwaysAvailableTriageSections(
+        isAdminOrAnalyst ? DEFAULT_ADMIN_SECTIONS : DEFAULT_STANDARD_SECTIONS
+      )
+    );
     toast({ title: 'Fresh start ready', description: 'Wizard has been reset. You can begin again from upload.' });
   };
+
+  const visibleExternalSources = EXTERNAL_SOURCES.filter((src) => activeExternalSourceIds.includes(src.id));
+  const selectedExternalSourceIds = selectedSources.filter((id) => activeExternalSourceIds.includes(id));
+  const selectedExternalSourceSignature = selectedExternalSourceIds.slice().sort().join('|');
 
   useEffect(() => {
     try {
@@ -1379,28 +1452,80 @@ export default function TriageReportWizardPage() {
         parsedRole === 'admin' ? 'admin' : parsedRole === 'analyst' ? 'analyst' : 'standard';
 
       setUserRole(role);
-      setSelectedModules(getDefaultSelectedModulesForRole(role));
 
       const isPrivileged = role === 'admin' || role === 'analyst';
+      const defaultModules = getDefaultSelectedModulesForRole(role);
+      setSelectedModules(defaultModules);
+
       if (isPrivileged) {
         const saved = localStorage.getItem('report-config-triage-admin');
-        setReportSections(saved ? JSON.parse(saved) : DEFAULT_ADMIN_SECTIONS);
+        const baseSections = ensureAlwaysAvailableTriageSections(
+          saved ? JSON.parse(saved) : DEFAULT_ADMIN_SECTIONS
+        );
+        setReportSections(applyModuleStateToTriageSections(baseSections, defaultModules));
       } else {
-        setReportSections(DEFAULT_STANDARD_SECTIONS);
+        setReportSections(applyModuleStateToTriageSections(DEFAULT_STANDARD_SECTIONS, defaultModules));
       }
     } catch {
       setUserRole('standard');
       setReportOwner('Unknown User');
-      setReportSections(DEFAULT_STANDARD_SECTIONS);
+      const fallbackModules = getDefaultSelectedModulesForRole('standard');
+      setSelectedModules(fallbackModules);
+      setReportSections(applyModuleStateToTriageSections(DEFAULT_STANDARD_SECTIONS, fallbackModules));
     }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadManagedDataSources = async () => {
+      const stored = await azureStorage.getItem<unknown>('data-sources-config');
+      if (!Array.isArray(stored)) {
+        return;
+      }
+
+      const configuredActive = stored
+        .filter((item) => typeof item === 'object' && item !== null)
+        .map((item) => item as { id?: string; active?: boolean })
+        .filter((item) => item.id && item.active)
+        .map((item) => item.id as string);
+
+      const allowed = EXTERNAL_SOURCES
+        .map((src) => src.id)
+        .filter((id) => configuredActive.includes(id));
+
+      if (cancelled || allowed.length === 0) {
+        return;
+      }
+
+      setActiveExternalSourceIds(allowed);
+      setSelectedSources((prev) => {
+        const filtered = prev.filter((id) => allowed.includes(id));
+        return filtered.length > 0 ? filtered : getPreferredExternalSourceSelection(allowed);
+      });
+    };
+
+    void loadManagedDataSources();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    setIsHydrated(true);
   }, []);
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem(TRIAGE_AUTOSAVE_KEY);
-      if (!raw) return;
+      if (!raw) {
+        return;
+      }
+
       const snapshot = JSON.parse(raw) as Record<string, unknown>;
       if (typeof snapshot.currentStep === 'number') setCurrentStep(snapshot.currentStep);
+      if (Array.isArray(snapshot.completedSteps)) setCompletedSteps(snapshot.completedSteps as number[]);
       if (typeof snapshot.companyName === 'string') setCompanyName(snapshot.companyName);
       if (typeof snapshot.sector === 'string') setSector(snapshot.sector);
       if (typeof snapshot.stage === 'string') setStage(snapshot.stage);
@@ -1415,6 +1540,8 @@ export default function TriageReportWizardPage() {
       if (typeof snapshot.annualRevenue === 'string') setAnnualRevenue(snapshot.annualRevenue);
       if (typeof snapshot.preMoneyValuation === 'string') setPreMoneyValuation(snapshot.preMoneyValuation);
       if (typeof snapshot.pitchDeckPath === 'string') setPitchDeckPath(snapshot.pitchDeckPath);
+      if (typeof snapshot.legalName === 'string') setLegalName(snapshot.legalName);
+      if (typeof snapshot.numberOfEmployees === 'string') setNumberOfEmployees(snapshot.numberOfEmployees);
       if (typeof snapshot.pitchSummary === 'string') setPitchSummary(snapshot.pitchSummary);
       if (typeof snapshot.keyMetrics === 'string') setKeyMetrics(snapshot.keyMetrics);
       if (typeof snapshot.teamInfo === 'string') setTeamInfo(snapshot.teamInfo);
@@ -1422,25 +1549,60 @@ export default function TriageReportWizardPage() {
       if (typeof snapshot.framework === 'string') setFramework(snapshot.framework as Framework);
       if (Array.isArray(snapshot.selectedModules)) setSelectedModules(snapshot.selectedModules as string[]);
       if (Array.isArray(snapshot.selectedSources)) setSelectedSources(snapshot.selectedSources as string[]);
-      if (snapshot.whatIfScores && typeof snapshot.whatIfScores === 'object') {
-        setWhatIfScores(snapshot.whatIfScores as Record<string, number>);
+      if (snapshot.simulatedScores && typeof snapshot.simulatedScores === 'object') {
+        setSimulatedScores(snapshot.simulatedScores as Record<string, number>);
+      }
+      if (snapshot.derivedModuleScores && typeof snapshot.derivedModuleScores === 'object') {
+        setDerivedModuleScores(snapshot.derivedModuleScores as Record<string, number | null>);
       }
       if (Array.isArray(snapshot.reportSections)) setReportSections(snapshot.reportSections as ReportSection[]);
       if (typeof snapshot.compositeScore === 'number') setCompositeScore(snapshot.compositeScore);
-      if (snapshot.moduleScores && typeof snapshot.moduleScores === 'object') {
-        setModuleScores(snapshot.moduleScores as Record<string, number | null>);
-      }
       if (snapshot.analysisResult) setAnalysisResult(snapshot.analysisResult);
+      if (typeof snapshot.extractedText === 'string') setExtractedText(snapshot.extractedText);
+      if (typeof snapshot.additionalContext === 'string') setAdditionalContext(snapshot.additionalContext);
+      if (typeof snapshot.links === 'string') setLinks(snapshot.links);
+      if (typeof snapshot.autoFillText === 'string') setAutoFillText(snapshot.autoFillText);
+
+      toast({ title: 'Restored draft', description: 'Your triage draft was restored automatically.' });
     } catch {
-      // ignore invalid autosave payload
+      // Ignore invalid autosave payload.
+    } finally {
+      setHasRestoredAutosave(true);
     }
   }, []);
 
+  // Safety net: ensure reportSections is populated if empty after hydration/autosave restore
   useEffect(() => {
+    if (!hasRestoredAutosave) return;
+
+    // If reportSections is empty, initialize it based on user role
+    if (!reportSections || reportSections.length === 0) {
+      const isPrivileged = userRole === 'admin' || userRole === 'analyst';
+      const defaultModules = getDefaultSelectedModulesForRole(userRole);
+      const baseSections = isPrivileged 
+        ? ensureAlwaysAvailableTriageSections(DEFAULT_ADMIN_SECTIONS)
+        : DEFAULT_STANDARD_SECTIONS;
+      setReportSections(applyModuleStateToTriageSections(baseSections, defaultModules));
+    }
+  }, [hasRestoredAutosave, userRole]);
+
+    // Keep standard user module set constrained to managed defaults.
+    useEffect(() => {
+      if (userRole === 'standard') {
+        const defaultModules = getDefaultSelectedModulesForRole('standard');
+        setSelectedModules(defaultModules);
+        setReportSections((prev) => applyModuleStateToTriageSections(prev, defaultModules));
+      }
+    }, [userRole]);
+
+  useEffect(() => {
+    if (!hasRestoredAutosave) return;
+
     const timer = setTimeout(() => {
       try {
         localStorage.setItem(TRIAGE_AUTOSAVE_KEY, JSON.stringify({
           currentStep,
+          completedSteps,
           companyName,
           sector,
           stage,
@@ -1455,6 +1617,8 @@ export default function TriageReportWizardPage() {
           annualRevenue,
           preMoneyValuation,
           pitchDeckPath,
+          legalName,
+          numberOfEmployees,
           pitchSummary,
           keyMetrics,
           teamInfo,
@@ -1462,32 +1626,76 @@ export default function TriageReportWizardPage() {
           framework,
           selectedModules,
           selectedSources,
-          whatIfScores,
+          simulatedScores,
           reportSections,
           compositeScore,
-          moduleScores,
+          derivedModuleScores,
           analysisResult,
+          extractedText,
+          additionalContext,
+          links,
+          autoFillText,
           savedAt: new Date().toISOString(),
         }));
       } catch {
         // no-op
       }
     }, 300);
+
     return () => clearTimeout(timer);
   }, [
-    currentStep, companyName, sector, stage, website, location, businessModel, country, stateRegion, city,
-    oneLineDescription, companyDescription, annualRevenue, preMoneyValuation, pitchDeckPath,
-    pitchSummary, keyMetrics, teamInfo, productDescription, framework,
-    selectedModules, selectedSources, whatIfScores, reportSections, compositeScore, moduleScores, analysisResult
+    hasRestoredAutosave,
+    currentStep,
+    completedSteps,
+    companyName,
+    sector,
+    stage,
+    website,
+    location,
+    businessModel,
+    country,
+    stateRegion,
+    city,
+    oneLineDescription,
+    companyDescription,
+    annualRevenue,
+    preMoneyValuation,
+    pitchDeckPath,
+    legalName,
+    numberOfEmployees,
+    pitchSummary,
+    keyMetrics,
+    teamInfo,
+    productDescription,
+    framework,
+    selectedModules,
+    selectedSources,
+    simulatedScores,
+    reportSections,
+    compositeScore,
+    derivedModuleScores,
+    analysisResult,
+    extractedText,
+    additionalContext,
+    links,
+    autoFillText,
   ]);
 
   const isAdminOrAnalyst = userRole === 'admin' || userRole === 'analyst';
   const visibleSteps = isAdminOrAnalyst
     ? TRIAGE_STEPS
     : TRIAGE_STEPS.filter((s) => !STANDARD_RESTRICTED_STEP_IDS.includes(s.id));
+  const displaySteps = TRIAGE_WORKFLOW_STEPS
+    .map((step) => ({
+      ...step,
+      stepIds: step.stepIds.filter((stepId) => visibleSteps.some((visibleStep) => visibleStep.id === stepId)),
+    }))
+    .filter((step) => step.stepIds.length > 0);
   const firstStepId = visibleSteps[0]?.id ?? 1;
   const lastStepId = visibleSteps[visibleSteps.length - 1]?.id ?? 1;
-  const currentStepPosition = Math.max(1, visibleSteps.findIndex((s) => s.id === currentStep) + 1);
+  const lastDisplayStepId = displaySteps[displaySteps.length - 1]?.id ?? 101;
+  const displayedCurrentStepId = displaySteps.find((step) => step.stepIds.includes(currentStep))?.id ?? displaySteps[0]?.id ?? 101;
+  const currentStepPosition = Math.max(1, displaySteps.findIndex((s) => s.id === displayedCurrentStepId) + 1);
   const currentStepMeta = visibleSteps.find((s) => s.id === currentStep);
 
   const getNextStepId = (stepId: number): number => {
@@ -1507,6 +1715,16 @@ export default function TriageReportWizardPage() {
   };
 
   useEffect(() => {
+    if (currentStep === 4) {
+      setCurrentStep(5);
+      return;
+    }
+
+    if (currentStep === 8) {
+      setCurrentStep(9);
+      return;
+    }
+
     if (!visibleSteps.some((s) => s.id === currentStep)) {
       setCurrentStep(firstStepId);
     }
@@ -1517,7 +1735,6 @@ export default function TriageReportWizardPage() {
     if (step === 2) return true; // Data Extraction is optional
     if (step === 3) {
       const requiredChecks = [
-        companyName.trim().length > 0,
         sector.length > 0,
         stage.length > 0,
         businessModel.trim().length > 0,
@@ -1528,22 +1745,22 @@ export default function TriageReportWizardPage() {
         companyDescription.trim().length > 0,
         productDescription.trim().length > 0,
         pitchDeckPath.trim().length > 0,
-        isPositiveNumberText(annualRevenue),
-        isPositiveNumberText(preMoneyValuation),
+        isProvidedMoneyOrNA(annualRevenue),
+        isProvidedMoneyOrNA(preMoneyValuation),
       ];
       return requiredChecks.every(Boolean);
     }
-    if (step === 4) return pitchSummary.trim().length > 0;
+    if (step === 4) return true;
     if (step === 5) return true;
     if (step === 6) return selectedModules.length > 0;
     if (step === 7) return reportSections.filter((s) => s.active).length > 0;
+    if (step === 11) return !!savedReportId;
     return true;
   };
 
   const goToNext = () => {
     if (!canAdvanceFrom(currentStep)) {
       const missingSsdStep3Fields = [
-        companyName.trim().length === 0 ? 'Company Name' : null,
         sector.length === 0 ? 'Industry Vertical' : null,
         stage.length === 0 ? 'Development Stage' : null,
         businessModel.trim().length === 0 ? 'Business Model' : null,
@@ -1554,8 +1771,8 @@ export default function TriageReportWizardPage() {
         companyDescription.trim().length === 0 ? 'Company Description' : null,
         productDescription.trim().length === 0 ? 'Product Description' : null,
         pitchDeckPath.trim().length === 0 ? 'Pitch Deck Path' : null,
-        !isPositiveNumberText(annualRevenue) ? 'Annual Revenue' : null,
-        !isPositiveNumberText(preMoneyValuation) ? 'Pre-Money Valuation' : null,
+        !isProvidedMoneyOrNA(annualRevenue) ? 'Annual Revenue' : null,
+        !isProvidedMoneyOrNA(preMoneyValuation) ? 'Pre-Money Valuation' : null,
       ].filter(Boolean) as string[];
 
       toast({
@@ -1567,6 +1784,8 @@ export default function TriageReportWizardPage() {
             :
           currentStep === 3
             ? `Missing SSD fields: ${missingSsdStep3Fields.slice(0, 5).join(', ')}${missingSsdStep3Fields.length > 5 ? '...' : ''}`
+            : currentStep === 11
+            ? 'Save Report is required before proceeding to Report Complete.'
             : currentStep === 4
             ? 'Please enter a pitch summary.'
             : 'Please select at least one module.',
@@ -1588,15 +1807,13 @@ export default function TriageReportWizardPage() {
     growth: ['growth-classifier'],
     team: ['team-assessment'],
     analyst: ['analyst-comments', 'analyst-ai-deviation'],
+    founderFit: ['team-assessment'],
     strategic: ['competitive-landscape'],
-    marketing: ['marketing-analysis'],
-    social: ['social-analysis'],
-    environmental: ['environmental-analysis'],
-    financial: ['financial-analysis'],
-    economic: ['economic-analysis'],
-    strategicFit: ['strategic-fit'],
-    founderFit: ['founder-fit'],
-    funder: ['funder-readiness'],
+    marketing: ['competitive-landscape'],
+    social: ['macro-trend-alignment'],
+    environmental: ['macro-trend-alignment'],
+    strategicFit: ['final-recommendation'],
+    funder: ['final-recommendation'],
   };
 
   const toggleModule = (moduleId: string, required: boolean) => {
@@ -1605,14 +1822,6 @@ export default function TriageReportWizardPage() {
     setSelectedModules((prev) =>
       isCurrentlySelected ? prev.filter((m) => m !== moduleId) : [...prev, moduleId]
     );
-  };
-
-  const toggleAllModules = (selectAll: boolean) => {
-    if (selectAll) {
-      setSelectedModules(TRIAGE_MODULES.map((m) => m.id));
-      return;
-    }
-    setSelectedModules([...REQUIRED_MODULE_IDS]);
   };
 
   // For admin/analyst users, keep module-driven sections synced with selected modules.
@@ -1627,13 +1836,42 @@ export default function TriageReportWizardPage() {
     setReportSections((prev) =>
       prev.map((section) => {
         if (!managedSectionIds.has(section.id)) return section;
+        if (ALWAYS_AVAILABLE_TRIAGE_SECTION_IDS.has(section.id)) return section;
         return { ...section, active: activeManagedIds.has(section.id) };
       })
     );
   }, [isAdminOrAnalyst, selectedModules]);
 
+  // Auto-populate pitch summary with fallback if empty on review step
+  useEffect(() => {
+    if (currentStep !== 9) return;
+
+    setPitchSummary((prev) => {
+      if (prev.trim().length > 0) return prev;
+
+      let fallback = '';
+      if (additionalContext?.trim().length > 0) {
+        fallback = additionalContext.trim().slice(0, 500);
+      } else if (productDescription?.trim().length > 0) {
+        fallback = productDescription.trim().slice(0, 500);
+      } else if (companyDescription?.trim().length > 0) {
+        fallback = companyDescription.trim().slice(0, 500);
+      } else if (extractedText?.trim().length > 0) {
+        fallback = extractedText.trim().slice(0, 500);
+      } else {
+        fallback = 'N/A';
+      }
+
+      return fallback;
+    });
+  }, [currentStep, additionalContext, productDescription, companyDescription, extractedText]);
+
   const toggleSection = (sectionId: string) => {
     if (!isAdminOrAnalyst) return;
+
+    if (ALWAYS_AVAILABLE_TRIAGE_SECTION_IDS.has(sectionId)) {
+      return;
+    }
 
     const managedSectionIds = new Set(Object.values(moduleToSections).flat());
     const activeManagedIds = new Set(
@@ -1659,6 +1897,9 @@ export default function TriageReportWizardPage() {
 
     setReportSections((prev) =>
       prev.map((s) => {
+        if (ALWAYS_AVAILABLE_TRIAGE_SECTION_IDS.has(s.id)) {
+          return { ...s, active: true };
+        }
         if (!active) return { ...s, active: false };
         if (managedSectionIds.has(s.id) && !activeManagedIds.has(s.id)) {
           return { ...s, active: false };
@@ -1677,16 +1918,17 @@ export default function TriageReportWizardPage() {
       });
       return;
     }
-    if (selectedSources.length === 0) return;
+    const effectiveSources = selectedSources.filter((id) => activeExternalSourceIds.includes(id));
+    if (effectiveSources.length === 0) return;
     setFetchingData(true);
     try {
       const response = await fetch('/api/external-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ company: companyName, sources: selectedSources }),
+        body: JSON.stringify({ company: companyName, sources: effectiveSources }),
       });
       const result = await response.json();
-      const results = selectedSources.map((sourceId) => ({
+      const results = effectiveSources.map((sourceId) => ({
         source: sourceId,
         success: result.data?.[sourceId]?.success ?? false,
         data: result.data?.[sourceId]?.data ?? null,
@@ -1701,39 +1943,58 @@ export default function TriageReportWizardPage() {
     }
   };
 
+  useEffect(() => {
+    if (currentStep !== 5 || !isAdminOrAnalyst || !companyName.trim() || !selectedExternalSourceSignature || fetchingData) {
+      return;
+    }
+
+    const requestKey = `${companyName.trim().toLowerCase()}::${selectedExternalSourceSignature}`;
+    if (lastAutoFetchedExternalKeyRef.current === requestKey) {
+      return;
+    }
+
+    lastAutoFetchedExternalKeyRef.current = requestKey;
+    void fetchExternalData();
+  }, [currentStep, isAdminOrAnalyst, companyName, selectedExternalSourceSignature, fetchingData]);
+
   const handleAutoFill = async () => {
     if (!autoFillText.trim()) return;
     setIsAutoFilling(true);
     try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 25000);
       const res = await fetch('/api/ai-autofill', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: autoFillText, companyHint: companyName.trim() || undefined }),
+        signal: controller.signal,
       });
+      clearTimeout(timer);
       const result = await res.json();
       if (result.success && result.data) {
         const d = result.data as Record<string, unknown>;
-        const aiCompany = cleanCompanyName(pickFirstText(d, ['company_name', 'companyName', 'startup_name', 'startupName', 'name']));
-        const legalNameValue = cleanShortText(pickFirstText(d, ['legalName', 'legal_name']));
+        const fieldConfidence = result.fieldConfidence;
+        const requirementMatch = result.requirementMatch;
         const websiteValue = cleanShortText(pickFirstText(d, ['website', 'company_website', 'companyWebsite', 'url', 'domain']));
-        const company = resolveBestCompanyName({
-          aiCandidate: aiCompany,
-          legalName: legalNameValue,
+        const company = resolveCompanyNameCandidate({
+          aiCandidate: pickFirstText(d, ['company_name', 'companyName', 'startup_name', 'startupName', 'name']),
+          legalName: pickFirstText(d, ['legalName', 'legal_name']),
           website: websiteValue,
-          fromText: inferCompanyNameFromText(autoFillText),
+          inferredFromText: inferCompanyNameFromText(autoFillText),
           existing: companyName,
         });
-        const sectorValue = normalizeSectorValue(pickFirstText(d, ['sector', 'industry', 'industry_vertical', 'industryVertical', 'vertical']));
-        const stageValue = normalizeStageValue(pickFirstText(d, ['stage', 'company_stage', 'companyStage', 'funding_stage', 'fundingStage', 'development_stage', 'developmentStage']));
-        const businessModelValue = cleanShortText(pickFirstText(d, ['business_model', 'businessModel', 'model']));
+        const sectorValue = normalizeSectorValue(pickFirstText(d, ['sector', 'industry', 'industry_vertical', 'industryVertical', 'vertical'])) || inferSectorFromText(autoFillText);
+        const stageValue = normalizeStageValue(pickFirstText(d, ['stage', 'company_stage', 'companyStage', 'funding_stage', 'fundingStage', 'development_stage', 'developmentStage'])) || inferStageFromText(autoFillText);
+        const businessModelValue = cleanBusinessModelValue(pickFirstText(d, ['business_model', 'businessModel', 'model']));
         const countryValue = cleanShortText(pickFirstText(d, ['country']));
         const stateValue = cleanShortText(pickFirstText(d, ['state', 'province', 'region']));
         const cityValue = cleanShortText(pickFirstText(d, ['city']));
         const oneLineValue = cleanOneLineDescription(pickFirstText(d, ['one_line_description', 'oneLineDescription', 'tagline']));
         const companyDescriptionValue = cleanLongText(pickFirstText(d, ['company_description', 'companyDescription']));
-        const annualRevenueValue = cleanShortText(pickFirstText(d, ['annualRevenue', 'annual_revenue', 'yearlyRevenue', 'yearly_revenue'])) || extractAnnualRevenueText(autoFillText);
-        const preMoneyValue = cleanShortText(pickFirstText(d, ['preMoneyValuation', 'pre_money_valuation']));
-        const pitchDeckPathValue = cleanShortText(pickFirstText(d, ['pitchDeckPath', 'pitch_deck_path']));
+        const annualRevenueValue = cleanMoneyValue(pickFirstText(d, ['annualRevenue', 'annual_revenue', 'yearlyRevenue', 'yearly_revenue'])) || extractAnnualRevenueText(autoFillText);
+        const preMoneyValue = cleanMoneyValue(pickFirstText(d, ['preMoneyValuation', 'pre_money_valuation'])) || extractPreMoneyValuationText(autoFillText);
+        const pitchDeckPathValue = cleanPitchDeckPathValue(pickFirstText(d, ['pitchDeckPath', 'pitch_deck_path']));
+        const legalNameValue = cleanShortText(pickFirstText(d, ['legalName', 'legal_name']));
         const employeesValue = cleanShortText(pickFirstText(d, ['numberOfEmployees', 'number_of_employees', 'team_size'])) || extractEmployeesText(autoFillText);
         const locationValue = buildLocationText(d);
         const locationParts = splitLocationParts(locationValue);
@@ -1742,34 +2003,99 @@ export default function TriageReportWizardPage() {
         const teamValue = cleanLongText(pickFirstText(d, ['team_info', 'teamInfo', 'team_background', 'teamBackground', 'founder_info', 'founderInfo', 'companyBackgroundTeam']));
         const productValue = cleanLongText(pickFirstText(d, ['product_description', 'productDescription', 'product_overview', 'productOverview', 'solution_description', 'solutionDescription'])) || deriveProductDescription(oneLineValue, companyDescriptionValue);
 
-        if (company) setCompanyName(company);
-        if (websiteValue) setWebsite(websiteValue);
-        if (sectorValue) setSector(sectorValue);
-        if (stageValue) setStage(stageValue);
-        if (businessModelValue) setBusinessModel(businessModelValue);
-        if (countryValue || locationParts.country) setCountry(countryValue || locationParts.country);
-        if (stateValue || locationParts.state) setStateRegion(stateValue || locationParts.state);
-        if (cityValue || locationParts.city) setCity(cityValue || locationParts.city);
-        if (oneLineValue) setOneLineDescription(oneLineValue);
-        if (companyDescriptionValue) setCompanyDescription(companyDescriptionValue);
-        if (annualRevenueValue) setAnnualRevenue(annualRevenueValue);
-        if (preMoneyValue) setPreMoneyValuation(preMoneyValue);
-        if (pitchDeckPathValue) setPitchDeckPath(pitchDeckPathValue);
-        if (legalNameValue) setLegalName(legalNameValue);
-        if (employeesValue) setNumberOfEmployees(employeesValue);
+        const shouldReplaceExistingCompany =
+          isLikelyInvalidExistingCompanyName(companyName)
+          || isCompanyMismatchedWithWebsite(companyName, websiteValue);
+        if (company && (shouldReplaceExistingCompany
+          ? shouldApplyFieldForEmptyRequired(fieldConfidence, requirementMatch, ['company_name', 'companyName', 'legal_name', 'legalName'])
+          : shouldApplyField(fieldConfidence, requirementMatch, ['company_name', 'companyName', 'legal_name', 'legalName']))) setCompanyName(company);
+        if (websiteValue && (website.trim()
+          ? shouldApplyField(fieldConfidence, requirementMatch, ['website'])
+          : shouldApplyFieldForEmptyRequired(fieldConfidence, requirementMatch, ['website']))) setWebsite(websiteValue);
+        if (sectorValue && (sector
+          ? shouldApplyField(fieldConfidence, requirementMatch, ['sector', 'industryVertical'])
+          : shouldApplyFieldForEmptyRequired(fieldConfidence, requirementMatch, ['sector', 'industryVertical']))) setSector(sectorValue);
+        if (stageValue && (stage
+          ? shouldApplyField(fieldConfidence, requirementMatch, ['stage', 'developmentStage'])
+          : shouldApplyFieldForEmptyRequired(fieldConfidence, requirementMatch, ['stage', 'developmentStage']))) setStage(stageValue);
+        if (businessModelValue && (businessModel.trim()
+          ? shouldApplyField(fieldConfidence, requirementMatch, ['business_model', 'businessModel'])
+          : shouldApplyFieldForEmptyRequired(fieldConfidence, requirementMatch, ['business_model', 'businessModel']))) setBusinessModel(businessModelValue);
+        if ((countryValue || locationParts.country) && (country.trim()
+          ? shouldApplyField(fieldConfidence, requirementMatch, ['country'])
+          : shouldApplyLocationField(fieldConfidence, ['country', 'location']))) setCountry(countryValue || locationParts.country);
+        if ((stateValue || locationParts.state) && (stateRegion.trim()
+          ? shouldApplyField(fieldConfidence, requirementMatch, ['state'])
+          : shouldApplyLocationField(fieldConfidence, ['state', 'location']))) setStateRegion(stateValue || locationParts.state);
+        if ((cityValue || locationParts.city) && (city.trim()
+          ? shouldApplyField(fieldConfidence, requirementMatch, ['city'])
+          : shouldApplyLocationField(fieldConfidence, ['city', 'location']))) setCity(cityValue || locationParts.city);
+        if (oneLineValue && (oneLineDescription.trim()
+          ? shouldApplyField(fieldConfidence, requirementMatch, ['one_line_description', 'oneLineDescription'])
+          : shouldApplyFieldForEmptyRequired(fieldConfidence, requirementMatch, ['one_line_description', 'oneLineDescription']))) setOneLineDescription(oneLineValue);
+        if (companyDescriptionValue && (companyDescription.trim()
+          ? shouldApplyField(fieldConfidence, requirementMatch, ['company_description', 'companyDescription'])
+          : shouldApplyFieldForEmptyRequired(fieldConfidence, requirementMatch, ['company_description', 'companyDescription']))) setCompanyDescription(companyDescriptionValue);
+        if (annualRevenueValue && (annualRevenue.trim()
+          ? shouldApplyField(fieldConfidence, requirementMatch, ['annual_revenue', 'annualRevenue'])
+          : shouldApplyFinancialField(fieldConfidence, ['annual_revenue', 'annualRevenue']))) setAnnualRevenue(annualRevenueValue);
+        if (preMoneyValue && (preMoneyValuation.trim()
+          ? shouldApplyField(fieldConfidence, requirementMatch, ['pre_money_valuation', 'preMoneyValuation'])
+          : shouldApplyFinancialField(fieldConfidence, ['pre_money_valuation', 'preMoneyValuation']))) setPreMoneyValuation(preMoneyValue);
+        if (pitchDeckPathValue && (pitchDeckPath.trim()
+          ? shouldApplyField(fieldConfidence, requirementMatch, ['pitch_deck_path', 'pitchDeckPath'])
+          : shouldApplyFieldForEmptyRequired(fieldConfidence, requirementMatch, ['pitch_deck_path', 'pitchDeckPath']))) setPitchDeckPath(pitchDeckPathValue);
+        if (legalNameValue && shouldApplyField(fieldConfidence, requirementMatch, ['legal_name', 'legalName'])) setLegalName(legalNameValue);
+        if (employeesValue && shouldApplyField(fieldConfidence, requirementMatch, ['number_of_employees', 'numberOfEmployees'])) setNumberOfEmployees(employeesValue);
         if (locationValue) setLocation(locationValue);
         if (summaryValue) setPitchSummary(summaryValue);
         if (metricsValue) setKeyMetrics(metricsValue);
         if (teamValue) setTeamInfo(teamValue);
-        if (productValue) setProductDescription(productValue);
+        if (productValue && (productDescription.trim()
+          ? shouldApplyField(fieldConfidence, requirementMatch, ['product_description', 'productDescription', 'product_overview', 'productOverview'])
+          : shouldApplyFieldForEmptyRequired(fieldConfidence, requirementMatch, ['product_description', 'productDescription', 'product_overview', 'productOverview']))) setProductDescription(productValue);
+
+        // Hard fallback to ensure all required company fields are populated.
+        const richCompanyDescription = buildComprehensiveCompanyDescription(
+          autoFillText,
+          oneLineValue || oneLineDescription,
+          sectorValue || sector,
+          stageValue || stage
+        );
+        const richProductDescription = buildComprehensiveProductDescription(
+          autoFillText,
+          oneLineValue || oneLineDescription,
+          companyDescriptionValue || richCompanyDescription
+        );
+
+        if (!companyName.trim()) setCompanyName(normalizeRequiredShortText(company || extractDomainCompanyName(websiteValue), 'N/A'));
+        if (!businessModel.trim()) setBusinessModel(normalizeRequiredShortText(businessModelValue || inferBusinessModelFromText(autoFillText), 'N/A'));
+        if (!country.trim()) setCountry(normalizeRequiredShortText(countryValue || locationParts.country, 'N/A'));
+        if (!stateRegion.trim()) setStateRegion(normalizeRequiredShortText(stateValue || locationParts.state, 'N/A'));
+        if (!city.trim()) setCity(normalizeRequiredShortText(cityValue || locationParts.city, 'N/A'));
+        if (!oneLineDescription.trim()) setOneLineDescription(normalizeRequiredText(oneLineValue || inferCompanyNameFromText(autoFillText) || 'N/A', 'N/A'));
+        if (!companyDescription.trim() || companyDescription.trim().length < 120) setCompanyDescription(normalizeRequiredText(companyDescriptionValue || richCompanyDescription, 'N/A'));
+        const productFallback = productValue.trim().length >= 120 ? productValue : richProductDescription;
+        if (!productDescription.trim() || productDescription.trim().length < 120) setProductDescription(normalizeRequiredText(productFallback, 'N/A'));
+        if (!isProvidedMoneyOrNA(annualRevenue)) setAnnualRevenue(normalizeRequiredMoneyText(annualRevenueValue, 'N/A'));
+        if (!isProvidedMoneyOrNA(preMoneyValuation)) setPreMoneyValuation(normalizeRequiredMoneyText(preMoneyValue, 'N/A'));
+
         setShowAutoFill(false);
         setAutoFillText('');
-        toast({ title: 'Auto-fill complete', description: `${result.fieldsExtracted || 'Fields'} extracted successfully.` });
+        const lowConfidenceNotice = hasLowConfidenceCriticalFields(fieldConfidence) || hasWeakRequirementCriticalFields(requirementMatch)
+          ? ' Low-confidence or weak-match fields were left unchanged for your review.'
+          : '';
+        toast({ title: 'Auto-fill complete', description: `${result.fieldsExtracted || 'Fields'} extracted successfully.${lowConfidenceNotice}` });
       } else {
         toast({ variant: 'destructive', title: 'Auto-fill failed', description: 'Could not extract fields from text.' });
       }
     } catch (e) {
-      toast({ variant: 'destructive', title: 'Auto-fill failed', description: e instanceof Error ? e.message : 'Could not extract fields from text.' });
+      const description = e instanceof Error && e.name === 'AbortError'
+        ? 'Auto-fill timed out. Please try again.'
+        : e instanceof Error
+        ? e.message
+        : 'Could not extract fields from text.';
+      toast({ variant: 'destructive', title: 'Auto-fill failed', description });
     } finally {
       setIsAutoFilling(false);
     }
@@ -1853,6 +2179,7 @@ export default function TriageReportWizardPage() {
     setExtractionStatus('Auto-filling fields from extracted text...');
     const trimmed = cleanLongText(combined);
     setExtractedText(trimmed);
+    let hasLowConfidenceFromExtraction = false;
 
     if (trimmed) {
       setAutoFillText(trimmed);
@@ -1867,27 +2194,29 @@ export default function TriageReportWizardPage() {
           const autofillResult = await autofillRes.json();
           if (autofillResult.success && autofillResult.data) {
             const d = autofillResult.data as Record<string, unknown>;
-            const aiCompany = cleanCompanyName(pickFirstText(d, ['company_name', 'companyName', 'startup_name', 'startupName', 'name']));
-            const legalNameValue = cleanShortText(pickFirstText(d, ['legalName', 'legal_name']));
+            const fieldConfidence = autofillResult.fieldConfidence;
+            const requirementMatch = autofillResult.requirementMatch;
+            hasLowConfidenceFromExtraction = hasLowConfidenceCriticalFields(fieldConfidence) || hasWeakRequirementCriticalFields(requirementMatch);
             const websiteValue = cleanShortText(pickFirstText(d, ['website', 'company_website', 'companyWebsite', 'url', 'domain']));
-            const company = resolveBestCompanyName({
-              aiCandidate: aiCompany,
-              legalName: legalNameValue,
+            const company = resolveCompanyNameCandidate({
+              aiCandidate: pickFirstText(d, ['company_name', 'companyName', 'startup_name', 'startupName', 'name']),
+              legalName: pickFirstText(d, ['legalName', 'legal_name']),
               website: websiteValue,
-              fromText: inferCompanyNameFromText(trimmed),
+              inferredFromText: inferCompanyNameFromText(trimmed),
               existing: companyName,
             });
-            const sectorValue = normalizeSectorValue(pickFirstText(d, ['sector', 'industry', 'industry_vertical', 'industryVertical', 'vertical']));
-            const stageValue = normalizeStageValue(pickFirstText(d, ['stage', 'company_stage', 'companyStage', 'funding_stage', 'fundingStage', 'development_stage', 'developmentStage']));
-            const businessModelValue = cleanShortText(pickFirstText(d, ['business_model', 'businessModel', 'model']));
+            const sectorValue = normalizeSectorValue(pickFirstText(d, ['sector', 'industry', 'industry_vertical', 'industryVertical', 'vertical'])) || inferSectorFromText(trimmed);
+            const stageValue = normalizeStageValue(pickFirstText(d, ['stage', 'company_stage', 'companyStage', 'funding_stage', 'fundingStage', 'development_stage', 'developmentStage'])) || inferStageFromText(trimmed);
+            const businessModelValue = cleanBusinessModelValue(pickFirstText(d, ['business_model', 'businessModel', 'model']));
             const countryValue = cleanShortText(pickFirstText(d, ['country']));
             const stateValue = cleanShortText(pickFirstText(d, ['state', 'province', 'region']));
             const cityValue = cleanShortText(pickFirstText(d, ['city']));
             const oneLineValue = cleanOneLineDescription(pickFirstText(d, ['one_line_description', 'oneLineDescription', 'tagline']));
             const companyDescriptionValue = cleanLongText(pickFirstText(d, ['company_description', 'companyDescription']));
-            const annualRevenueValue = cleanShortText(pickFirstText(d, ['annualRevenue', 'annual_revenue', 'yearlyRevenue', 'yearly_revenue'])) || extractAnnualRevenueText(trimmed);
-            const preMoneyValue = cleanShortText(pickFirstText(d, ['preMoneyValuation', 'pre_money_valuation']));
-            const pitchDeckPathValue = cleanShortText(pickFirstText(d, ['pitchDeckPath', 'pitch_deck_path']));
+            const annualRevenueValue = cleanMoneyValue(pickFirstText(d, ['annualRevenue', 'annual_revenue', 'yearlyRevenue', 'yearly_revenue'])) || extractAnnualRevenueText(trimmed);
+            const preMoneyValue = cleanMoneyValue(pickFirstText(d, ['preMoneyValuation', 'pre_money_valuation'])) || extractPreMoneyValuationText(trimmed);
+            const pitchDeckPathValue = cleanPitchDeckPathValue(pickFirstText(d, ['pitchDeckPath', 'pitch_deck_path']));
+            const legalNameValue = cleanShortText(pickFirstText(d, ['legalName', 'legal_name']));
             const employeesValue = cleanShortText(pickFirstText(d, ['numberOfEmployees', 'number_of_employees', 'team_size'])) || extractEmployeesText(trimmed);
             const locationValue = buildLocationText(d);
             const locationParts = splitLocationParts(locationValue);
@@ -1896,31 +2225,63 @@ export default function TriageReportWizardPage() {
             const teamValue = cleanLongText(pickFirstText(d, ['team_info', 'teamInfo', 'team_background', 'teamBackground', 'founder_info', 'founderInfo', 'companyBackgroundTeam']));
             const productValue = cleanLongText(pickFirstText(d, ['product_description', 'productDescription', 'product_overview', 'productOverview', 'solution_description', 'solutionDescription'])) || deriveProductDescription(oneLineValue, companyDescriptionValue);
 
-            if (company && !companyName.trim()) setCompanyName(company);
-            if (websiteValue && !website.trim()) setWebsite(websiteValue);
-            if (sectorValue && !sector) setSector(sectorValue);
-            if (stageValue && !stage) setStage(stageValue);
-            if (businessModelValue && !businessModel.trim()) setBusinessModel(businessModelValue);
-            if ((countryValue || locationParts.country) && !country.trim()) setCountry(countryValue || locationParts.country);
-            if ((stateValue || locationParts.state) && !stateRegion.trim()) setStateRegion(stateValue || locationParts.state);
-            if ((cityValue || locationParts.city) && !city.trim()) setCity(cityValue || locationParts.city);
-            if (oneLineValue && !oneLineDescription.trim()) setOneLineDescription(oneLineValue);
-            if (companyDescriptionValue && !companyDescription.trim()) setCompanyDescription(companyDescriptionValue);
-            if (annualRevenueValue && !annualRevenue.trim()) setAnnualRevenue(annualRevenueValue);
-            if (preMoneyValue && !preMoneyValuation.trim()) setPreMoneyValuation(preMoneyValue);
-            if (pitchDeckPathValue && !pitchDeckPath.trim()) setPitchDeckPath(pitchDeckPathValue);
-            if (legalNameValue && !legalName.trim()) setLegalName(legalNameValue);
-            if (employeesValue && !numberOfEmployees.trim()) setNumberOfEmployees(employeesValue);
+            if (
+              company
+              && (isLikelyInvalidExistingCompanyName(companyName) || isCompanyMismatchedWithWebsite(companyName, websiteValue))
+              && shouldApplyFieldForEmptyRequired(fieldConfidence, requirementMatch, ['company_name', 'companyName', 'legal_name', 'legalName'])
+            ) setCompanyName(company);
+            if (websiteValue && !website.trim() && shouldApplyField(fieldConfidence, requirementMatch, ['website'])) setWebsite(websiteValue);
+            if (sectorValue && !sector && shouldApplyFieldForEmptyRequired(fieldConfidence, requirementMatch, ['sector', 'industryVertical'])) setSector(sectorValue);
+            if (stageValue && !stage && shouldApplyFieldForEmptyRequired(fieldConfidence, requirementMatch, ['stage', 'developmentStage'])) setStage(stageValue);
+            if (businessModelValue && !businessModel.trim() && shouldApplyFieldForEmptyRequired(fieldConfidence, requirementMatch, ['business_model', 'businessModel'])) setBusinessModel(businessModelValue);
+            if ((countryValue || locationParts.country) && !country.trim() && shouldApplyLocationField(fieldConfidence, ['country', 'location'])) setCountry(countryValue || locationParts.country);
+            if ((stateValue || locationParts.state) && !stateRegion.trim() && shouldApplyLocationField(fieldConfidence, ['state', 'location'])) setStateRegion(stateValue || locationParts.state);
+            if ((cityValue || locationParts.city) && !city.trim() && shouldApplyLocationField(fieldConfidence, ['city', 'location'])) setCity(cityValue || locationParts.city);
+            if (oneLineValue && !oneLineDescription.trim() && shouldApplyFieldForEmptyRequired(fieldConfidence, requirementMatch, ['one_line_description', 'oneLineDescription'])) setOneLineDescription(oneLineValue);
+            if (companyDescriptionValue && !companyDescription.trim() && shouldApplyFieldForEmptyRequired(fieldConfidence, requirementMatch, ['company_description', 'companyDescription'])) setCompanyDescription(companyDescriptionValue);
+            if (annualRevenueValue && !annualRevenue.trim() && isPositiveNumberText(annualRevenueValue) && shouldApplyFinancialField(fieldConfidence, ['annual_revenue', 'annualRevenue'])) setAnnualRevenue(annualRevenueValue);
+            if (preMoneyValue && !preMoneyValuation.trim() && isPositiveNumberText(preMoneyValue) && shouldApplyFinancialField(fieldConfidence, ['pre_money_valuation', 'preMoneyValuation'])) setPreMoneyValuation(preMoneyValue);
+            if (pitchDeckPathValue && !pitchDeckPath.trim() && shouldApplyField(fieldConfidence, requirementMatch, ['pitch_deck_path', 'pitchDeckPath'])) setPitchDeckPath(pitchDeckPathValue);
+            if (legalNameValue && !legalName.trim() && shouldApplyField(fieldConfidence, requirementMatch, ['legal_name', 'legalName'])) setLegalName(legalNameValue);
+            if (employeesValue && !numberOfEmployees.trim() && shouldApplyField(fieldConfidence, requirementMatch, ['number_of_employees', 'numberOfEmployees'])) setNumberOfEmployees(employeesValue);
             if (locationValue && !location.trim()) setLocation(locationValue);
             if (summaryValue) setPitchSummary(summaryValue);
             if (metricsValue && !keyMetrics.trim()) setKeyMetrics(metricsValue);
             if (teamValue && !teamInfo.trim()) setTeamInfo(teamValue);
-            if (productValue && !productDescription.trim()) setProductDescription(productValue);
+            if (productValue && !productDescription.trim() && shouldApplyFieldForEmptyRequired(fieldConfidence, requirementMatch, ['product_description', 'productDescription', 'product_overview', 'productOverview'])) setProductDescription(productValue);
+
+            // Hard fallback to ensure all required company fields are populated.
+            const richCompanyDescription = buildComprehensiveCompanyDescription(
+              trimmed,
+              oneLineValue || oneLineDescription,
+              sectorValue || sector,
+              stageValue || stage
+            );
+            const richProductDescription = buildComprehensiveProductDescription(
+              trimmed,
+              oneLineValue || oneLineDescription,
+              companyDescriptionValue || richCompanyDescription
+            );
+
+            if (!companyName.trim()) setCompanyName(normalizeRequiredShortText(company || extractDomainCompanyName(websiteValue), 'N/A'));
+            if (!businessModel.trim()) setBusinessModel(normalizeRequiredShortText(businessModelValue || inferBusinessModelFromText(trimmed), 'N/A'));
+            if (!country.trim()) setCountry(normalizeRequiredShortText(countryValue || locationParts.country, 'N/A'));
+            if (!stateRegion.trim()) setStateRegion(normalizeRequiredShortText(stateValue || locationParts.state, 'N/A'));
+            if (!city.trim()) setCity(normalizeRequiredShortText(cityValue || locationParts.city, 'N/A'));
+            if (!oneLineDescription.trim()) setOneLineDescription(normalizeRequiredText(oneLineValue || inferCompanyNameFromText(trimmed) || 'N/A', 'N/A'));
+            if (!companyDescription.trim() || companyDescription.trim().length < 120) setCompanyDescription(normalizeRequiredText(companyDescriptionValue || richCompanyDescription, 'N/A'));
+            const productFallback = productValue.trim().length >= 120 ? productValue : richProductDescription;
+            if (!productDescription.trim() || productDescription.trim().length < 120) setProductDescription(normalizeRequiredText(productFallback, 'N/A'));
+            if (!isProvidedMoneyOrNA(annualRevenue)) setAnnualRevenue(normalizeRequiredMoneyText(annualRevenueValue, 'N/A'));
+            if (!isProvidedMoneyOrNA(preMoneyValuation)) setPreMoneyValuation(normalizeRequiredMoneyText(preMoneyValue, 'N/A'));
           }
         }
       } catch { /* ignore autofill errors — fields still pre-filled from raw text */ }
       if (!pitchSummary.trim()) setPitchSummary(trimmed.slice(0, 2000));
-      toast({ title: 'Extraction complete', description: `Text extracted from ${files.length} file(s). Fields pre-filled.` });
+      const lowConfidenceNotice = hasLowConfidenceFromExtraction
+        ? ' Low-confidence fields were left unchanged for review.'
+        : '';
+      toast({ title: 'Extraction complete', description: `Text extracted from ${files.length} file(s). Fields pre-filled.${lowConfidenceNotice}` });
     } else {
       setExtractionError('Could not extract readable text from the uploaded file(s). You can continue manually or try another file format (PDF usually works best).');
       if (!pitchSummary.trim() && hasContext) {
@@ -2052,53 +2413,35 @@ export default function TriageReportWizardPage() {
     setIsSaving(true);
     setSaveError(null);
     try {
-      const recommendation = getOutcomeLabel(compositeScore);
-      const evalId = trackingId || `triage-${Date.now()}`;
-      const moduleResults = TRIAGE_MODULES
-        .filter((m) => selectedModules.includes(m.id))
-        .map((m) => ({ module: m.id, score: moduleScores[m.id] ?? null }));
-
-      const payload = {
-        eval_id: evalId,
-        company_data: {
-          company_name: companyName,
-          sector,
-          stage,
-          website,
-          location,
-        },
-        final_score: compositeScore,
-        recommendation: { decision: recommendation },
-        report_sections: reportSections.filter((s) => s.active).map((s) => ({ id: s.id, title: s.title })),
-        module_results: moduleResults,
-        analysis_data: analysisResult,
-      };
-
-      const storeRes = await fetch('/api/report/store', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (storeRes.ok) {
-        const stored = await storeRes.json();
-        const id = Number(stored.reportId ?? stored.report_id ?? Date.now());
-        setSavedReportId(id);
-        toast({ title: 'Report saved', description: `Report #${id} saved for ${companyName}.` });
-      } else {
-        const fallbackSaved = await reportsApi.createReport({
-          company_name: companyName,
-          report_type: 'triage',
-          overall_score: compositeScore,
-          tca_score: compositeScore,
-          recommendation,
-          analysis_data: analysisResult as Record<string, unknown>,
-          module_scores: { modules: selectedModules, framework } as Record<string, unknown>,
-          missing_sections: reportSections.filter((s) => !s.active).map((s) => s.id),
+      if (!qualityAssessment.canExport) {
+        const blocker = qualityAssessment.blockers[0] || `Quality tier is ${qualityAssessment.qualityTier}, not High (required 80+ score)`;
+        setSaveError(`Cannot export: ${blocker}`);
+        toast({
+          variant: 'destructive',
+          title: 'Export blocked',
+          description: blocker,
         });
-        setSavedReportId(fallbackSaved.id);
-        toast({ title: 'Report saved', description: `Report #${fallbackSaved.id} saved for ${companyName}.` });
+        return;
       }
+
+      const recommendation = qualityAssessment.recommendationLabel;
+      const enrichedAnalysis = {
+        ...(analysisResult as Record<string, unknown>),
+        qualityAssessment,
+        reportNarrative: qualityAssessment.reportNarrative,
+      };
+      const saved = await reportsApi.createReport({
+        company_name: companyName,
+        report_type: 'triage',
+        overall_score: compositeScore,
+        tca_score: compositeScore,
+        recommendation,
+        analysis_data: enrichedAnalysis,
+        module_scores: { modules: selectedModules, framework } as Record<string, unknown>,
+        missing_sections: reportSections.filter((s) => !s.active).map((s) => s.id),
+      });
+      setSavedReportId(saved.id);
+      toast({ title: '100% Quality Report Saved', description: `Report #${saved.id} saved for ${companyName}. High-quality analysis archived.` });
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Failed to save report.';
       setSaveError(msg);
@@ -2109,9 +2452,18 @@ export default function TriageReportWizardPage() {
   };
 
   const handleDownloadJSON = () => {
+    if (!qualityAssessment.canExport) {
+      toast({
+        variant: 'destructive',
+        title: 'Export blocked',
+        description: qualityAssessment.blockers[0] || 'Quality gates not passed; improve analysis to High tier before export.',
+      });
+      return;
+    }
     const data = {
       company: companyName, sector, stage, framework,
       compositeScore, analysisResult,
+      qualityAssessment,
       reportSections: reportSections.filter((s) => s.active).map((s) => s.id),
       exportedAt: new Date().toISOString(),
     };
@@ -2125,6 +2477,14 @@ export default function TriageReportWizardPage() {
   };
 
   const handleDownloadCSV = () => {
+    if (!qualityAssessment.canExport) {
+      toast({
+        variant: 'destructive',
+        title: 'Export blocked',
+        description: qualityAssessment.blockers[0] || 'Quality gates not passed; improve analysis to High tier before export.',
+      });
+      return;
+    }
     const activeSections = reportSections.filter((s) => s.active);
     const rows = [['Section ID', 'Section Title', 'Active']].concat(
       reportSections.map((s) => [s.id, s.title, s.active ? 'Yes' : 'No'])
@@ -2140,48 +2500,38 @@ export default function TriageReportWizardPage() {
     void activeSections;
   };
 
-  const handleDownloadHTML = () => {
-    const activeSections = reportSections.filter((s) => s.active);
-    const html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <title>Triage Report - ${companyName}</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 24px; line-height: 1.4; }
-    h1, h2 { margin-bottom: 8px; }
-    .meta { color: #555; margin-bottom: 16px; }
-    .block { border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin: 10px 0; }
-  </style>
-</head>
-<body>
-  <h1>Triage Report</h1>
-  <div class="meta">Company: ${companyName || '-'} | Sector: ${sector || '-'} | Stage: ${stage || '-'} | Score: ${compositeScore.toFixed(2)}</div>
-  <h2>Module Scores</h2>
-  ${TRIAGE_MODULES.filter((m) => selectedModules.includes(m.id)).map((m) => `<div class="block"><strong>${m.name}</strong>: ${(moduleScores[m.id] ?? 0).toFixed(2)} / 10</div>`).join('')}
-  <h2>Active Sections</h2>
-  ${activeSections.map((s) => `<div class="block"><strong>${s.title}</strong><br/>${s.description}</div>`).join('')}
-</body>
-</html>`;
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `triage-${companyName.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}.html`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   const handleGenerate = async () => {
+    const hasMinimumAnalysisInput = [
+      companyName,
+      companyDescription,
+      pitchSummary,
+      keyMetrics,
+      teamInfo,
+      productDescription,
+      additionalContext,
+      extractedText,
+    ].some((value) => value.trim().length > 0);
+
+    if (!hasMinimumAnalysisInput) {
+      toast({
+        variant: 'destructive',
+        title: 'Input required',
+        description: 'Add a company name, uploaded/extracted text, or summary details before running triage analysis.',
+      });
+      return;
+    }
+
     setIsGenerating(true);
     setGenerationProgress(0);
     setGenerationStatus('Preparing triage analysis...');
-    setAnalysisError(null);
 
+    const activeTriageSections = reportSections.filter((s) => s.active);
     const triageContext = {
       companyName, sector, stage, website, location,
       pitchSummary, keyMetrics, teamInfo, productDescription,
       framework, selectedModules, reportType: 'triage',
+      reportSections: activeTriageSections,
+      activeSectionIds: activeTriageSections.map((s) => s.id),
       createdAt: new Date().toISOString(),
     };
     localStorage.setItem('triageContext', JSON.stringify(triageContext));
@@ -2213,61 +2563,83 @@ export default function TriageReportWizardPage() {
     }, 1500);
 
     try {
-      const metricsFromSupportingDocs = supportingDocsMetrics
-        .map((m) => `${m.field}: ${m.value} (source: ${m.source})`)
-        .join('\n');
-      const keyMetricsForAnalysis = [keyMetrics.trim(), metricsFromSupportingDocs.trim()]
-        .filter(Boolean)
-        .join('\n');
-      const aggregatedContext = [
-        extractedText?.trim() || '',
-        additionalContext?.trim() || '',
-        pitchSummary?.trim() || '',
-        keyMetricsForAnalysis,
-        teamInfo?.trim() || '',
-        productDescription?.trim() || '',
-      ].filter(Boolean).join('\n\n');
-
-      let extractionSnapshot: unknown = null;
-      try {
-        const rawExtraction = localStorage.getItem('current_extraction_data');
-        extractionSnapshot = rawExtraction ? JSON.parse(rawExtraction) : null;
-      } catch {
-        extractionSnapshot = null;
-      }
-
-      const analysisData = await runAnalysis(framework, {
-        companyName, sector, stage, website, location,
-        pitchSummary,
-        keyMetrics: keyMetricsForAnalysis,
-        teamInfo,
-        productDescription,
-        submittedTexts: aggregatedContext ? [aggregatedContext] : [],
-        processedFilesData: aggregatedContext
-          ? [{ isPitchDeck: true, extracted_data: { text_content: aggregatedContext } }]
-          : [],
-        extractionData: extractionSnapshot,
+      const analysisPayload = {
+        companyName: companyName.trim(), sector, stage, website, location,
+        companyDescription: companyDescription.trim() || additionalContext.trim() || extractedText.trim().slice(0, 1200),
+        pitchSummary, keyMetrics, teamInfo, productDescription,
+        submittedTexts: [additionalContext, teamInfo, keyMetrics].filter((value) => value.trim().length > 0),
         strictRealDataOnly: true,
         disallowSampleFallback: true,
         activeModules: TRIAGE_MODULES.filter(m => selectedModules.includes(m.id)).map(m => ({ module_id: m.id, weight: m.weight, is_enabled: true })),
+      };
+      const analysisResponse = await fetch('/api/analysis/run', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          framework,
+          userData: analysisPayload,
+        }),
       });
+
+      if (!analysisResponse.ok) {
+        const errorBody = await analysisResponse.json().catch(() => null);
+        throw new Error(
+          errorBody?.message
+          || errorBody?.error
+          || `Analysis request failed with status ${analysisResponse.status}`
+        );
+      }
+
+      const analysisData = await analysisResponse.json();
+      const analysisWithReportContext = {
+        ...(analysisData as Record<string, unknown>),
+        _triageReportContext: {
+          reportType: 'triage',
+          role: userRole,
+          framework,
+          selectedModules: [...selectedModules],
+          activeSectionIds: activeTriageSections.map((s) => s.id),
+          sections: activeTriageSections,
+        },
+      };
       clearInterval(progressTimer);
       setGenerationProgress(100);
       setGenerationStatus('Triage complete!');
 
-      localStorage.setItem('analysisResult', JSON.stringify(analysisData));
-      sessionStorage.setItem('analysisResult', JSON.stringify(analysisData));
+      localStorage.setItem('analysisResult', JSON.stringify(analysisWithReportContext));
+      sessionStorage.setItem('analysisResult', JSON.stringify(analysisWithReportContext));
       localStorage.setItem('analysisFramework', framework);
 
-      const tcaScore = deriveModuleScore('tca', analysisData) ?? 0;
-      const derivedScores = Object.fromEntries(
-        TRIAGE_MODULES.map((module) => [module.id, deriveModuleScore(module.id, analysisData)])
-      ) as Record<string, number | null>;
-      setModuleScores(derivedScores);
-      setWhatIfScores(getDefaultWhatIfScores(derivedScores));
-      const score = tcaScore;
+      const scoreData = (analysisWithReportContext as { tcaData?: { overallScore?: number; compositeScore?: number } })?.tcaData;
+      const tcaScore = scoreData?.compositeScore ?? scoreData?.overallScore ?? 0;
+      const aiModuleScores = deriveModuleScoresFromAnalysis(analysisWithReportContext);
+      const weightedComposite = computeWeightedCompositeScore(selectedModules, aiModuleScores, savedModuleWeights);
+      const score = weightedComposite ?? tcaScore;
+      const generatedQuality = evaluateTriageQuality({
+        analysisData: analysisWithReportContext,
+        selectedModuleIds: selectedModules,
+        moduleScores: aiModuleScores,
+        compositeScore: score,
+        companyName,
+        sector,
+        stage,
+        website,
+        country,
+        stateRegion,
+        city,
+        pitchSummary,
+        keyMetrics,
+        teamInfo,
+        productDescription,
+        annualRevenue,
+        preMoneyValuation,
+      });
+
       setCompositeScore(score);
-      setAnalysisResult(analysisData);
+      setDerivedModuleScores(aiModuleScores);
+      setAnalysisResult(analysisWithReportContext);
       sessionStorage.setItem('companyData', JSON.stringify({
         companyName, sector, stage, website, location,
         pitchSummary, keyMetrics, teamInfo, productDescription
@@ -2278,92 +2650,36 @@ export default function TriageReportWizardPage() {
       const triageReport = {
         reportId, reportType: 'triage', companyName, framework,
         metadata: { compositeScore: score, sector, stage },
-        createdAt: new Date().toISOString(), data: analysisData,
+        createdAt: new Date().toISOString(), data: analysisWithReportContext,
       };
       const existingReports = JSON.parse(localStorage.getItem('tca_reports') || '[]');
       existingReports.unshift(triageReport);
       localStorage.setItem('tca_reports', JSON.stringify(existingReports.slice(0, 50)));
 
-      toast({ title: 'Triage Complete', description: `${companyName} triage analysis finished. Proceed to save.` });
-      setCompletedSteps((prev) => [...new Set([...prev, 9])]);
-      setCurrentStep(isAdminOrAnalyst ? 10 : 11);
-    } catch (error) {
-      clearInterval(progressTimer);
-      const errMsg = error instanceof Error ? error.message : String(error);
-      let errType: 'ai-timeout' | 'backend-error' | 'module-inactive' | 'validation' | 'unknown' = 'unknown';
-      let errDetail = 'An unexpected error occurred. Please try again or contact support.';
-
-      const lower = errMsg.toLowerCase();
-      if (lower.includes('timeout') || lower.includes('etimedout') || lower.includes('504') || lower.includes('timed out')) {
-        errType = 'ai-timeout';
-        errDetail = 'The AI backend did not respond in time. This is usually temporary — wait 30 seconds and retry. If it persists, the analysis service may be under load.';
-      } else if (lower.includes('500') || lower.includes('internal server error') || lower.includes('service unavailable') || lower.includes('503')) {
-        errType = 'backend-error';
-        errDetail = 'The analysis server returned an error. Ensure the backend container is running and all required modules are enabled. Check Step 6 (Modules) to verify configuration.';
-      } else if (lower.includes('module') || lower.includes('disabled') || lower.includes('inactive') || lower.includes('not found')) {
-        errType = 'module-inactive';
-        errDetail = 'One or more selected modules may not be active or recognised. Go back to Step 6 and verify your module selection, then retry.';
-      } else if (lower.includes('validation') || lower.includes('invalid') || lower.includes('required') || lower.includes('missing')) {
-        errType = 'validation';
-        errDetail = 'Some required input data is missing or invalid. Review your entries in Steps 3–5 (Company Info, Data Input, External Data) and ensure all required fields are filled.';
-      } else if (lower.includes('network') || lower.includes('fetch') || lower.includes('connection')) {
-        errType = 'backend-error';
-        errDetail = 'Network error — could not reach the analysis backend. Check your internet connection and ensure the API service is reachable.';
+      if (!generatedQuality.gatePassed) {
+        toast({
+          variant: 'destructive',
+          title: 'Quality gate triggered',
+          description: generatedQuality.blockers[0] || 'Manual review is required before final recommendation.',
+        });
       }
 
-      setAnalysisError({ message: errMsg, type: errType, detail: errDetail });
+      toast({ title: 'Triage Complete', description: `${companyName} triage analysis finished. Proceed to save.` });
+      setCompletedSteps((prev) => [...new Set([...prev, 9])]);
+      setCurrentStep(10);
+    } catch (error) {
+      clearInterval(progressTimer);
       console.error('Triage generation failed:', error);
       toast({
         variant: 'destructive',
-        title: 'Analysis Failed',
-        description: errDetail,
+        title: 'Triage Failed',
+        description: error instanceof Error ? error.message : 'An error occurred during triage.',
       });
       setIsGenerating(false);
       setGenerationProgress(0);
       setGenerationStatus('');
     }
   };
-
-  useEffect(() => {
-    if (currentStep !== 11) return;
-    try {
-      const latest = localStorage.getItem('analysisResult');
-      if (!latest) return;
-      const parsed = JSON.parse(latest) as Record<string, unknown>;
-      setAnalysisResult(parsed);
-      const derivedScores = Object.fromEntries(
-        TRIAGE_MODULES.map((module) => [module.id, deriveModuleScore(module.id, parsed)])
-      ) as Record<string, number | null>;
-      setModuleScores(derivedScores);
-      const tcaScore = derivedScores.tca;
-      if (typeof tcaScore === 'number') setCompositeScore(tcaScore);
-    } catch {
-      // ignore malformed local analysis cache
-    }
-  }, [currentStep, selectedModules]);
-
-  // Fire AI insight once analysis finishes and user reaches preview
-  useEffect(() => {
-    if (!analysisResult || compositeScore === 0 || aiStatus !== 'idle') return;
-    const topModules = TRIAGE_MODULES
-      .filter((m) => selectedModules.includes(m.id))
-      .map((m) => ({ id: m.id, name: m.name, score: moduleScores[m.id] ?? null }))
-      .filter((m) => m.score !== null)
-      .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-      .slice(0, 6);
-    const prompt = [
-      `Triage analysis for ${companyName || 'this company'} (${sector || 'unspecified sector'}, ${stage || 'unspecified stage'}).`,
-      `Overall composite score: ${compositeScore.toFixed(2)}/10.`,
-      `Top modules: ${topModules.map((m) => `${m.name} ${m.score?.toFixed(1)}`).join(', ')}.`,
-      pitchSummary ? `Business context: ${pitchSummary.slice(0, 400)}` : '',
-      'Provide: summary of investment thesis, key risks, confidence level (0-1), and 3 concrete next steps.',
-    ].filter(Boolean).join(' ');
-    fetchAiInsight('recommend', prompt, {
-      companyName, sector, stage, compositeScore,
-      topModules: topModules.slice(0, 4),
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [analysisResult, compositeScore]);
 
   const renderStepContent = () => {
     switch (currentStep) {
@@ -2422,6 +2738,8 @@ export default function TriageReportWizardPage() {
                       type="file"
                       className="hidden"
                       accept=".pdf,.ppt,.pptx,.doc,.docx"
+                      title="Upload pitch deck"
+                      aria-label="Upload pitch deck"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file) handlePitchDeckSelect(file);
@@ -2601,8 +2919,8 @@ export default function TriageReportWizardPage() {
           { label: 'Company Description', ok: companyDescription.trim().length > 0 },
           { label: 'Product Description', ok: productDescription.trim().length > 0 },
           { label: 'Pitch Deck Path', ok: pitchDeckPath.trim().length > 0 },
-          { label: 'Annual Revenue', ok: isPositiveNumberText(annualRevenue) },
-          { label: 'Pre-Money Valuation', ok: isPositiveNumberText(preMoneyValuation) },
+          { label: 'Annual Revenue', ok: isProvidedMoneyOrNA(annualRevenue) },
+          { label: 'Pre-Money Valuation', ok: isProvidedMoneyOrNA(preMoneyValuation) },
         ];
         const ssdMissingItems = ssdMandatoryItems.filter((item) => !item.ok).map((item) => item.label);
 
@@ -2611,16 +2929,16 @@ export default function TriageReportWizardPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Building2 className="size-5" />
-                Company Information (Startup Steroid)
+                Company Information
               </CardTitle>
               <CardDescription>
-                Startup Steroid aligned company details. Then upload additional company documents as second upload.
+                Review extracted company details, complete required fields, and add supporting sources if needed.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="rounded-lg border p-3 bg-muted/30 space-y-2">
                 <div className="flex items-center justify-between gap-2">
-                  <Label className="text-sm font-semibold">Mandatory SSD Fields Completeness</Label>
+                  <Label className="text-sm font-semibold">Required Company Fields</Label>
                   <Badge variant={ssdMissingItems.length === 0 ? 'default' : 'secondary'}>
                     {ssdMandatoryItems.length - ssdMissingItems.length}/{ssdMandatoryItems.length} complete
                   </Badge>
@@ -2643,7 +2961,7 @@ export default function TriageReportWizardPage() {
                     id="companyName"
                     placeholder="e.g., QuantumLeap AI"
                     value={companyName}
-                    onChange={(e) => setCompanyName(e.target.value)}
+                    onChange={applyStringValue(setCompanyName)}
                   />
                 </div>
                 <div className="space-y-2">
@@ -2652,7 +2970,7 @@ export default function TriageReportWizardPage() {
                     id="website"
                     placeholder="https://example.com"
                     value={website}
-                    onChange={(e) => setWebsite(e.target.value)}
+                    onChange={applyStringValue(setWebsite)}
                   />
                 </div>
               </div>
@@ -2698,44 +3016,44 @@ export default function TriageReportWizardPage() {
                   id="location"
                   placeholder="e.g., San Francisco, CA"
                   value={location}
-                  onChange={(e) => setLocation(e.target.value)}
+                  onChange={applyStringValue(setLocation)}
                 />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="legalName">Legal Name</Label>
-                  <Input id="legalName" placeholder="Legal name of company" value={legalName} onChange={(e) => setLegalName(e.target.value)} />
+                  <Input id="legalName" placeholder="Legal name of company" value={legalName} onChange={applyStringValue(setLegalName)} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="numberOfEmployees">Number of Employees</Label>
-                  <Input id="numberOfEmployees" placeholder="e.g., 12" value={numberOfEmployees} onChange={(e) => setNumberOfEmployees(e.target.value)} />
+                  <Input id="numberOfEmployees" placeholder="e.g., 12" value={numberOfEmployees} onChange={applyStringValue(setNumberOfEmployees)} />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="businessModel">Business Model <span className="text-destructive">*</span></Label>
-                  <Input id="businessModel" placeholder="e.g., B2B SaaS" value={businessModel} onChange={(e) => setBusinessModel(e.target.value)} />
+                  <Input id="businessModel" placeholder="e.g., B2B SaaS" value={businessModel} onChange={applyStringValue(setBusinessModel)} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="pitchDeckPath">Pitch Deck Path <span className="text-destructive">*</span></Label>
-                  <Input id="pitchDeckPath" placeholder="/documents/pitch_deck.pdf" value={pitchDeckPath} onChange={(e) => setPitchDeckPath(e.target.value)} />
+                  <Input id="pitchDeckPath" placeholder="/documents/pitch_deck.pdf" value={pitchDeckPath} onChange={applyStringValue(setPitchDeckPath)} />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="country">Country <span className="text-destructive">*</span></Label>
-                  <Input id="country" placeholder="United States" value={country} onChange={(e) => setCountry(e.target.value)} />
+                  <Input id="country" placeholder="United States" value={country} onChange={applyStringValue(setCountry)} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="stateRegion">State <span className="text-destructive">*</span></Label>
-                  <Input id="stateRegion" placeholder="California" value={stateRegion} onChange={(e) => setStateRegion(e.target.value)} />
+                  <Input id="stateRegion" placeholder="California" value={stateRegion} onChange={applyStringValue(setStateRegion)} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="city">City <span className="text-destructive">*</span></Label>
-                  <Input id="city" placeholder="San Francisco" value={city} onChange={(e) => setCity(e.target.value)} />
+                  <Input id="city" placeholder="San Francisco" value={city} onChange={applyStringValue(setCity)} />
                 </div>
               </div>
 
@@ -2745,18 +3063,18 @@ export default function TriageReportWizardPage() {
                   id="oneLineDescription"
                   placeholder="AI-powered customer service automation platform"
                   value={oneLineDescription}
-                  onChange={(e) => setOneLineDescription(e.target.value)}
+                  onChange={applyStringValue(setOneLineDescription)}
                 />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="annualRevenue">Annual Revenue <span className="text-destructive">*</span></Label>
-                  <Input id="annualRevenue" placeholder="250000" value={annualRevenue} onChange={(e) => setAnnualRevenue(e.target.value)} />
+                  <Input id="annualRevenue" placeholder="250000" value={annualRevenue} onChange={applyStringValue(setAnnualRevenue)} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="preMoneyValuation">Pre-Money Valuation <span className="text-destructive">*</span></Label>
-                  <Input id="preMoneyValuation" placeholder="5000000" value={preMoneyValuation} onChange={(e) => setPreMoneyValuation(e.target.value)} />
+                  <Input id="preMoneyValuation" placeholder="5000000" value={preMoneyValuation} onChange={applyStringValue(setPreMoneyValuation)} />
                 </div>
               </div>
 
@@ -2767,7 +3085,7 @@ export default function TriageReportWizardPage() {
                   rows={4}
                   placeholder="Detailed description of the company"
                   value={companyDescription}
-                  onChange={(e) => setCompanyDescription(e.target.value)}
+                  onChange={applyStringValue(setCompanyDescription)}
                 />
               </div>
 
@@ -2778,164 +3096,185 @@ export default function TriageReportWizardPage() {
                   rows={4}
                   placeholder="Describe the core product and value"
                   value={productDescription}
-                  onChange={(e) => setProductDescription(e.target.value)}
+                  onChange={applyStringValue(setProductDescription)}
                 />
               </div>
 
               <Separator />
 
-              <Tabs defaultValue="documents" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="documents">Documents</TabsTrigger>
-                  <TabsTrigger value="online-search">Online Search</TabsTrigger>
-                  <TabsTrigger value="extra-info">Extra Information</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="documents" className="space-y-2 pt-3">
-                  <Label className="text-sm font-semibold">
-                    Upload Company Documents (Second Upload)
-                    <span className="text-xs font-normal text-muted-foreground ml-1">(optional — financials, data sheets, market docs)</span>
-                  </Label>
-                  <div
-                    className="border border-dashed border-border rounded-lg p-4 text-center hover:border-primary/30 transition-colors cursor-pointer"
-                    onClick={() => document.getElementById('supporting-files-input')?.click()}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      const files = Array.from(e.dataTransfer.files);
-                      if (files.length > 0) setSupportingFiles(prev => [...prev, ...files]);
-                    }}
-                  >
-                    <p className="text-xs text-muted-foreground">Click or drag to add supporting documents</p>
-                    <input
-                      id="supporting-files-input"
-                      type="file"
-                      className="hidden"
-                      multiple
-                      accept=".pdf,.docx,.pptx,.xlsx,.txt,.csv"
-                      onChange={(e) => {
-                        const files = Array.from(e.target.files || []);
-                        setSupportingFiles(prev => [...prev, ...files]);
-                        e.target.value = '';
-                      }}
-                    />
-                  </div>
-                  {supportingFiles.length > 0 && (
+              <div className="rounded-xl border-2 border-primary/20 bg-white shadow-sm">
+                <div className="border-b px-4 py-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex size-7 items-center justify-center rounded-full border border-primary/30 text-sm font-semibold text-primary">
+                      2
+                    </div>
                     <div className="space-y-1">
-                      {supportingFiles.map((file, idx) => (
-                        <div key={idx} className="flex items-center gap-2 rounded-md border p-2 text-sm">
-                          <FileText className="size-4 text-muted-foreground shrink-0" />
-                          <span className="truncate flex-1">{file.name}</span>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="size-6 shrink-0"
-                            onClick={() => setSupportingFiles(prev => prev.filter((_, i) => i !== idx))}
-                          >
-                            <X className="size-3" />
-                          </Button>
-                        </div>
-                      ))}
+                      <h3 className="text-lg font-semibold text-slate-900">Document Submission</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Add supporting files, online sources, or extra notes to strengthen the triage review.
+                      </p>
                     </div>
-                  )}
-                  
-                  {/* Extraction Status & Metrics Table */}
-                  {(supportingDocsExtractionStatus || supportingDocsExtractionError || supportingDocsMetrics.length > 0) && (
-                    <div className="border rounded-lg p-4 bg-muted/20 space-y-3">
-                      {/* Status Indicator */}
-                      {supportingDocsExtractionStatus && (
-                        <div className="flex items-center gap-2">
-                          <Check className="size-4 text-green-600" />
-                          <span className="text-sm text-muted-foreground">{supportingDocsExtractionStatus}</span>
-                        </div>
-                      )}
-                      
-                      {supportingDocsExtractionError && (
-                        <div className="flex items-center gap-2 text-destructive">
-                          <AlertCircle className="size-4" />
-                          <span className="text-sm">{supportingDocsExtractionError}</span>
-                        </div>
-                      )}
-                      
-                      {/* Metrics Table */}
-                      {supportingDocsMetrics.length > 0 && (
-                        <div className="mt-3">
-                          <Label className="text-xs font-semibold text-muted-foreground mb-2 block">Extracted Metrics</Label>
-                          <div className="border rounded-md overflow-hidden">
-                            <div className="overflow-x-auto">
-                              <table className="w-full text-sm">
-                                <thead className="bg-muted/50 border-b">
-                                  <tr>
-                                    <th className="px-3 py-2 text-left font-semibold">Field</th>
-                                    <th className="px-3 py-2 text-left font-semibold">Value</th>
-                                    <th className="px-3 py-2 text-left font-semibold">Source</th>
-                                    <th className="px-3 py-2 text-center font-semibold">Verified</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {supportingDocsMetrics.map((metric, idx) => (
-                                    <tr key={idx} className="border-b last:border-b-0 hover:bg-muted/20">
-                                      <td className="px-3 py-2 text-muted-foreground">{metric.field}</td>
-                                      <td className="px-3 py-2 font-medium">{metric.value}</td>
-                                      <td className="px-3 py-2 text-xs text-muted-foreground truncate">{metric.source}</td>
-                                      <td className="px-3 py-2 text-center">
-                                        {metric.verified ? (
-                                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                                            ✓
-                                          </Badge>
-                                        ) : (
-                                          <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
-                                            ⚠
-                                          </Badge>
-                                        )}
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
+                  </div>
+                </div>
+
+                <div className="p-4">
+                  <Tabs defaultValue="documents" className="w-full">
+                    <TabsList className="grid h-10 w-full grid-cols-3 bg-muted/70 p-1">
+                      <TabsTrigger value="documents" className="gap-2"><UploadCloud className="size-4" /> File Upload</TabsTrigger>
+                      <TabsTrigger value="online-search" className="gap-2"><LinkIcon className="size-4" /> URL Import</TabsTrigger>
+                      <TabsTrigger value="extra-info" className="gap-2"><Type className="size-4" /> Text Input</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="documents" className="space-y-4 pt-4">
+                      <div
+                        className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50/70 px-6 py-12 text-center transition-colors hover:border-primary/40 hover:bg-slate-50"
+                        onClick={() => document.getElementById('supporting-files-input')?.click()}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const files = Array.from(e.dataTransfer.files);
+                          if (files.length > 0) setSupportingFiles((prev) => [...prev, ...files]);
+                        }}
+                      >
+                        <UploadCloud className="mb-3 size-10 text-slate-500" />
+                        <p className="text-base font-semibold text-slate-900">Drop your files here or click to browse</p>
+                        <p className="mt-1 text-sm text-muted-foreground">Supported: PDF, DOCX, PPTX, XLSX, TXT, CSV</p>
+                        <input
+                          id="supporting-files-input"
+                          type="file"
+                          className="hidden"
+                          multiple
+                          accept=".pdf,.docx,.pptx,.xlsx,.txt,.csv"
+                          title="Upload supporting company documents"
+                          aria-label="Upload supporting company documents"
+                          onChange={(e) => {
+                            const files = Array.from(e.target.files || []);
+                            setSupportingFiles((prev) => [...prev, ...files]);
+                            e.target.value = '';
+                          }}
+                        />
+                      </div>
+
+                      {supportingFiles.length > 0 && (
+                        <div className="space-y-2">
+                          {supportingFiles.map((file, idx) => (
+                            <div key={idx} className="flex items-center justify-between rounded-md border bg-muted/30 p-2.5 text-sm">
+                              <div className="flex min-w-0 items-center gap-2">
+                                <FileText className="size-4 shrink-0 text-primary" />
+                                <span className="truncate font-medium">{file.name}</span>
+                                <Badge variant="secondary" className="shrink-0 text-[10px]">{formatBytes(file.size)}</Badge>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="size-7 shrink-0"
+                                onClick={() => setSupportingFiles((prev) => prev.filter((_, i) => i !== idx))}
+                              >
+                                <X className="size-3" />
+                              </Button>
                             </div>
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-2">
-                            {supportingDocsMetrics.length} metrics extracted and verified from {new Set(supportingDocsMetrics.map(m => m.source)).size} document(s)
-                          </p>
+                          ))}
                         </div>
                       )}
-                    </div>
-                  )}
-                </TabsContent>
 
-                <TabsContent value="online-search" className="space-y-2 pt-3">
-                  <Label htmlFor="links-input" className="text-sm font-semibold">
-                    Links for Scan & Online Search
-                    <span className="text-xs font-normal text-muted-foreground ml-1">(website, LinkedIn, Crunchbase, news URLs)</span>
-                  </Label>
-                  <Input
-                    id="links-input"
-                    placeholder="https://example.com, https://linkedin.com/company/..."
-                    value={links}
-                    onChange={(e) => setLinks(e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground">These links are scanned during extraction to enrich company information.</p>
-                </TabsContent>
+                      {(supportingDocsExtractionStatus || supportingDocsExtractionError || supportingDocsMetrics.length > 0) && (
+                        <div className="rounded-lg border bg-muted/20 p-4 space-y-3">
+                          {supportingDocsExtractionStatus && (
+                            <div className="flex items-center gap-2">
+                              <Check className="size-4 text-green-600" />
+                              <span className="text-sm text-muted-foreground">{supportingDocsExtractionStatus}</span>
+                            </div>
+                          )}
 
-                <TabsContent value="extra-info" className="space-y-2 pt-3">
-                  <Label htmlFor="additional-context" className="text-sm font-semibold">
-                    Additional Context
-                    <span className="text-xs font-normal text-muted-foreground ml-1">(optional)</span>
-                  </Label>
-                  <Textarea
-                    id="additional-context"
-                    placeholder="Add notes, focus areas, known concerns, or deal thesis for the analysis..."
-                    value={additionalContext}
-                    onChange={(e) => setAdditionalContext(e.target.value)}
-                    rows={4}
-                  />
-                </TabsContent>
-              </Tabs>
+                          {supportingDocsExtractionError && (
+                            <div className="flex items-center gap-2 text-destructive">
+                              <AlertCircle className="size-4" />
+                              <span className="text-sm">{supportingDocsExtractionError}</span>
+                            </div>
+                          )}
+
+                          {supportingDocsMetrics.length > 0 && (
+                            <div className="mt-3">
+                              <Label className="mb-2 block text-xs font-semibold text-muted-foreground">Extracted Metrics</Label>
+                              <div className="overflow-hidden rounded-md border">
+                                <div className="overflow-x-auto">
+                                  <table className="w-full text-sm">
+                                    <thead className="border-b bg-muted/50">
+                                      <tr>
+                                        <th className="px-3 py-2 text-left font-semibold">Field</th>
+                                        <th className="px-3 py-2 text-left font-semibold">Value</th>
+                                        <th className="px-3 py-2 text-left font-semibold">Source</th>
+                                        <th className="px-3 py-2 text-center font-semibold">Verified</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {supportingDocsMetrics.map((metric, idx) => (
+                                        <tr key={idx} className="border-b last:border-b-0 hover:bg-muted/20">
+                                          <td className="px-3 py-2 text-muted-foreground">{metric.field}</td>
+                                          <td className="px-3 py-2 font-medium">{metric.value}</td>
+                                          <td className="truncate px-3 py-2 text-xs text-muted-foreground">{metric.source}</td>
+                                          <td className="px-3 py-2 text-center">
+                                            {metric.verified ? (
+                                              <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700">✓</Badge>
+                                            ) : (
+                                              <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">⚠</Badge>
+                                            )}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </TabsContent>
+
+                    <TabsContent value="online-search" className="space-y-3 pt-4">
+                      <Label htmlFor="links-input" className="text-sm font-semibold">
+                        Company Links
+                        <span className="ml-1 text-xs font-normal text-muted-foreground">(website, LinkedIn, Crunchbase, news URLs)</span>
+                      </Label>
+                      <Input
+                        id="links-input"
+                        placeholder="https://example.com, https://linkedin.com/company/..."
+                        value={links}
+                        onChange={applyStringValue(setLinks)}
+                      />
+                      <p className="text-xs text-muted-foreground">These links are scanned during extraction to enrich company information.</p>
+                    </TabsContent>
+
+                    <TabsContent value="extra-info" className="space-y-3 pt-4">
+                      <Label htmlFor="additional-context" className="text-sm font-semibold">
+                        Additional Context
+                        <span className="ml-1 text-xs font-normal text-muted-foreground">(optional)</span>
+                      </Label>
+                      <Textarea
+                        id="additional-context"
+                        placeholder="Add notes, focus areas, known concerns, or deal thesis for the analysis..."
+                        value={additionalContext}
+                        onChange={applyStringValue(setAdditionalContext)}
+                        rows={4}
+                      />
+                    </TabsContent>
+                  </Tabs>
+                </div>
+              </div>
 
               <div className="border rounded-lg p-4 bg-muted/30 space-y-3">
-                <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => setShowAutoFill(!showAutoFill)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => {
+                    setShowAutoFill(!showAutoFill);
+                    setIsAutoFilling(false);
+                  }}
+                >
                   <Sparkles className="size-4" />
                   {showAutoFill ? 'Hide' : 'Auto-Fill from Pitch Deck'}
                 </Button>
@@ -2944,7 +3283,7 @@ export default function TriageReportWizardPage() {
                     <Textarea
                       placeholder="Paste your pitch deck or company description here..."
                       value={autoFillText}
-                      onChange={(e) => setAutoFillText(e.target.value)}
+                      onChange={applyStringValue(setAutoFillText)}
                       rows={5}
                     />
                     <Button
@@ -2989,7 +3328,7 @@ export default function TriageReportWizardPage() {
                   placeholder="Paste the company pitch deck content, executive summary, or any description of the business, market opportunity, and value proposition..."
                   rows={6}
                   value={pitchSummary}
-                  onChange={(e) => setPitchSummary(e.target.value)}
+                  onChange={applyStringValue(setPitchSummary)}
                 />
                 <p className="text-xs text-muted-foreground">{pitchSummary.length} characters</p>
               </div>
@@ -3001,7 +3340,7 @@ export default function TriageReportWizardPage() {
                   placeholder="ARR, MRR, growth rate, CAC, LTV, burn rate, runway, team size, number of customers..."
                   rows={4}
                   value={keyMetrics}
-                  onChange={(e) => setKeyMetrics(e.target.value)}
+                  onChange={applyStringValue(setKeyMetrics)}
                 />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -3012,7 +3351,7 @@ export default function TriageReportWizardPage() {
                     placeholder="Founder backgrounds, key team members, advisors..."
                     rows={3}
                     value={teamInfo}
-                    onChange={(e) => setTeamInfo(e.target.value)}
+                    onChange={applyStringValue(setTeamInfo)}
                   />
                 </div>
                 <div className="space-y-2">
@@ -3022,7 +3361,7 @@ export default function TriageReportWizardPage() {
                     placeholder="Product description, tech stack, IP, differentiators..."
                     rows={3}
                     value={productDescription}
-                    onChange={(e) => setProductDescription(e.target.value)}
+                    onChange={applyStringValue(setProductDescription)}
                   />
                 </div>
               </div>
@@ -3036,17 +3375,17 @@ export default function TriageReportWizardPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Database className="size-5" />
-                Fetch External Data
+                External Data Sources
               </CardTitle>
               <CardDescription>
-                Pull data from external sources to enrich the triage. All sources are optional.
+                Connect to free external data sources for comprehensive analysis.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="space-y-3">
                 <Label className="text-base font-semibold">Data Sources</Label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {EXTERNAL_SOURCES.map((src) => {
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {visibleExternalSources.map((src) => {
                     const isSelected = selectedSources.includes(src.id);
                     return (
                       <div
@@ -3076,7 +3415,10 @@ export default function TriageReportWizardPage() {
                           }
                         />
                         <div className="flex-1 space-y-1">
-                          <p className="font-medium text-sm">{src.name}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-sm">{src.name}</p>
+                            {src.free && <Badge variant="outline" className="text-xs text-green-600 border-green-300">FREE</Badge>}
+                          </div>
                           <p className="text-xs text-muted-foreground">{src.description}</p>
                         </div>
                       </div>
@@ -3084,25 +3426,17 @@ export default function TriageReportWizardPage() {
                   })}
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <Button
-                  onClick={fetchExternalData}
-                  disabled={fetchingData || selectedSources.length === 0}
-                  className="gap-2"
-                >
-                  {fetchingData ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Database className="size-4" />
-                  )}
-                  {fetchingData ? 'Fetching...' : `Fetch ${selectedSources.length} Source(s)`}
-                </Button>
-                {externalData.length > 0 && (
-                  <Badge variant="secondary" className="gap-1">
-                    <CheckCircle2 className="size-3" />
-                    {externalData.filter((d) => d.success).length}/{externalData.length} fetched
-                  </Badge>
-                )}
+              <div className="flex items-center justify-between rounded-lg border bg-muted/20 px-4 py-3">
+                <div>
+                  <p className="font-medium">Auto-fetch external data for: <span className="text-primary">{companyName || 'No company set'}</span></p>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedExternalSourceIds.length} source(s) selected. Data fetch starts automatically when you select a source.
+                  </p>
+                </div>
+                <Badge variant="secondary" className="gap-1">
+                  {fetchingData ? <Loader2 className="size-3 animate-spin" /> : <CheckCircle2 className="size-3" />}
+                  {fetchingData ? 'Auto-fetching' : `${externalData.filter((d) => d.success).length}/${Math.max(externalData.length, selectedExternalSourceIds.length)} fetched`}
+                </Badge>
               </div>
               {externalData.length > 0 && (
                 <div className="space-y-2">
@@ -3140,7 +3474,7 @@ export default function TriageReportWizardPage() {
                 Select Analysis Modules
               </CardTitle>
               <CardDescription>
-                Choose modules for triage. Required modules are always included, and optional modules can be bulk selected or disabled.
+                Choose the modules to include in the triage. Required modules are always included.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -3188,14 +3522,6 @@ export default function TriageReportWizardPage() {
                 <Label className="text-base font-semibold">
                   Triage Modules ({selectedModules.length} selected)
                 </Label>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" type="button" onClick={() => toggleAllModules(true)}>
-                    Select All
-                  </Button>
-                  <Button variant="outline" size="sm" type="button" onClick={() => toggleAllModules(false)}>
-                    Disable All Optional
-                  </Button>
-                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {TRIAGE_MODULES.map((mod) => {
                     const Icon = mod.icon;
@@ -3285,11 +3611,14 @@ export default function TriageReportWizardPage() {
                       const activeManagedIds = new Set(
                         selectedModules.flatMap((moduleId) => moduleToSections[moduleId] ?? [])
                       );
-                      const lockedByModule = managedSectionIds.has(section.id) && !activeManagedIds.has(section.id);
+                      const lockedByModule =
+                        !ALWAYS_AVAILABLE_TRIAGE_SECTION_IDS.has(section.id)
+                        && managedSectionIds.has(section.id)
+                        && !activeManagedIds.has(section.id);
                       return (
                     <Switch
                       checked={section.active}
-                      disabled={lockedByModule}
+                      disabled={lockedByModule || ALWAYS_AVAILABLE_TRIAGE_SECTION_IDS.has(section.id)}
                       onCheckedChange={() => toggleSection(section.id)}
                     />
                       );
@@ -3300,6 +3629,102 @@ export default function TriageReportWizardPage() {
             </CardContent>
           </Card>
         );
+
+      case 8: {
+        const selectedModulesData = TRIAGE_MODULES.filter(m => selectedModules.includes(m.id));
+        const totalWeight = selectedModulesData.reduce((sum, m) => sum + m.weight, 0);
+        const simulatedComposite = totalWeight > 0
+          ? selectedModulesData.reduce((sum, m) => sum + (simulatedScores[m.id] ?? 50) * m.weight, 0) / totalWeight / 10
+          : 0;
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <SlidersHorizontal className="size-5" />
+                Module Score Simulation
+              </CardTitle>
+              <CardDescription>
+                Adjust expected scores per module to preview the composite result before running AI analysis. Scores range 0–100.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="rounded-lg border bg-primary/5 p-4 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Simulated Composite Score</p>
+                  <p className="text-3xl font-bold text-primary">
+                    {simulatedComposite.toFixed(2)} <span className="text-lg font-normal text-muted-foreground">/ 10</span>
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                  <Badge
+                    variant={simulatedComposite >= 7 ? 'default' : simulatedComposite >= 5.5 ? 'secondary' : 'destructive'}
+                    className="text-sm px-3 py-1"
+                  >
+                    {simulatedComposite >= 7 ? 'Proceed' : simulatedComposite >= 5.5 ? 'Conditional' : 'Pass'}
+                  </Badge>
+                  <p className="text-xs text-muted-foreground">{selectedModulesData.length} modules · combined weight {totalWeight}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {selectedModulesData.map((mod) => {
+                  const Icon = mod.icon;
+                  const score = simulatedScores[mod.id] ?? 50;
+                  const contribution = totalWeight > 0 ? (score * mod.weight / totalWeight / 10) : 0;
+                  return (
+                    <div key={mod.id} className="rounded-lg border p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Icon className="size-4 text-primary shrink-0" />
+                          <span className="font-medium text-sm">{mod.name}</span>
+                          <span className="text-xs text-muted-foreground">(wt:{mod.weight})</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-lg font-bold text-primary">{score}</span>
+                          <span className="text-xs text-muted-foreground ml-1">+{contribution.toFixed(2)}</span>
+                        </div>
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        step={1}
+                        value={score}
+                        aria-label={`Score for ${mod.name}`}
+                        title={`Score for ${mod.name}: ${score}`}
+                        onChange={(e) =>
+                          setSimulatedScores((prev) => ({ ...prev, [mod.id]: Number(e.target.value) }))
+                        }
+                        className="w-full accent-primary cursor-pointer h-2"
+                      />
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>0</span>
+                        <span>50</span>
+                        <span>100</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex items-center justify-between pt-2 border-t">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setSimulatedScores(Object.fromEntries(TRIAGE_MODULES.map(m => [m.id, 50])))
+                  }
+                >
+                  <RefreshCw className="size-4 mr-2" />
+                  Reset All to 50
+                </Button>
+                <Button onClick={goToNext} className="gap-2 px-8" size="lg">
+                  <BrainCircuit className="size-4" />
+                  Finalize &amp; Continue to Generate
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      }
 
       case 9:
         return (
@@ -3353,16 +3778,8 @@ export default function TriageReportWizardPage() {
                 <p className="text-sm font-semibold">Input data summary:</p>
                 <ul className="text-sm text-muted-foreground space-y-1">
                   <li className="flex items-center gap-2">
-                    {companyName ? <CheckCircle2 className="size-4 text-green-500" /> : <AlertCircle className="size-4 text-destructive" />}
-                    Company name: {companyName || <span className="text-destructive font-medium">Missing — go to Step 3</span>}
-                  </li>
-                  <li className="flex items-center gap-2">
-                    {selectedModules.length > 0 ? <CheckCircle2 className="size-4 text-green-500" /> : <AlertCircle className="size-4 text-destructive" />}
-                    Analysis modules: {selectedModules.length > 0 ? `${selectedModules.length} selected` : <span className="text-destructive font-medium">None selected — go to Step 6</span>}
-                  </li>
-                  <li className="flex items-center gap-2">
-                    {pitchSummary.trim().length >= 50 ? <CheckCircle2 className="size-4 text-green-500" /> : <AlertCircle className="size-4 text-amber-500" />}
-                    Pitch summary: {pitchSummary.trim().length >= 50 ? `${pitchSummary.length} characters` : <span className="text-amber-600 font-medium">{pitchSummary.length} characters — add more detail in Step 4 for better results</span>}
+                    <CheckCircle2 className="size-4 text-green-500" />
+                    Pitch summary: {pitchSummary.length} characters
                   </li>
                   {keyMetrics && (
                     <li className="flex items-center gap-2">
@@ -3384,40 +3801,6 @@ export default function TriageReportWizardPage() {
                   )}
                 </ul>
               </div>
-              {/* Analysis error panel */}
-              {analysisError && !isGenerating && (
-                <div className="rounded-lg border border-destructive bg-destructive/5 p-4 space-y-3">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="size-5 text-destructive shrink-0 mt-0.5" />
-                    <div className="space-y-1">
-                      <p className="font-semibold text-destructive text-sm">Analysis Failed</p>
-                      <p className="text-sm">{analysisError.detail}</p>
-                    </div>
-                  </div>
-                  <details className="text-xs">
-                    <summary className="cursor-pointer text-muted-foreground hover:text-foreground select-none">
-                      Technical error details
-                    </summary>
-                    <p className="mt-1 font-mono text-muted-foreground break-all bg-muted/50 rounded p-2">
-                      {analysisError.message}
-                    </p>
-                  </details>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => setAnalysisError(null)}>
-                      Dismiss
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        setAnalysisError(null);
-                        isAdminOrAnalyst ? setShowHumanReviewModal(true) : handleGenerate();
-                      }}
-                    >
-                      <RefreshCw className="size-3 mr-1.5" /> Retry Analysis
-                    </Button>
-                  </div>
-                </div>
-              )}
               {isGenerating && (
                 <div className="space-y-3 rounded-lg border border-primary/30 bg-primary/5 p-4">
                   <div className="flex items-center gap-2">
@@ -3426,13 +3809,13 @@ export default function TriageReportWizardPage() {
                   </div>
                   <Progress value={generationProgress} className="h-2" />
                   <p className="text-xs text-muted-foreground text-center">
-                    {generationProgress}% complete — AI is processing your data. This may take 30–90 seconds.
+                    {generationProgress}% complete
                   </p>
                 </div>
               )}
               {!isGenerating && (
                 <div className="flex justify-center pt-2">
-                  <Button size="lg" onClick={() => isAdminOrAnalyst ? setShowHumanReviewModal(true) : handleGenerate()} className="gap-2 px-8">
+                  <Button size="lg" onClick={() => handleGenerate()} className="gap-2 px-8">
                     <Zap className="size-5" />
                     Run Triage Analysis
                   </Button>
@@ -3448,10 +3831,10 @@ export default function TriageReportWizardPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <SlidersHorizontal className="size-5" />
-                What-If Simulation
+                What-If Scenario Analysis
               </CardTitle>
               <CardDescription>
-                Simple score simulation: adjust active module scores and compare against the current AI result.
+                Adjust module scores to explore alternative investment scenarios before finalizing.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -3460,66 +3843,47 @@ export default function TriageReportWizardPage() {
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">Actual Score</p>
                   <p className="font-semibold text-2xl">{compositeScore.toFixed(1)}</p>
                   <p className="text-sm text-muted-foreground">
-                    {getOutcomeLabel(compositeScore)}
+                    {compositeScore >= 7 ? 'Proceed' : compositeScore >= 5.5 ? 'Conditional' : 'Pass'}
                   </p>
                 </div>
                 <div className="rounded-lg border bg-primary/5 border-primary/30 p-4 space-y-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">What-If Scenario Score</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Simulated Score</p>
                   <p className="font-semibold text-2xl text-primary">
                     {(() => {
                       const activeModules = TRIAGE_MODULES.filter(m => selectedModules.includes(m.id));
                       const totalWeight = activeModules.reduce((sum, m) => sum + m.weight, 0);
                       const simScore = totalWeight > 0
-                        ? activeModules.reduce((sum, m) => sum + (whatIfScores[m.id] ?? DEFAULT_WHAT_IF_SCORE) * m.weight, 0) / totalWeight
+                        ? activeModules.reduce((sum, m) => sum + (simulatedScores[m.id] ?? 50) * m.weight, 0) / totalWeight / 10
                         : 0;
                       return simScore.toFixed(1);
                     })()}
                   </p>
-                  <p className="text-sm text-muted-foreground">Based on your manual module adjustments</p>
+                  <p className="text-sm text-muted-foreground">Based on adjusted sliders</p>
                 </div>
               </div>
               <div className="space-y-4">
                 <Label className="text-sm font-semibold">Adjust Module Scores</Label>
                 {TRIAGE_MODULES.filter(m => selectedModules.includes(m.id)).map((mod) => {
-                  const score = whatIfScores[mod.id] ?? DEFAULT_WHAT_IF_SCORE;
+                  const score = simulatedScores[mod.id] ?? 50;
                   return (
                     <div key={mod.id} className="space-y-1">
                       <div className="flex items-center justify-between">
                         <span className="text-sm">{mod.name}</span>
-                        <span className="text-sm font-semibold">{score.toFixed(1)}</span>
+                        <span className="text-sm font-semibold">{score}</span>
                       </div>
-                      <p className="text-xs text-muted-foreground">{MODULE_FORMULA_MAP[mod.id] ?? 'weighted module raw score'}</p>
                       <input
-                        type="range" min={0} max={10} step={0.1} value={score}
-                        title={`Score for ${mod.name}: ${score.toFixed(1)}`}
-                        onChange={(e) => setWhatIfScores(prev => ({ ...prev, [mod.id]: Number(e.target.value) }))}
+                        type="range" min={0} max={100} value={score}
+                        title={`Score for ${mod.name}: ${score}`}
+                        onChange={(e) => setSimulatedScores(prev => ({ ...prev, [mod.id]: Number(e.target.value) }))}
                         className="w-full accent-primary cursor-pointer h-2"
                       />
                     </div>
                   );
                 })}
               </div>
-              <div className="rounded-lg border bg-muted/20 p-4 space-y-2">
-                <p className="text-sm font-semibold">AI Raw Score Calculation Log (0-10)</p>
-                <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
-                  {TRIAGE_MODULES.filter(m => selectedModules.includes(m.id)).map((mod) => {
-                    const aiScore = moduleScores[mod.id];
-                    const signal = typeof aiScore === 'number' ? (aiScore >= 8 ? 'Green' : aiScore >= 5.5 ? 'Yellow' : 'Red') : 'N/A';
-                    return (
-                      <div key={`log-${mod.id}`} className="rounded border bg-background p-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs font-medium">{mod.name}</span>
-                          <span className="text-xs text-muted-foreground">AI raw: {typeof aiScore === 'number' ? aiScore.toFixed(2) : 'N/A'} · {signal}</span>
-                        </div>
-                        <p className="text-[11px] text-muted-foreground">Formula: {MODULE_FORMULA_MAP[mod.id] ?? 'weighted module raw score'}</p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
               <div className="flex items-center justify-between pt-2 border-t">
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setWhatIfScores(getDefaultWhatIfScores())}>
+                  <Button variant="outline" size="sm" onClick={() => setSimulatedScores(Object.fromEntries(TRIAGE_MODULES.map(m => [m.id, 50])))}>
                     <RefreshCw className="size-4 mr-2" />Reset All
                   </Button>
                   <Button variant="outline" size="sm" onClick={() => window.open('/analysis/what-if', '_blank')}>
@@ -3535,340 +3899,237 @@ export default function TriageReportWizardPage() {
           </Card>
         );
 
-      case 11: {
-        // Cast analysisResult to the full typed structure
-        const fullData = analysisResult
-          ? normalizeAnalysisData(analysisResult as ComprehensiveAnalysisOutput, framework)
-          : null;
-        const activeSectionIds = new Set(reportSections.filter((s) => s.active).map((s) => s.id));
-
-        // Render each section using the correct component prop signature
-        const renderPreviewSection = (id: string) => {
-          const buildModuleNarrative = (
-            title: string,
-            moduleId: string,
-            fallback: string,
-            extraPoints: string[] = []
-          ) => {
-            const score = moduleScores[moduleId];
-            const status = typeof score === 'number'
-              ? (score >= 8 ? 'Green' : score >= 5.5 ? 'Yellow' : 'Red')
-              : 'N/A';
-
-            return (
-              <Card>
-                <CardHeader>
-                  <CardTitle>{title}</CardTitle>
-                  <CardDescription>
-                    Score: {typeof score === 'number' ? `${score.toFixed(2)}/10` : 'N/A'} · Signal: {status}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <p className="text-sm text-muted-foreground">{fallback}</p>
-                  {extraPoints.length > 0 && (
-                    <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
-                      {extraPoints.map((point) => (
-                        <li key={point}>{point}</li>
+      case 11:
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Eye className="size-5" />
+                Preview Report
+              </CardTitle>
+              <CardDescription>
+                Review the analysis results before saving and exporting.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="rounded-lg border bg-muted/30 p-4 space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Company</p>
+                  <p className="font-semibold">{companyName}</p>
+                  <p className="text-sm text-muted-foreground">{sector} · {stage}</p>
+                </div>
+                <div className="rounded-lg border bg-muted/30 p-4 space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Composite Score</p>
+                  <p className="font-semibold text-2xl">{compositeScore.toFixed(1)}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {qualityAssessment.recommendationLabel}
+                  </p>
+                </div>
+                <div className="rounded-lg border bg-muted/30 p-4 space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Active Sections</p>
+                  <p className="font-semibold">{reportSections.filter((s) => s.active).length}</p>
+                  <p className="text-sm text-muted-foreground">report sections</p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Active Modules</p>
+                <div className="flex flex-wrap gap-2">
+                  {TRIAGE_MODULES.filter((m) => selectedModules.includes(m.id)).map((m) => (
+                    <span key={m.id} className="rounded-full border bg-primary/5 px-3 py-1 text-xs font-medium">
+                      {m.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              {(() => {
+                const tcaCategories = (analysisResult as { tcaData?: { categories?: Array<{ name?: string; score?: number; maxScore?: number; category?: string; rawScore?: number }> } } | null)?.tcaData?.categories;
+                const activeModules = TRIAGE_MODULES.filter((m) => selectedModules.includes(m.id));
+                return (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Active Module Scores (Real AI, 0-10)</p>
+                    <div className="space-y-1">
+                      {activeModules.map((m) => {
+                        const backendCat = tcaCategories?.find((c) => {
+                          const label = (c.name ?? c.category ?? '').toLowerCase();
+                          return label === m.name.toLowerCase();
+                        });
+                        const score = derivedModuleScores[m.id]
+                          ?? backendCat?.score
+                          ?? backendCat?.rawScore;
+                        const maxScore = backendCat?.maxScore ?? 10;
+                        return (
+                          <div key={m.id} className="flex items-center justify-between rounded-md border p-2 text-sm">
+                            <span className="text-muted-foreground">{m.name}</span>
+                            <span className="font-semibold">{typeof score === 'number' ? `${score.toFixed(1)} / ${maxScore}` : 'N/A'}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
+              {(() => {
+                const keyFindings = (analysisResult as { keyFindings?: string[] } | null)?.keyFindings;
+                if (!keyFindings) return null;
+                return (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Key Findings</p>
+                    <ul className="list-disc pl-5 space-y-1">
+                      {keyFindings.slice(0, 5).map((finding, i) => (
+                        <li key={i} className="text-sm text-muted-foreground">{finding}</li>
                       ))}
                     </ul>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          };
+                  </div>
+                );
+              })()}
+              <div className="space-y-3 rounded-lg border bg-muted/30 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-semibold">Quality Gate & Report Narrative</p>
+                  <Badge variant={qualityAssessment.gatePassed ? 'default' : 'secondary'}>
+                    {qualityAssessment.gatePassed ? 'Gate Passed' : 'Manual Review Required'}
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Evidence {qualityAssessment.evidenceCoveragePct}% · Module Coverage {qualityAssessment.moduleCoveragePct}% · Verification {qualityAssessment.verificationScore}% · Consistency {qualityAssessment.consistencyScore}% · Quality {qualityAssessment.qualityScore}%
+                </p>
+                {!qualityAssessment.gatePassed && qualityAssessment.blockers.length > 0 && (
+                  <ul className="list-disc pl-5 space-y-1">
+                    {qualityAssessment.blockers.map((blocker) => (
+                      <li key={blocker} className="text-sm text-muted-foreground">{blocker}</li>
+                    ))}
+                  </ul>
+                )}
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Executive Summary</p>
+                  <p className="text-sm text-muted-foreground leading-6">{qualityAssessment.reportNarrative.executiveSummary}</p>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Analysis Narrative</p>
+                  <p className="text-sm text-muted-foreground leading-6">{qualityAssessment.reportNarrative.analysisNarrative}</p>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Final Recommendation Narrative</p>
+                  <p className="text-sm text-muted-foreground leading-6">{qualityAssessment.reportNarrative.recommendationNarrative}</p>
+                </div>
+              </div>
+              {(() => {
+                const activePreviewSections = reportSections.filter((s) => s.active);
+                const fallbackSections = applyModuleStateToTriageSections(DEFAULT_STANDARD_SECTIONS, selectedModules)
+                  .filter((s) => s.active);
+                const sectionsForPreview = activePreviewSections.length > 0 ? activePreviewSections : fallbackSections;
 
-          switch (id) {
-            case 'executive-summary':
-              return (
-                <ExecutiveSummary
-                  summaryText={buildExecutiveSummaryText({
-                    companyName,
-                    sector,
-                    stage,
-                    framework,
-                    compositeScore,
-                    moduleScores,
-                    pitchSummary,
-                    analysisSummary: fullData?.tcaData?.summary,
-                  })}
-                />
-              );
-            case 'quick-summary':
-              return <QuickSummary companyName={companyName} sector={sector} stage={stage} />;
-            case 'tca-scorecard':
-              return fullData?.tcaData ? <TcaScorecard initialData={fullData.tcaData} /> : null;
-            case 'tca-summary-card':
-              return fullData?.tcaData ? <TcaSummaryCard initialData={fullData.tcaData} /> : null;
-            case 'tca-ai-table':
-              return fullData?.tcaData ? <TcaAiTable data={fullData.tcaData} /> : null;
-            case 'tca-interpretation-summary':
-              return buildModuleNarrative(
-                'TCA AI Interpretation Summary',
-                'tca',
-                `Composite result is ${compositeScore.toFixed(2)}/10 with recommendation ${getOutcomeLabel(compositeScore)} for ${companyName || 'the company'}. Interpretation is based on active module outputs and extracted company data from this run.`,
-                [
-                  `Active modules: ${selectedModules.length}.`,
-                  `Top module signals: ${TRIAGE_MODULES.filter((m) => selectedModules.includes(m.id)).slice(0, 5).map((m) => `${m.name} ${(moduleScores[m.id] ?? 0).toFixed(2)}/10`).join(' | ') || 'No module scores available yet.'}`,
-                  `Framework: ${framework}. Sector: ${sector || 'N/A'}. Stage: ${stage || 'N/A'}.`,
-                ]
-              );
-            case 'weighted-score-breakdown':
-              return <WeightedScoreBreakdown data={fullData?.tcaData} />;
-            case 'risk-flag-summary-table':
-              return <RiskFlagSummaryTable data={fullData?.riskData ?? null} />;
-            case 'flag-analysis-narrative':
-              return <FlagAnalysisNarrative />;
-            case 'gap-analysis':
-              return <GapAnalysis />;
-            case 'macro-trend-alignment':
-              return fullData?.macroData ? <MacroTrendAlignment data={fullData.macroData} /> : null;
-            case 'benchmark-comparison':
-              return fullData?.benchmarkData ? <BenchmarkComparison initialData={fullData.benchmarkData} /> : null;
-            case 'competitive-landscape':
-              return <CompetitiveLandscape companyName={companyName} />;
-            case 'growth-classifier':
-              return buildModuleNarrative(
-                'Growth Classifier',
-                'growth',
-                'Growth potential is calculated from real module outputs and current company evidence.',
-                [
-                  'Signals include traction velocity, GTM readiness, team execution, and market scalability.',
-                  'No placeholder model matrix is shown in triage preview when real model outputs are unavailable.',
-                ]
-              );
-            case 'team-assessment':
-              return <TeamAssessment />;
-            case 'financial-analysis':
-              return buildModuleNarrative(
-                'Financial Analysis',
-                'financial',
-                'Evaluates revenue model quality, unit economics, forecast realism, and funding discipline to assess financial durability and investment readiness.',
-                [
-                  'Weights: Revenue Model 30%, Unit Economics 30%, Projections 20%, Funding Requirements 20%.',
-                  'Escalation checks include burn multiple > 2, runway < 9 months, and low forecast credibility.',
-                ]
-              );
-            case 'economic-analysis':
-              return buildModuleNarrative(
-                'Economic Analysis',
-                'economic',
-                'Assesses economic durability through industry structure, pricing power, macro alignment, and cycle resilience.',
-                [
-                  'Weights: Industry Structure 30%, Pricing Power 25%, Macro Indicators 25%, Cycle Resilience 20%.',
-                  'Flags recession sensitivity and macro vulnerability when resilience indicators weaken.',
-                ]
-              );
-            case 'social-analysis':
-              return buildModuleNarrative(
-                'Social Analysis',
-                'social',
-                'Measures social trust and adoption potential across impact, demographic fit, cultural adoption, and stakeholder confidence.',
-                [
-                  'Weights: Social Impact 30%, Demographic Fit 25%, Cultural Adoption 25%, Stakeholder Trust 20%.',
-                  'Escalates governance/credibility and adoption-friction risks when trust or adoption scores are weak.',
-                ]
-              );
-            case 'marketing-analysis':
-              return buildModuleNarrative(
-                'Marketing Analysis',
-                'marketing',
-                'Reviews positioning clarity, digital authority, spend efficiency, and GTM execution to evaluate scalable demand generation.',
-                [
-                  'Weights: Positioning 25%, Digital Presence 20%, Spend Efficiency 30%, GTM Execution 25%.',
-                  'Highlights CAC deterioration, weak GTM execution, and retention risk signals.',
-                ]
-              );
-            case 'environmental-analysis':
-              return buildModuleNarrative(
-                'Environmental Analysis',
-                'environmental',
-                'Evaluates ESG readiness, climate exposure, environmental impact, and sustainability validation.',
-                [
-                  'Weights: Environmental Impact 30%, Climate Risk 25%, Certification 15%, ESG Alignment 30%.',
-                  'Triggers climate-vulnerability and ESG-readiness warnings for institutional funding contexts.',
-                ]
-              );
-            case 'founder-fit':
-              return buildModuleNarrative(
-                'Founder Fit Assessment',
-                'founderFit',
-                'Assesses founder-market alignment, leadership depth, execution capability, and credibility signals.',
-                ['Used to validate execution trust and team-level investment confidence.']
-              );
-            case 'funder-readiness':
-              return buildModuleNarrative(
-                'Funder Readiness Assessment',
-                'funder',
-                'Assesses investor compatibility by stage, check size, sector alignment, geography, and thesis match.',
-                ['Includes routing priority and recommendation language for fundraising workflow.']
-              );
-            case 'strategic-fit':
-              return buildModuleNarrative(
-                'Strategic Fit Matrix',
-                'strategicFit',
-                'Measures mandate alignment, portfolio synergy, and strategic pathway compatibility with target investors.',
-                ['Used alongside strategic analysis for final recommendation calibration.']
-              );
-            case 'ceo-questions':
-              return <CEOQuestions />;
-            case 'consistency-check':
-              return (
-                <ConsistencyCheck
-                  moduleScores={moduleScores}
-                  pitchSummary={pitchSummary}
-                  dataCompleteness={(selectedModules.filter((m) => typeof moduleScores[m] === 'number').length / Math.max(1, selectedModules.length)) * 100}
-                />
-              );
-            case 'analyst-comments':
-              return <AnalystComments />;
-            case 'analyst-ai-deviation':
-              return <AnalystAIDeviation companyName={companyName} readOnly={true} />;
-            case 'final-recommendation':
-              return <FinalRecommendation companyName={companyName} compositeScore={compositeScore} />;
-            default:
-              return null;
-          }
-        };
-
-        return (
-          <div className="space-y-6">
-            {/* Header summary bar */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Eye className="size-5" />
-                  Preview Report
-                </CardTitle>
-                <CardDescription>
-                  Full report based on {reportSections.filter((s) => s.active).length} configured sections — review before saving.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                  <div className="rounded-lg border bg-muted/30 p-3 space-y-1">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Company</p>
-                    <p className="font-semibold text-sm">{companyName || '—'}</p>
-                    <p className="text-xs text-muted-foreground">{sector} · {stage}</p>
-                  </div>
-                  <div className="rounded-lg border bg-muted/30 p-3 space-y-1">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Composite Score</p>
-                    <p className={cn('font-bold text-2xl', getOutcomeTextClass(compositeScore))}>
-                      {compositeScore.toFixed(1)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {getOutcomeLabel(compositeScore)}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border bg-muted/30 p-3 space-y-1">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Active Sections</p>
-                    <p className="font-semibold text-2xl">{reportSections.filter((s) => s.active).length}</p>
-                    <p className="text-xs text-muted-foreground">report sections</p>
-                  </div>
-                  <div className="rounded-lg border bg-muted/30 p-3 space-y-1">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Modules</p>
-                    <p className="font-semibold text-2xl">{selectedModules.length}</p>
-                    <p className="text-xs text-muted-foreground">analysis modules</p>
+                return (
+                  <div className="space-y-3">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Configured Report Sections (Preview Coverage)</p>
+                  <div className="rounded-md border overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/40">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-medium">Section</th>
+                          <th className="px-3 py-2 text-left font-medium">Output Type</th>
+                          <th className="px-3 py-2 text-left font-medium">Mode</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sectionsForPreview.map((section) => (
+                            <tr key={section.id} className="border-t">
+                              <td className="px-3 py-2">{section.title}</td>
+                              <td className="px-3 py-2 text-muted-foreground">{inferSectionArtifacts(section.title)}</td>
+                              <td className="px-3 py-2 text-muted-foreground">{isAdminOrAnalyst ? 'Editable (Admin/Analyst)' : 'Read-only'}</td>
+                            </tr>
+                        ))}
+                        {sectionsForPreview.length === 0 && (
+                          <tr className="border-t">
+                            <td className="px-3 py-3 text-muted-foreground" colSpan={3}>
+                              No sections are active yet. Go back to Report Sections and enable at least one section.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
-                {/* Module score strip */}
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Module Scores</p>
-                  <div className="flex flex-wrap gap-2">
-                    {TRIAGE_MODULES.filter((m) => selectedModules.includes(m.id)).map((m) => {
-                      const score = moduleScores[m.id] ?? null;
-                      return (
-                        <span key={m.id} className={cn(
-                          'rounded-full border px-3 py-1 text-xs font-medium',
-                          score === null ? 'bg-muted/30 text-muted-foreground' :
-                          score >= 8.5 ? 'border-green-300 bg-green-50 text-green-700' :
-                          score >= 7 ? 'border-yellow-300 bg-yellow-50 text-yellow-700' :
-                          score >= 5 ? 'border-orange-300 bg-orange-50 text-orange-700' :
-                          'border-red-300 bg-red-50 text-red-700'
-                        )}>
-                          {m.name}: {score === null ? 'N/A' : score.toFixed(1)}
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* AI Insight Panel */}
-            <AiInsightPanel
-              status={aiStatus}
-              insight={aiInsight}
-              title="AI Triage Insight"
-              onRetry={() => {
-                if (!analysisResult) return;
-                const prompt = `Re-analyze triage for ${companyName || 'company'}, composite score ${compositeScore.toFixed(2)}/10, sector ${sector}.`;
-                fetchAiInsight('recommend', prompt, { companyName, sector, stage, compositeScore });
-              }}
-            />
-
-            {/* Analysis error (if any) */}
-            {analysisError && (
-              <AiErrorExplainer context="triage" error={analysisError.detail} onRetry={() => setCurrentStep(9)} />
-            )}
-
-            {/* Full report sections */}
-            {!fullData ? (
-              <Card className="border-amber-200 bg-amber-50/30">
-                <CardContent className="p-8 text-center space-y-3">
-                  <AlertTriangle className="size-10 text-amber-500 mx-auto" />
-                  <p className="font-semibold">No analysis data available</p>
-                  <p className="text-sm text-muted-foreground">Run the analysis in Step 9 to generate report sections.</p>
-                  <Button variant="outline" onClick={() => setCurrentStep(9)}>
-                    <ArrowLeft className="mr-2 size-4" /> Go to Generate
+                <div className="flex items-center justify-between gap-3">
+                  <Button variant="outline" asChild>
+                    <Link href="/dashboard/help/understanding-your-report" target="_blank">
+                      <FileText className="mr-2 size-4" />
+                      Help: Full Report Sections
+                    </Link>
                   </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <EvaluationProvider
-                role={userRole === 'standard' ? 'user' : userRole}
-                reportType="triage"
-                framework={framework}
-                onFrameworkChangeAction={() => {}}
-                setReportTypeAction={() => {}}
-                isLoading={false}
-                handleRunAnalysisAction={() => {}}
-                companyName={companyName}
-              >
-                <div className="space-y-6">
-                  {reportSections
-                    .filter((s) => s.active && activeSectionIds.has(s.id))
-                    .map((section) => {
-                      const content = renderPreviewSection(section.id);
-                      if (!content) return null;
-                      return (
-                        <div key={section.id} id={`preview-${section.id}`}>
-                          {content}
-                        </div>
-                      );
-                    })}
+                  <Button onClick={goToNext} disabled={!savedReportId}>
+                    Complete Report
+                    <ArrowRight className="ml-2 size-4" />
+                  </Button>
                 </div>
-              </EvaluationProvider>
-            )}
-
-            {/* Footer action */}
-            <div className="flex justify-between pt-2">
-              {isAdminOrAnalyst ? (
-                <Button variant="outline" onClick={() => setCurrentStep(10)}>
-                  <ArrowLeft className="mr-2 size-4" /> Back to What-If
-                </Button>
-              ) : (
-                <Button variant="outline" onClick={() => setCurrentStep(9)}>
-                  <ArrowLeft className="mr-2 size-4" /> Back to Analysis
-                </Button>
-              )}
-              <Button onClick={goToNext}>
-                Proceed to Storage
-                <ArrowRight className="ml-2 size-4" />
-              </Button>
-            </div>
-          </div>
+                {savedReportId && (
+                  <div className="rounded-lg border border-green-300 bg-green-50/40 p-4 flex items-center gap-3">
+                    <CheckCircle2 className="size-5 text-green-600 shrink-0" />
+                    <div>
+                      <p className="font-semibold text-sm text-green-800">
+                        Saved as Report #{savedReportId}
+                      </p>
+                      <p className="text-xs text-green-700">
+                        Report saved successfully to the database.
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {saveError && (
+                  <div className="rounded-lg border border-red-300 bg-red-50/40 p-3 text-sm text-red-700">
+                    {saveError}
+                  </div>
+                )}
+                {!savedReportId && (
+                  <div className="rounded-lg border border-amber-300 bg-amber-50/40 p-3 text-sm text-amber-800">
+                    Save Report is required before proceeding to Report Complete.
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-3">
+                  {!savedReportId && (
+                    <Button onClick={handleSaveReport} disabled={isSaving} className="gap-2">
+                      {isSaving ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <Save className="size-4" />
+                      )}
+                      {isSaving ? 'Saving...' : 'Save Report'}
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    onClick={handleDownloadJSON}
+                    className="gap-2"
+                    disabled={!analysisResult}
+                  >
+                    <Download className="size-4" />
+                    Download JSON
+                  </Button>
+                  <Button variant="outline" onClick={handleDownloadCSV} className="gap-2">
+                    <Download className="size-4" />
+                    Download Sections CSV
+                  </Button>
+                  {savedReportId && (
+                    <Button variant="outline" asChild className="gap-2">
+                      <Link href="/dashboard/reports">
+                        <Eye className="size-4" />
+                        View All Reports
+                      </Link>
+                    </Button>
+                  )}
+                </div>
+                <div className="rounded-lg border bg-muted/20 p-3">
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Advanced export options: PDF, DOCX, PPTX, XLSX, PNG/JPG, and JSON.
+                  </p>
+                  <ExportButtons />
+                </div>
+              </div>
+                );
+              })()}
+            </CardContent>
+          </Card>
         );
-      }
       case 12:
         return (
           <Card>
@@ -3892,7 +4153,7 @@ export default function TriageReportWizardPage() {
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">Score</p>
                   <p className="font-semibold text-2xl">{compositeScore.toFixed(1)}</p>
                   <p className="text-sm text-muted-foreground">
-                    {getOutcomeLabel(compositeScore)}
+                    {qualityAssessment.recommendationLabel}
                   </p>
                 </div>
                 <div className="rounded-lg border bg-muted/30 p-4 space-y-1">
@@ -3919,6 +4180,11 @@ export default function TriageReportWizardPage() {
                   {saveError}
                 </div>
               )}
+              {!savedReportId && (
+                <div className="rounded-lg border border-amber-300 bg-amber-50/40 p-3 text-sm text-amber-800">
+                  Save Report is required before proceeding to Report Complete.
+                </div>
+              )}
               <div className="flex flex-wrap gap-3">
                 {!savedReportId && (
                   <Button onClick={handleSaveReport} disabled={isSaving} className="gap-2">
@@ -3943,10 +4209,6 @@ export default function TriageReportWizardPage() {
                   <Download className="size-4" />
                   Download Sections CSV
                 </Button>
-                <Button variant="outline" onClick={handleDownloadHTML} className="gap-2" disabled={!analysisResult}>
-                  <Download className="size-4" />
-                  Download HTML
-                </Button>
                 {savedReportId && (
                   <Button variant="outline" asChild className="gap-2">
                     <Link href="/dashboard/reports">
@@ -3956,8 +4218,10 @@ export default function TriageReportWizardPage() {
                   </Button>
                 )}
               </div>
-              <div className="pt-2 border-t">
-                <p className="text-xs text-muted-foreground mb-2">Advanced exports: PDF, DOCX, PPTX, XLSX, JSON (compatible with Google Docs/Slides import).</p>
+              <div className="rounded-lg border bg-muted/20 p-3">
+                <p className="text-xs text-muted-foreground mb-2">
+                  Advanced export options: PDF, DOCX, PPTX, XLSX, PNG/JPG, and JSON.
+                </p>
                 <ExportButtons />
               </div>
             </CardContent>
@@ -3981,7 +4245,7 @@ export default function TriageReportWizardPage() {
                 <p className="font-semibold text-green-800">Analysis Complete</p>
                 <p className="text-sm text-green-700">
                   {companyName} — Score: {compositeScore.toFixed(1)} (
-                  {getOutcomeLabel(compositeScore)})
+                  {qualityAssessment.recommendationLabel})
                 </p>
                 {savedReportId && (
                   <p className="text-xs text-green-700">Saved as Report #{savedReportId}</p>
@@ -3994,7 +4258,7 @@ export default function TriageReportWizardPage() {
                     View All Reports
                   </Link>
                 </Button>
-                <Button variant="outline" onClick={resetWizard}>
+                <Button variant="outline" onClick={() => window.location.reload()}>
                   Start New Triage
                 </Button>
                 {isAdminOrAnalyst && (
@@ -4037,7 +4301,7 @@ export default function TriageReportWizardPage() {
                     <div key={r.id} className="flex items-center justify-between rounded-lg border p-3 text-sm">
                       <span className="text-muted-foreground" suppressHydrationWarning>{r.date ? new Date(r.date).toISOString().slice(0, 10) : 'Unknown date'}</span>
                       <span className="font-semibold">{r.score?.toFixed(1) ?? '—'}</span>
-                      <Badge variant={r.recommendation === 'Advanced Screening / DD' || r.recommendation === 'Proceed' ? 'default' : r.recommendation === 'Prescreening' || r.recommendation === 'Conditional' || r.recommendation === 'Early Stage' ? 'secondary' : 'destructive'}>
+                      <Badge variant={r.recommendation === 'Proceed' ? 'default' : r.recommendation === 'Conditional' ? 'secondary' : 'destructive'}>
                         {r.recommendation}
                       </Badge>
                     </div>
@@ -4070,7 +4334,7 @@ export default function TriageReportWizardPage() {
                 <Textarea
                   placeholder="Add any final observations, caveats, or follow-up actions for this triage run..."
                   value={humanReviewNotes}
-                  onChange={(e) => setHumanReviewNotes(e.target.value)}
+                  onChange={applyStringValue(setHumanReviewNotes)}
                   rows={5}
                 />
               </div>
@@ -4078,7 +4342,7 @@ export default function TriageReportWizardPage() {
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">Summary</p>
                 <p className="font-semibold">{companyName} — Score: {compositeScore.toFixed(1)}</p>
                 <p className="text-sm text-muted-foreground">
-                  {`Recommendation: ${getOutcomeLabel(compositeScore)}`}
+                  Recommendation: {qualityAssessment.recommendationLabel}
                 </p>
               </div>
               <div className="flex justify-end">
@@ -4091,6 +4355,159 @@ export default function TriageReportWizardPage() {
         );
     }
   };
+
+  if (!isHydrated) {
+    return <div className="p-4 md:p-6" suppressHydrationWarning />;
+  }
+
+  const roleLabel = userRole === 'admin' ? 'Admin Control' : userRole === 'analyst' ? 'Reviewer Workspace' : 'User Summary Flow';
+  const currentWorkflowIndex = Math.max(0, displaySteps.findIndex((workflowStep) => workflowStep.id === displayedCurrentStepId));
+  const completedCount = Math.max(0, currentStepPosition - 1);
+  const workflowProgressPercent = Math.max(
+    0,
+    Math.min(
+      100,
+      Math.round(((completedCount + (displayedCurrentStepId === lastDisplayStepId ? 1 : 0.35)) / Math.max(displaySteps.length, 1)) * 100)
+    )
+  );
+  const remainingSteps = Math.max(displaySteps.length - completedCount - (displayedCurrentStepId === lastDisplayStepId ? 1 : 0), 0);
+  const estimatedSecondsRemaining = (remainingSteps * 45) + (isGenerating ? 140 : 0) + (isExtracting ? 70 : 0);
+
+  const confidenceBase = averageNumbers([
+    averageNumbers(Object.values(derivedModuleScores).map((value) => (typeof value === 'number' && value > 0 ? value : null))),
+    compositeScore > 0 ? compositeScore : null,
+  ]);
+  const extractionConfidenceInputs = [
+    sector,
+    stage,
+    businessModel,
+    country,
+    stateRegion,
+    city,
+    oneLineDescription,
+    companyDescription,
+    productDescription,
+    pitchDeckPath,
+    annualRevenue,
+    preMoneyValuation,
+    pitchSummary,
+  ];
+  const extractionCoveragePct = Math.round(
+    (extractionConfidenceInputs.filter((value) => cleanShortText(value).length > 0).length / extractionConfidenceInputs.length) * 100
+  );
+  const hasConfidenceEvidence = qualityAssessment.hasComputedAnalysis && qualityAssessment.moduleCoveragePct > 0;
+  const hasExtractionEvidence = autoFillText.trim().length > 0 || extractedText.trim().length > 0 || extractionCoveragePct > 0;
+  const extractionConfidenceScore = hasExtractionEvidence
+    ? Math.max(
+      35,
+      Math.min(
+        94,
+        Math.round(
+          (extractionCoveragePct * 0.78)
+          + (autoFillText.trim().length > 0 ? 8 : 0)
+          + (extractedText.trim().length > 0 ? 8 : 0)
+          + (selectedExternalSourceIds.length > 0 ? 4 : 0)
+        )
+      )
+    )
+    : null;
+  const confidenceScore = hasConfidenceEvidence
+    ? (qualityAssessment.gatePassed
+      ? 100
+      : Math.max(
+        1,
+        Math.min(
+          99,
+          Math.round((((confidenceBase ?? 0) * 10) * 0.7) + (qualityAssessment.evidenceCoveragePct * 0.3))
+        )
+      ))
+    : extractionConfidenceScore;
+
+  const currentEngine = (() => {
+    if (isExtracting) return 'AI Extraction Engine';
+    if (isGenerating) {
+      const selected = TRIAGE_MODULES.filter((m) => selectedModules.includes(m.id));
+      const idx = Math.min(selected.length - 1, Math.max(0, Math.floor((generationProgress / 100) * Math.max(1, selected.length))));
+      return selected[idx]?.name || 'Composite Investment Engine';
+    }
+    if (currentStep === 8) return 'Scenario Simulation Engine';
+    if (currentStep === 10) return 'What-If Engine';
+    if (currentStep === 2) return 'Signal Detection Engine';
+    return currentStepMeta?.name || 'Evaluation Engine';
+  })();
+
+  const currentAiStage = isGenerating
+    ? generationStatus || 'Running investment analysis engines'
+    : isExtracting
+    ? extractionStatus || 'Analyzing uploaded material'
+    : `Current step: ${currentStepMeta?.name || `Step ${currentStep}`}`;
+
+  const riskScore = typeof derivedModuleScores.risk === 'number' ? derivedModuleScores.risk : null;
+  const riskLevel = riskScore === null ? 'Pending' : riskScore <= 4 ? 'High' : riskScore <= 7 ? 'Medium' : 'Low';
+  const reviewerStatus = humanReviewNotes.trim().length > 0 ? 'Completed' : 'Pending';
+
+  const workflowMetrics = [
+    { label: 'TCA Score', value: Number.isFinite(compositeScore) && compositeScore > 0 ? compositeScore.toFixed(1) : '' },
+    { label: 'Risk Level', value: riskLevel === 'Pending' ? '' : riskLevel },
+    { label: 'Reviewer Status', value: reviewerStatus === 'Pending' ? '' : reviewerStatus },
+    { label: 'AI Confidence', value: typeof confidenceScore === 'number' ? `${confidenceScore}%` : '' },
+  ];
+
+  const workflowStepsWithStatus: WorkflowStepWithStatus[] = displaySteps.map((step) => {
+    const workflowIndex = displaySteps.findIndex((workflowStep) => workflowStep.id === step.id);
+    const isCurrent = step.id === displayedCurrentStepId;
+    const status = workflowIndex < currentWorkflowIndex
+      ? 'completed'
+      : isCurrent
+      ? (canAdvanceFrom(currentStep) ? 'active' : 'warning')
+      : 'pending';
+    return { ...step, status };
+  });
+
+  const goToWorkflowStep = (workflowStepId: number) => {
+    const targetWorkflowStep = displaySteps.find((step) => step.id === workflowStepId);
+    const targetStepId = targetWorkflowStep?.stepIds[0];
+
+    if (typeof targetStepId === 'number') {
+      setCurrentStep(targetStepId);
+    }
+  };
+
+  const aiActivityItems: Array<{ id: string; text: string; tone: 'success' | 'warning' | 'info' }> = [
+    {
+      id: 'extract',
+      text: extractionProgress >= 100
+        ? 'Extracted business signals, KPIs, and investment indicators from uploaded material.'
+        : isExtracting
+        ? `Extraction in progress (${extractionProgress}%).`
+        : 'Awaiting document extraction.',
+      tone: extractionProgress >= 100 ? 'success' : isExtracting ? 'info' : 'warning',
+    },
+    {
+      id: 'engines',
+      text: `Activated ${selectedModules.length} evaluation engine${selectedModules.length === 1 ? '' : 's'} for this run.`,
+      tone: selectedModules.length > 0 ? 'success' : 'warning',
+    },
+    {
+      id: 'simulation',
+      text: currentStep === 8
+        ? 'Scenario simulation is live. Adjust weights and observe score deltas.'
+        : 'Simulation engine standing by for scenario tuning.',
+      tone: currentStep === 8 ? 'info' : 'success',
+    },
+    {
+      id: 'consistency',
+      text: riskLevel === 'High'
+        ? 'Regulatory or execution risk signals detected. DD escalation suggested.'
+        : 'Risk scan completed with no high-severity escalation triggers.',
+      tone: riskLevel === 'High' ? 'warning' : 'success',
+    },
+    {
+      id: 'benchmark',
+      text: `Benchmark context loaded for ${sector || 'selected'} sector analysis.`,
+      tone: sector ? 'success' : 'info',
+    },
+  ];
 
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6">
@@ -4113,13 +4530,13 @@ export default function TriageReportWizardPage() {
           </p>
           {isAdminOrAnalyst && (
             <p className="text-xs text-muted-foreground">
-              Privileged flow: includes full What-If simulation and review steps.
+              Privileged flow: includes Simulation and full review steps.
             </p>
           )}
         </div>
         <div className="flex w-full flex-wrap items-center gap-2 md:w-auto md:justify-end">
           <Badge variant="secondary" className="text-sm">
-            Step {currentStepPosition} of {visibleSteps.length}
+            Step {currentStepPosition} of {displaySteps.length}
           </Badge>
           <Button variant="outline" size="sm" onClick={resetWizard}>
             <RefreshCw className="mr-2 size-4" />
@@ -4133,74 +4550,24 @@ export default function TriageReportWizardPage() {
         </div>
       </div>
 
-      <Card>
-        <CardContent className="pt-4 pb-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-sm">
-            <div className="rounded-md border bg-muted/30 p-3">
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">Tracker ID</p>
-              <p className="font-semibold">{trackingId}</p>
-            </div>
-            <div className="rounded-md border bg-muted/30 p-3">
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">Company</p>
-              <p className="font-semibold">{companyName.trim() || 'Not set yet'}</p>
-            </div>
-            <div className="rounded-md border bg-muted/30 p-3">
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">Report Owner</p>
-              <p className="font-semibold">{reportOwner}</p>
-            </div>
-            <div className="rounded-md border bg-muted/30 p-3">
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">Current Step</p>
-              <p className="font-semibold">{currentStepMeta?.name || `Step ${currentStep}`}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-3 md:grid-cols-12 gap-2">
-        {visibleSteps.map((step) => {
-          const Icon = step.icon;
-          const isCompleted = completedSteps.includes(step.id);
-          const isCurrent = currentStep === step.id;
-          return (
-            <div
-              key={step.id}
-              className={cn(
-                'flex flex-col items-center gap-1 rounded-lg border p-3 text-center transition-all',
-                isCurrent
-                  ? 'border-primary bg-primary/5'
-                  : isCompleted
-                  ? 'border-green-500/30 bg-green-50/30'
-                  : 'border-border bg-muted/20 opacity-60'
-              )}
-            >
-              <div
-                className={cn(
-                  'flex size-8 items-center justify-center rounded-full',
-                  isCurrent
-                    ? 'bg-primary text-primary-foreground'
-                    : isCompleted
-                    ? 'bg-green-500 text-white'
-                    : 'bg-muted text-muted-foreground'
-                )}
-              >
-                {isCompleted ? (
-                  <CheckCircle2 className="size-4" />
-                ) : (
-                  <Icon className="size-4" />
-                )}
-              </div>
-              <div>
-                <p className="text-xs font-semibold">{step.name}</p>
-                <p className="text-xs text-muted-foreground hidden md:block">
-                  {step.description}
-                </p>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {renderStepContent()}
+      <TriageWizard
+        trackingId={trackingId}
+        companyName={companyName.trim() || 'Not set yet'}
+        owner={reportOwner}
+        roleLabel={roleLabel}
+        progressPercent={workflowProgressPercent}
+        eta={formatEta(estimatedSecondsRemaining)}
+        stage={currentAiStage}
+        engine={currentEngine}
+        confidencePercent={confidenceScore}
+        metrics={workflowMetrics}
+        steps={workflowStepsWithStatus}
+        currentStepId={displayedCurrentStepId}
+        onStepSelect={goToWorkflowStep}
+        activityItems={aiActivityItems}
+      >
+        {renderStepContent()}
+      </TriageWizard>
 
       {!(currentStep === 9 && isGenerating) && (
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -4214,7 +4581,7 @@ export default function TriageReportWizardPage() {
               Fresh Start
             </Button>
           </div>
-          {currentStep < lastStepId && currentStep !== 8 && currentStep !== 9 && currentStep !== 10 && (
+          {currentStep < lastStepId && currentStep !== 8 && currentStep !== 9 && currentStep !== 10 && currentStep !== 11 && (
             <Button onClick={goToNext} disabled={!canAdvanceFrom(currentStep)}>
               Next
               <ArrowRight className="ml-2 size-4" />
@@ -4222,31 +4589,8 @@ export default function TriageReportWizardPage() {
           )}
         </div>
       )}
-      <Dialog open={showHumanReviewModal} onOpenChange={setShowHumanReviewModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Human Review Required</DialogTitle>
-            <DialogDescription>
-              As an analyst/admin, please confirm you have reviewed all input data before running the triage analysis.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            <Label>Review Notes (optional)</Label>
-            <Textarea
-              placeholder="Document your pre-generation review observations..."
-              value={humanReviewNotes}
-              onChange={(e) => setHumanReviewNotes(e.target.value)}
-              rows={4}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowHumanReviewModal(false)}>Cancel</Button>
-            <Button onClick={() => { setShowHumanReviewModal(false); handleGenerate(); }}>
-              <BrainCircuit className="mr-2 size-4" /> Confirm &amp; Generate
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+
     </div>
   );
 }
+

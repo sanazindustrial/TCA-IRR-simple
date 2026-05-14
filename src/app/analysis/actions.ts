@@ -554,6 +554,12 @@ export async function runAnalysis(
       ...(filteredScoreOverrides && Object.keys(filteredScoreOverrides).length > 0 && {
         module_score_overrides: filteredScoreOverrides,
       }),
+      // Module configuration — saved settings (weights, enabled flags, per-module rubric overrides)
+      // attached by run/page.tsx prior to invoking runAnalysis. Backend uses these to skip disabled
+      // modules, apply per-module weights to the composite/triage score, and honour saved
+      // sub-category weights (e.g. TCA categories).
+      ...((userData as any)?.activeModules && { module_settings: (userData as any).activeModules }),
+      ...((userData as any)?.moduleConfigs  && { module_configs:  (userData as any).moduleConfigs  }),
     };
 
     console.log('Making request to:', `${BACKEND_API_URL}${API_VERSION}/analysis/comprehensive`);

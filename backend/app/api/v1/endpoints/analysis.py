@@ -4,7 +4,7 @@ Analysis management endpoints
 
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import asyncpg
 
 from app.db import get_db
@@ -95,12 +95,54 @@ async def comprehensive_analysis(company_data: Dict[str, Any]):
             f"Starting comprehensive analysis for: {company_data.get('company_name', 'Unknown')}"
         )
 
+        # ------------------------------------------------------------------
+        # Pull saved module configuration (passed by frontend run/page.tsx).
+        #   module_settings: [{module_id, weight, is_enabled}, ...]    top-level enable/weight
+        #   module_configs:  {moduleId: {<rubric saved on /analysis/modules/{id}>}}
+        # When absent we fall back to defaults (every module enabled, hardcoded weights).
+        # ------------------------------------------------------------------
+        raw_module_settings = company_data.get("module_settings") or []
+        raw_module_configs  = company_data.get("module_configs")  or {}
+        enabled_modules: Dict[str, bool] = {}
+        module_weights:  Dict[str, float] = {}
+        if isinstance(raw_module_settings, list):
+            for entry in raw_module_settings:
+                if not isinstance(entry, dict):
+                    continue
+                mid = entry.get("module_id") or entry.get("id")
+                if not mid:
+                    continue
+                enabled_modules[str(mid)] = bool(entry.get("is_enabled", True))
+                try:
+                    module_weights[str(mid)] = float(entry.get("weight") or 0.0)
+                except (TypeError, ValueError):
+                    module_weights[str(mid)] = 0.0
+        if enabled_modules:
+            logger.info(
+                f"Module settings received: {sum(enabled_modules.values())}/{len(enabled_modules)} enabled"
+            )
+
+        def _is_on(mod_id: str, default: bool = True) -> bool:
+            if not enabled_modules:
+                return default
+            return enabled_modules.get(mod_id, default)
+
         # Use real analysis processor instead of mock data
         analysis_options = {
-            "tca_scorecard": True,
-            "benchmark_comparison": True,
-            "risk_assessment": True,
-            "founder_analysis": company_data.get("founders") is not None
+            "tca_scorecard":        _is_on("tca"),
+            "benchmark_comparison": _is_on("benchmark"),
+            "risk_assessment":      _is_on("risk"),
+            "founder_analysis":     _is_on("founderFit", company_data.get("founders") is not None),
+            "macro_trend":          _is_on("macro"),
+            "team_assessment":      _is_on("team"),
+            "growth_classifier":    _is_on("growth"),
+            "gap_analysis":         _is_on("gap"),
+            "strategic_fit":        _is_on("strategicFit"),
+            "financial_analysis":   _is_on("financial"),
+            "economic_analysis":    _is_on("economic"),
+            "social_analysis":      _is_on("social"),
+            "marketing_analysis":   _is_on("marketing"),
+            "environmental_analysis": _is_on("environmental"),
         }
         # Process analysis through AI service
         try:
@@ -116,14 +158,25 @@ async def comprehensive_analysis(company_data: Dict[str, Any]):
                 logger.warning(
                     "AI analysis failed or incomplete, using calculated fallback"
                 )
-                analysis_result = _calculate_fallback_analysis(company_data)
+                analysis_result = _calculate_fallback_analysis(
+                    company_data, module_weights, raw_module_configs)
             else:
                 analysis_result = _format_ai_results(ai_results, company_data)
 
         except Exception as ai_error:
             logger.error(f"AI analysis error: {ai_error}")
             # Fallback to calculated analysis
-            analysis_result = _calculate_fallback_analysis(company_data)
+            analysis_result = _calculate_fallback_analysis(
+                company_data, module_weights, raw_module_configs)
+
+        # Echo applied module configuration so the result/triage pages can render
+        # the exact weights/enabled-set that produced these scores.
+        if enabled_modules or module_weights or raw_module_configs:
+            analysis_result.setdefault("module_settings_applied", {
+                "enabled": enabled_modules,
+                "weights": module_weights,
+                "configs": raw_module_configs,
+            })
 
         return analysis_result
 
@@ -134,15 +187,29 @@ async def comprehensive_analysis(company_data: Dict[str, Any]):
 
 
 def _calculate_fallback_analysis(
-        company_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Calculate TCA analysis using business logic when AI service is unavailable"""
+        company_data: Dict[str, Any],
+        module_weights: Optional[Dict[str, float]] = None,
+        module_configs: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Calculate TCA analysis using business logic when AI service is unavailable.
+
+    Optional module_weights / module_configs come from the saved
+    /dashboard/module-settings configuration. When absent the function preserves
+    the legacy behaviour with hardcoded weights.
+    """
     from datetime import datetime
 
     company_name = company_data.get("company_name", "Unknown Company")
 
-    # Calculate TCA scores based on available data
-    tca_categories = _calculate_tca_categories(company_data)
-    composite_score = _calculate_composite_score(tca_categories)
+    # Calculate TCA scores based on available data — honour saved sub-category
+    # weights from module_configs["tca"] when present.
+    tca_categories = _calculate_tca_categories(
+        company_data,
+        tca_module_config=(module_configs or {}).get("tca"),
+    )
+    composite_score = _calculate_composite_score(
+        tca_categories,
+        module_weight=(module_weights or {}).get("tca"),
+    )
 
     # Generate risk assessment
     risk_data = _calculate_risk_assessment(company_data, tca_categories)
@@ -209,8 +276,15 @@ def _format_ai_results(ai_results: Dict[str, Any],
 
 
 def _calculate_tca_categories(
-        company_data: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Calculate TCA category scores based on company data"""
+        company_data: Dict[str, Any],
+        tca_module_config: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+    """Calculate TCA category scores based on company data.
+
+    Optional tca_module_config is the user-saved TCA configuration as stored
+    by /analysis/modules/tca — shape: {categories: [{name, general, generalNA, ...}]}.
+    When provided, weights are taken from that object (general framework) instead
+    of the hardcoded defaults below.
+    """
 
     # TCA Category weights (General framework)
     category_config = {
@@ -268,6 +342,29 @@ def _calculate_tca_categories(
             "factors": ["acquisition_targets", "ipo_potential"]
         }
     }
+
+    # Overlay user-saved TCA category weights when available.
+    if tca_module_config and isinstance(tca_module_config, dict):
+        saved_categories = tca_module_config.get("categories")
+        if isinstance(saved_categories, list):
+            saved_weights: Dict[str, float] = {}
+            for sc in saved_categories:
+                if not isinstance(sc, dict):
+                    continue
+                name = (sc.get("name") or "").strip()
+                if not name:
+                    continue
+                if sc.get("generalNA"):
+                    saved_weights[name] = 0.0
+                else:
+                    try:
+                        saved_weights[name] = float(sc.get("general") or 0.0) / 100.0
+                    except (TypeError, ValueError):
+                        continue
+            if saved_weights:
+                for cat_name in list(category_config.keys()):
+                    if cat_name in saved_weights:
+                        category_config[cat_name]["weight"] = saved_weights[cat_name]
 
     categories = []
 
@@ -360,8 +457,16 @@ def _calculate_category_score(company_data: Dict[str, Any], category: str,
     return min(BASE_SCORE + sum(1.0 for f in factors if company_data.get(f)), 10.0)
 
 
-def _calculate_composite_score(categories: List[Dict[str, Any]]) -> float:
-    """Calculate composite TCA score from weighted categories"""
+def _calculate_composite_score(
+        categories: List[Dict[str, Any]],
+        module_weight: Optional[float] = None) -> float:
+    """Calculate composite TCA score from weighted categories.
+
+    Optional module_weight is the top-level TCA module weight from the saved
+    /dashboard/module-settings configuration; logged for downstream reference.
+    """
+    if module_weight is not None:
+        logger.debug(f"Composite computed with TCA module weight={module_weight}")
     total_weighted_score = sum(cat["weightedScore"] for cat in categories)
     return round(total_weighted_score * 10, 1)  # Convert to 0-100 scale
 
