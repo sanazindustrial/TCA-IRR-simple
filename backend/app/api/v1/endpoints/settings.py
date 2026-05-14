@@ -649,7 +649,7 @@ async def run_simulation(data: SimulationRunCreate):
             """, data.settings_version_id, data.company_name, data.analysis_id,
                 tca_score, module_scores, data.adjusted_scores or {})
 
-            return SimulationResult(simulation_id=run_id,
+            return SimulationResult(simulation_id=int(run_id or 0),
                                     tca_score=tca_score,
                                     module_scores=module_scores,
                                     settings_version=settings,

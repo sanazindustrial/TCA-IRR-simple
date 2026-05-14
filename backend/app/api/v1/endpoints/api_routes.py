@@ -169,7 +169,7 @@ async def upload_files(
 
         return UploadResponse(
             upload_id=upload_id,
-            filename=file.filename,
+            filename=file.filename or "unknown",
             status="uploaded",
             message=f"File uploaded successfully ({file_size} bytes)",
             uploaded_at=datetime.utcnow().isoformat()
@@ -199,7 +199,7 @@ async def upload_files_multipart(
 
             results.append(UploadResponse(
                 upload_id=upload_id,
-                filename=file.filename,
+                filename=file.filename or "unknown",
                 status="uploaded",
                 message=f"File uploaded successfully ({len(content)} bytes)",
                 uploaded_at=datetime.utcnow().isoformat()
@@ -216,7 +216,7 @@ async def upload_files_multipart(
             logger.error(f"Error uploading {file.filename}: {e}")
             results.append(UploadResponse(
                 upload_id="",
-                filename=file.filename,
+                filename=file.filename or "unknown",
                 status="error",
                 message=str(e),
                 uploaded_at=datetime.utcnow().isoformat()

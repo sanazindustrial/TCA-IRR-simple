@@ -1426,7 +1426,7 @@ async def extract_text_from_file(
                 for slide_num, slide in enumerate(prs.slides, 1):
                     text_parts.extend(
                         [f"=== Slide {slide_num} ==="] +
-                        [shape.text for shape in slide.shapes if hasattr(shape, "text") and shape.text]
+                        [getattr(shape, "text", "") for shape in slide.shapes if getattr(shape, "text", None)]
                     )
                 content = "\n".join(text_parts)
             except ImportError:
