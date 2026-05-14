@@ -4,7 +4,7 @@ Analysis management endpoints
 
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import asyncpg
 
 from app.db import get_db
