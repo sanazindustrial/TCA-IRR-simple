@@ -5,7 +5,7 @@ import logging
 from fastapi import APIRouter
 from .endpoints import (auth, users, companies, analysis, investments, admin,
                         tca, dashboard, ssd, settings, reports, cost,
-                        external_sources, api_routes, roles)
+                        external_sources, api_routes, roles, storage)
 
 _logger = logging.getLogger(__name__)
 
@@ -55,6 +55,9 @@ api_router.include_router(cost.router,
 api_router.include_router(external_sources.router,
                           prefix="/external",
                           tags=["External Sources"])
+api_router.include_router(storage.router,
+                          prefix="/storage",
+                          tags=["Storage"])
 
 # API routes for files, uploads, modules, extraction, etc. (mounted at /api/*)
 api_router.include_router(api_routes.files_router,

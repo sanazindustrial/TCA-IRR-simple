@@ -18,33 +18,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/reports", tags=["Reports"])
 
 
-async def _get_table_columns(db: asyncpg.Connection, table_name: str) -> Set[str]:
-    rows = await db.fetch(
-        """
-        SELECT column_name
-        FROM information_schema.columns
-        WHERE table_name = $1
-        """,
-        table_name,
-    )
-    return {row["column_name"] for row in rows}
-
-
-def _first_available(columns: Set[str], *candidates: str) -> Optional[str]:
-    for candidate in candidates:
-        if candidate in columns:
-            return candidate
-    return None
-
-
-def _build_report_joins(report_columns: Set[str]) -> tuple[str, str, Optional[str], Optional[str]]:
-    user_column = _first_available(report_columns, "generated_by", "user_id")
-    company_column = _first_available(report_columns, "company_id")
-    user_join = f"LEFT JOIN users u ON r.{user_column} = u.id" if user_column else "LEFT JOIN users u ON FALSE"
-    company_join = f"LEFT JOIN companies c ON r.{company_column} = c.id" if company_column else ""
-    return user_join, company_join, user_column, company_column
-
-
 # Pydantic Models
 class UserInfo(BaseModel):
     """User information for report"""
@@ -63,6 +36,9 @@ class ReportCreate(BaseModel):
     recommendation: Optional[str] = None
     module_scores: Optional[Dict[str, Any]] = None
     analysis_data: Optional[Dict[str, Any]] = None
+    evaluation_id: Optional[str] = None
+    analysis_id: Optional[str] = None
+    report_id: Optional[str] = None
     settings_version_id: Optional[int] = None
     simulation_run_id: Optional[int] = None
     missing_sections: Optional[List[str]] = None
@@ -93,6 +69,10 @@ class ReportResponse(BaseModel):
     confidence: Optional[float] = None
     recommendation: Optional[str] = None
     module_scores: Optional[Dict[str, Any]] = None
+    analysis_data: Optional[Dict[str, Any]] = None
+    evaluation_id: Optional[str] = None
+    analysis_id: Optional[str] = None
+    report_id: Optional[str] = None
     settings_version_id: Optional[int] = None
     simulation_run_id: Optional[int] = None
     missing_sections: Optional[List[str]] = None
@@ -126,6 +106,65 @@ class ReportStatsResponse(BaseModel):
     average_score: Optional[float] = None
 
 
+async def _get_reports_table_columns(db: asyncpg.Connection) -> Set[str]:
+    """Get reports table columns for schema compatibility across environments."""
+    rows = await db.fetch(
+        """
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'reports'
+        """
+    )
+    return {row["column_name"] for row in rows}
+
+
+async def _resolve_valid_user_id(db: asyncpg.Connection, requested_user_id: Optional[int]) -> Optional[int]:
+    """Return a valid user id for FK-constrained columns, or None if unavailable."""
+    if requested_user_id is None:
+        return None
+
+    try:
+        exists = await db.fetchval("SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)", requested_user_id)
+        return requested_user_id if exists else None
+    except Exception:
+        # If user lookup fails due schema/environment differences, avoid FK violation by omitting user link.
+        return None
+
+
+def _choose_first_available(columns: Set[str], candidates: List[str]) -> Optional[str]:
+    for candidate in candidates:
+        if candidate in columns:
+            return candidate
+    return None
+
+
+def _safe_float(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _build_report_select_query(user_join_column: Optional[str]) -> str:
+    user_join = (
+        f"LEFT JOIN users u ON r.{user_join_column} = u.id"
+        if user_join_column
+        else "LEFT JOIN users u ON 1 = 0"
+    )
+    return f"""
+        SELECT
+            r.*,
+            u.username as user_name,
+            u.email as user_email,
+            c.name as company_name_from_company
+        FROM reports r
+        {user_join}
+        LEFT JOIN companies c ON r.company_id = c.id
+    """
+
+
 def record_to_response(record: asyncpg.Record) -> Dict[str, Any]:
     """Convert database record to response dict"""
     # Handle metadata JSON field for extended attributes
@@ -137,29 +176,44 @@ def record_to_response(record: asyncpg.Record) -> Dict[str, Any]:
         except:
             metadata = {}
     
+    company_name = (
+        metadata.get("company_name")
+        or record.get("company_name")
+        or record.get("title")
+        or record.get("company_name_from_company")
+        or "Unknown Company"
+    )
+    created_at_dt = record.get("generated_at") or record.get("created_at")
+    updated_at_dt = record.get("updated_at") or created_at_dt
+    status = record.get("status") or "Pending"
+
     return {
         "id": record["id"],
-        "company_name": metadata.get("company_name") or record.get("title") or "Unknown Company",
+        "company_name": company_name,
         "company_id": record.get("company_id"),
         "type": record.get("report_type") or "Triage",
-        "status": record.get("status") or "Pending",
-        "approval": metadata.get("approval_status") or "Pending",
-        "score": float(metadata.get("overall_score")) if metadata.get("overall_score") else None,
-        "tca_score": float(metadata.get("tca_score")) if metadata.get("tca_score") else None,
-        "confidence": float(metadata.get("confidence")) if metadata.get("confidence") else None,
-        "recommendation": metadata.get("recommendation"),
-        "module_scores": metadata.get("module_scores"),
-        "settings_version_id": metadata.get("settings_version_id"),
-        "simulation_run_id": metadata.get("simulation_run_id"),
-        "missing_sections": metadata.get("missing_sections"),
+        "status": status,
+        "approval": metadata.get("approval_status") or record.get("approval_status") or "Pending",
+        "score": _safe_float(metadata.get("overall_score") or record.get("overall_score")),
+        "tca_score": _safe_float(metadata.get("tca_score") or record.get("tca_score")),
+        "confidence": _safe_float(metadata.get("confidence") or record.get("confidence")),
+        "recommendation": metadata.get("recommendation") or record.get("recommendation"),
+        "module_scores": metadata.get("module_scores") or record.get("module_scores"),
+        "analysis_data": metadata.get("analysis_data") or record.get("analysis_data"),
+        "evaluation_id": metadata.get("evaluation_id") or record.get("evaluation_id"),
+        "analysis_id": metadata.get("analysis_id") or record.get("analysis_id"),
+        "report_id": metadata.get("report_id") or record.get("report_id"),
+        "settings_version_id": metadata.get("settings_version_id") or record.get("settings_version_id"),
+        "simulation_run_id": metadata.get("simulation_run_id") or record.get("simulation_run_id"),
+        "missing_sections": metadata.get("missing_sections") or record.get("missing_sections"),
         "user": {
             "name": record.get("user_name") or record.get("username") or "Unknown",
             "email": record.get("user_email") or record.get("email") or "unknown@tca.com"
         },
-        "reviewer_notes": metadata.get("reviewer_notes"),
-        "created_at": record["generated_at"].strftime("%m/%d/%Y") if record.get("generated_at") else None,
-        "updated_at": record["generated_at"].strftime("%m/%d/%Y") if record.get("generated_at") else None,
-        "completed_at": record["generated_at"].strftime("%m/%d/%Y") if record.get("generated_at") and record.get("status") == "Completed" else None
+        "reviewer_notes": metadata.get("reviewer_notes") or record.get("reviewer_notes"),
+        "created_at": created_at_dt.strftime("%m/%d/%Y") if created_at_dt else "",
+        "updated_at": updated_at_dt.strftime("%m/%d/%Y") if updated_at_dt else "",
+        "completed_at": created_at_dt.strftime("%m/%d/%Y") if created_at_dt and status == "Completed" else None
     }
 
 
@@ -168,6 +222,9 @@ async def get_reports(
     status: Optional[str] = None,
     report_type: Optional[str] = None,
     company_name: Optional[str] = None,
+    evaluation_id: Optional[str] = None,
+    analysis_id: Optional[str] = None,
+    report_id: Optional[str] = None,
     user_id: Optional[int] = None,
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
@@ -177,55 +234,44 @@ async def get_reports(
     Get all reports with optional filtering
     """
     try:
-        report_columns = await _get_table_columns(db, "reports")
-        user_join_clause, company_join_clause, user_join_column, company_join = _build_report_joins(report_columns)
-        company_name_expr = "c.name" if company_join else "NULL"
+        columns = await _get_reports_table_columns(db)
+        user_column = _choose_first_available(columns, ["generated_by", "created_by", "user_id"])
+        report_type_column = _choose_first_available(columns, ["report_type"])
+        status_column = _choose_first_available(columns, ["status"])
+        company_text_column = _choose_first_available(columns, ["company_name", "title"])
+        sort_column = _choose_first_available(columns, ["generated_at", "created_at", "id"])
 
-        query = """
-            SELECT 
-                r.*,
-                u.username as user_name,
-                u.email as user_email,
-                {company_name_expr} as company_name_from_company
-            FROM reports r
-            {user_join_clause}
-            {company_join_clause}
-            WHERE 1=1
-        """.format(
-            company_name_expr=company_name_expr,
-            user_join_clause=user_join_clause,
-            company_join_clause=company_join_clause,
-        )
+        query = _build_report_select_query(user_column) + " WHERE 1=1"
         params = []
         param_count = 0
         
-        if status:
+        if status and status_column:
             param_count += 1
-            query += f" AND r.status = ${param_count}"
+            query += f" AND r.{status_column} = ${param_count}"
             params.append(status)
         
-        if report_type:
+        if report_type and report_type_column:
             param_count += 1
-            query += f" AND r.report_type = ${param_count}"
+            query += f" AND r.{report_type_column} = ${param_count}"
             params.append(report_type)
         
         if company_name:
             param_count += 1
-            if company_join:
-                query += f" AND (r.title ILIKE ${param_count} OR c.name ILIKE ${param_count})"
+            if company_text_column:
+                query += f" AND (r.{company_text_column} ILIKE ${param_count} OR c.name ILIKE ${param_count})"
             else:
-                query += f" AND r.title ILIKE ${param_count}"
+                query += f" AND c.name ILIKE ${param_count}"
             params.append(f"%{company_name}%")
         
-        if user_id:
+        if user_id and user_column:
             param_count += 1
-            if user_join_column:
-                query += f" AND r.{user_join_column} = ${param_count}"
-                params.append(user_id)
-            else:
-                param_count -= 1
+            query += f" AND r.{user_column} = ${param_count}"
+            params.append(user_id)
         
-        query += " ORDER BY r.generated_at DESC NULLS LAST"
+        if sort_column:
+            query += f" ORDER BY r.{sort_column} DESC NULLS LAST"
+        else:
+            query += " ORDER BY r.id DESC"
         
         param_count += 1
         query += f" LIMIT ${param_count}"
@@ -237,7 +283,16 @@ async def get_reports(
         
         records = await db.fetch(query, *params)
         
-        return [record_to_response(record) for record in records]
+        responses = [record_to_response(record) for record in records]
+
+        if evaluation_id:
+            responses = [r for r in responses if str(r.get("evaluation_id") or "") == evaluation_id]
+        if analysis_id:
+            responses = [r for r in responses if str(r.get("analysis_id") or "") == analysis_id]
+        if report_id:
+            responses = [r for r in responses if str(r.get("report_id") or "") == report_id]
+
+        return responses
         
     except Exception as e:
         logger.error(f"Error fetching reports: {e}")
@@ -253,19 +308,40 @@ async def get_report_stats(
     Get report statistics
     """
     try:
+        columns = await _get_reports_table_columns(db)
+        user_column = _choose_first_available(columns, ["generated_by", "created_by", "user_id"])
+        status_column = _choose_first_available(columns, ["status"])
+        report_type_column = _choose_first_available(columns, ["report_type"])
+
         base_filter = "WHERE 1=1"
         params = []
         
-        if user_id:
-            base_filter += " AND generated_by = $1"
+        if user_id and user_column:
+            base_filter += f" AND {user_column} = $1"
             params.append(user_id)
+
+        completed_expr = (
+            f"COUNT(*) FILTER (WHERE {status_column} = 'Completed')"
+            if status_column
+            else "0"
+        )
+        pending_expr = (
+            f"COUNT(*) FILTER (WHERE {status_column} = 'Pending' OR {status_column} IS NULL)"
+            if status_column
+            else "0"
+        )
+        due_diligence_expr = (
+            f"COUNT(*) FILTER (WHERE {report_type_column} = 'Due Diligence')"
+            if report_type_column
+            else "0"
+        )
         
         stats = await db.fetchrow(f"""
             SELECT 
                 COUNT(*) as total_reports,
-                COUNT(*) FILTER (WHERE status = 'Completed') as completed,
-                COUNT(*) FILTER (WHERE status = 'Pending' OR status IS NULL) as pending,
-                COUNT(*) FILTER (WHERE report_type = 'Due Diligence') as due_diligence
+                {completed_expr} as completed,
+                {pending_expr} as pending,
+                {due_diligence_expr} as due_diligence
             FROM reports
             {base_filter}
         """, *params)
@@ -292,23 +368,10 @@ async def get_report(
     Get a specific report by ID
     """
     try:
-        report_columns = await _get_table_columns(db, "reports")
-        user_join_clause, company_join_clause, _, company_join = _build_report_joins(report_columns)
-        record = await db.fetchrow("""
-            SELECT 
-                r.*,
-                u.username as user_name,
-                u.email as user_email,
-                {company_name_expr} as company_name_from_company
-            FROM reports r
-            {user_join_clause}
-            {company_join_clause}
-            WHERE r.id = $1
-        """.format(
-            company_name_expr="c.name" if company_join else "NULL",
-            user_join_clause=user_join_clause,
-            company_join_clause=company_join_clause,
-        ), report_id)
+        columns = await _get_reports_table_columns(db)
+        user_column = _choose_first_available(columns, ["generated_by", "created_by", "user_id"])
+        query = _build_report_select_query(user_column) + " WHERE r.id = $1"
+        record = await db.fetchrow(query, report_id)
         
         if not record:
             raise HTTPException(status_code=404, detail="Report not found")
@@ -333,10 +396,20 @@ async def create_report(
     """
     try:
         import json
-        report_columns = await _get_table_columns(db, "reports")
+
+        columns = await _get_reports_table_columns(db)
+        user_column = _choose_first_available(columns, ["generated_by", "created_by", "user_id"])
+        safe_user_id = await _resolve_valid_user_id(db, user_id)
+        report_type_column = _choose_first_available(columns, ["report_type"])
+        company_text_column = _choose_first_available(columns, ["title", "company_name"])
+        status_column = _choose_first_available(columns, ["status"])
+        timestamp_column = _choose_first_available(columns, ["generated_at", "created_at"])
         
         # Store extended attributes in metadata JSON
         metadata = {
+            "report_id": report.report_id,
+            "evaluation_id": report.evaluation_id,
+            "analysis_id": report.analysis_id,
             "company_name": report.company_name,
             "overall_score": report.overall_score,
             "tca_score": report.tca_score,
@@ -349,55 +422,57 @@ async def create_report(
             "missing_sections": report.missing_sections,
             "approval_status": "Pending"
         }
+        
+        insert_columns: List[str] = []
+        insert_values: List[str] = []
+        insert_params: List[Any] = []
 
-        insert_columns = []
-        values_sql = []
-        insert_params = []
+        def add_param_column(column: str, value: Any) -> None:
+            insert_columns.append(column)
+            insert_params.append(value)
+            insert_values.append(f"${len(insert_params)}")
 
-        def add_column(column_name: str, value, raw_sql: Optional[str] = None):
-            if column_name not in report_columns:
-                return
-            insert_columns.append(column_name)
-            if raw_sql is not None:
-                values_sql.append(raw_sql)
-            else:
-                insert_params.append(value)
-                values_sql.append(f"${len(insert_params)}")
+        def add_now_column(column: str) -> None:
+            insert_columns.append(column)
+            insert_values.append("NOW()")
 
-        add_column("company_id", report.company_id)
-        add_column("report_type", report.report_type)
-        add_column("title", report.company_name)
-        add_column("status", "Completed")
-        add_column("generated_at", None, raw_sql="NOW()")
-        add_column("generated_by", user_id)
-        add_column("user_id", user_id)
-        add_column("metadata", json.dumps(metadata))
+        if "company_id" in columns and report.company_id is not None:
+            add_param_column("company_id", report.company_id)
+        if report_type_column:
+            add_param_column(report_type_column, report.report_type)
+        if company_text_column:
+            add_param_column(company_text_column, report.company_name)
+        if status_column:
+            add_param_column(status_column, "Completed")
+        if timestamp_column == "generated_at":
+            add_now_column("generated_at")
+        if user_column and safe_user_id is not None:
+            add_param_column(user_column, safe_user_id)
+        if "metadata" in columns:
+            add_param_column("metadata", json.dumps(metadata))
+
+        if "analysis_data" in columns and report.analysis_data is not None:
+            add_param_column("analysis_data", report.analysis_data)
+        if "evaluation_id" in columns and report.evaluation_id:
+            add_param_column("evaluation_id", report.evaluation_id)
+        if "analysis_id" in columns and report.analysis_id:
+            add_param_column("analysis_id", report.analysis_id)
+        if "report_id" in columns and report.report_id:
+            add_param_column("report_id", report.report_id)
 
         if not insert_columns:
-            raise HTTPException(status_code=500, detail="No compatible report columns found")
-        
-        record = await db.fetchrow("""
-            INSERT INTO reports ({columns}) VALUES ({values})
+            raise HTTPException(status_code=500, detail="Reports table schema is missing expected insert columns")
+
+        insert_sql = f"""
+            INSERT INTO reports ({', '.join(insert_columns)})
+            VALUES ({', '.join(insert_values)})
             RETURNING *
-        """.format(columns=", ".join(insert_columns), values=", ".join(values_sql)), *insert_params)
+        """
+        record = await db.fetchrow(insert_sql, *insert_params)
         
         # Fetch with user info
-        company_join = "LEFT JOIN companies c ON r.company_id = c.id" if "company_id" in report_columns else ""
-        full_record = await db.fetchrow("""
-            SELECT 
-                r.*,
-                u.username as user_name,
-                u.email as user_email,
-                {company_name_expr} as company_name_from_company
-            FROM reports r
-            {user_join_clause}
-            {company_join_clause}
-            WHERE r.id = $1
-        """.format(
-            company_name_expr="c.name" if "company_id" in report_columns else "NULL",
-            user_join_clause=_build_report_joins(report_columns)[0],
-            company_join_clause=company_join,
-        ), record["id"])
+        full_record_query = _build_report_select_query(user_column) + " WHERE r.id = $1"
+        full_record = await db.fetchrow(full_record_query, record["id"])
         
         return record_to_response(full_record)
         
@@ -418,7 +493,9 @@ async def update_report(
     """
     try:
         import json
-        report_columns = await _get_table_columns(db, "reports")
+
+        columns = await _get_reports_table_columns(db)
+        user_column = _choose_first_available(columns, ["generated_by", "created_by", "user_id"])
         
         # Get current report
         current = await db.fetchrow("SELECT * FROM reports WHERE id = $1", report_id)
@@ -451,35 +528,60 @@ async def update_report(
             current_metadata["change_reason"] = report.change_reason
         
         # Build update query
-        updates = ["metadata = $2"]
-        params = [report_id, json.dumps(current_metadata)]
-        param_idx = 3
+        updates: List[str] = []
+        params: List[Any] = [report_id]
+        param_idx = 2
+
+        if "metadata" in columns:
+            updates.append("metadata = $2")
+            params.append(json.dumps(current_metadata))
+            param_idx += 1
         
-        if report.status is not None and "status" in report_columns:
+        if report.status is not None and "status" in columns:
             updates.append(f"status = ${param_idx}")
             params.append(report.status)
             param_idx += 1
+
+        if report.approval_status is not None and "approval_status" in columns:
+            updates.append(f"approval_status = ${param_idx}")
+            params.append(report.approval_status)
+            param_idx += 1
+
+        if report.reviewer_notes is not None and "reviewer_notes" in columns:
+            updates.append(f"reviewer_notes = ${param_idx}")
+            params.append(report.reviewer_notes)
+            param_idx += 1
+
+        if report.overall_score is not None and "overall_score" in columns:
+            updates.append(f"overall_score = ${param_idx}")
+            params.append(report.overall_score)
+            param_idx += 1
+
+        if report.tca_score is not None and "tca_score" in columns:
+            updates.append(f"tca_score = ${param_idx}")
+            params.append(report.tca_score)
+            param_idx += 1
+
+        if report.confidence is not None and "confidence" in columns:
+            updates.append(f"confidence = ${param_idx}")
+            params.append(report.confidence)
+            param_idx += 1
+
+        if report.recommendation is not None and "recommendation" in columns:
+            updates.append(f"recommendation = ${param_idx}")
+            params.append(report.recommendation)
+            param_idx += 1
+
+        if not updates:
+            record = await db.fetchrow("SELECT * FROM reports WHERE id = $1", report_id)
+            return record_to_response(record)
         
         query = f"UPDATE reports SET {', '.join(updates)} WHERE id = $1"
         await db.execute(query, *params)
         
         # Fetch updated record
-        user_join_clause, company_join_clause, _, company_join = _build_report_joins(report_columns)
-        record = await db.fetchrow("""
-            SELECT 
-                r.*,
-                u.username as user_name,
-                u.email as user_email,
-                {company_name_expr} as company_name_from_company
-            FROM reports r
-            {user_join_clause}
-            {company_join_clause}
-            WHERE r.id = $1
-        """.format(
-            company_name_expr="c.name" if "company_id" in report_columns else "NULL",
-            user_join_clause=user_join_clause,
-            company_join_clause=company_join_clause,
-        ), report_id)
+        updated_query = _build_report_select_query(user_column) + " WHERE r.id = $1"
+        record = await db.fetchrow(updated_query, report_id)
         
         return record_to_response(record)
         

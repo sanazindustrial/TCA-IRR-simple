@@ -4,9 +4,11 @@ Administrative endpoints with enhanced security and governance features
 
 import contextlib
 import logging
+import os
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from typing import Dict, Any, List, Optional
+from pydantic import BaseModel, Field
 from app.utils.json_utils import json_response_with_datetime
 import asyncpg
 
@@ -20,6 +22,12 @@ from .auth import get_current_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+class DatabaseQueryRequest(BaseModel):
+    query: str = Field(..., min_length=1)
+    params: List[Any] = Field(default_factory=list)
+    limit: int = Field(default=200, ge=1, le=1000)
 
 
 def require_admin(current_user: dict = Depends(get_current_user)):
@@ -337,3 +345,93 @@ async def get_system_logs(
     except Exception as e:
         logger.error(f"Error reading system logs: {e}")
         return {"logs": [], "error": str(e)}
+
+
+@router.post("/database/query")
+async def execute_database_query(
+    request: Request,
+    payload: DatabaseQueryRequest,
+    current_user: dict = Depends(require_admin),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    """Execute a read-only SQL query for admin diagnostics."""
+    query = payload.query.strip()
+    lowered = query.lower()
+    if not lowered.startswith("select"):
+        raise HTTPException(status_code=400, detail="Only SELECT queries are allowed")
+    if ";" in query:
+        raise HTTPException(status_code=400, detail="Multiple statements are not allowed")
+
+    safe_query = f"{query} LIMIT {payload.limit}"
+    try:
+        await audit_logger.log(
+            AuditEventType.ADMIN_ACTION,
+            user_id=current_user.get('id'),
+            username=current_user['username'],
+            ip_address=request.client.host if request.client else None,
+            action_details={"action": "database_query", "limit": payload.limit},
+            db=db,
+        )
+
+        rows = await db.fetch(safe_query, *payload.params)
+        return {
+            "rows": [dict(r) for r in rows],
+            "row_count": len(rows),
+            "limit": payload.limit,
+        }
+    except Exception as e:
+        logger.error("Database query execution failed: %s", e)
+        raise HTTPException(status_code=500, detail=f"Query failed: {e}") from e
+
+
+@router.get("/ai/providers")
+async def get_ai_provider_chain(current_user: dict = Depends(require_admin)):
+    """Return live AI provider chain status and rollout guidance."""
+    health = await ai_client.health_check()
+
+    openai_configured = bool(getattr(settings, "openai_api_key", None) or os.getenv("OPENAI_API_KEY"))
+    gemini_configured = bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"))
+
+    mode = health.get("mode", "unknown")
+    providers = [
+        {
+            "name": "OpenAI",
+            "configured": openai_configured,
+            "status": "healthy" if mode in ("openai_fallback", "genkit") and openai_configured else ("configured" if openai_configured else "missing"),
+            "priority": 1,
+        },
+        {
+            "name": "Gemini",
+            "configured": gemini_configured,
+            "status": "configured" if gemini_configured else "missing",
+            "priority": 2,
+        },
+        {
+            "name": "LocalFallback",
+            "configured": True,
+            "status": "active" if mode == "local_fallback" else "standby",
+            "priority": 3,
+        },
+    ]
+
+    active_provider = "LocalFallback"
+    if mode == "openai_fallback":
+        active_provider = "OpenAI"
+    elif mode == "genkit":
+        active_provider = "Genkit"
+
+    return {
+        "status": health.get("status", "unknown"),
+        "mode": mode,
+        "active_provider": active_provider,
+        "providers": providers,
+        "chain": [p["name"] for p in providers if p.get("configured")],
+        "guidance": {
+            "policy": "Use low temperature for scoring consistency, enforce JSON output, and always keep one fallback configured.",
+            "steps": [
+                "Set provider credentials in backend/app service environment variables.",
+                "Refresh provider health and verify fallback chain is healthy.",
+                "Run live analysis test before enabling production traffic.",
+            ],
+        },
+    }

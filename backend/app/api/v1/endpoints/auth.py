@@ -12,8 +12,8 @@ Enhanced with:
 
 import logging
 import secrets
-from datetime import timedelta, datetime
-from typing import Optional, List
+from datetime import timedelta, datetime, timezone
+from typing import Optional, List, Any
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field, field_validator
@@ -191,7 +191,7 @@ async def get_optional_current_user(
         return None
 
 
-async def get_user_by_username(db: asyncpg.Connection, username: str) -> dict:
+async def get_user_by_username(db: asyncpg.Connection, username: str) -> Optional[dict[str, Any]]:
     """Get user by username"""
     try:
         user = await db.fetchrow(
@@ -208,7 +208,7 @@ async def get_user_by_username(db: asyncpg.Connection, username: str) -> dict:
         return None
 
 
-async def get_user_by_email(db: asyncpg.Connection, email: str) -> dict:
+async def get_user_by_email(db: asyncpg.Connection, email: str) -> Optional[dict[str, Any]]:
     """Get user by email address"""
     try:
         user = await db.fetchrow(
@@ -242,14 +242,15 @@ async def login(request: Request,
     # Get client info for logging
     client_ip = request.client.host if request.client else "unknown"
     user_agent = request.headers.get("user-agent", "unknown")
+    login_identifier = (user_credentials.email or user_credentials.username or "").strip().lower()
     
     try:
         # Check if account is locked
-        is_locked, minutes_remaining = await account_lockout.is_locked(user_credentials.email)
+        is_locked, minutes_remaining = await account_lockout.is_locked(login_identifier)
         if is_locked:
             await audit_logger.log(
                 AuditEventType.LOGIN_FAILED,
-                username=user_credentials.email,
+                username=login_identifier,
                 ip_address=client_ip,
                 user_agent=user_agent,
                 action_details={"reason": "account_locked", "minutes_remaining": minutes_remaining},
@@ -261,24 +262,28 @@ async def login(request: Request,
                 detail=f"Account locked. Try again in {minutes_remaining} minutes"
             )
         
-        # Get user from database by email
-        user = await get_user_by_email(db, user_credentials.email)
+        # Resolve user by email first, then username for backward compatibility.
+        user = None
+        if user_credentials.email:
+            user = await get_user_by_email(db, user_credentials.email.strip().lower())
+        if not user and user_credentials.username:
+            user = await get_user_by_username(db, user_credentials.username.strip())
 
         if not user:
             # Record failed attempt
             locked, remaining = await account_lockout.record_failed_attempt(
-                user_credentials.email, client_ip
+                login_identifier, client_ip
             )
             await audit_logger.log(
                 AuditEventType.LOGIN_FAILED,
-                username=user_credentials.email,
+                username=login_identifier,
                 ip_address=client_ip,
                 user_agent=user_agent,
                 action_details={"reason": "user_not_found"},
                 success=False,
                 db=db
             )
-            logger.warning(f"Login attempt for non-existent user: {user_credentials.email}")
+            logger.warning(f"Login attempt for non-existent user: {login_identifier}")
             detail = "Incorrect email or password"
             if locked:
                 detail += ". Account has been locked due to multiple failed attempts"
@@ -286,29 +291,31 @@ async def login(request: Request,
                 detail += f". {remaining} attempts remaining before lockout"
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=detail)
 
+        lockout_key = (user.get('email') or login_identifier).lower()
+
         # Verify password
         if not verify_password(user_credentials.password, user['password']):
             # Record failed attempt
             locked, remaining = await account_lockout.record_failed_attempt(
-                user_credentials.email, client_ip
+                lockout_key, client_ip
             )
             await audit_logger.log(
                 AuditEventType.LOGIN_FAILED,
                 user_id=user['id'],
-                username=user_credentials.email,
+                username=lockout_key,
                 ip_address=client_ip,
                 user_agent=user_agent,
                 action_details={"reason": "invalid_password", "locked": locked},
                 success=False,
                 db=db
             )
-            logger.warning(f"Failed login attempt for user: {user_credentials.email}")
+            logger.warning(f"Failed login attempt for user: {lockout_key}")
             detail = "Incorrect email or password"
             if locked:
                 await audit_logger.log(
                     AuditEventType.ACCOUNT_LOCKED,
                     user_id=user['id'],
-                    username=user_credentials.email,
+                    username=lockout_key,
                     ip_address=client_ip,
                     action_details={"reason": "max_failed_attempts"},
                     db=db
@@ -323,19 +330,19 @@ async def login(request: Request,
             await audit_logger.log(
                 AuditEventType.LOGIN_FAILED,
                 user_id=user['id'],
-                username=user_credentials.email,
+                username=lockout_key,
                 ip_address=client_ip,
                 user_agent=user_agent,
                 action_details={"reason": "account_inactive"},
                 success=False,
                 db=db
             )
-            logger.warning(f"Login attempt for inactive user: {user_credentials.email}")
+            logger.warning(f"Login attempt for inactive user: {lockout_key}")
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
                                 detail="Account is inactive")
 
         # Clear failed attempts on successful login
-        await account_lockout.clear_failed_attempts(user_credentials.email)
+        await account_lockout.clear_failed_attempts(lockout_key)
         
         # Create access token
         access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
@@ -363,7 +370,7 @@ async def login(request: Request,
             db=db
         )
         
-        logger.info(f"Successful login for user: {user_credentials.email}")
+        logger.info(f"Successful login for user: {lockout_key}")
 
         return Token(access_token=access_token,
                      refresh_token=refresh_token,
@@ -447,8 +454,12 @@ async def register(request: Request,
             SELECT id, username, email, full_name, role, is_active, created_at, updated_at
             FROM users WHERE id = $1
             """, user_id)
-        
-        created_user = dict(created_user_row)
+
+        if created_user_row is None:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                                detail="Failed to load created user")
+
+        created_user: dict[str, Any] = {k: created_user_row[k] for k in created_user_row.keys()}
 
         # Log successful registration
         await audit_logger.log(
@@ -775,8 +786,85 @@ async def get_reset_token_for_testing(email: str):
 # INVITE-BASED SIGNUP FOR ADMIN/ANALYST ROLES
 # =============================================
 
-# In-memory invite token storage (for production, use Redis or database)
+# Legacy in-memory cache kept only as best-effort mirror for compatibility.
 invite_tokens: dict = {}
+
+
+def _now_utc() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _to_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+async def _ensure_user_invites_table(db: asyncpg.Connection) -> None:
+    await db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS user_invites (
+            id SERIAL PRIMARY KEY,
+            email VARCHAR(255) NOT NULL,
+            role VARCHAR(20) NOT NULL,
+            invite_token VARCHAR(255) UNIQUE NOT NULL,
+            invited_by INTEGER REFERENCES users(id),
+            invited_by_username VARCHAR(100),
+            status VARCHAR(20) NOT NULL DEFAULT 'pending',
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            expires_at TIMESTAMPTZ NOT NULL,
+            accepted_at TIMESTAMPTZ,
+            revoked_at TIMESTAMPTZ
+        )
+        """
+    )
+
+
+async def _get_pending_invite_by_token(db: asyncpg.Connection, token: str) -> Optional[dict]:
+    await _ensure_user_invites_table(db)
+    row = await db.fetchrow(
+        """
+        SELECT email, role, invited_by, invited_by_username, status, created_at, expires_at
+        FROM user_invites
+        WHERE invite_token = $1
+        """,
+        token,
+    )
+    if not row:
+        return None
+    data = dict(row)
+    expires_at = _to_utc(data["expires_at"])
+    now = _now_utc()
+    if data.get("status") != "pending":
+        return None
+    if now > expires_at:
+        await db.execute(
+            "UPDATE user_invites SET status = 'expired' WHERE invite_token = $1 AND status = 'pending'",
+            token,
+        )
+        invite_tokens.pop(token, None)
+        return None
+    data["expires_at"] = expires_at
+    return data
+
+
+async def _set_invite_status(db: asyncpg.Connection, token: str, status_value: str) -> None:
+    await _ensure_user_invites_table(db)
+    if status_value == "accepted":
+        await db.execute(
+            "UPDATE user_invites SET status = 'accepted', accepted_at = NOW() WHERE invite_token = $1",
+            token,
+        )
+    elif status_value == "revoked":
+        await db.execute(
+            "UPDATE user_invites SET status = 'revoked', revoked_at = NOW() WHERE invite_token = $1",
+            token,
+        )
+    elif status_value == "expired":
+        await db.execute(
+            "UPDATE user_invites SET status = 'expired' WHERE invite_token = $1",
+            token,
+        )
 
 
 class InviteRequest(BaseModel):
@@ -851,6 +939,8 @@ async def invite_user(
         )
     
     try:
+        await _ensure_user_invites_table(db)
+
         # Check if email already exists
         existing_user = await db.fetchrow(
             "SELECT id FROM users WHERE email = $1",
@@ -861,27 +951,48 @@ async def invite_user(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="A user with this email already exists"
             )
-        
+
+        # Expire old invites first
+        await db.execute(
+            "UPDATE user_invites SET status = 'expired' WHERE status = 'pending' AND expires_at < NOW()"
+        )
+
         # Check if there's already a pending invite for this email
-        for token, data in invite_tokens.items():
-            if data['email'] == invite_data.email and datetime.utcnow() < data['expires_at']:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="An active invitation already exists for this email"
-                )
-        
+        existing_invite = await db.fetchval(
+            "SELECT 1 FROM user_invites WHERE email = $1 AND status = 'pending' AND expires_at > NOW()",
+            invite_data.email,
+        )
+        if existing_invite:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="An active invitation already exists for this email"
+            )
+
         # Generate invite token
         invite_token = secrets.token_urlsafe(32)
-        expires_at = datetime.utcnow() + timedelta(days=7)  # Invite valid for 7 days
-        
-        # Store the invite token
+        expires_at = _now_utc() + timedelta(days=7)
+
+        await db.execute(
+            """
+            INSERT INTO user_invites (email, role, invite_token, invited_by, invited_by_username, status, expires_at)
+            VALUES ($1, $2, $3, $4, $5, 'pending', $6)
+            """,
+            invite_data.email,
+            invite_data.role,
+            invite_token,
+            current_user['id'],
+            current_user['username'],
+            expires_at,
+        )
+
+        # Legacy mirror for compatibility with older flows
         invite_tokens[invite_token] = {
             "email": invite_data.email,
             "role": invite_data.role,
             "invited_by": current_user['id'],
             "invited_by_username": current_user['username'],
             "expires_at": expires_at,
-            "created_at": datetime.utcnow()
+            "created_at": _now_utc(),
         }
         
         # Log the invitation
@@ -954,22 +1065,13 @@ async def accept_invite(
     user_agent = request.headers.get("user-agent", "unknown")
     
     try:
-        # Validate the invite token
-        token_data = invite_tokens.get(accept_data.token)
-        
+        # Validate the invite token from persistent storage
+        token_data = await _get_pending_invite_by_token(db, accept_data.token)
+
         if not token_data:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid or expired invitation token"
-            )
-        
-        # Check if token has expired
-        if datetime.utcnow() > token_data['expires_at']:
-            # Remove expired token
-            del invite_tokens[accept_data.token]
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invitation token has expired"
             )
         
         # Validate password strength
@@ -1011,8 +1113,9 @@ async def accept_invite(
             token_data['role']
         )
         
-        # Remove the used invite token
-        del invite_tokens[accept_data.token]
+        # Mark invite as accepted and remove legacy cache token
+        await _set_invite_status(db, accept_data.token, "accepted")
+        invite_tokens.pop(accept_data.token, None)
         
         # Fetch created user
         created_user_row = await db.fetchrow(
@@ -1021,8 +1124,12 @@ async def accept_invite(
             FROM users WHERE id = $1
             """, user_id
         )
-        
-        created_user = dict(created_user_row)
+
+        if created_user_row is None:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                                detail="Failed to load created invited user")
+
+        created_user: dict[str, Any] = {k: created_user_row[k] for k in created_user_row.keys()}
         created_user['full_name'] = accept_data.full_name
         
         # Log the account creation
@@ -1090,26 +1197,23 @@ async def complete_invite(
     user_agent = request.headers.get("user-agent", "unknown")
     
     try:
-        # Validate the invite token
-        token_data = invite_tokens.get(complete_data.token)
-        
+        # Validate the invite token from persistent storage
+        token_data = await _get_pending_invite_by_token(db, complete_data.token)
+
         if not token_data:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid or expired invitation token"
             )
-        
-        # Check if token has expired
-        if datetime.utcnow() > token_data['expires_at']:
-            del invite_tokens[complete_data.token]
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invitation token has expired"
-            )
-        
-        # Generate username from email
+
+        # Generate username from email and guarantee uniqueness
         email = token_data['email']
-        username = email.split('@')[0].replace('.', '_').replace('-', '_')[:50]
+        base_username = email.split('@')[0].replace('.', '_').replace('-', '_')[:45]
+        username = base_username
+        suffix = 1
+        while await db.fetchrow("SELECT 1 FROM users WHERE username = $1", username):
+            username = f"{base_username}_{suffix}"[:50]
+            suffix += 1
         
         # Validate password strength
         is_valid, errors = PasswordPolicy.validate(
@@ -1123,10 +1227,10 @@ async def complete_invite(
                 detail={"password_errors": errors}
             )
         
-        # Check if username already exists
+        # Check if account already exists for email
         existing_user = await db.fetchrow(
-            "SELECT id FROM users WHERE username = $1 OR email = $2",
-            username, email
+            "SELECT id FROM users WHERE email = $1",
+            email,
         )
         if existing_user:
             raise HTTPException(
@@ -1147,8 +1251,9 @@ async def complete_invite(
             username, email, hashed_password, token_data['role']
         )
         
-        # Remove used token
-        del invite_tokens[complete_data.token]
+        # Mark invite as accepted and remove legacy cache token
+        await _set_invite_status(db, complete_data.token, "accepted")
+        invite_tokens.pop(complete_data.token, None)
         
         # Fetch created user
         created_user_row = await db.fetchrow(
@@ -1157,7 +1262,12 @@ async def complete_invite(
             FROM users WHERE id = $1
             """, user_id
         )
-        created_user = dict(created_user_row)
+
+        if created_user_row is None:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                                detail="Failed to load completed invited user")
+
+        created_user: dict[str, Any] = {k: created_user_row[k] for k in created_user_row.keys()}
         created_user['full_name'] = complete_data.full_name
         
         # Log successful account creation
@@ -1202,7 +1312,10 @@ async def complete_invite(
 
 
 @router.get("/validate-invite")
-async def validate_invite_query(token: str = Query(..., description="The invitation token to validate")):
+async def validate_invite_query(
+    token: str = Query(..., description="The invitation token to validate"),
+    db: asyncpg.Connection = Depends(get_db),
+):
     """
     Validate an invitation token using query parameter (frontend compatibility)
     
@@ -1210,22 +1323,14 @@ async def validate_invite_query(token: str = Query(..., description="The invitat
     
     Returns the email and role for the invitation.
     """
-    token_data = invite_tokens.get(token)
-    
+    token_data = await _get_pending_invite_by_token(db, token)
+
     if not token_data:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid invitation token"
         )
-    
-    if datetime.utcnow() > token_data['expires_at']:
-        # Remove expired token
-        del invite_tokens[token]
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invitation token has expired"
-        )
-    
+
     # Return full email for the signup form (frontend needs it to pre-fill)
     return {
         "valid": True,
@@ -1236,7 +1341,10 @@ async def validate_invite_query(token: str = Query(..., description="The invitat
 
 
 @router.get("/invite/validate/{token}")
-async def validate_invite_token(token: str):
+async def validate_invite_token(
+    token: str,
+    db: asyncpg.Connection = Depends(get_db),
+):
     """
     Validate an invitation token without using it
     
@@ -1244,38 +1352,31 @@ async def validate_invite_token(token: str):
     
     Returns whether the token is valid and what role it's for.
     """
-    token_data = invite_tokens.get(token)
-    
+    token_data = await _get_pending_invite_by_token(db, token)
+
     if not token_data:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid invitation token"
         )
-    
-    if datetime.utcnow() > token_data['expires_at']:
-        # Remove expired token
-        del invite_tokens[token]
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invitation token has expired"
-        )
-    
+
     # Mask email for privacy
     email = token_data['email']
     masked_email = email[:3] + "***" + email[email.index('@'):]
-    
+
     return {
         "valid": True,
         "email": masked_email,
         "role": token_data['role'],
         "invited_by": token_data['invited_by_username'],
-        "expires_in_days": int((token_data['expires_at'] - datetime.utcnow()).total_seconds() / 86400)
+        "expires_in_days": int((token_data['expires_at'] - _now_utc()).total_seconds() / 86400)
     }
 
 
 @router.get("/invites", response_model=List[dict])
 async def list_pending_invites(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
     """
     List all pending invitations (admin only)
@@ -1286,27 +1387,36 @@ async def list_pending_invites(
             detail="Only admins can view pending invitations"
         )
     
+    await _ensure_user_invites_table(db)
+    await db.execute("UPDATE user_invites SET status = 'expired' WHERE status = 'pending' AND expires_at < NOW()")
+    rows = await db.fetch(
+        """
+        SELECT email, role, invited_by_username, created_at, expires_at, invite_token
+        FROM user_invites
+        WHERE status = 'pending' AND expires_at > NOW()
+        ORDER BY created_at DESC
+        """
+    )
+
     pending_invites = []
-    current_time = datetime.utcnow()
-    
-    for token, data in invite_tokens.items():
-        if current_time < data['expires_at']:
-            pending_invites.append({
-                "email": data['email'],
-                "role": data['role'],
-                "invited_by": data['invited_by_username'],
-                "created_at": data['created_at'].isoformat(),
-                "expires_at": data['expires_at'].isoformat(),
-                "token_preview": token[:8] + "..."  # Show partial token for reference
-            })
-    
+    for row in rows:
+        pending_invites.append({
+            "email": row["email"],
+            "role": row["role"],
+            "invited_by": row["invited_by_username"],
+            "created_at": row["created_at"].isoformat() if row.get("created_at") else None,
+            "expires_at": row["expires_at"].isoformat() if row.get("expires_at") else None,
+            "token_preview": row["invite_token"][:8] + "...",
+        })
+
     return pending_invites
 
 
 @router.delete("/invite/{email}")
 async def revoke_invite(
     email: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
     """
     Revoke a pending invitation (admin only)
@@ -1319,18 +1429,24 @@ async def revoke_invite(
             detail="Only admins can revoke invitations"
         )
     
-    # Find and remove the invite for this email
-    token_to_remove = None
-    for token, data in invite_tokens.items():
-        if data['email'] == email:
-            token_to_remove = token
-            break
-    
-    if token_to_remove:
-        del invite_tokens[token_to_remove]
+    await _ensure_user_invites_table(db)
+    token = await db.fetchval(
+        """
+        SELECT invite_token
+        FROM user_invites
+        WHERE email = $1 AND status = 'pending' AND expires_at > NOW()
+        ORDER BY created_at DESC
+        LIMIT 1
+        """,
+        email,
+    )
+
+    if token:
+        await _set_invite_status(db, token, "revoked")
+        invite_tokens.pop(token, None)
         logger.info(f"Invite for {email} revoked by {current_user['username']}")
         return {"success": True, "message": f"Invitation for {email} has been revoked"}
-    
+
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
         detail="No pending invitation found for this email"

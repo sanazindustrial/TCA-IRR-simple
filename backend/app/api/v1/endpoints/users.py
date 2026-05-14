@@ -6,7 +6,7 @@ import logging
 import io
 import csv
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from fastapi.responses import StreamingResponse
 from typing import Any, List, Optional, cast
@@ -232,26 +232,61 @@ async def invite_user(
                 detail="A user with this email already exists"
             )
         
+        # Ensure persistent invite storage exists
+        await db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_invites (
+                id SERIAL PRIMARY KEY,
+                email VARCHAR(255) NOT NULL,
+                role VARCHAR(20) NOT NULL,
+                invite_token VARCHAR(255) UNIQUE NOT NULL,
+                invited_by INTEGER REFERENCES users(id),
+                invited_by_username VARCHAR(100),
+                status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                expires_at TIMESTAMPTZ NOT NULL,
+                accepted_at TIMESTAMPTZ,
+                revoked_at TIMESTAMPTZ
+            )
+            """
+        )
+        await db.execute("UPDATE user_invites SET status = 'expired' WHERE status = 'pending' AND expires_at < NOW()")
+
         # Check if there's already a pending invite for this email
-        for token, data in auth.invite_tokens.items():
-            if data['email'] == email and datetime.utcnow() < data['expires_at']:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="An active invitation already exists for this email"
-                )
-        
+        exists = await db.fetchval(
+            "SELECT 1 FROM user_invites WHERE email = $1 AND status = 'pending' AND expires_at > NOW()",
+            email,
+        )
+        if exists:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="An active invitation already exists for this email"
+            )
+
         # Generate invite token
         invite_token = secrets.token_urlsafe(32)
-        expires_at = datetime.utcnow() + timedelta(days=7)
-        
-        # Store the invite token (shared with auth module)
+        expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+
+        # Persist invite token and mirror for compatibility
+        await db.execute(
+            """
+            INSERT INTO user_invites (email, role, invite_token, invited_by, invited_by_username, status, expires_at)
+            VALUES ($1, $2, $3, $4, $5, 'pending', $6)
+            """,
+            email,
+            role,
+            invite_token,
+            current_user['id'],
+            current_user['username'],
+            expires_at,
+        )
         auth.invite_tokens[invite_token] = {
             "email": email,
             "role": role,
             "invited_by": current_user['id'],
             "invited_by_username": current_user['username'],
             "expires_at": expires_at,
-            "created_at": datetime.utcnow()
+            "created_at": datetime.now(timezone.utc)
         }
         
         # Send invitation email

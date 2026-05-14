@@ -13,6 +13,8 @@ import asyncpg
 
 from app.db import get_db
 from .auth import get_current_user, get_optional_current_user
+from app.core import settings
+from app.services import ai_client
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +97,23 @@ class EvaluationResponse(BaseModel):
     evaluation_type: str
     status: str
     created_at: str
+
+
+def _normalize_status(value: Optional[str]) -> str:
+    """Normalize status values to frontend-safe lower-case enums."""
+    mapping = {
+        "pending": "pending",
+        "queued": "pending",
+        "processing": "processing",
+        "running": "processing",
+        "in_progress": "processing",
+        "completed": "completed",
+        "done": "completed",
+        "failed": "failed",
+        "error": "failed",
+    }
+    key = (value or "unknown").strip().lower()
+    return mapping.get(key, "unknown")
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -559,7 +578,7 @@ async def create_evaluation(
             evaluation_id=evaluation_id,
             company_name=evaluation_data.company_name,
             evaluation_type=evaluation_data.evaluation_type,
-            status="pending",
+            status=_normalize_status("pending"),
             created_at=datetime.utcnow().isoformat()
         )
     except Exception as e:
@@ -584,7 +603,7 @@ async def list_evaluations(
             evaluation_id=str(r['evaluation_id']),
             company_name=r['company_name'] or 'Unknown',
             evaluation_type=r['evaluation_type'] or 'triage',
-            status=r['status'] or 'unknown',
+            status=_normalize_status(r['status']),
             created_at=r['created_at'].isoformat() if r['created_at'] else datetime.utcnow().isoformat()
         ) for r in rows]
     except Exception as e:
@@ -642,7 +661,7 @@ async def get_evaluation(
             evaluation_id=str(evaluation['evaluation_id']),
             company_name=evaluation['company_name'] or 'Unknown',
             evaluation_type=evaluation['evaluation_type'] or 'triage',
-            status=evaluation['status'] or 'unknown',
+            status=_normalize_status(evaluation['status']),
             created_at=evaluation['created_at'].isoformat() if evaluation['created_at'] else datetime.utcnow().isoformat()
         )
     except HTTPException:
@@ -848,6 +867,51 @@ async def ai_extract(
 ):
     """AI extraction endpoint"""
     return {"status": "processed", "extracted": data, "timestamp": datetime.utcnow().isoformat()}
+
+
+@ai_router.get("/providers")
+async def ai_providers(current_user: dict = Depends(get_optional_current_user)):
+    """Return AI provider chain status (non-admin compatibility endpoint)."""
+    health = await ai_client.health_check()
+
+    openai_configured = bool(getattr(settings, "openai_api_key", None))
+    gemini_configured = False
+
+    mode = health.get("mode", "unknown")
+    providers = [
+        {
+            "name": "OpenAI",
+            "configured": openai_configured,
+            "status": "healthy" if mode in ("openai_fallback", "genkit") and openai_configured else ("configured" if openai_configured else "missing"),
+            "priority": 1,
+        },
+        {
+            "name": "Gemini",
+            "configured": gemini_configured,
+            "status": "configured" if gemini_configured else "missing",
+            "priority": 2,
+        },
+        {
+            "name": "LocalFallback",
+            "configured": True,
+            "status": "active" if mode == "local_fallback" else "standby",
+            "priority": 3,
+        },
+    ]
+
+    active_provider = "LocalFallback"
+    if mode == "openai_fallback":
+        active_provider = "OpenAI"
+    elif mode == "genkit":
+        active_provider = "Genkit"
+
+    return {
+        "status": health.get("status", "unknown"),
+        "mode": mode,
+        "active_provider": active_provider,
+        "providers": providers,
+        "chain": [p["name"] for p in providers if p.get("configured")],
+    }
 
 
 # ═══════════════════════════════════════════════════════════════════════

@@ -4,7 +4,7 @@ Pydantic models for API request/response validation
 
 from datetime import datetime
 from typing import Optional, List, Dict, Any, Union
-from pydantic import BaseModel, Field, ConfigDict, field_validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
 from enum import Enum
 
 
@@ -110,8 +110,15 @@ class UserResponse(UserBase):
 
 class UserLogin(BaseModel):
     """User login model"""
-    email: str = Field(..., description="User email address")
+    email: Optional[str] = Field(None, description="User email address")
+    username: Optional[str] = Field(None, description="Username for login")
     password: str
+
+    @model_validator(mode='after')
+    def ensure_login_identifier(self):
+        if not self.email and not self.username:
+            raise ValueError('Either email or username is required')
+        return self
 
 
 class Token(BaseModel):

@@ -308,19 +308,19 @@ async def get_public_cost_summary(
     """
     # Default fallback response (used when DB is unavailable)
     _fallback = {
-        "totalCost": 82.75,
-        "totalRequests": 4,
-        "billedUsers": 3,
-        "dailyAverage": 2.76,
+        "totalCost": 0.0,
+        "totalRequests": 0,
+        "billedUsers": 0,
+        "dailyAverage": 0.0,
         "breakdown": [
-            {"category": "AI Analysis (GPT-4)", "cost": 28.50, "percentage": 80.0, "executions": 63},
-            {"category": "Embeddings (Ada)", "cost": 4.25, "percentage": 12.0, "executions": 189},
-            {"category": "External Data APIs", "cost": 3.50, "percentage": 5.0, "executions": 126},
-            {"category": "Infrastructure", "cost": 1.50, "percentage": 3.0, "executions": 252}
+            {"category": "AI Analysis (GPT-4)", "cost": 0.0, "percentage": 80.0, "executions": 0},
+            {"category": "Embeddings (Ada)", "cost": 0.0, "percentage": 12.0, "executions": 0},
+            {"category": "External Data APIs", "cost": 0.0, "percentage": 5.0, "executions": 0},
+            {"category": "Infrastructure", "cost": 0.0, "percentage": 3.0, "executions": 0}
         ],
         "trends": [],
         "aiBreakdown": {
-            "totalAiCost": 35.80,
+            "totalAiCost": 0.0,
             "costPerAnalysis": 0.45,
             "inputTokens": 0,
             "outputTokens": 0,
