@@ -132,10 +132,10 @@ export default function ModuleSettingsPage() {
             const activeVersion = data.find(v => v.is_active);
             if (activeVersion) {
                 const fullVersion = await settingsApi.getVersion(activeVersion.id);
-                setSelectedVersion(mergeModuleSettings(fullVersion));
+                if (fullVersion) setSelectedVersion(mergeModuleSettings(fullVersion));
             } else if (data.length > 0) {
                 const fullVersion = await settingsApi.getVersion(data[0].id);
-                setSelectedVersion(mergeModuleSettings(fullVersion));
+                if (fullVersion) setSelectedVersion(mergeModuleSettings(fullVersion));
             }
         } catch (error) {
             console.error('Failed to load settings versions:', error);
@@ -194,7 +194,7 @@ export default function ModuleSettingsPage() {
     const handleSelectVersion = async (versionId: number) => {
         try {
             const fullVersion = await settingsApi.getVersion(versionId);
-            setSelectedVersion(mergeModuleSettings(fullVersion));
+            if (fullVersion) setSelectedVersion(mergeModuleSettings(fullVersion));
         } catch (error) {
             toast({
                 title: 'Error',

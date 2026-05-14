@@ -1446,7 +1446,7 @@ export default function AnalysisResultPage({
                                 <h2 className="text-2xl font-bold text-foreground">Expanded Module Analysis</h2>
                                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                                     {visibleModules.map(({ key, label, Icon, subscore_labels }) => {
-                                        const mod = (analysisData as any)[key] as NonNullable<typeof analysisData['financialData']>;
+                                        const mod = (analysisData as any)[key] as NonNullable<NonNullable<typeof analysisData>['financialData']>;
                                         return (
                                             <Card key={key} className="flex flex-col">
                                                 <CardHeader className="pb-3">
@@ -1516,12 +1516,14 @@ export default function AnalysisResultPage({
                         );
                     })()}
 
-                    <ReportView
-                        analysisData={analysisData}
-                        isPreview={isPreview}
-                        visibleSections={visibleSections}
-                        wizardResult={wizardResult}
-                    />
+                    {analysisData && (
+                        <ReportView
+                            analysisData={analysisData}
+                            isPreview={isPreview}
+                            visibleSections={visibleSections}
+                            wizardResult={wizardResult}
+                        />
+                    )}
                 </div>
             </main>
         </EvaluationProvider>

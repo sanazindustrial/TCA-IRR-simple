@@ -267,7 +267,7 @@ async def create_settings_version(data: SettingsVersionCreate):
             max_version = await conn.fetchval(
                 "SELECT COALESCE(MAX(version_number), 0) FROM module_settings_versions"
             )
-            new_version_number = max_version + 1
+            new_version_number = (max_version or 0) + 1
 
             # Create version
             version_id = await conn.fetchval(
@@ -470,8 +470,8 @@ async def update_tca_category(version_id: int, category_id: int,
     """Update a specific TCA category setting with dual framework weights"""
     try:
         async with db_manager.get_transaction() as conn:
-            updates = []
-            params = [category_id, version_id]
+            updates: List[str] = []
+            params: List[Any] = [category_id, version_id]
             param_idx = 3
 
             if data.weight is not None:

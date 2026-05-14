@@ -512,6 +512,7 @@ async def get_app_requests(
                     user_id, size, offset)
 
         items = [_row_to_request(r) for r in rows]
+        total = total or 0
         pages = max(1, (total + size - 1) // size) if total > 0 else 0
 
         return {"items": items, "total": total, "page": page, "size": size, "pages": pages}
