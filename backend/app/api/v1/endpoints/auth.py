@@ -75,7 +75,7 @@ async def issue_password_reset_email(
         db=db,
     )
 
-    logger.info(f"Password reset requested for user: {username}, token: {reset_token[:8]}...")
+    logger.info(f"Password reset requested for user: {username}")
 
     try:
         email_sent = await send_password_reset_email(

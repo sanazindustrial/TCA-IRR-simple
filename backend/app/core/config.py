@@ -192,6 +192,20 @@ def load_secrets_from_keyvault():
 if settings.is_production and settings.azure_keyvault_url:
     load_secrets_from_keyvault()
 
+# SECURITY: Refuse to run in production with the well-known default JWT secret.
+# This default exists only as a placeholder so dev/test can boot; it MUST be
+# overridden via SECRET_KEY env var or Azure Key Vault "jwt-secret-key" in prod.
+_DEFAULT_DEV_SECRET_KEY = "TCA-IRR-PLATFORM-SUPER-SECRET-KEY-2026-PRODUCTION-MIN32CHARS"
+if settings.is_production and settings.secret_key == _DEFAULT_DEV_SECRET_KEY:
+    raise RuntimeError(
+        "Refusing to start in production with the default JWT secret_key. "
+        "Set SECRET_KEY env var or configure 'jwt-secret-key' in Azure Key Vault."
+    )
+if settings.secret_key == _DEFAULT_DEV_SECRET_KEY:
+    logger.warning(
+        "Using DEFAULT JWT secret_key (non-production). Override SECRET_KEY env var before deploying."
+    )
+
 
 def configure_logging():
     """Configure application logging"""

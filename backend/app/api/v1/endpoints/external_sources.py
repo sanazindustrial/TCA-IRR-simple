@@ -9,6 +9,7 @@ import time
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 from functools import lru_cache
+from urllib.parse import quote_plus
 import httpx
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, HTTPException, Query, BackgroundTasks, Depends
@@ -1453,10 +1454,13 @@ async def enrich_report_context(
     errors = []
     
     # Define which sources to query for company enrichment
+    # URL-encode user-supplied company_name to prevent URL/query parameter
+    # injection into the upstream provider requests.
+    safe_name = quote_plus(company_name or "")
     enrichment_sources = [
-        ("github", f"https://api.github.com/search/repositories?q={company_name}&sort=stars&per_page=3"),
-        ("hackernews", f"https://hn.algolia.com/api/v1/search?query={company_name}&tags=story"),
-        ("pubmed", f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term={company_name}&retmode=json&retmax=5"),
+        ("github", f"https://api.github.com/search/repositories?q={safe_name}&sort=stars&per_page=3"),
+        ("hackernews", f"https://hn.algolia.com/api/v1/search?query={safe_name}&tags=story"),
+        ("pubmed", f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term={safe_name}&retmode=json&retmax=5"),
     ]
     
     async with httpx.AsyncClient(timeout=10) as client:
