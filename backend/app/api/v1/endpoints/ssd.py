@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, status, Header, Security, Depends
+from fastapi import APIRouter, BackgroundTasks, HTTPException, status, Header, Security, Depends, Request
 from fastapi.security import APIKeyHeader
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr, Field
@@ -1438,23 +1438,83 @@ async def ssd_callback_test_post(payload: dict = None):
 
 
 @router.post("/webhook")
-async def ssd_webhook_receiver(payload: dict = None):
+async def ssd_webhook_receiver(
+    request: Request,
+    x_signature: Optional[str] = Header(default=None, alias="X-Signature"),
+    x_signature_256: Optional[str] = Header(default=None, alias="X-Signature-256"),
+):
     """
     Main webhook endpoint for receiving SSD/StartupSteroid callbacks.
-    This endpoint receives external webhook notifications and processes them.
-    
-    Args:
-        payload: Webhook payload data from external service
-    
-    Returns:
-        Acknowledgment of webhook receipt with processing status
+
+    SECURITY:
+    - Per-IP rate limiting (60 req/min) to prevent flood / log-spam abuse.
+    - HMAC-SHA256 signature verification when ``ssd_webhook_secret`` (or
+      ``ssd_api_key`` as fallback) is configured. The sender must include the
+      hex-encoded HMAC in the ``X-Signature-256`` header (or legacy
+      ``X-Signature``). Requests without a valid signature are rejected with 401.
+    - Verification is skipped only when no secret is configured AND the app is
+      not running in production (developer convenience).
     """
+    # 1) Per-IP rate limit
+    client_ip = request.client.host if request.client else "unknown"
+    from app.core.rate_limit import ssd_webhook_limiter
+    allowed, retry_after = await ssd_webhook_limiter.check(f"ssd_webhook:{client_ip}")
+    if not allowed:
+        logger.warning(
+            f"SSD webhook rate limit exceeded for IP {client_ip}; retry_after={retry_after}s"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many webhook requests",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+    # 2) Read raw body once for both signature verification and JSON parsing
+    raw_body = await request.body()
+
+    # 3) Verify HMAC signature
+    secret = (
+        getattr(settings, "ssd_webhook_secret", None)
+        or getattr(settings, "ssd_api_key", None)
+    )
+    if secret:
+        import hmac
+        provided_sig = (x_signature_256 or x_signature or "").strip()
+        if provided_sig.lower().startswith("sha256="):
+            provided_sig = provided_sig[len("sha256="):]
+        expected_sig = hmac.new(
+            secret.encode("utf-8"), raw_body, hashlib.sha256
+        ).hexdigest()
+        if not provided_sig or not hmac.compare_digest(provided_sig, expected_sig):
+            logger.warning(
+                f"SSD webhook signature mismatch from IP {client_ip}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid webhook signature",
+            )
+    elif getattr(settings, "is_production", False):
+        # Refuse to run unauthenticated in production.
+        logger.error("SSD webhook received but no ssd_webhook_secret/ssd_api_key configured in production")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Webhook receiver is not configured",
+        )
+
+    # 4) Parse JSON body
+    payload: Optional[dict] = None
+    if raw_body:
+        try:
+            payload = json.loads(raw_body.decode("utf-8"))
+        except Exception:
+            payload = None
+
     try:
         webhook_id = f"wh_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
-        
+
         # Log webhook receipt
-        logger.info(f"Webhook received: {webhook_id}, payload_size: {len(str(payload)) if payload else 0}")
-        
+        logger.info(f"Webhook received: {webhook_id}, payload_size: {len(raw_body)}")
+
         return {
             "status": "acknowledged",
             "webhook_id": webhook_id,
