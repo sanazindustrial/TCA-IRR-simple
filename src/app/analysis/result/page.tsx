@@ -854,6 +854,24 @@ export default function AnalysisResultPage({
                 defaultConfig = triageStandardConfig;
             }
 
+            // For triage reports, prioritize the exact sections selected in the triage wizard.
+            const wizardTriageSections = reportType === 'triage'
+                ? localStorage.getItem('triageReportSections')
+                : null;
+            if (wizardTriageSections) {
+                try {
+                    const parsedWizardSections = JSON.parse(wizardTriageSections);
+                    if (Array.isArray(parsedWizardSections) && parsedWizardSections.every((item) =>
+                        item && item.id && item.title && typeof item.active === 'boolean'
+                    )) {
+                        setVisibleSections(parsedWizardSections);
+                        return;
+                    }
+                } catch (e) {
+                    console.warn('Invalid triageReportSections format, falling back to saved config:', e);
+                }
+            }
+
             // Try to load saved configuration, fallback to default
             const savedConfig = localStorage.getItem(configKey);
             if (savedConfig) {

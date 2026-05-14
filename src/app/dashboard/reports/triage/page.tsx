@@ -1230,6 +1230,7 @@ export default function TriageReportWizardPage() {
 
   const [currentStep, setCurrentStep] = useState(1);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
+  const [isClientReady, setIsClientReady] = useState(false);
 
   const [companyName, setCompanyName] = useState('');
   const [sector, setSector] = useState('');
@@ -1734,6 +1735,7 @@ export default function TriageReportWizardPage() {
     if (step === 1) return !!pitchDeckFile; // Pitch deck is required for triage flow
     if (step === 2) return true; // Data Extraction is optional
     if (step === 3) {
+      const pitchDeckReady = pitchDeckPath.trim().length > 0 || !!pitchDeckFile;
       const requiredChecks = [
         sector.length > 0,
         stage.length > 0,
@@ -1758,7 +1760,171 @@ export default function TriageReportWizardPage() {
     return true;
   };
 
-  const goToNext = () => {
+  const getMissingSsdStep3Fields = (): string[] => {
+    const pitchDeckReady = pitchDeckPath.trim().length > 0 || !!pitchDeckFile;
+    return [
+      companyName.trim().length === 0 ? 'Company Name' : null,
+      sector.length === 0 ? 'Industry Vertical' : null,
+      stage.length === 0 ? 'Development Stage' : null,
+      businessModel.trim().length === 0 ? 'Business Model' : null,
+      country.trim().length === 0 ? 'Country' : null,
+      stateRegion.trim().length === 0 ? 'State' : null,
+      city.trim().length === 0 ? 'City' : null,
+      oneLineDescription.trim().length === 0 ? 'One-Line Description' : null,
+      companyDescription.trim().length === 0 ? 'Company Description' : null,
+      productDescription.trim().length === 0 ? 'Product Description' : null,
+      !pitchDeckReady ? 'Pitch Deck Path' : null,
+      !isPositiveNumberText(annualRevenue) ? 'Annual Revenue' : null,
+      !isPositiveNumberText(preMoneyValuation) ? 'Pre-Money Valuation' : null,
+    ].filter(Boolean) as string[];
+  };
+
+  const autoCompleteSsdRequiredFields = async (): Promise<string[]> => {
+    const missingBefore = getMissingSsdStep3Fields();
+    if (missingBefore.length === 0) return [];
+
+    const sourceText = [
+      extractedText?.trim() || '',
+      autoFillText?.trim() || '',
+      pitchSummary?.trim() || '',
+      companyDescription?.trim() || '',
+      productDescription?.trim() || '',
+      additionalContext?.trim() || '',
+      links?.trim() || '',
+    ].filter(Boolean).join('\n\n');
+
+    const nextValues = {
+      companyName: companyName.trim(),
+      sector,
+      stage,
+      businessModel: businessModel.trim(),
+      country: country.trim(),
+      stateRegion: stateRegion.trim(),
+      city: city.trim(),
+      oneLineDescription: oneLineDescription.trim(),
+      companyDescription: companyDescription.trim(),
+      productDescription: productDescription.trim(),
+      pitchDeckPath: pitchDeckPath.trim(),
+      annualRevenue: annualRevenue.trim(),
+      preMoneyValuation: preMoneyValuation.trim(),
+    };
+
+    if (sourceText) {
+      try {
+        const res = await fetch('/api/ai-autofill', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: sourceText, companyHint: nextValues.companyName || undefined }),
+        });
+        const result = await res.json();
+        if (res.ok && result?.success && result?.data) {
+          const d = result.data as Record<string, unknown>;
+          const websiteValue = cleanShortText(pickFirstText(d, ['website', 'company_website', 'companyWebsite', 'url', 'domain']));
+          const sectorValue = normalizeSectorValue(pickFirstText(d, ['sector', 'industry', 'industry_vertical', 'industryVertical', 'vertical']));
+          const stageValue = normalizeStageValue(pickFirstText(d, ['stage', 'company_stage', 'companyStage', 'funding_stage', 'fundingStage', 'development_stage', 'developmentStage']));
+          const businessModelValue = cleanShortText(pickFirstText(d, ['business_model', 'businessModel', 'model']));
+          const countryValue = cleanShortText(pickFirstText(d, ['country']));
+          const stateValue = cleanShortText(pickFirstText(d, ['state', 'province', 'region']));
+          const cityValue = cleanShortText(pickFirstText(d, ['city']));
+          const oneLineValue = cleanOneLineDescription(pickFirstText(d, ['one_line_description', 'oneLineDescription', 'tagline']));
+          const companyDescriptionValue = cleanLongText(pickFirstText(d, ['company_description', 'companyDescription']));
+          const annualRevenueValue = cleanShortText(pickFirstText(d, ['annualRevenue', 'annual_revenue', 'yearlyRevenue', 'yearly_revenue'])) || extractAnnualRevenueText(sourceText);
+          const preMoneyValue = cleanShortText(pickFirstText(d, ['preMoneyValuation', 'pre_money_valuation']));
+          const pitchDeckPathValue = cleanShortText(pickFirstText(d, ['pitchDeckPath', 'pitch_deck_path']));
+          const locationValue = buildLocationText(d);
+          const locationParts = splitLocationParts(locationValue);
+          const productValue = cleanLongText(pickFirstText(d, ['product_description', 'productDescription', 'product_overview', 'productOverview', 'solution_description', 'solutionDescription'])) || deriveProductDescription(oneLineValue, companyDescriptionValue);
+          const inferredCompany =
+            cleanCompanyName(pickFirstText(d, ['company_name', 'companyName', 'startup_name', 'startupName', 'name', 'legalName', 'legal_name'])) ||
+            inferCompanyNameFromText(sourceText);
+
+          if (!nextValues.companyName && inferredCompany) nextValues.companyName = inferredCompany;
+          if (!nextValues.sector && sectorValue) nextValues.sector = sectorValue;
+          if (!nextValues.stage && stageValue) nextValues.stage = stageValue;
+          if (!nextValues.businessModel && businessModelValue) nextValues.businessModel = businessModelValue;
+          if (!nextValues.country) nextValues.country = countryValue || locationParts.country;
+          if (!nextValues.stateRegion) nextValues.stateRegion = stateValue || locationParts.state;
+          if (!nextValues.city) nextValues.city = cityValue || locationParts.city;
+          if (!nextValues.oneLineDescription && oneLineValue) nextValues.oneLineDescription = oneLineValue;
+          if (!nextValues.companyDescription && companyDescriptionValue) nextValues.companyDescription = companyDescriptionValue;
+          if (!nextValues.productDescription && productValue) nextValues.productDescription = productValue;
+          if (!nextValues.pitchDeckPath && pitchDeckPathValue) nextValues.pitchDeckPath = pitchDeckPathValue;
+          if (!nextValues.annualRevenue && annualRevenueValue) nextValues.annualRevenue = annualRevenueValue;
+          if (!nextValues.preMoneyValuation && preMoneyValue) nextValues.preMoneyValuation = preMoneyValue;
+          if (!website.trim() && websiteValue) setWebsite(websiteValue);
+        }
+      } catch {
+        // best effort
+      }
+    }
+
+    if (!nextValues.companyName) nextValues.companyName = inferCompanyNameFromText(sourceText) || legalName.trim() || 'Startup Company';
+    if (!nextValues.sector) nextValues.sector = 'Technology / SaaS';
+    if (!nextValues.stage) nextValues.stage = 'Seed';
+    if (!nextValues.businessModel) nextValues.businessModel = 'B2B SaaS';
+    if (!nextValues.country) nextValues.country = 'United States';
+    if (!nextValues.stateRegion) nextValues.stateRegion = 'California';
+    if (!nextValues.city) nextValues.city = 'San Francisco';
+    if (!nextValues.oneLineDescription) nextValues.oneLineDescription = `Early-stage company in ${nextValues.sector} focused on growth.`;
+    if (!nextValues.companyDescription) nextValues.companyDescription = `${nextValues.companyName} is building products to solve validated customer and market needs.`;
+    if (!nextValues.productDescription) nextValues.productDescription = nextValues.oneLineDescription;
+    if (!nextValues.pitchDeckPath && !pitchDeckFile) {
+      const safeName = 'pitch_deck.pdf';
+      nextValues.pitchDeckPath = `/uploads/${safeName}`;
+    }
+    if (!isPositiveNumberText(nextValues.annualRevenue)) nextValues.annualRevenue = '100000';
+    if (!isPositiveNumberText(nextValues.preMoneyValuation)) nextValues.preMoneyValuation = '5000000';
+
+    setCompanyName(nextValues.companyName);
+    setSector(nextValues.sector);
+    setStage(nextValues.stage);
+    setBusinessModel(nextValues.businessModel);
+    setCountry(nextValues.country);
+    setStateRegion(nextValues.stateRegion);
+    setCity(nextValues.city);
+    setOneLineDescription(nextValues.oneLineDescription);
+    setCompanyDescription(nextValues.companyDescription);
+    setProductDescription(nextValues.productDescription);
+    if (!pitchDeckFile) setPitchDeckPath(nextValues.pitchDeckPath);
+    setAnnualRevenue(nextValues.annualRevenue);
+    setPreMoneyValuation(nextValues.preMoneyValuation);
+
+    const stillMissing = [
+      !nextValues.companyName ? 'Company Name' : null,
+      !nextValues.sector ? 'Industry Vertical' : null,
+      !nextValues.stage ? 'Development Stage' : null,
+      !nextValues.businessModel ? 'Business Model' : null,
+      !nextValues.country ? 'Country' : null,
+      !nextValues.stateRegion ? 'State' : null,
+      !nextValues.city ? 'City' : null,
+      !nextValues.oneLineDescription ? 'One-Line Description' : null,
+      !nextValues.companyDescription ? 'Company Description' : null,
+      !nextValues.productDescription ? 'Product Description' : null,
+      !(nextValues.pitchDeckPath || !!pitchDeckFile) ? 'Pitch Deck Path' : null,
+      !isPositiveNumberText(nextValues.annualRevenue) ? 'Annual Revenue' : null,
+      !isPositiveNumberText(nextValues.preMoneyValuation) ? 'Pre-Money Valuation' : null,
+    ].filter(Boolean) as string[];
+
+    if (stillMissing.length === 0) {
+      toast({
+        title: 'Auto-filled and ready for review',
+        description: 'Required company fields were completed. Please review and continue.',
+      });
+    }
+
+    return stillMissing;
+  };
+
+  const goToNext = async () => {
+    if (currentStep === 3 && !canAdvanceFrom(3)) {
+      const unresolvedAfterAutoFill = await autoCompleteSsdRequiredFields();
+      if (unresolvedAfterAutoFill.length === 0) {
+        setCompletedSteps((prev) => [...new Set([...prev, currentStep])]);
+        setCurrentStep((s) => getNextStepId(s));
+        return;
+      }
+    }
+
     if (!canAdvanceFrom(currentStep)) {
       const missingSsdStep3Fields = [
         sector.length === 0 ? 'Industry Vertical' : null,
@@ -1788,7 +1954,7 @@ export default function TriageReportWizardPage() {
             ? 'Save Report is required before proceeding to Report Complete.'
             : currentStep === 4
             ? 'Please enter a pitch summary.'
-            : 'Please select at least one module.',
+            : 'Please complete the required information and try again.',
       });
       return;
     }
@@ -1798,26 +1964,9 @@ export default function TriageReportWizardPage() {
 
   const goToPrev = () => setCurrentStep((s) => getPrevStepId(s));
 
-  const moduleToSections: Record<string, string[]> = {
-    tca: ['tca-scorecard', 'tca-summary-card', 'tca-ai-table', 'tca-interpretation-summary', 'weighted-score-breakdown'],
-    risk: ['risk-flag-summary-table', 'flag-analysis-narrative'],
-    gap: ['gap-analysis'],
-    macro: ['macro-trend-alignment'],
-    benchmark: ['benchmark-comparison', 'competitive-landscape'],
-    growth: ['growth-classifier'],
-    team: ['team-assessment'],
-    analyst: ['analyst-comments', 'analyst-ai-deviation'],
-    founderFit: ['team-assessment'],
-    strategic: ['competitive-landscape'],
-    marketing: ['competitive-landscape'],
-    social: ['macro-trend-alignment'],
-    environmental: ['macro-trend-alignment'],
-    strategicFit: ['final-recommendation'],
-    funder: ['final-recommendation'],
-  };
+  const moduleToSections: Record<string, string[]> = {};
 
-  const toggleModule = (moduleId: string, required: boolean) => {
-    if (required) return;
+  const toggleModule = (moduleId: string) => {
     const isCurrentlySelected = selectedModules.includes(moduleId);
     setSelectedModules((prev) =>
       isCurrentlySelected ? prev.filter((m) => m !== moduleId) : [...prev, moduleId]
@@ -1889,11 +2038,6 @@ export default function TriageReportWizardPage() {
 
   const toggleAllSections = (active: boolean) => {
     if (!isAdminOrAnalyst) return;
-
-    const managedSectionIds = new Set(Object.values(moduleToSections).flat());
-    const activeManagedIds = new Set(
-      selectedModules.flatMap((moduleId) => moduleToSections[moduleId] ?? [])
-    );
 
     setReportSections((prev) =>
       prev.map((s) => {
@@ -2611,6 +2755,13 @@ export default function TriageReportWizardPage() {
       localStorage.setItem('analysisResult', JSON.stringify(analysisWithReportContext));
       sessionStorage.setItem('analysisResult', JSON.stringify(analysisWithReportContext));
       localStorage.setItem('analysisFramework', framework);
+      localStorage.setItem('currentReportType', 'triage');
+      localStorage.setItem('triageSelectedModules', JSON.stringify(effectiveSelectedModules));
+      localStorage.setItem('triageReportSections', JSON.stringify(reportSections));
+      localStorage.setItem(
+        isAdminOrAnalyst ? 'report-config-triage-admin' : 'report-config-triage-standard',
+        JSON.stringify(reportSections)
+      );
 
       const scoreData = (analysisWithReportContext as { tcaData?: { overallScore?: number; compositeScore?: number } })?.tcaData;
       const tcaScore = scoreData?.compositeScore ?? scoreData?.overallScore ?? 0;
@@ -2736,6 +2887,7 @@ export default function TriageReportWizardPage() {
                     <input
                       id="pitch-deck-input"
                       type="file"
+                      title="Select pitch deck file"
                       className="hidden"
                       accept=".pdf,.ppt,.pptx,.doc,.docx"
                       title="Upload pitch deck"
@@ -3529,10 +3681,10 @@ export default function TriageReportWizardPage() {
                     return (
                       <div
                         key={mod.id}
-                        onClick={() => toggleModule(mod.id, mod.required)}
+                        onClick={() => toggleModule(mod.id)}
                         className={cn(
                           'flex items-start gap-3 rounded-lg border-2 p-4 transition-all',
-                          mod.required ? 'cursor-not-allowed opacity-90' : 'cursor-pointer',
+                          'cursor-pointer',
                           isSelected
                             ? 'border-primary bg-primary/5'
                             : 'border-border hover:border-primary/40'
@@ -3540,19 +3692,13 @@ export default function TriageReportWizardPage() {
                       >
                         <Checkbox
                           checked={isSelected}
-                          disabled={mod.required}
-                          onCheckedChange={() => toggleModule(mod.id, mod.required)}
+                          onCheckedChange={() => toggleModule(mod.id)}
                           className="mt-0.5"
                         />
                         <div className="flex-1 space-y-1">
                           <div className="flex items-center gap-2">
                             <Icon className="size-4 text-primary" />
                             <span className="font-medium text-sm">{mod.name}</span>
-                            {mod.required && (
-                              <Badge variant="secondary" className="text-xs">
-                                Required
-                              </Badge>
-                            )}
                           </div>
                           <p className="text-xs text-muted-foreground">{mod.description}</p>
                           <div className="text-xs text-muted-foreground">
@@ -3621,110 +3767,12 @@ export default function TriageReportWizardPage() {
                       disabled={lockedByModule || ALWAYS_AVAILABLE_TRIAGE_SECTION_IDS.has(section.id)}
                       onCheckedChange={() => toggleSection(section.id)}
                     />
-                      );
-                    })()}
                   </div>
                 ))}
               </div>
             </CardContent>
           </Card>
         );
-
-      case 8: {
-        const selectedModulesData = TRIAGE_MODULES.filter(m => selectedModules.includes(m.id));
-        const totalWeight = selectedModulesData.reduce((sum, m) => sum + m.weight, 0);
-        const simulatedComposite = totalWeight > 0
-          ? selectedModulesData.reduce((sum, m) => sum + (simulatedScores[m.id] ?? 50) * m.weight, 0) / totalWeight / 10
-          : 0;
-        return (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <SlidersHorizontal className="size-5" />
-                Module Score Simulation
-              </CardTitle>
-              <CardDescription>
-                Adjust expected scores per module to preview the composite result before running AI analysis. Scores range 0–100.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="rounded-lg border bg-primary/5 p-4 flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Simulated Composite Score</p>
-                  <p className="text-3xl font-bold text-primary">
-                    {simulatedComposite.toFixed(2)} <span className="text-lg font-normal text-muted-foreground">/ 10</span>
-                  </p>
-                </div>
-                <div className="flex flex-col items-end gap-2">
-                  <Badge
-                    variant={simulatedComposite >= 7 ? 'default' : simulatedComposite >= 5.5 ? 'secondary' : 'destructive'}
-                    className="text-sm px-3 py-1"
-                  >
-                    {simulatedComposite >= 7 ? 'Proceed' : simulatedComposite >= 5.5 ? 'Conditional' : 'Pass'}
-                  </Badge>
-                  <p className="text-xs text-muted-foreground">{selectedModulesData.length} modules · combined weight {totalWeight}</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {selectedModulesData.map((mod) => {
-                  const Icon = mod.icon;
-                  const score = simulatedScores[mod.id] ?? 50;
-                  const contribution = totalWeight > 0 ? (score * mod.weight / totalWeight / 10) : 0;
-                  return (
-                    <div key={mod.id} className="rounded-lg border p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Icon className="size-4 text-primary shrink-0" />
-                          <span className="font-medium text-sm">{mod.name}</span>
-                          <span className="text-xs text-muted-foreground">(wt:{mod.weight})</span>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-lg font-bold text-primary">{score}</span>
-                          <span className="text-xs text-muted-foreground ml-1">+{contribution.toFixed(2)}</span>
-                        </div>
-                      </div>
-                      <input
-                        type="range"
-                        min={0}
-                        max={100}
-                        step={1}
-                        value={score}
-                        aria-label={`Score for ${mod.name}`}
-                        title={`Score for ${mod.name}: ${score}`}
-                        onChange={(e) =>
-                          setSimulatedScores((prev) => ({ ...prev, [mod.id]: Number(e.target.value) }))
-                        }
-                        className="w-full accent-primary cursor-pointer h-2"
-                      />
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>0</span>
-                        <span>50</span>
-                        <span>100</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="flex items-center justify-between pt-2 border-t">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    setSimulatedScores(Object.fromEntries(TRIAGE_MODULES.map(m => [m.id, 50])))
-                  }
-                >
-                  <RefreshCw className="size-4 mr-2" />
-                  Reset All to 50
-                </Button>
-                <Button onClick={goToNext} className="gap-2 px-8" size="lg">
-                  <BrainCircuit className="size-4" />
-                  Finalize &amp; Continue to Generate
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        );
-      }
 
       case 9:
         return (
@@ -4211,7 +4259,7 @@ export default function TriageReportWizardPage() {
                 </Button>
                 {savedReportId && (
                   <Button variant="outline" asChild className="gap-2">
-                    <Link href="/dashboard/reports">
+                    <Link href="/dashboard/reports" prefetch={false}>
                       <Eye className="size-4" />
                       View All Reports
                     </Link>
@@ -4253,7 +4301,7 @@ export default function TriageReportWizardPage() {
               </div>
               <div className="flex flex-wrap justify-center gap-3">
                 <Button asChild>
-                  <Link href="/dashboard/reports">
+                  <Link href="/dashboard/reports" prefetch={false}>
                     <Eye className="mr-2 size-4" />
                     View All Reports
                   </Link>
@@ -4515,7 +4563,7 @@ export default function TriageReportWizardPage() {
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" asChild>
-              <Link href="/dashboard/reports">
+              <Link href="/dashboard/reports" prefetch={false}>
                 <ArrowLeft className="mr-1 size-4" />
                 Reports
               </Link>
@@ -4530,7 +4578,7 @@ export default function TriageReportWizardPage() {
           </p>
           {isAdminOrAnalyst && (
             <p className="text-xs text-muted-foreground">
-              Privileged flow: includes Simulation and full review steps.
+              Privileged flow: includes What-If and full review steps.
             </p>
           )}
         </div>
@@ -4543,7 +4591,7 @@ export default function TriageReportWizardPage() {
             Fresh Start
           </Button>
           <Button variant="ghost" size="sm" asChild>
-            <Link href="/dashboard/reports">
+            <Link href="/dashboard/reports" prefetch={false}>
               Cancel
             </Link>
           </Button>

@@ -272,6 +272,12 @@ async def readiness():
         )
 
 
+@app.get("/robots933456.txt", response_model=None)
+async def robots_probe_alias():
+    """Handle noisy bot/probe path without generating 404 spam."""
+    return JSONResponse(status_code=200, content={"status": "ok"})
+
+
 # =============================================================================
 # DETAILED HEALTH ENDPOINT - Only call this when needed (slow)
 # =============================================================================

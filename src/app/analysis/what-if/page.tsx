@@ -748,11 +748,12 @@ export default function SimulationPage() {
             const def = MODULE_DEFINITIONS[moduleId] || { name: moduleId, description: '' };
             // Use saved config if available, otherwise default values
             const savedConfig = savedConfigs[moduleId];
+            const enabledBySelection = selectedModuleSet.size === 0 || selectedModuleSet.has(moduleId);
             configs[moduleId] = {
               id: moduleId,
               name: def.name,
               description: def.description,
-              enabled: savedConfig?.enabled ?? true,
+              enabled: savedConfig?.enabled ?? enabledBySelection,
               simulated: savedConfig?.simulated ?? true, // Default to simulating all modules
             };
           });
@@ -903,7 +904,22 @@ export default function SimulationPage() {
           locked: true,
           settingsVersionId: selectedVersion?.id,
           settingsVersionName: selectedVersion?.version_name
-        }
+        },
+        triageConfig: {
+          selectedModules: Object.entries(moduleConfigs)
+            .filter(([, config]) => config.enabled)
+            .map(([moduleId]) => moduleId),
+          reportSections: (() => {
+            try {
+              const rawSections = localStorage.getItem('triageReportSections');
+              if (!rawSections) return [];
+              const parsed = JSON.parse(rawSections);
+              return Array.isArray(parsed) ? parsed : [];
+            } catch {
+              return [];
+            }
+          })(),
+        },
       };
 
       // Save to localStorage (with quota error handling)

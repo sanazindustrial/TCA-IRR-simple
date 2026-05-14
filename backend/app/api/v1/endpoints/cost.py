@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import Dict, Any, List, Optional
 import asyncpg
 
-from app.db import get_db, db_manager
+from app.db import get_db, db_manager  # type: ignore[import]
 from .auth import get_current_user
 
 logger = logging.getLogger(__name__)
@@ -25,6 +25,76 @@ def require_admin(current_user: dict = Depends(get_current_user)):
 
 
 router = APIRouter()
+
+
+def _as_dict(record: Optional[asyncpg.Record]) -> Dict[str, Any]:
+    """Convert asyncpg.Record to a plain dict for safe access."""
+    return dict(record) if record else {}
+
+
+async def _safe_fetch_user_activity(
+    db: asyncpg.Connection,
+    start_dt: datetime,
+    end_dt: datetime,
+) -> List[asyncpg.Record]:
+    """Return user activity while tolerating schema variations in users table."""
+    if not (await _table_exists(db, 'users') and await _table_exists(db, 'company_analyses')):
+        return []
+
+    candidate_queries = [
+        """
+            SELECT
+                u.username,
+                u.email,
+                COUNT(ca.id) as analysis_count
+            FROM users u
+            LEFT JOIN company_analyses ca ON ca.user_id = u.id
+                AND ca.created_at >= $1 AND ca.created_at <= $2
+            WHERE u.is_active = true
+            GROUP BY u.id, u.username, u.email
+            ORDER BY analysis_count DESC
+            LIMIT 10
+        """,
+        """
+            SELECT
+                COALESCE(u.full_name, u.email) as username,
+                u.email,
+                COUNT(ca.id) as analysis_count
+            FROM users u
+            LEFT JOIN company_analyses ca ON ca.user_id = u.id
+                AND ca.created_at >= $1 AND ca.created_at <= $2
+            WHERE u.is_active = true
+            GROUP BY u.id, u.full_name, u.email
+            ORDER BY analysis_count DESC
+            LIMIT 10
+        """,
+        """
+            SELECT
+                u.email as username,
+                u.email,
+                COUNT(ca.id) as analysis_count
+            FROM users u
+            LEFT JOIN company_analyses ca ON ca.user_id = u.id
+                AND ca.created_at >= $1 AND ca.created_at <= $2
+            WHERE u.is_active = true
+            GROUP BY u.id, u.email
+            ORDER BY analysis_count DESC
+            LIMIT 10
+        """,
+    ]
+
+    for query in candidate_queries:
+        try:
+            return await db.fetch(query, start_dt, end_dt)
+        except (asyncpg.exceptions.UndefinedColumnError, asyncpg.exceptions.GroupingError):
+            continue
+        except asyncpg.exceptions.UndefinedTableError:
+            return []
+        except Exception as exc:
+            logger.warning("User activity query failed; using empty fallback: %s", exc)
+            return []
+
+    return []
 
 
 @router.get("/summary")
@@ -47,43 +117,43 @@ async def get_cost_summary(
         else:
             start_dt = datetime.strptime(start_date, "%Y-%m-%d")
         
-        # Get total analysis counts from database
-        analysis_stats = await db.fetchrow("""
-            SELECT 
-                COUNT(*) as total_analyses,
-                COUNT(DISTINCT user_id) as unique_users,
-                COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed
-            FROM company_analyses
-            WHERE created_at >= $1 AND created_at <= $2
-        """, start_dt, end_dt)
+        # Get total analysis counts from database (schema-safe)
+        analysis_stats: Dict[str, Any] = {
+            "total_analyses": 0,
+            "unique_users": 0,
+            "completed": 0,
+        }
+        if await _table_exists(db, 'company_analyses'):
+            analysis_stats = _as_dict(await db.fetchrow("""
+                SELECT 
+                    COUNT(*) as total_analyses,
+                    COUNT(DISTINCT user_id) as unique_users,
+                    COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed
+                FROM company_analyses
+                WHERE created_at >= $1 AND created_at <= $2
+            """, start_dt, end_dt))
         
         # Get report counts
-        report_stats = await db.fetchrow("""
-            SELECT 
-                COUNT(*) as total_reports,
-                COUNT(CASE WHEN report_type = 'triage' THEN 1 END) as triage_reports,
-                COUNT(CASE WHEN report_type = 'due_diligence' THEN 1 END) as dd_reports
-            FROM reports
-            WHERE created_at >= $1 AND created_at <= $2
-        """, start_dt, end_dt) if await _table_exists(db, 'reports') else {'total_reports': 0, 'triage_reports': 0, 'dd_reports': 0}
+        report_stats: Dict[str, Any] = {
+            'total_reports': 0,
+            'triage_reports': 0,
+            'dd_reports': 0,
+        }
+        if await _table_exists(db, 'reports'):
+            report_stats = _as_dict(await db.fetchrow("""
+                SELECT 
+                    COUNT(*) as total_reports,
+                    COUNT(CASE WHEN report_type = 'triage' THEN 1 END) as triage_reports,
+                    COUNT(CASE WHEN report_type = 'due_diligence' THEN 1 END) as dd_reports
+                FROM reports
+                WHERE created_at >= $1 AND created_at <= $2
+            """, start_dt, end_dt))
         
-        # Get user activity
-        user_activity = await db.fetch("""
-            SELECT 
-                u.username,
-                u.email,
-                COUNT(ca.id) as analysis_count
-            FROM users u
-            LEFT JOIN company_analyses ca ON ca.user_id = u.id 
-                AND ca.created_at >= $1 AND ca.created_at <= $2
-            WHERE u.is_active = true
-            GROUP BY u.id, u.username, u.email
-            ORDER BY analysis_count DESC
-            LIMIT 10
-        """, start_dt, end_dt)
+        # Get user activity (schema-safe)
+        user_activity = await _safe_fetch_user_activity(db, start_dt, end_dt)
         
         # Calculate estimated costs based on usage
-        total_analyses = analysis_stats['total_analyses'] if analysis_stats else 0
+        total_analyses = int(analysis_stats.get('total_analyses', 0) or 0)
         ai_cost_per_analysis = 0.45  # Estimated cost per analysis
         total_ai_cost = total_analyses * ai_cost_per_analysis
         
@@ -116,21 +186,23 @@ async def get_cost_summary(
         ]
         
         # Get daily cost trends
-        daily_trends = await db.fetch("""
-            SELECT 
-                DATE(created_at) as date,
-                COUNT(*) as analyses
-            FROM company_analyses
-            WHERE created_at >= $1 AND created_at <= $2
-            GROUP BY DATE(created_at)
-            ORDER BY date DESC
-            LIMIT 7
-        """, start_dt, end_dt)
+        daily_trends = []
+        if await _table_exists(db, 'company_analyses'):
+            daily_trends = await db.fetch("""
+                SELECT
+                    DATE(created_at) as date,
+                    COUNT(*) as analyses
+                FROM company_analyses
+                WHERE created_at >= $1 AND created_at <= $2
+                GROUP BY DATE(created_at)
+                ORDER BY date DESC
+                LIMIT 7
+            """, start_dt, end_dt)
         
         trends = [
             {
-                "date": row['date'].strftime("%m/%d/%Y"),
-                "cost": round(row['analyses'] * ai_cost_per_analysis, 2)
+                "date": row['date'].strftime("%m/%d/%Y") if hasattr(row['date'], 'strftime') else str(row['date']),
+                "cost": round(int(row['analyses'] or 0) * ai_cost_per_analysis, 2)
             }
             for row in daily_trends
         ]
@@ -152,15 +224,15 @@ async def get_cost_summary(
                 for row in user_activity[:5]
             ],
             "costByReportType": [
-                {"name": "Triage Reports", "cost": round((report_stats.get('triage_reports', 0) if report_stats else 0) * ai_cost_per_analysis, 2), "percentage": 70.0},
-                {"name": "Due Diligence", "cost": round((report_stats.get('dd_reports', 0) if report_stats else 0) * ai_cost_per_analysis * 2, 2), "percentage": 30.0}
+                {"name": "Triage Reports", "cost": round(int(report_stats.get('triage_reports', 0) or 0) * ai_cost_per_analysis, 2), "percentage": 70.0},
+                {"name": "Due Diligence", "cost": round(int(report_stats.get('dd_reports', 0) or 0) * ai_cost_per_analysis * 2, 2), "percentage": 30.0}
             ]
         }
         
         return {
             "totalCost": round(total_ai_cost + 5.0, 2),  # Add base infrastructure cost
             "totalRequests": total_analyses,
-            "billedUsers": analysis_stats['unique_users'] if analysis_stats else 0,
+            "billedUsers": int(analysis_stats.get('unique_users', 0) or 0),
             "dailyAverage": round((total_ai_cost + 5.0) / 30, 2),
             "breakdown": breakdown,
             "trends": trends,
@@ -257,7 +329,7 @@ async def get_budget_status(
             WHERE created_at >= $1
         """, start_of_month)
         
-        monthly_cost = monthly_analyses * 0.45
+        monthly_cost = int(monthly_analyses or 0) * 0.45
         monthly_budget = 500.00  # Default budget
         
         return {
@@ -287,12 +359,13 @@ async def get_budget_status(
 async def _table_exists(db: asyncpg.Connection, table_name: str) -> bool:
     """Check if a table exists in the database"""
     try:
-        return await db.fetchval("""
+        result = await db.fetchval("""
             SELECT EXISTS (
                 SELECT FROM information_schema.tables 
                 WHERE table_name = $1
             )
         """, table_name)
+        return bool(result)
     except Exception:
         return False
 
@@ -347,16 +420,22 @@ async def get_public_cost_summary(
 
         async with db_manager.get_connection() as db:
             # Get total analysis counts from database
-            analysis_stats = await db.fetchrow("""
-                SELECT 
-                    COUNT(*) as total_analyses,
-                    COUNT(DISTINCT user_id) as unique_users,
-                    COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed
-                FROM company_analyses
-                WHERE created_at >= $1 AND created_at <= $2
-            """, start_dt, end_dt)
+            analysis_stats: Dict[str, Any] = {
+                "total_analyses": 0,
+                "unique_users": 0,
+                "completed": 0,
+            }
+            if await _table_exists(db, 'company_analyses'):
+                analysis_stats = _as_dict(await db.fetchrow("""
+                    SELECT 
+                        COUNT(*) as total_analyses,
+                        COUNT(DISTINCT user_id) as unique_users,
+                        COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed
+                    FROM company_analyses
+                    WHERE created_at >= $1 AND created_at <= $2
+                """, start_dt, end_dt))
 
-            total_analyses = analysis_stats['total_analyses'] if analysis_stats else 0
+            total_analyses = int(analysis_stats.get('total_analyses', 0) or 0)
             ai_cost_per_analysis = 0.45
             total_ai_cost = total_analyses * ai_cost_per_analysis
 
@@ -429,7 +508,7 @@ async def get_public_cost_summary(
             return {
                 "totalCost": round(total_ai_cost + 5.0, 2),
                 "totalRequests": total_analyses,
-                "billedUsers": analysis_stats['unique_users'] if analysis_stats else 0,
+                "billedUsers": int(analysis_stats.get('unique_users', 0) or 0),
                 "dailyAverage": round((total_ai_cost + 5.0) / 30, 2),
                 "breakdown": breakdown,
                 "trends": trends,
