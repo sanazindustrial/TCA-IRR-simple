@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
 
 from app.db.database import db_manager
+from .auth import get_current_user
 from app.models.settings_version import (
     SettingsVersion,
     SettingsVersionCreate,
@@ -356,6 +357,54 @@ async def update_settings_version(version_id: int,
                 await conn.execute(query, *params)
 
             return await get_settings_version(version_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/versions/{version_id}", status_code=204)
+async def delete_settings_version(
+    version_id: int,
+    current_user: dict = Depends(get_current_user),
+):
+    """Delete a non-active settings version (admin only).
+
+    Safety:
+      - Admin role required
+      - Refuses to delete the currently-active version
+      - Refuses if any simulation_runs reference it (FK is NO ACTION)
+      - module_settings / tca_category_settings cascade automatically
+    """
+    if (current_user or {}).get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    try:
+        async with db_manager.get_transaction() as conn:
+            row = await conn.fetchrow(
+                "SELECT id, is_active FROM module_settings_versions WHERE id = $1",
+                version_id,
+            )
+            if not row:
+                raise HTTPException(status_code=404, detail="Settings version not found")
+            if row["is_active"]:
+                raise HTTPException(status_code=409, detail="Cannot delete the active settings version")
+
+            sim_count = await conn.fetchval(
+                "SELECT COUNT(*) FROM simulation_runs WHERE settings_version_id = $1",
+                version_id,
+            )
+            if sim_count and sim_count > 0:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Cannot delete: {sim_count} simulation_runs reference this version",
+                )
+
+            await conn.execute(
+                "DELETE FROM module_settings_versions WHERE id = $1",
+                version_id,
+            )
+        return None
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
