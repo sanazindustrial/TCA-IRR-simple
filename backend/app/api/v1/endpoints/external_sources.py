@@ -11,8 +11,10 @@ from datetime import datetime, timedelta
 from functools import lru_cache
 import httpx
 from pydantic import BaseModel, Field
-from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Query, BackgroundTasks, Depends
 from enum import Enum
+
+from .auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -1275,7 +1277,11 @@ async def get_health_dashboard():
 
 
 @router.post("/api-keys/{source_id}")
-async def set_api_key(source_id: str, api_key: str):
+async def set_api_key(
+    source_id: str,
+    api_key: str,
+    current_user: dict = Depends(get_current_user),
+):
     """Store API key for a source (in production, use Azure Key Vault)"""
     if source_id not in EXTERNAL_SOURCES:
         raise HTTPException(status_code=404, detail=f"Source {source_id} not found")
@@ -1287,7 +1293,10 @@ async def set_api_key(source_id: str, api_key: str):
 
 
 @router.delete("/api-keys/{source_id}")
-async def delete_api_key(source_id: str):
+async def delete_api_key(
+    source_id: str,
+    current_user: dict = Depends(get_current_user),
+):
     """Remove API key for a source"""
     if source_id in _api_keys:
         del _api_keys[source_id]
@@ -1295,7 +1304,9 @@ async def delete_api_key(source_id: str):
 
 
 @router.get("/api-keys")
-async def list_configured_keys():
+async def list_configured_keys(
+    current_user: dict = Depends(get_current_user),
+):
     """List which sources have API keys configured (masked)"""
     return {
         source_id: f"{key[:4]}...{key[-4:]}" if len(key) > 8 else "****"
@@ -1427,7 +1438,11 @@ async def get_categories_summary():
 # ============================================================================
 
 @router.post("/enrich-report-context")
-async def enrich_report_context(company_name: str, company_website: Optional[str] = None):
+async def enrich_report_context(
+    company_name: str,
+    company_website: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
     """
     Enrich report context by fetching data from multiple sources.
     Call this before generate_report() to add external data.
