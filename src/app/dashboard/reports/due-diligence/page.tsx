@@ -1396,8 +1396,7 @@ ${sectionsHtml}
                   />
                 ) : (
                   <div
-                    className="rounded-lg border bg-white shadow-sm overflow-y-auto"
-                    style={{ maxHeight: '620px' }}
+                    className="rounded-lg border bg-white shadow-sm overflow-y-auto max-h-[620px]"
                     dangerouslySetInnerHTML={{
                       __html: DOMPurify.sanitize(
                         htmlReportContent || '<p style="padding:1.5rem;color:#94a3b8;font-size:0.875rem;">Report preview will appear here after generation.</p>',

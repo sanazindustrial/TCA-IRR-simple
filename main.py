@@ -2326,8 +2326,8 @@ async def complete_invite(request: CompleteInviteRequest):
 
 @app.get("/api/v1/roles/configurations")
 @app.get("/roles/configurations")
-async def get_role_configurations():
-    """Get all role configurations from database or defaults"""
+async def get_role_configurations(current_user: dict = Depends(get_current_user)):
+    """Get all role configurations from database or defaults (auth required)"""
     try:
         async with db_manager.get_connection() as conn:
             # Check if tables exist
@@ -6927,8 +6927,9 @@ async def delete_ssd_audit_log(tracking_id: str):
 
 
 @app.get("/api/v1/settings/versions")
-async def get_all_settings_versions_v1(include_archived: bool = False):
-    """Get all settings versions"""
+async def get_all_settings_versions_v1(include_archived: bool = False,
+                                       current_user: dict = Depends(get_current_user)):
+    """Get all settings versions (auth required)"""
     try:
         async with db_manager.get_connection() as conn:
             rows = await conn.fetch(
@@ -7220,8 +7221,9 @@ async def get_reports_v1(status: Optional[str] = None,
                          report_type: Optional[str] = None,
                          company_name: Optional[str] = None,
                          limit: int = 50,
-                         offset: int = 0):
-    """Get all reports with optional filtering"""
+                         offset: int = 0,
+                         current_user: dict = Depends(get_current_user)):
+    """Get all reports with optional filtering (auth required)"""
     try:
         async with db_manager.get_connection() as conn:
             conditions = ["1=1"]
@@ -9462,8 +9464,8 @@ async def get_cost_summary():
 
 
 @app.get("/api/v1/cost/summary/public")
-async def get_cost_summary_public():
-    """Public cost summary endpoint (no auth required)"""
+async def get_cost_summary_public(current_user: dict = Depends(get_current_user)):
+    """Cost summary endpoint (auth required - 'public' name retained for frontend compatibility)"""
     return await get_cost_summary()
 
 
@@ -11135,6 +11137,80 @@ async def ssd_connection_test():
             "error": str(e),
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
+
+
+# ============================================================================
+# Stub endpoints for frontend paths that previously returned 404
+# These return safe empty defaults so the UI can render without errors.
+# Replace with real implementations as features are wired up.
+# ============================================================================
+
+
+@app.get("/api/v1/analysis/")
+async def list_analyses_stub(current_user: dict = Depends(get_current_user)):
+    """Stub: list analyses (returns empty list pending real implementation)."""
+    return {"success": True, "data": [], "total": 0}
+
+
+@app.get("/api/v1/auth/email/status")
+async def email_status_v1_alias():
+    """Alias of /auth/email/status under /api/v1 prefix."""
+    return await email_status()
+
+
+@app.get("/api/v1/tca/system-status")
+async def tca_system_status_stub():
+    """Stub: TCA subsystem health check."""
+    return {
+        "success": True,
+        "status": "ok",
+        "components": {"api": "ok", "database": "ok", "workers": "ok"},
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+
+
+@app.get("/api/v1/tca/sector-analysis")
+async def tca_sector_analysis_stub(current_user: dict = Depends(get_current_user)):
+    """Stub: TCA sector analysis (returns empty payload)."""
+    return {"success": True, "data": {"sectors": [], "summary": {}}}
+
+
+@app.get("/api/v1/tca/quick")
+async def tca_quick_stub(current_user: dict = Depends(get_current_user)):
+    """Stub: TCA quick analysis (returns empty payload)."""
+    return {"success": True, "data": {}}
+
+
+@app.get("/api/v1/dashboard/charts")
+async def dashboard_charts_stub(current_user: dict = Depends(get_current_user)):
+    """Stub: dashboard charts data."""
+    return {"success": True, "data": {"charts": []}}
+
+
+@app.get("/api/v1/dashboard/stats")
+async def dashboard_stats_stub(current_user: dict = Depends(get_current_user)):
+    """Stub: dashboard stats data."""
+    return {
+        "success": True,
+        "data": {
+            "reports": 0,
+            "users": 0,
+            "evaluations": 0,
+            "pending": 0,
+        },
+    }
+
+
+@app.get("/api/v1/investments/")
+async def list_investments_stub(current_user: dict = Depends(get_current_user)):
+    """Stub: list investments."""
+    return {"success": True, "data": [], "total": 0}
+
+
+@app.post("/api/v1/analysis/ai-extract")
+async def analysis_ai_extract_stub(current_user: dict = Depends(get_current_user)):
+    """Stub: AI text extraction (returns empty payload pending implementation)."""
+    return {"success": True, "data": {"extracted": {}, "confidence": 0.0}}
 
 
 # Wrap app with ASGI JSON validation middleware (must be after all route definitions)
