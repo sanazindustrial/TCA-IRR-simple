@@ -128,7 +128,6 @@ class Settings(BaseSettings):
         "https://tca-irr.azurewebsites.net",
         "https://tca-irr-app.azurewebsites.net",
         "https://tcairrapiccontainer.azurewebsites.net",
-        "*"
     ]
 
     @field_validator("environment")
