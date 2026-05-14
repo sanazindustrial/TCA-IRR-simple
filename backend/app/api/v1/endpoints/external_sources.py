@@ -936,7 +936,7 @@ async def test_source_connection(source: ExternalSourceConfig, api_key: Optional
                     # Truncate large responses
                     if isinstance(sample_data, dict) and len(str(sample_data)) > 1000:
                         sample_data = {"preview": "Data received successfully", "size": len(str(sample_data))}
-                except:
+                except Exception:
                     sample_data = {"preview": response.text[:200] if response.text else "Empty response"}
             
             return SourceTestResult(
@@ -1318,7 +1318,7 @@ async def get_cost_summary():
             try:
                 cost_str = source.cost.replace("$", "").replace("/mo", "").split(" ")[0]
                 monthly_cost = float(cost_str)
-            except:
+            except (AttributeError, TypeError, ValueError):
                 monthly_cost = 0
         
         api_calls = len(_source_costs.get(source_id, []))

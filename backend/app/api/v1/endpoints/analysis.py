@@ -133,6 +133,12 @@ async def comprehensive_analysis(company_data: Dict[str, Any]):
             # Fallback to calculated analysis
             analysis_result = _calculate_fallback_analysis(company_data)
 
+        # Echo the What-If / Simulation scenario (Step 10 of the triage wizard)
+        # so the report page can persist it next to the AI-derived scores.
+        what_if_scenario = company_data.get("what_if_scenario")
+        if isinstance(what_if_scenario, dict) and what_if_scenario:
+            analysis_result.setdefault("what_if_scenario", what_if_scenario)
+
         return analysis_result
 
     except Exception as e:

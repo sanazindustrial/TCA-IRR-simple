@@ -746,7 +746,7 @@ async def get_cost_summary():
     budget = os.environ.get("TCA_MONTHLY_BUDGET", 500.0)
     try:
         budget = float(budget)
-    except:
+    except (TypeError, ValueError):
         budget = 500.0
     
     return CostSummary(
@@ -846,7 +846,7 @@ async def test_source(source_id: str):
                     preview = {"_truncated": True, "_keys": list(preview.keys())[:10]}
                 elif isinstance(preview, list) and len(preview) > 5:
                     preview = preview[:5] + [{"_truncated": True, "_total": len(preview)}]
-            except:
+            except Exception:
                 preview = {"_raw": response.text[:500]}
             
             return TestResult(

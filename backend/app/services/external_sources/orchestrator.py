@@ -166,7 +166,7 @@ class SourceAdapter:
             # Try to parse JSON
             try:
                 data = response.json()
-            except:
+            except Exception:
                 data = {"raw": response.text[:5000]}
             
             return SourceResponse(

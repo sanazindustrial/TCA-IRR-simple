@@ -5,11 +5,13 @@ import asyncio
 import asyncpg
 import ssl
 
-DB_HOST = 'tca-irr-server.postgres.database.azure.com'
-DB_PORT = 5432
-DB_NAME = 'tca_platform'
-DB_USER = 'tcairrserver'
-DB_PASSWORD = 'Tc@1rr53rv5r'
+DB_HOST = os.environ.get('DB_HOST', 'tca-irr-server.postgres.database.azure.com')
+DB_PORT = int(os.environ.get('DB_PORT', '5432'))
+DB_NAME = os.environ.get('DB_NAME', 'tca_platform')
+DB_USER = os.environ.get('DB_USER', 'tcairrserver')
+DB_PASSWORD = os.environ.get('DB_PASSWORD')
+if not DB_PASSWORD:
+    raise SystemExit('DB_PASSWORD environment variable is required')
 
 def parse_sql_statements(sql_content):
     """Parse SQL content into individual statements, handling multi-line correctly"""

@@ -107,7 +107,7 @@ def record_to_response(record: asyncpg.Record) -> Dict[str, Any]:
         import json
         try:
             metadata = json.loads(metadata)
-        except:
+        except Exception:
             metadata = {}
     
     return {
@@ -362,7 +362,7 @@ async def update_report(
         if isinstance(current_metadata, str):
             try:
                 current_metadata = json.loads(current_metadata)
-            except:
+            except Exception:
                 current_metadata = {}
         
         # Update metadata fields

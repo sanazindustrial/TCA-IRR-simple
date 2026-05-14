@@ -314,7 +314,9 @@ async def create_settings_version(data: SettingsVersionCreate):
                         tc.is_medtech_active, tc.normalization_key,
                         tc.description, tc.factors)
 
-            return await get_settings_version(version_id)
+            if version_id is None:
+                raise HTTPException(status_code=500, detail="Failed to create settings version")
+            return await get_settings_version(int(version_id))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -330,8 +332,8 @@ async def update_settings_version(version_id: int,
                 await conn.execute(
                     "UPDATE module_settings_versions SET is_active = FALSE")
 
-            updates = []
-            params = [version_id]
+            updates: list[str] = []
+            params: list[Any] = [version_id]
             param_idx = 2
 
             if data.version_name is not None:
