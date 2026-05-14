@@ -78,7 +78,7 @@ async def get_analysis(analysis_id: int,
 
 
 @router.post("/test", response_model=Dict[str, Any])
-async def test_analysis(company_data: Dict[str, Any]):
+async def test_analysis(company_data: Dict[str, Any], current_user: dict = Depends(get_current_user)):
     """Test endpoint for basic analysis"""
     return {
         "test": "success",
@@ -88,7 +88,7 @@ async def test_analysis(company_data: Dict[str, Any]):
 
 
 @router.post("/comprehensive", response_model=Dict[str, Any])
-async def comprehensive_analysis(company_data: Dict[str, Any]):
+async def comprehensive_analysis(company_data: Dict[str, Any], current_user: dict = Depends(get_current_user)):
     """Run comprehensive TCA analysis on company data"""
     try:
         company_name = (company_data.get("company_name") or company_data.get("name") or "").strip()
@@ -557,7 +557,7 @@ def _analyze_team_strength(company_data: Dict[str, Any]) -> str:
 # ============ Company Info Extraction Endpoint ============
 
 @router.post("/extract-company-info", response_model=Dict[str, Any])
-async def extract_company_info(request_data: Dict[str, Any]):
+async def extract_company_info(request_data: Dict[str, Any], current_user: dict = Depends(get_current_user)):
     """
     Extract company information from document content using AI/NLP.
     Used by frontend to auto-fill company information form after document upload.
@@ -903,7 +903,7 @@ async def extract_company_info(request_data: Dict[str, Any]):
 # ============ Analyst Review Workflow Endpoints ============
 
 @router.post("/analyst-reviews", response_model=Dict[str, Any])
-async def create_analyst_review(review_data: Dict[str, Any]):
+async def create_analyst_review(review_data: Dict[str, Any], current_user: dict = Depends(get_current_user)):
     """
     Create a new analyst review for an analysis.
     Captures human scores, comments, and deviation rationale.
@@ -956,13 +956,13 @@ async def create_analyst_review(review_data: Dict[str, Any]):
 
 
 @router.put("/analyst-reviews", response_model=Dict[str, Any])
-async def upsert_analyst_review(review_data: Dict[str, Any]):
+async def upsert_analyst_review(review_data: Dict[str, Any], current_user: dict = Depends(get_current_user)):
     """PUT alias for clients that upsert analyst reviews."""
     return await create_analyst_review(review_data)
 
 
 @router.get("/analyst-reviews/{analysis_id}", response_model=Dict[str, Any])
-async def get_analyst_review(analysis_id: str):
+async def get_analyst_review(analysis_id: str, current_user: dict = Depends(get_current_user)):
     """Get analyst review for an analysis"""
     # In production, fetch from database
     return {
@@ -973,7 +973,7 @@ async def get_analyst_review(analysis_id: str):
 
 
 @router.post("/ai-deviation-comparison", response_model=Dict[str, Any])
-async def compare_ai_human_scores(comparison_data: Dict[str, Any]):
+async def compare_ai_human_scores(comparison_data: Dict[str, Any], current_user: dict = Depends(get_current_user)):
     """
     Compare AI scores with human analyst scores and generate deviation analysis.
     Used by the AI vs Human Gap Analysis component.
@@ -1028,7 +1028,7 @@ async def compare_ai_human_scores(comparison_data: Dict[str, Any]):
 
 
 @router.post("/submit-for-training", response_model=Dict[str, Any])
-async def submit_for_ml_training(training_data: Dict[str, Any]):
+async def submit_for_ml_training(training_data: Dict[str, Any], current_user: dict = Depends(get_current_user)):
     """
     Submit analyst review data for ML model training.
     Captures human corrections to improve AI accuracy over time.
@@ -1068,7 +1068,7 @@ async def submit_for_ml_training(training_data: Dict[str, Any]):
 
 
 @router.post("/sentiment-analysis", response_model=Dict[str, Any])
-async def analyze_comment_sentiment(request_data: Dict[str, Any]):
+async def analyze_comment_sentiment(request_data: Dict[str, Any], current_user: dict = Depends(get_current_user)):
     """
     Analyze sentiment and insights from analyst comments.
     Supports deep content analysis for reviewer feedback.
@@ -1321,8 +1321,9 @@ def _calculate_training_priority(training_data: Dict[str, Any]) -> str:
 
 @router.post("/extract-text-from-file", response_model=Dict[str, Any])
 async def extract_text_from_file(
-    file: bytes = None,
-    file_data: Dict[str, Any] = None,
+    file: Optional[bytes] = None,
+    file_data: Optional[Dict[str, Any]] = None,
+    current_user: dict = Depends(get_current_user),
 ):
     """
     Extract text content from uploaded files (PDF, DOCX, etc.)

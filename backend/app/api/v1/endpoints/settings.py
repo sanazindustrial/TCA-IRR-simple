@@ -25,7 +25,7 @@ from app.models.settings_version import (
     DEFAULT_TCA_CATEGORIES,
 )
 
-router = APIRouter(prefix="/settings", tags=["Settings"])
+router = APIRouter(prefix="/settings", tags=["Settings"], dependencies=[Depends(get_current_user)])
 
 
 def parse_json_field(value: Any) -> dict:

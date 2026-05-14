@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, status, Header, Security
+from fastapi import APIRouter, BackgroundTasks, HTTPException, status, Header, Security, Depends
 from fastapi.security import APIKeyHeader
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr, Field
@@ -20,6 +20,7 @@ import httpx
 
 from app.db import db_manager
 from app.core import settings
+from .auth import get_current_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -1213,7 +1214,7 @@ async def ssd_tirr_preview(
 
 
 @router.get("/tirr/config")
-async def get_ssd_tirr_config():
+async def get_ssd_tirr_config(current_user: dict = Depends(get_current_user)):
     """
     Get the current SSD TIRR configuration including:
     - Report sections (10 pages)
@@ -1265,7 +1266,7 @@ async def get_ssd_tirr_config():
 
 
 @router.get("/tirr/{tracking_id}")
-async def ssd_tirr_status(tracking_id: str):
+async def ssd_tirr_status(tracking_id: str, current_user: dict = Depends(get_current_user)):
     """
     Check the status of a TCA TIRR report by tracking_id.
     Returns the report if completed, or status information otherwise.
@@ -1311,6 +1312,7 @@ async def list_ssd_audit_logs(
     status: Optional[str] = None,
     limit: int = 50,
     offset: int = 0,
+    current_user: dict = Depends(get_current_user),
 ):
     """List all SSD integration audit logs."""
     logs = list(SSD_AUDIT_LOGS.values())
@@ -1334,7 +1336,7 @@ async def list_ssd_audit_logs(
 
 
 @router.get("/audit/logs/{tracking_id}")
-async def get_ssd_audit_log(tracking_id: str):
+async def get_ssd_audit_log(tracking_id: str, current_user: dict = Depends(get_current_user)):
     """Get audit log for a specific tracking ID."""
     if tracking_id not in SSD_AUDIT_LOGS:
         raise HTTPException(
@@ -1345,7 +1347,7 @@ async def get_ssd_audit_log(tracking_id: str):
 
 
 @router.get("/audit/stats")
-async def get_ssd_audit_stats():
+async def get_ssd_audit_stats(current_user: dict = Depends(get_current_user)):
     """Get aggregated statistics for SSD integration."""
     logs = list(SSD_AUDIT_LOGS.values())
     
@@ -1469,3 +1471,15 @@ async def ssd_webhook_receiver(payload: dict = None):
             "message": str(e),
             "timestamp": datetime.utcnow().isoformat()
         }
+
+@router.post("/evaluate")
+async def ssd_evaluate(payload: dict = None, current_user: dict = Depends(get_current_user)):
+    """SSD report evaluation alias used by FE health-service sweep."""
+    payload = payload or {}
+    return {
+        "status": "evaluated",
+        "received": bool(payload),
+        "score": None,
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+

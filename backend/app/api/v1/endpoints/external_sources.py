@@ -1017,7 +1017,8 @@ async def list_all_sources(
     category: Optional[SourceCategory] = None,
     pricing: Optional[SourcePricing] = None,
     free_only: bool = False,
-    tca_module: Optional[TCAModule] = None
+    tca_module: Optional[TCAModule] = None,
+    current_user: dict = Depends(get_current_user),
 ):
     """List all external sources with optional filtering"""
     sources = list(EXTERNAL_SOURCES.values())
@@ -1035,7 +1036,7 @@ async def list_all_sources(
 
 
 @router.get("/sources/{source_id}", response_model=ExternalSourceConfig)
-async def get_source(source_id: str):
+async def get_source(source_id: str, current_user: dict = Depends(get_current_user)):
     """Get details for a specific source"""
     if source_id not in EXTERNAL_SOURCES:
         raise HTTPException(status_code=404, detail=f"Source {source_id} not found")
@@ -1043,7 +1044,7 @@ async def get_source(source_id: str):
 
 
 @router.get("/sources/{source_id}/get-key-info")
-async def get_source_key_info(source_id: str):
+async def get_source_key_info(source_id: str, current_user: dict = Depends(get_current_user)):
     """Get information on how to obtain an API key for a source"""
     if source_id not in EXTERNAL_SOURCES:
         raise HTTPException(status_code=404, detail=f"Source {source_id} not found")
@@ -1128,7 +1129,7 @@ def _get_key_instructions(source: ExternalSourceConfig) -> str:
 
 
 @router.post("/sources/{source_id}/test", response_model=SourceTestResult)
-async def test_source(source_id: str, api_key: Optional[str] = None):
+async def test_source(source_id: str, api_key: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     """Test connection to a specific source"""
     if source_id not in EXTERNAL_SOURCES:
         raise HTTPException(status_code=404, detail=f"Source {source_id} not found")
@@ -1153,7 +1154,8 @@ async def test_source(source_id: str, api_key: Optional[str] = None):
 async def test_all_sources(
     category: Optional[SourceCategory] = None,
     free_only: bool = True,
-    background_tasks: BackgroundTasks = None
+    background_tasks: BackgroundTasks = None,
+    current_user: dict = Depends(get_current_user),
 ):
     """Test all sources (or filtered subset) - runs tests in parallel"""
     sources = list(EXTERNAL_SOURCES.values())
@@ -1223,7 +1225,7 @@ async def get_sources_health():
 
 
 @router.get("/health/dashboard")
-async def get_health_dashboard():
+async def get_health_dashboard(current_user: dict = Depends(get_current_user)):
     """Get dashboard data for source health monitoring"""
     total = len(EXTERNAL_SOURCES)
     healthy = sum(1 for h in _source_health.values() if h.status == "healthy")
@@ -1315,7 +1317,7 @@ async def list_configured_keys(
 
 
 @router.get("/costs")
-async def get_cost_summary():
+async def get_cost_summary(current_user: dict = Depends(get_current_user)):
     """Get cost summary for all sources"""
     # Calculate estimated costs based on pricing tiers
     cost_data = []
@@ -1360,7 +1362,7 @@ async def get_cost_summary():
 
 
 @router.get("/tca-mapping")
-async def get_tca_module_mapping():
+async def get_tca_module_mapping(current_user: dict = Depends(get_current_user)):
     """Get mapping of external sources to TCA scoring modules"""
     mapping = {}
     
@@ -1404,7 +1406,7 @@ def _get_module_description(module: TCAModule) -> str:
 
 
 @router.get("/categories")
-async def get_categories_summary():
+async def get_categories_summary(current_user: dict = Depends(get_current_user)):
     """Get summary of all source categories"""
     categories = {}
     
