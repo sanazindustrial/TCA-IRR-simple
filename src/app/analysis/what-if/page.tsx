@@ -44,7 +44,6 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
-import { runAnalysis } from '@/app/analysis/actions';
 import { settingsApi, SettingsVersion, MODULE_DEFINITIONS as API_MODULE_DEFS } from '@/lib/settings-api';
 import { unifiedRecordTracking, generateSimulationId } from '@/lib/unified-record-tracking';
 
@@ -368,8 +367,8 @@ export default function SimulationPage() {
   }>({ evaluationId: '', companyName: '', userName: '', framework: '' });
 
   // Settings version state
-  const [settingsVersions, setSettingsVersions] = useState<SettingsVersion[]>([]);
-  const [selectedVersion, setSelectedVersion] = useState<SettingsVersion | null>(null);
+  const [settingsVersions, setSettingsVersions] = useState<any[]>([]);
+  const [selectedVersion, setSelectedVersion] = useState<any | null>(null);
   const [moduleWeights, setModuleWeights] = useState<Record<string, number>>({});
 
   const router = useRouter();
@@ -520,7 +519,28 @@ export default function SimulationPage() {
             const userData = JSON.parse(companySessionData);
 
             console.log('Fetching fresh analysis with data:', userData);
-            data = await runAnalysis('general', userData);
+            const analysisResponse = await fetch('/api/analysis/run', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ framework: 'general', userData }),
+            });
+
+            if (!analysisResponse.ok) {
+              let message = `Analysis request failed: ${analysisResponse.status} ${analysisResponse.statusText}`;
+              try {
+                const errorBody = await analysisResponse.json();
+                if (errorBody?.message || errorBody?.error) {
+                  message = String(errorBody.message || errorBody.error);
+                }
+              } catch {
+                // Ignore malformed error payload and keep status-derived fallback message.
+              }
+              throw new Error(message);
+            }
+
+            data = await analysisResponse.json();
 
             // Store the fresh data
             localStorage.setItem('analysisResult', JSON.stringify(data));
@@ -860,9 +880,9 @@ export default function SimulationPage() {
 
       // Calculate individual module scores separately
       const moduleScores: Record<string, number> = {};
-      Object.entries(editableScores).forEach(([moduleId, rows]) => {
-        if (moduleConfigs[moduleId]?.enabled && rows.length > 0) {
-          moduleScores[moduleId] = rows.reduce((sum, r) => sum + r.score, 0) / rows.length;
+      Object.entries(editableScores).forEach(([moduleId, rows]: [string, any]) => {
+        if (moduleConfigs[moduleId]?.enabled && (rows as any[]).length > 0) {
+          moduleScores[moduleId] = (rows as any[]).reduce((sum: number, r: any) => sum + r.score, 0) / (rows as any[]).length;
         }
       });
 
@@ -1017,7 +1037,7 @@ export default function SimulationPage() {
     router.push(`/analysis/result${queryString ? '?' + queryString : ''}`);
   }
 
-  const allScores = Object.values(editableScores).flat().map(s => s.score);
+  const allScores = Object.values(editableScores).flat().map((s: any) => s.score);
   const moduleCount = Object.keys(editableScores).length;
 
   if (isLoading) {
@@ -1182,7 +1202,7 @@ export default function SimulationPage() {
             <SummaryCard
               scores={allScores}
               moduleConfigs={moduleConfigs}
-              enabledCount={Object.values(moduleConfigs).filter(m => m.enabled).length}
+              enabledCount={Object.values(moduleConfigs).filter((m: any) => m.enabled).length}
               totalCount={Object.keys(moduleConfigs).length}
               editableScores={editableScores}
               simulationHistory={simulationHistory}

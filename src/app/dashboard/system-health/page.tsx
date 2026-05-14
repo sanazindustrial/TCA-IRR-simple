@@ -111,14 +111,22 @@ export default function SystemHealthPage() {
     const fetchHealthData = async () => {
         try {
             const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
-            const res = await fetch(`${API_BASE}/api/v1/dashboard/health`, {
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
-            });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const data = await res.json();
+        const headers = {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        };
+
+        // Prefer dashboard-specific health, then fall back to base backend health.
+        let res = await fetch(`${API_BASE}/api/v1/dashboard/health`, { headers });
+        let data: Record<string, any>;
+
+        if (!res.ok && res.status === 404) {
+          res = await fetch(`${API_BASE}/health`, { headers });
+        }
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        data = await res.json();
+
             setHealthData(prev => ({
                 ...prev,
                 cpu: data.cpu?.percent ?? prev.cpu,

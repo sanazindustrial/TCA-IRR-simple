@@ -104,7 +104,8 @@ export default function ModuleSettingsPage() {
     }, []);
 
     // Merge MODULE_DEFINITIONS to ensure all 17 modules appear
-    const mergeModuleSettings = useCallback((version: SettingsVersion): SettingsVersion => {
+    const mergeModuleSettings = useCallback((version: SettingsVersion | null): SettingsVersion | null => {
+        if (!version) return null;
         const existingIds = new Set((version.module_settings || []).map((m: { module_id: string }) => m.module_id));
         const missing = Object.entries(MODULE_DEFINITIONS)
             .filter(([id]) => !existingIds.has(id))
@@ -112,7 +113,9 @@ export default function ModuleSettingsPage() {
                 module_id: id,
                 module_name: def.name,
                 weight: def.weight,
-                is_enabled: false,
+                // Default newly-discovered modules to ACTIVE so analysts don't see
+                // a half-empty Module Settings page after a deploy adds modules.
+                is_enabled: true,
                 priority: (version.module_settings?.length ?? 0) + idx + 1,
                 settings: {},
                 thresholds: {},

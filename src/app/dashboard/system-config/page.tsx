@@ -92,10 +92,11 @@ const configurationFeatures = [
     { name: 'TCA Categories (12) with custom weights'},
     { name: 'Risk Flags (14) with thresholds'},
     { name: 'Growth Classifier (6 models)'},
-    { name: 'DD Configuration (10 modules)'},
+  { name: 'DD Configuration (17 modules)'},
     { name: 'Macro Trend Alignment'},
     { name: 'Benchmark Comparison'},
     { name: 'Founder & Strategic Fit Analysis'},
+  { name: 'Framework Profile Versioning (General · Life Science · Custom)'},
 ];
 
 const ApiKeyDialog = ({ open, onOpenChange, onSave, apiKey }: { open: boolean, onOpenChange: (open: boolean) => void, onSave: (key: ApiKey) => void, apiKey: ApiKey | null }) => {
@@ -637,7 +638,7 @@ export default function SystemConfigPage() {
                               <Rocket className="h-4 w-4 !text-blue-400" />
                               <AlertTitle className="text-blue-300">Create New Analysis Configurations</AlertTitle>
                               <AlertDescription className="text-blue-200/80">
-                                  Configure custom analysis setups for different sectors, use cases, or client requirements. Each setup includes TCA categories, risk flags, growth classifier, and all 9 analysis modules.
+                                  Configure custom analysis setups for different sectors, use cases, or client requirements. Each setup includes TCA categories, risk flags, growth classifier, and all 17 analysis modules.
                                   <div className="mt-4">
                                       <Button asChild variant="outline" className="bg-transparent hover:bg-blue-400/20 border-blue-400/50 text-blue-300">
                                           <Link href="/analysis/modules/tca">Open Sector Configuration Panel</Link>
@@ -703,7 +704,7 @@ export default function SystemConfigPage() {
                                       <li>Click "Create New Setup" in the Setup Management section.</li>
                                       <li>Enter setup name and select target sector.</li>
                                       <li>Choose base template (default or existing setup).</li>
-                                      <li>Configure all 9 modules with custom weights and settings.</li>
+                                      <li>Configure all 17 modules with custom weights and settings.</li>
                                       <li>Save and activate your new configuration.</li>
                                   </ol>
                               </AlertDescription>

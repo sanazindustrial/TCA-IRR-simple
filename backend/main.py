@@ -238,6 +238,17 @@ async def health_check_fast():
     }
 
 
+@app.get("/api/v1/dashboard/health", response_model=None)
+async def dashboard_health_compat():
+    """Compatibility endpoint for dashboard health checks in clients expecting /api/v1/dashboard/health."""
+    return {
+        "status": "healthy" if _app_ready else "starting",
+        "module": "dashboard",
+        "ready": _app_ready,
+        "timestamp": asyncio.get_event_loop().time(),
+    }
+
+
 @app.get("/healthz", response_model=None)
 async def healthz():
     """Kubernetes-style health endpoint - INSTANT"""

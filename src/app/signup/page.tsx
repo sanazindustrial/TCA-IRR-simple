@@ -10,8 +10,6 @@ import { UserPlus, Mail, Lock, User, Eye, EyeOff, Loader2, Info } from 'lucide-r
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
-
 export default function SignupPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -59,7 +57,7 @@ export default function SignupPage() {
       const fullName = `${firstName} ${lastName}`.trim();
       const username = email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '_').substring(0, 50);
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
+      const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -67,6 +65,8 @@ export default function SignupPage() {
           email,
           password,
           confirm_password: confirmPassword,
+          first_name: firstName,
+          last_name: lastName,
           full_name: fullName,
         }),
       });
@@ -78,13 +78,23 @@ export default function SignupPage() {
         });
         router.push('/login');
       } else {
-        const error = await response.json();
+        const error = await response.json().catch(() => ({}));
         let errorMessage = 'Registration failed. Please try again.';
+        const detail = error?.detail;
 
-        if (error.detail?.password_errors) {
-          errorMessage = error.detail.password_errors.join('. ');
-        } else if (typeof error.detail === 'string') {
-          errorMessage = error.detail;
+        if (response.status === 409 || response.status === 422) {
+          errorMessage = 'This email is already registered. Please sign in or reset your password.';
+        }
+
+        if (detail?.password_errors) {
+          errorMessage = detail.password_errors.join('. ');
+        } else if (Array.isArray(detail)) {
+          const first = detail[0];
+          if (first?.msg) {
+            errorMessage = String(first.msg);
+          }
+        } else if (typeof detail === 'string') {
+          errorMessage = detail;
         } else if (typeof error.message === 'string') {
           errorMessage = error.message;
         }
@@ -141,7 +151,7 @@ export default function SignupPage() {
                     required
                     className="pl-10"
                     value={firstName}
-                    onChange={e => setFirstName(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFirstName(e.target.value)}
                   />
                 </div>
               </div>
@@ -154,7 +164,7 @@ export default function SignupPage() {
                   placeholder="Doe"
                   required
                   value={lastName}
-                  onChange={e => setLastName(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLastName(e.target.value)}
                 />
               </div>
             </div>
@@ -171,7 +181,7 @@ export default function SignupPage() {
                   required
                   className="pl-10"
                   value={email}
-                  onChange={e => setEmail(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
                 />
               </div>
             </div>
@@ -188,7 +198,7 @@ export default function SignupPage() {
                   required
                   className="pl-10 pr-10"
                   value={password}
-                  onChange={e => setPassword(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
                 />
                 <button
                   type="button"
@@ -212,7 +222,7 @@ export default function SignupPage() {
                   required
                   className="pl-10 pr-10"
                   value={confirmPassword}
-                  onChange={e => setConfirmPassword(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfirmPassword(e.target.value)}
                 />
               </div>
             </div>

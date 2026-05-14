@@ -673,25 +673,64 @@ export default function UserManagementPage() {
 
     setInviteLoading(true);
     try {
-      const response = await fetch(`${backendUrl}/api/v1/users/invite`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          email: inviteEmail,
-          role: inviteRole,
-        }),
-      });
+      const sendInvite = async () => {
+        const response = await fetch(`${backendUrl}/api/v1/users/invite`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            email: inviteEmail,
+            role: inviteRole,
+          }),
+        });
 
-      // Safely parse response — backend may return non-JSON on some errors
-      let data: Record<string, unknown> = {};
-      try {
-        const text = await response.text();
-        if (text) data = JSON.parse(text);
-      } catch { /* ignore parse error */ }
+        let data: Record<string, unknown> = {};
+        try {
+          const text = await response.text();
+          if (text) data = JSON.parse(text);
+        } catch {
+          // Ignore parse errors and fallback to status-based messaging
+        }
+
+        return { response, data };
+      };
+
+      let { response, data } = await sendInvite();
+      let replacedExistingInvite = false;
+
+      if (!response.ok) {
+        const rawDetail = data.detail;
+        const detailText = typeof rawDetail === 'string'
+          ? rawDetail
+          : typeof data.message === 'string'
+            ? data.message as string
+            : '';
+
+        const hasActiveInviteConflict =
+          response.status === 400 && /active invitation already exists/i.test(detailText);
+
+        // If backend still has a pending invite record, revoke it and resend.
+        if (hasActiveInviteConflict) {
+          const revokeResponse = await fetch(
+            `${backendUrl}/api/v1/auth/invite/${encodeURIComponent(inviteEmail)}`,
+            {
+              method: 'DELETE',
+              headers: {
+                'Accept': 'application/json',
+                'Authorization': `Bearer ${token}`,
+              },
+            }
+          );
+
+          if (revokeResponse.ok) {
+            replacedExistingInvite = true;
+            ({ response, data } = await sendInvite());
+          }
+        }
+      }
 
       if (!response.ok) {
         const rawDetail = data.detail;
@@ -718,9 +757,11 @@ export default function UserManagementPage() {
         : null;
 
       toast({
-        title: '✉️ Invitation Sent',
+        title: replacedExistingInvite ? '✉️ Invitation Re-Sent' : '✉️ Invitation Sent',
         description: data.email_sent
-          ? `An invitation email has been sent to ${inviteEmail}. They will receive a secure link to create their ${inviteRole} account.`
+          ? replacedExistingInvite
+            ? `Previous pending invite for ${inviteEmail} was replaced and a new invitation email was sent.`
+            : `An invitation email has been sent to ${inviteEmail}. They will receive a secure link to create their ${inviteRole} account.`
           : inviteLink
             ? `Invite created for ${inviteEmail}. Email not sent — share this link manually: ${inviteLink}`
             : `Invite created for ${inviteEmail}. Ask them to check their email or contact an admin for the link.`,

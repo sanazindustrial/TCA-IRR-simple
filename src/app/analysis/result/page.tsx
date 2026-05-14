@@ -85,6 +85,15 @@ type WizardResult = {
     comments: string[];
 };
 
+type ExpandedModuleData = {
+    score: number;
+    signal: string;
+    subscores: Record<string, number>;
+    summary?: string;
+    risks?: string[];
+    recommendations?: string[];
+};
+
 const defaultReviewChecklist: ReviewCheckItem[] = [
     { id: 'data-accuracy', label: 'Data accuracy verified', checked: false },
     { id: 'scoring-consistency', label: 'TCA scoring consistency checked', checked: false },
@@ -241,8 +250,19 @@ const ddReportConfig = [
     { id: 'appendix', title: 'Appendix', active: true }
 ];
 
+const buildVisibleSectionsFromIds = (sectionIds: string[]): ReportSection[] => {
+    const idSet = new Set(sectionIds);
+    return allReportComponents
+        .filter((component) => idSet.has(component.id))
+        .map((component) => ({
+            id: component.id,
+            title: component.title,
+            active: true,
+        }));
+};
+
 // Helper function to extract the correct data for each component
-function getComponentData(componentId: string, analysisData: ComprehensiveAnalysisOutput) {
+function getComponentData(componentId: string, analysisData: any) {
     switch (componentId) {
         // Core Components
         case 'quick-summary':
@@ -313,22 +333,19 @@ function ReportView({
     visibleSections,
     wizardResult
 }: {
-    analysisData: ComprehensiveAnalysisOutput;
+    analysisData: any;
     isPreview: boolean;
     visibleSections: ReportSection[];
     wizardResult?: WizardResult | null;
 }) {
+    const alwaysRenderableSectionIds = new Set(['analyst-comments', 'analyst-ai-deviation']);
+
     const hasRenderableData = (id: string): boolean => {
+        if (alwaysRenderableSectionIds.has(id)) {
+            return true;
+        }
+
         const sectionData = getComponentData(id, analysisData);
-        if (id === 'analyst-ai-deviation') {
-            return Boolean(wizardResult?.aiScoresMap && wizardResult?.humanScoresMap);
-        }
-        if (id === 'analyst-comments') {
-            return Boolean(
-                (wizardResult?.comments && wizardResult.comments.length > 0)
-                || wizardResult?.comments
-            );
-        }
         if (id === 'gap-analysis') {
             return Boolean(
                 (wizardResult?.gaps && wizardResult.gaps.length > 0)
@@ -343,7 +360,7 @@ function ReportView({
 
     const visibleComponents = allReportComponents.filter((comp) => {
         const sectionEnabled = visibleSections.some((section) => section.id === comp.id && section.active);
-        return sectionEnabled && hasRenderableData(comp.id);
+        return sectionEnabled && (isPreview || hasRenderableData(comp.id));
     });
 
     // Helper to render component with proper props
@@ -422,7 +439,7 @@ export default function AnalysisResultPage({
     const [reportType, setReportType] = useState<ReportType>('triage');
     const [framework, setFramework] = useState<'general' | 'medtech'>('general');
     const [visibleSections, setVisibleSections] = useState<ReportSection[]>([]);
-    const [analysisData, setAnalysisData] = useState<ComprehensiveAnalysisOutput | null>(null);
+    const [analysisData, setAnalysisData] = useState<any | null>(null);
     const [wizardResult, setWizardResult] = useState<WizardResult | null>(null);
     const [analysisDuration, setAnalysisDuration] = useState<number | null>(null);
     const [params, setParams] = useState<{ preview?: string; type?: string; evalId?: string; anlId?: string; company?: string; user?: string }>({});
@@ -536,7 +553,11 @@ export default function AnalysisResultPage({
                 // Load real analysis data from localStorage
                 // First, validate that stored analysis belongs to current evaluation
                 const storedEvalIdForValidation = localStorage.getItem('currentEvaluationId');
+                const storedAnlIdForValidation = localStorage.getItem('currentAnalysisId');
                 const urlEvalId = params?.evalId;
+                const urlAnlId = params?.anlId;
+                const urlCompanyForValidation = params?.company ? decodeURIComponent(params.company).replace(/[\r\n]+/g, ' ').trim().toLowerCase() : '';
+                const hasStrictLinkContext = Boolean(urlEvalId || urlAnlId || urlCompanyForValidation);
 
                 // If URL has an evalId that doesn't match stored data, clear stale data
                 if (urlEvalId && storedEvalIdForValidation && urlEvalId !== storedEvalIdForValidation) {
@@ -549,10 +570,42 @@ export default function AnalysisResultPage({
                     return;
                 }
 
+                // If URL has an analysis id that doesn't match stored data, clear stale data
+                if (urlAnlId && storedAnlIdForValidation && urlAnlId !== storedAnlIdForValidation) {
+                    console.log('Clearing stale analysis data - URL anlId:', urlAnlId, 'stored:', storedAnlIdForValidation);
+                    localStorage.removeItem('analysisResult');
+                    localStorage.removeItem('analysisTrackingInfo');
+                    localStorage.removeItem('reportApprovalStatus');
+                    setIsLoading(false);
+                    redirectToRunAnalysis('No analysis data found for this analysis link. Please run analysis first.');
+                    return;
+                }
+
                 const storedAnalysis = localStorage.getItem('analysisResult');
                 if (storedAnalysis) {
                     try {
                         const parsedAnalysis = JSON.parse(storedAnalysis);
+                        const parsedCompanyCandidates = [
+                            parsedAnalysis?.companyName,
+                            parsedAnalysis?.company_name,
+                            parsedAnalysis?.companyData?.name,
+                            parsedAnalysis?.companyData?.company_name,
+                        ]
+                            .map((value) => String(value || '').trim().toLowerCase())
+                            .filter((value) => value.length > 0);
+
+                        if (urlCompanyForValidation && parsedCompanyCandidates.length > 0 && !parsedCompanyCandidates.includes(urlCompanyForValidation)) {
+                            console.log('Clearing stale analysis payload - URL company does not match payload company', {
+                                urlCompany: urlCompanyForValidation,
+                                parsedCompanies: parsedCompanyCandidates,
+                            });
+                            localStorage.removeItem('analysisResult');
+                            localStorage.removeItem('analysisTrackingInfo');
+                            localStorage.removeItem('reportApprovalStatus');
+                            setIsLoading(false);
+                            redirectToRunAnalysis('No matching real analysis found for this company link. Please run analysis for this company first.');
+                            return;
+                        }
 
                         // Normalize TCA data to ensure correct composite score (0-10 scale)
                         if (parsedAnalysis.tcaData) {
@@ -610,6 +663,10 @@ export default function AnalysisResultPage({
                         return;
                     }
                 } else if (!isPreview) {
+                    if (hasStrictLinkContext) {
+                        redirectToRunAnalysis('No matching real analysis found for this shared link. Please run analysis again or open from Reports.');
+                        return;
+                    }
                     redirectToRunAnalysis('No real analysis results were found. Please run analysis first.');
                     return;
                 } else {
@@ -715,6 +772,50 @@ export default function AnalysisResultPage({
 
         try {
             const isPrivileged = role === 'admin' || role === 'analyst';
+            const hasStrictLinkContext = Boolean(params?.evalId || params?.anlId || params?.company);
+
+            if (reportType === 'triage') {
+                let persistedSectionIds: string[] = [];
+                const triageContextFromAnalysis = (analysisData as Record<string, unknown> | null)?._triageReportContext as Record<string, unknown> | undefined;
+
+                if (triageContextFromAnalysis && Array.isArray(triageContextFromAnalysis.activeSectionIds)) {
+                    persistedSectionIds = triageContextFromAnalysis.activeSectionIds.filter(
+                        (id): id is string => typeof id === 'string' && id.length > 0
+                    );
+                }
+
+                if (persistedSectionIds.length === 0 && !hasStrictLinkContext) {
+                    const rawTriageContext = localStorage.getItem('triageContext');
+                    if (rawTriageContext) {
+                        try {
+                            const parsedTriageContext = JSON.parse(rawTriageContext) as Record<string, unknown>;
+
+                            if (Array.isArray(parsedTriageContext.activeSectionIds)) {
+                                persistedSectionIds = parsedTriageContext.activeSectionIds.filter(
+                                    (id): id is string => typeof id === 'string' && id.length > 0
+                                );
+                            } else if (Array.isArray(parsedTriageContext.reportSections)) {
+                                persistedSectionIds = (parsedTriageContext.reportSections as Array<Record<string, unknown>>)
+                                    .filter((section) => Boolean(section?.active) && typeof section?.id === 'string')
+                                    .map((section) => section.id as string);
+                            }
+                        } catch (error) {
+                            console.warn('Failed to parse triage context for section sync:', error);
+                        }
+                    }
+                }
+
+                if (persistedSectionIds.length > 0) {
+                    if (isPrivileged) {
+                        persistedSectionIds = Array.from(
+                            new Set([...persistedSectionIds, 'analyst-comments', 'analyst-ai-deviation'])
+                        );
+                    }
+                    setVisibleSections(buildVisibleSectionsFromIds(persistedSectionIds));
+                    return;
+                }
+            }
+
             let configKey = '';
             let defaultConfig: ReportSection[] = [];
 
@@ -788,7 +889,7 @@ export default function AnalysisResultPage({
             ];
             setVisibleSections(emergencyConfig);
         }
-    }, [role, reportType, isPreview]);
+    }, [role, reportType, isPreview, analysisData, params?.evalId, params?.anlId, params?.company]);
 
     // AI Agent: fetch insight once analysis data is ready (non-blocking)
     useEffect(() => {
@@ -1081,6 +1182,10 @@ export default function AnalysisResultPage({
     }, [analysisData, reportType, framework, role, analysisDuration, isPreview, isUsingSampleData, evaluationId, companyId, companyName, toast]);
 
     if (isLoading) {
+        return <Loading />;
+    }
+
+    if (!analysisData) {
         return <Loading />;
     }
 
@@ -1536,7 +1641,9 @@ export default function AnalysisResultPage({
                                 <h2 className="text-2xl font-bold text-foreground">Expanded Module Analysis</h2>
                                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                                     {visibleModules.map(({ key, label, Icon, subscore_labels }) => {
-                                        const mod = (analysisData as any)[key] as NonNullable<typeof analysisData['financialData']>;
+                                        const mod = (analysisData as any)[key] as ExpandedModuleData;
+                                        const risks = Array.isArray(mod.risks) ? mod.risks : [];
+                                        const recommendations = Array.isArray(mod.recommendations) ? mod.recommendations : [];
                                         return (
                                             <Card key={key} className="flex flex-col">
                                                 <CardHeader className="pb-3">
@@ -1570,11 +1677,11 @@ export default function AnalysisResultPage({
                                                         <p className="text-sm text-muted-foreground border-t pt-3">{mod.summary}</p>
                                                     )}
                                                     {/* Risks */}
-                                                    {mod.risks?.length > 0 && (
+                                                    {risks.length > 0 && (
                                                         <div className="space-y-1">
                                                             <p className="text-xs font-semibold uppercase tracking-wider text-destructive">Risks</p>
                                                             <ul className="space-y-1">
-                                                                {mod.risks.map((r: string, i: number) => (
+                                                                {risks.map((r: string, i: number) => (
                                                                     <li key={i} className="text-xs text-muted-foreground flex gap-1.5">
                                                                         <span className="text-destructive mt-0.5">•</span>
                                                                         {r}
@@ -1584,11 +1691,11 @@ export default function AnalysisResultPage({
                                                         </div>
                                                     )}
                                                     {/* Recommendations */}
-                                                    {mod.recommendations?.length > 0 && (
+                                                    {recommendations.length > 0 && (
                                                         <div className="space-y-1">
                                                             <p className="text-xs font-semibold uppercase tracking-wider text-primary">Recommendations</p>
                                                             <ul className="space-y-1">
-                                                                {mod.recommendations.map((r: string, i: number) => (
+                                                                {recommendations.map((r: string, i: number) => (
                                                                     <li key={i} className="text-xs text-muted-foreground flex gap-1.5">
                                                                         <span className="text-primary mt-0.5">›</span>
                                                                         {r}

@@ -1,6 +1,10 @@
 
+/* ! @type internal */
+/* stylelint-disable-next-line at-rule-no-unknown */
 @tailwind base;
+/* stylelint-disable-next-line at-rule-no-unknown */
 @tailwind components;
+/* stylelint-disable-next-line at-rule-no-unknown */
 @tailwind utilities;
 
 @layer base {
@@ -101,7 +105,8 @@
 @layer components {
   /* Improved layout consistency utilities */
   .section-spacing {
-    @apply space-y-6;
+    /* stylelint-disable-next-line at-rule-no-unknown */
+    @apply space-y-6; /* stylelint-disable-line at-rule-no-unknown */
   }
   
   .card-padding {
@@ -121,7 +126,7 @@
   }
   
   .text-balance {
-    text-wrap: balance;
+    overflow-wrap: anywhere;
   }
   
   /* Analysis page specific styles */

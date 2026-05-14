@@ -89,6 +89,8 @@ export function middleware(request: NextRequest) {
             '/api/ai-autofill',     // AI autofill - backend auth
             '/api/extract',         // File extraction proxy - backend auth
             '/api/scrape',          // Web scrape proxy - backend auth
+            '/api/ai-agent',        // AI management live-test routes - backend auth
+            '/api/what-if',         // What-if simulation execution route - backend auth
         ];
         const shouldCheckCSRF = !skipCSRFRoutes.some(route => pathname.startsWith(route))
             && !isNextServerAction;

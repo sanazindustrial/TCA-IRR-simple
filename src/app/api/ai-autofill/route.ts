@@ -478,7 +478,59 @@ function cleanCompanyName(value: unknown): string {
     return '';
   }
 
+  const noisyName = /\b(pitch\s*deck|deck|executive\s*summary|problem\s*&?\s*solution|confidential|company\s*overview|about\s*us|traction|financials)\b/i;
+  if (noisyName.test(candidate)) {
+    return '';
+  }
+
+  if (/\b(company\s*information|required\s*company\s*fields|review\s*extracted\s*company\s*details|company\s*details|company\s+info)\b/i.test(candidate)) {
+    return '';
+  }
+
+  const normalized = candidate.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').trim();
+  const words = normalized.split(/\s+/).filter(Boolean);
+  const genericSingles = new Set(['review', 'details', 'information', 'required', 'company']);
+  if (words.length === 1 && genericSingles.has(words[0])) {
+    return '';
+  }
+
+  if (/^[A-Z\s0-9&.'-]{3,}$/.test(candidate) && candidate.split(/\s+/).length >= 3) {
+    // Reject all-caps deck headings often misread as company names.
+    return '';
+  }
+
   return candidate;
+}
+
+function cleanFieldText(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  const text = value.replace(/\s+/g, ' ').trim();
+  if (!text) return '';
+  if (/^(n\/?a|none|null|unknown|not\s+provided)$/i.test(text)) return '';
+  return text;
+}
+
+function cleanMoneyText(value: unknown): string {
+  const raw = cleanFieldText(value);
+  if (!raw) return '';
+  const match = raw.match(/\$?\s*([\d,.]+)\s*(million|billion|thousand|m|b|k)?/i);
+  if (!match) return '';
+  const amount = match[1].replace(/,/g, '');
+  if (!amount) return '';
+  const unit = (match[2] ?? '').toLowerCase();
+  if (!unit) return `$${amount}`;
+  if (unit === 'million' || unit === 'm') return `$${amount}M`;
+  if (unit === 'billion' || unit === 'b') return `$${amount}B`;
+  if (unit === 'thousand' || unit === 'k') return `$${amount}K`;
+  return `$${amount}`;
+}
+
+function isLikelyPitchDeckPath(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  const text = value.trim();
+  if (!text) return false;
+  if (/\b(pitch\s*deck|deck)\b/i.test(text) && !/[\\/.]/.test(text)) return false;
+  return /(\.pdf|\.pptx?|\.docx?|\.key)$/i.test(text) || /[\\/]/.test(text);
 }
 
 function inferBusinessModel(text: string): string {
@@ -502,7 +554,7 @@ function improveCompanyInfoQuality(payload: Record<string, unknown>, sourceText:
       .trim();
   };
 
-  const cleanedName = cleanCompanyName(improved.company_name ?? improved.companyName ?? improved.legal_name ?? improved.legalName);
+  const cleanedName = cleanCompanyName(improved.legal_name ?? improved.legalName ?? improved.company_name ?? improved.companyName);
   if (cleanedName) {
     improved.company_name = cleanedName;
     improved.companyName = cleanedName;
@@ -520,6 +572,12 @@ function improveCompanyInfoQuality(payload: Record<string, unknown>, sourceText:
       improved.business_model = inferred;
       improved.businessModel = inferred;
     }
+  } else {
+    const model = cleanFieldText(improved.business_model);
+    if (/\b(pitch\s*deck|financials?|company\s*overview|problem\s*&?\s*solution)\b/i.test(model)) {
+      delete improved.business_model;
+      delete improved.businessModel;
+    }
   }
 
   if (!improved.legal_name) {
@@ -535,9 +593,6 @@ function improveCompanyInfoQuality(payload: Record<string, unknown>, sourceText:
     const normalizedUrl = normalizeWebsite(directUrl);
     if (normalizedUrl) {
       improved.website = normalizedUrl;
-    } else {
-      const websiteGuess = guessWebsiteFromCompanyName(String(improved.company_name ?? improved.companyName ?? ''));
-      if (websiteGuess) improved.website = websiteGuess;
     }
   }
 
@@ -554,9 +609,24 @@ function improveCompanyInfoQuality(payload: Record<string, unknown>, sourceText:
   if (!improved.annual_revenue) {
     const revenue = improved.revenue ?? improved.annualRevenue ?? improved.yearly_revenue ?? improved.yearlyRevenue;
     if (revenue !== undefined && revenue !== null && String(revenue).trim() !== '') {
-      improved.annual_revenue = String(revenue);
-      improved.annualRevenue = String(revenue);
+      const cleanRevenue = cleanMoneyText(String(revenue));
+      if (cleanRevenue) {
+        improved.annual_revenue = cleanRevenue;
+        improved.annualRevenue = cleanRevenue;
+      }
     }
+  } else {
+    const cleanRevenue = cleanMoneyText(improved.annual_revenue);
+    if (cleanRevenue) {
+      improved.annual_revenue = cleanRevenue;
+      improved.annualRevenue = cleanRevenue;
+    }
+  }
+
+  const cleanPreMoney = cleanMoneyText(improved.pre_money_valuation ?? improved.preMoneyValuation);
+  if (cleanPreMoney) {
+    improved.pre_money_valuation = cleanPreMoney;
+    improved.preMoneyValuation = cleanPreMoney;
   }
 
   if (!improved.number_of_employees) {
@@ -576,6 +646,18 @@ function improveCompanyInfoQuality(payload: Record<string, unknown>, sourceText:
     if (!improved.city && parts[0]) improved.city = parts[0];
     if (!improved.state && parts[1]) improved.state = parts[1];
     if (!improved.country && parts[2]) improved.country = parts[2];
+  }
+
+  const city = cleanFieldText(improved.city);
+  const state = cleanFieldText(improved.state);
+  const country = cleanFieldText(improved.country);
+  if (city) improved.city = city;
+  if (state) improved.state = state;
+  if (country) improved.country = country;
+
+  if (improved.pitch_deck_path !== undefined && !isLikelyPitchDeckPath(improved.pitch_deck_path)) {
+    delete improved.pitch_deck_path;
+    delete improved.pitchDeckPath;
   }
 
   if (!improved.one_line_description && typeof improved.pitch_summary === 'string') {
@@ -714,6 +796,222 @@ function normalizeExtractionPayload(input: Record<string, unknown>): Record<stri
   return normalized;
 }
 
+function clampConfidence(value: number): number {
+  return Math.max(0, Math.min(0.99, value));
+}
+
+function computeFieldConfidence(
+  payload: Record<string, unknown>,
+  sourceText: string,
+  usedAI: boolean
+): Record<string, number> {
+  const companyName = cleanCompanyName(payload.company_name ?? payload.companyName ?? payload.legal_name ?? payload.legalName);
+  const base = usedAI ? 0.68 : 0.54;
+  const confidence: Record<string, number> = {};
+
+  const scoreText = (value: unknown, minLen = 2, maxLen = 180): number => {
+    const text = cleanFieldText(value);
+    if (!text) return 0.08;
+    const len = text.length;
+    if (len < minLen) return 0.18;
+    if (len > maxLen) return 0.42;
+    return 0.78;
+  };
+
+  const setField = (key: string, rawScore: number) => {
+    confidence[key] = clampConfidence(rawScore);
+  };
+
+  // Company and legal identity
+  const company = cleanCompanyName(payload.company_name ?? payload.companyName);
+  setField('company_name', company ? base + 0.22 : 0.12);
+  const legal = cleanCompanyName(payload.legal_name ?? payload.legalName);
+  setField('legal_name', legal ? base + 0.18 : 0.14);
+
+  // Website confidence
+  const website = normalizeWebsite(payload.website);
+  const websiteScore = website
+    ? (isWebsiteLikelyForCompany(website, companyName || company) ? base + 0.2 : base - 0.2)
+    : 0.1;
+  setField('website', websiteScore);
+
+  // Structured categorical fields
+  const sector = cleanFieldText(payload.sector ?? payload.industryVertical);
+  setField('sector', sector ? base + 0.16 : 0.12);
+  const stage = cleanFieldText(payload.stage ?? payload.developmentStage ?? payload.funding_stage ?? payload.fundingStage);
+  setField('stage', stage ? base + 0.16 : 0.12);
+
+  const businessModel = cleanFieldText(payload.business_model ?? payload.businessModel);
+  const businessScore = businessModel && !/\b(pitch\s*deck|financials?|executive\s*summary|company\s*overview)\b/i.test(businessModel)
+    ? base + 0.15
+    : 0.12;
+  setField('business_model', businessScore);
+
+  // Location
+  setField('location', scoreText(payload.location, 4, 180) + 0.08);
+  setField('country', scoreText(payload.country, 2, 80) + 0.05);
+  setField('state', scoreText(payload.state, 2, 80) + 0.03);
+  setField('city', scoreText(payload.city, 2, 80) + 0.03);
+
+  // Core narrative
+  setField('one_line_description', scoreText(payload.one_line_description ?? payload.oneLineDescription, 12, 220));
+  setField('company_description', scoreText(payload.company_description ?? payload.companyDescription, 40, 2000));
+  setField('product_description', scoreText(payload.product_description ?? payload.productDescription, 20, 1200));
+
+  // Financial fields
+  const annual = cleanMoneyText(payload.annual_revenue ?? payload.annualRevenue);
+  setField('annual_revenue', annual ? base + 0.2 : 0.1);
+  const preMoney = cleanMoneyText(payload.pre_money_valuation ?? payload.preMoneyValuation);
+  setField('pre_money_valuation', preMoney ? base + 0.2 : 0.1);
+
+  const employees = cleanFieldText(payload.number_of_employees ?? payload.numberOfEmployees);
+  setField('number_of_employees', /^\d{1,6}$/.test(employees) ? base + 0.14 : 0.1);
+
+  const pitchPath = payload.pitch_deck_path ?? payload.pitchDeckPath;
+  setField('pitch_deck_path', isLikelyPitchDeckPath(pitchPath) ? base + 0.2 : 0.1);
+
+  // Penalize obvious hallucination fragments leaking from source text headers.
+  const sourceLower = sourceText.toLowerCase();
+  if (sourceLower.includes('pitch deck') && !isLikelyPitchDeckPath(pitchPath)) {
+    confidence.pitch_deck_path = clampConfidence((confidence.pitch_deck_path ?? 0.1) - 0.12);
+  }
+
+  return confidence;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function includesNormalized(haystack: string, needle: string): boolean {
+  const h = haystack.toLowerCase();
+  const n = needle.toLowerCase().trim();
+  if (!n) return false;
+  return h.includes(n);
+}
+
+function computeRequirementMatch(payload: Record<string, unknown>, sourceText: string): Record<string, { matched: boolean; score: number; reason: string }> {
+  const text = sourceText.toLowerCase();
+  const result: Record<string, { matched: boolean; score: number; reason: string }> = {};
+
+  const set = (key: string, matched: boolean, score: number, reason: string) => {
+    // Promote verified evidence matches to full score so true matches reach 100%.
+    const normalizedScore = matched ? 1 : score;
+    result[key] = { matched, score: clampConfidence(normalizedScore), reason };
+  };
+
+  const company = cleanCompanyName(payload.company_name ?? payload.companyName);
+  if (company) {
+    const rx = new RegExp(`\\b${escapeRegExp(company.toLowerCase())}\\b`, 'i');
+    set('company_name', rx.test(sourceText), rx.test(sourceText) ? 0.9 : 0.3, rx.test(sourceText) ? 'company name appears in upload text' : 'company name not found in upload text');
+  } else {
+    set('company_name', false, 0.12, 'no company name extracted');
+  }
+
+  const website = normalizeWebsite(payload.website);
+  if (website) {
+    let host = '';
+    try { host = new URL(website).hostname.toLowerCase().replace(/^www\./, ''); } catch { host = ''; }
+    const websiteMatched = includesNormalized(text, website) || (!!host && includesNormalized(text, host));
+    set('website', websiteMatched, websiteMatched ? 0.88 : 0.35, websiteMatched ? 'website/domain appears in upload text' : 'website/domain not found in upload text');
+  } else {
+    set('website', false, 0.1, 'no website extracted');
+  }
+
+  const stage = cleanFieldText(payload.stage ?? payload.developmentStage ?? payload.funding_stage ?? payload.fundingStage);
+  if (stage) {
+    const stageTerms = stage.toLowerCase().split(/\s+/).filter(Boolean);
+    const stageMatched = stageTerms.some((term) => term.length > 2 && includesNormalized(text, term));
+    set('stage', stageMatched, stageMatched ? 0.84 : 0.32, stageMatched ? 'stage keywords found in upload text' : 'stage keywords not found in upload text');
+  } else {
+    set('stage', false, 0.12, 'no stage extracted');
+  }
+
+  const sector = cleanFieldText(payload.sector ?? payload.industryVertical);
+  if (sector) {
+    const sectorTerms = sector.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length > 2 && t !== 'and');
+    const sectorMatched = sectorTerms.some((term) => includesNormalized(text, term));
+    set('sector', sectorMatched, sectorMatched ? 0.82 : 0.3, sectorMatched ? 'sector keywords found in upload text' : 'sector keywords not found in upload text');
+  } else {
+    set('sector', false, 0.12, 'no sector extracted');
+  }
+
+  const business = cleanFieldText(payload.business_model ?? payload.businessModel);
+  if (business) {
+    const businessTerms = business.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length > 3);
+    const businessMatched = businessTerms.some((term) => includesNormalized(text, term));
+    set('business_model', businessMatched, businessMatched ? 0.8 : 0.28, businessMatched ? 'business model terms found in upload text' : 'business model terms not found in upload text');
+  } else {
+    set('business_model', false, 0.1, 'no business model extracted');
+  }
+
+  const country = cleanFieldText(payload.country);
+  const state = cleanFieldText(payload.state);
+  const city = cleanFieldText(payload.city);
+  const location = cleanFieldText(payload.location);
+  for (const [key, value] of [['country', country], ['state', state], ['city', city]] as Array<[string, string]>) {
+    if (!value) {
+      set(key, false, 0.12, `no ${key} extracted`);
+      continue;
+    }
+    const matched = includesNormalized(text, value);
+    set(key, matched, matched ? 0.82 : 0.3, matched ? `${key} appears in upload text` : `${key} not found in upload text`);
+  }
+
+  if (location) {
+    const locationParts = location.split(',').map((part) => part.trim()).filter(Boolean);
+    const overlap = locationParts.filter((part) => part.length > 1 && includesNormalized(text, part)).length;
+    const matched = overlap >= Math.min(2, locationParts.length);
+    set('location', matched, matched ? 0.84 : 0.3, matched ? 'location parts appear in upload text' : 'location text has weak evidence in upload text');
+  } else {
+    set('location', false, 0.12, 'no location extracted');
+  }
+
+  const oneLine = cleanFieldText(payload.one_line_description ?? payload.oneLineDescription);
+  if (oneLine) {
+    const words = oneLine.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 3).slice(0, 5);
+    const overlap = words.filter((w) => includesNormalized(text, w)).length;
+    const matched = overlap >= 2;
+    set('one_line_description', matched, matched ? 0.78 : 0.3, matched ? 'one-line description has textual overlap with upload' : 'one-line description has weak textual overlap');
+  } else {
+    set('one_line_description', false, 0.12, 'no one-line description extracted');
+  }
+
+  const companyDesc = cleanFieldText(payload.company_description ?? payload.companyDescription);
+  if (companyDesc) {
+    const words = companyDesc.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 4).slice(0, 10);
+    const overlap = words.filter((w) => includesNormalized(text, w)).length;
+    const matched = overlap >= 3;
+    set('company_description', matched, matched ? 0.8 : 0.33, matched ? 'company description overlaps upload text' : 'company description overlap is weak');
+  } else {
+    set('company_description', false, 0.12, 'no company description extracted');
+  }
+
+  const annual = cleanMoneyText(payload.annual_revenue ?? payload.annualRevenue);
+  if (annual) {
+    const digits = annual.replace(/[^\d.]/g, '');
+    const matched = !!digits && includesNormalized(text, digits.slice(0, Math.min(digits.length, 6)));
+    set('annual_revenue', matched, matched ? 0.86 : 0.32, matched ? 'annual revenue value appears in upload text' : 'annual revenue value not found in upload text');
+  } else {
+    set('annual_revenue', false, 0.1, 'no annual revenue extracted');
+  }
+
+  const preMoney = cleanMoneyText(payload.pre_money_valuation ?? payload.preMoneyValuation);
+  if (preMoney) {
+    const digits = preMoney.replace(/[^\d.]/g, '');
+    const matched = !!digits && includesNormalized(text, digits.slice(0, Math.min(digits.length, 6)));
+    set('pre_money_valuation', matched, matched ? 0.86 : 0.32, matched ? 'pre-money valuation appears in upload text' : 'pre-money valuation not found in upload text');
+  } else {
+    set('pre_money_valuation', false, 0.1, 'no pre-money valuation extracted');
+  }
+
+  const pitchPath = cleanFieldText(payload.pitch_deck_path ?? payload.pitchDeckPath);
+  const pitchMatched = isLikelyPitchDeckPath(pitchPath);
+  set('pitch_deck_path', pitchMatched, pitchMatched ? 0.75 : 0.2, pitchMatched ? 'pitch deck path format looks valid' : 'pitch deck path format is not valid');
+
+  return result;
+}
+
 // ── Call backend AI extraction ─────────────────────────────────────────────
 
 async function callBackendAI(text: string, token?: string): Promise<Record<string, unknown> | null> {
@@ -834,10 +1132,15 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const fieldConfidence = computeFieldConfidence(improved, text, !!aiResult);
+    const requirementMatch = computeRequirementMatch(improved, text);
+
     return NextResponse.json(
       {
         success: true,
         data: improved,
+        fieldConfidence,
+        requirementMatch,
         source: aiResult ? 'ai+local' : 'local',
         fieldsExtracted: Object.keys(improved).filter(k => improved[k] !== '' && improved[k] !== null && improved[k] !== undefined).length,
       },

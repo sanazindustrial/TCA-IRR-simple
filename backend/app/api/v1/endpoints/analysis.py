@@ -91,6 +91,14 @@ async def test_analysis(company_data: Dict[str, Any]):
 async def comprehensive_analysis(company_data: Dict[str, Any]):
     """Run comprehensive TCA analysis on company data"""
     try:
+        company_name = (company_data.get("company_name") or company_data.get("name") or "").strip()
+        if not company_name:
+            raise HTTPException(status_code=422, detail="company_name is required")
+
+        company_data["company_name"] = company_name
+        if not company_data.get("industry") and not company_data.get("industry_vertical"):
+            raise HTTPException(status_code=422, detail="industry or industry_vertical is required")
+
         logger.info(
             f"Starting comprehensive analysis for: {company_data.get('company_name', 'Unknown')}"
         )
@@ -99,7 +107,7 @@ async def comprehensive_analysis(company_data: Dict[str, Any]):
         # Pull saved module configuration (passed by frontend run/page.tsx).
         #   module_settings: [{module_id, weight, is_enabled}, ...]    top-level enable/weight
         #   module_configs:  {moduleId: {<rubric saved on /analysis/modules/{id}>}}
-        # When absent we fall back to defaults (every module enabled, hardcoded weights).
+        # When absent, we fall back to defaults (every module enabled, hardcoded weights).
         # ------------------------------------------------------------------
         raw_module_settings = company_data.get("module_settings") or []
         raw_module_configs  = company_data.get("module_configs")  or {}
@@ -122,12 +130,12 @@ async def comprehensive_analysis(company_data: Dict[str, Any]):
                 f"Module settings received: {sum(enabled_modules.values())}/{len(enabled_modules)} enabled"
             )
 
+        # Use real analysis processor instead of mock data — honour saved enabled flags.
         def _is_on(mod_id: str, default: bool = True) -> bool:
             if not enabled_modules:
                 return default
             return enabled_modules.get(mod_id, default)
 
-        # Use real analysis processor instead of mock data
         analysis_options = {
             "tca_scorecard":        _is_on("tca"),
             "benchmark_comparison": _is_on("benchmark"),
@@ -169,8 +177,8 @@ async def comprehensive_analysis(company_data: Dict[str, Any]):
             analysis_result = _calculate_fallback_analysis(
                 company_data, module_weights, raw_module_configs)
 
-        # Echo applied module configuration so the result/triage pages can render
-        # the exact weights/enabled-set that produced these scores.
+        # Echo applied module configuration back to the client so the result/triage
+        # pages can render the exact weights/enabled-set that produced these scores.
         if enabled_modules or module_weights or raw_module_configs:
             analysis_result.setdefault("module_settings_applied", {
                 "enabled": enabled_modules,
@@ -192,9 +200,9 @@ def _calculate_fallback_analysis(
         module_configs: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Calculate TCA analysis using business logic when AI service is unavailable.
 
-    Optional module_weights / module_configs come from the saved
-    /dashboard/module-settings configuration. When absent the function preserves
-    the legacy behaviour with hardcoded weights.
+    module_weights / module_configs come from the saved /dashboard/module-settings
+    configuration. They are optional — when absent the function preserves the
+    legacy behaviour with hardcoded weights.
     """
     from datetime import datetime
 
@@ -280,13 +288,13 @@ def _calculate_tca_categories(
         tca_module_config: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
     """Calculate TCA category scores based on company data.
 
-    Optional tca_module_config is the user-saved TCA configuration as stored
-    by /analysis/modules/tca — shape: {categories: [{name, general, generalNA, ...}]}.
-    When provided, weights are taken from that object (general framework) instead
-    of the hardcoded defaults below.
+    tca_module_config (optional) is the user-saved TCA configuration as stored
+    by /analysis/modules/tca — shape: {categories: [{id, name, general, medtech,
+    generalNA, medtechNA}, ...]}. When provided, weights are taken from that
+    object (general framework) instead of the hardcoded defaults below.
     """
 
-    # TCA Category weights (General framework)
+    # TCA Category weights (General framework) — used when no saved config is supplied.
     category_config = {
         "Leadership": {
             "weight": 0.20,
@@ -347,6 +355,7 @@ def _calculate_tca_categories(
     if tca_module_config and isinstance(tca_module_config, dict):
         saved_categories = tca_module_config.get("categories")
         if isinstance(saved_categories, list):
+            # Map saved category names to weights (general framework, percent → fraction).
             saved_weights: Dict[str, float] = {}
             for sc in saved_categories:
                 if not isinstance(sc, dict):
@@ -404,57 +413,226 @@ def _calculate_tca_categories(
     return categories
 
 
+def _get_nested_value(data: Dict[str, Any], path: str) -> Any:
+    """Safely read dotted paths from nested request payloads."""
+    current: Any = data
+    for part in path.split('.'):
+        if not isinstance(current, dict) or part not in current:
+            return None
+        current = current.get(part)
+    return current
+
+
+def _coerce_number(value: Any) -> float | None:
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        text = value.strip().replace(',', '')
+        if not text:
+            return None
+        try:
+            return float(text)
+        except ValueError:
+            return None
+    return None
+
+
+def _has_signal(value: Any) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return float(value) > 0
+    if isinstance(value, str):
+        return len(value.strip()) > 0
+    if isinstance(value, (list, tuple, set, dict)):
+        return len(value) > 0
+    return False
+
+
+def _any_signal(company_data: Dict[str, Any], *paths: str) -> bool:
+    return any(_has_signal(_get_nested_value(company_data, path)) for path in paths)
+
+
+def _count_items(company_data: Dict[str, Any], *paths: str) -> int:
+    count = 0
+    for path in paths:
+        value = _get_nested_value(company_data, path)
+        if isinstance(value, (list, tuple, set)):
+            count += len(value)
+        elif _has_signal(value):
+            count += 1
+    return count
+
+
+def _numeric_max(company_data: Dict[str, Any], *paths: str) -> float | None:
+    values: List[float] = []
+    for path in paths:
+        number = _coerce_number(_get_nested_value(company_data, path))
+        if number is not None:
+            values.append(number)
+    return max(values) if values else None
+
+
 def _calculate_category_score(company_data: Dict[str, Any], category: str,
                               factors: List[str]) -> float:
-    """Calculate score for a specific TCA category"""
-    BASE_SCORE = 5.0
+    """Calculate score for a specific TCA category using available evidence signals."""
+    base_score = 5.0
+    score = base_score
 
-    def _bool_score(keys_weights: List[tuple]) -> float:
-        return BASE_SCORE + sum(
-            w for key, w in keys_weights if company_data.get(key)
-        )
+    if category == "Leadership":
+        founder_count = _count_items(company_data, "founders", "team_data.founders", "founder_profiles")
+        if founder_count >= 2:
+            score += 1.3
+        elif founder_count == 1:
+            score += 0.7
+        if _any_signal(company_data, "founder_experience", "team_data.founders", "leadership_track_record"):
+            score += 1.1
+        if _any_signal(company_data, "leadership_team", "team_data.key_personnel", "team_data.advisors"):
+            score += 0.8
+        if _any_signal(company_data, "advisory_board", "board_members"):
+            score += 0.6
 
-    scorers = {
-        "Leadership": lambda: _bool_score([
-            ("founder_experience", 2.0),
-            ("leadership_team", 1.5),
-            ("advisory_board", 0.5),
-        ]),
-        "Product-Market Fit": lambda: _bool_score([
-            ("customer_validation", 2.5),
-            ("revenue_traction", 2.0),
-            ("market_feedback", 1.0),
-        ]),
-        "Team Strength": lambda: (
-            BASE_SCORE
-            + (1.5 if company_data.get("team_size", 0) >= 5 else 0)
-            + (2.0 if company_data.get("technical_team") else 0)
-            + (1.5 if company_data.get("industry_experience") else 0)
-        ),
-        "Technology & IP": lambda: _bool_score([
-            ("patents", 2.0),
-            ("technical_innovation", 1.5),
-            ("tech_stack", 1.0),
-        ]),
-        "Market Potential": lambda: (
-            BASE_SCORE
-            + (2.5 if company_data.get("market_size", 0) > 1_000_000_000
-               else 1.5 if company_data.get("market_size", 0) > 100_000_000
-               else 0)
-            + (1.5 if company_data.get("growth_rate", 0) > 0.1 else 0)
-        ),
-        "Business Model & Financials": lambda: _bool_score([
-            ("revenue_model", 1.5),
-            ("positive_unit_economics", 1.5),
-        ]) + (2.0 if company_data.get("monthly_revenue", 0) > 0 else 0),
-    }
+    elif category == "Product-Market Fit":
+        if _any_signal(company_data, "customer_validation", "traction.customer_logos", "market_feedback"):
+            score += 1.8
+        if _any_signal(company_data, "revenue_traction", "financial_data.revenue", "monthly_revenue"):
+            score += 1.4
+        customer_count = _numeric_max(company_data, "financial_data.customer_count", "customer_count")
+        if customer_count is not None and customer_count >= 100:
+            score += 1.0
+        if _any_signal(company_data, "product_traction", "pilot_results", "nps_score"):
+            score += 0.8
 
-    scorer = scorers.get(category)
-    if scorer:
-        return min(scorer(), 10.0)
+    elif category == "Team Strength":
+        team_size = _numeric_max(company_data, "team_size", "team_data.team_size") or 0
+        if team_size >= 10:
+            score += 1.4
+        elif team_size >= 5:
+            score += 0.9
+        elif team_size > 0:
+            score += 0.3
+        if _any_signal(company_data, "technical_team", "team_data.key_personnel", "engineering_headcount"):
+            score += 1.1
+        if _any_signal(company_data, "industry_experience", "team_data.founders", "domain_expertise"):
+            score += 0.9
 
-    # Default: score based on available factor fields
-    return min(BASE_SCORE + sum(1.0 for f in factors if company_data.get(f)), 10.0)
+    elif category == "Technology & IP":
+        patent_count = _count_items(company_data, "patents", "ip_portfolio")
+        if patent_count >= 3:
+            score += 1.3
+        elif patent_count > 0:
+            score += 0.8
+        if _any_signal(company_data, "technical_innovation", "unique_technology", "technical_moat"):
+            score += 1.1
+        if _any_signal(company_data, "tech_stack", "architecture", "model_stack"):
+            score += 0.7
+        stage = str(_get_nested_value(company_data, "development_stage") or "").lower()
+        if stage in {"beta", "production", "launched"}:
+            score += 0.8
+        elif stage in {"concept", "idea"}:
+            score -= 0.6
+
+    elif category == "Business Model & Financials":
+        if _any_signal(company_data, "revenue_model", "pricing_model", "business_model"):
+            score += 1.1
+        if _any_signal(company_data, "positive_unit_economics", "financial_data.gross_margin"):
+            score += 1.0
+        monthly_revenue = _numeric_max(company_data, "monthly_revenue", "financial_data.revenue")
+        if monthly_revenue is not None and monthly_revenue > 0:
+            score += 1.2
+        runway = _numeric_max(company_data, "financial_data.runway_months", "runway_months")
+        if runway is not None:
+            if runway >= 12:
+                score += 0.8
+            elif runway < 6:
+                score -= 0.8
+
+    elif category == "Go-to-Market Strategy":
+        if _any_signal(company_data, "sales_strategy", "go_to_market", "distribution_strategy"):
+            score += 1.4
+        if _any_signal(company_data, "marketing_approach", "marketing_channels"):
+            score += 1.0
+        if _any_signal(company_data, "customer_acquisition", "customer_acquisition_cost", "pipeline"):
+            score += 1.0
+        if _any_signal(company_data, "partnerships", "channel_partners"):
+            score += 0.6
+
+    elif category == "Competition & Moat":
+        if _any_signal(company_data, "competitive_advantage", "differentiation", "moat"):
+            score += 1.6
+        if _any_signal(company_data, "market_differentiation", "unique_value_proposition"):
+            score += 1.1
+        if _any_signal(company_data, "patents", "ip_portfolio"):
+            score += 0.7
+
+    elif category == "Market Potential":
+        market_size = _numeric_max(company_data, "market_size", "tam", "market_data.market_size")
+        if market_size is not None:
+            if market_size >= 1_000_000_000:
+                score += 2.0
+            elif market_size >= 100_000_000:
+                score += 1.2
+        growth_rate = _numeric_max(company_data, "growth_rate", "market_growth_rate", "market_data.market_growth_pct")
+        if growth_rate is not None:
+            normalized_growth = growth_rate / 100 if growth_rate > 1 else growth_rate
+            if normalized_growth >= 0.15:
+                score += 1.0
+            elif normalized_growth >= 0.08:
+                score += 0.5
+        if _any_signal(company_data, "market_timing", "industry_tailwinds"):
+            score += 0.5
+
+    elif category == "Traction":
+        if _any_signal(company_data, "customer_growth", "financial_data.customer_count", "customer_count"):
+            score += 1.3
+        revenue_growth = _numeric_max(company_data, "revenue_growth", "financial_data.revenue_growth_pct")
+        if revenue_growth is not None:
+            normalized_growth = revenue_growth / 100 if revenue_growth > 1 else revenue_growth
+            if normalized_growth >= 0.30:
+                score += 1.1
+            elif normalized_growth >= 0.10:
+                score += 0.6
+        if _any_signal(company_data, "partnerships", "pilot_results", "enterprise_contracts"):
+            score += 0.9
+
+    elif category == "Scalability":
+        if _any_signal(company_data, "technical_scalability", "infrastructure", "cloud_architecture"):
+            score += 1.3
+        if _any_signal(company_data, "business_scalability", "process_automation", "operating_playbook"):
+            score += 1.1
+        if _any_signal(company_data, "unit_economics", "gross_margin"):
+            score += 0.6
+
+    elif category == "Risk Assessment":
+        risks = _count_items(company_data, "identified_risks", "risk_register", "risk_factors")
+        mitigations = _count_items(company_data, "mitigation_strategies", "risk_mitigation", "contingency_plan")
+        if risks == 0:
+            score += 0.6
+        elif risks <= 3:
+            score += 0.2
+        else:
+            score -= 0.8
+        if mitigations > 0:
+            score += 1.0
+        if _any_signal(company_data, "compliance_program", "security_controls"):
+            score += 0.6
+
+    elif category == "Exit Potential":
+        if _any_signal(company_data, "acquisition_targets", "strategic_interest"):
+            score += 1.5
+        if _any_signal(company_data, "ipo_potential", "public_market_readiness"):
+            score += 1.0
+        if _any_signal(company_data, "comparable_exits", "valuation_multiples"):
+            score += 0.8
+
+    else:
+        score += sum(0.8 for f in factors if _any_signal(company_data, f))
+
+    return min(max(score, 1.0), 10.0)
 
 
 def _calculate_composite_score(
@@ -462,8 +640,11 @@ def _calculate_composite_score(
         module_weight: Optional[float] = None) -> float:
     """Calculate composite TCA score from weighted categories.
 
-    Optional module_weight is the top-level TCA module weight from the saved
-    /dashboard/module-settings configuration; logged for downstream reference.
+    module_weight, when provided, is the top-level TCA module weight from the
+    saved /dashboard/module-settings configuration (e.g. 20 for 20%). It is
+    currently informational only — the composite remains the weighted sum of
+    sub-category scores — but is logged so downstream triage rendering can use
+    it as an authoritative reference.
     """
     if module_weight is not None:
         logger.debug(f"Composite computed with TCA module weight={module_weight}")
@@ -1046,6 +1227,12 @@ async def create_analyst_review(review_data: Dict[str, Any]):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.put("/analyst-reviews", response_model=Dict[str, Any])
+async def upsert_analyst_review(review_data: Dict[str, Any]):
+    """PUT alias for clients that upsert analyst reviews."""
+    return await create_analyst_review(review_data)
+
+
 @router.get("/analyst-reviews/{analysis_id}", response_model=Dict[str, Any])
 async def get_analyst_review(analysis_id: str):
     """Get analyst review for an analysis"""
@@ -1406,8 +1593,8 @@ def _calculate_training_priority(training_data: Dict[str, Any]) -> str:
 
 @router.post("/extract-text-from-file", response_model=Dict[str, Any])
 async def extract_text_from_file(
-    file: bytes = None,
-    file_data: Dict[str, Any] = None,
+    file: Optional[bytes] = None,
+    file_data: Optional[Dict[str, Any]] = None,
 ):
     """
     Extract text content from uploaded files (PDF, DOCX, etc.)
@@ -1508,10 +1695,10 @@ async def extract_text_from_file(
                 prs = Presentation(io.BytesIO(file_bytes))
                 text_parts = []
                 for slide_num, slide in enumerate(prs.slides, 1):
-                    text_parts.extend(
-                        [f"=== Slide {slide_num} ==="] +
-                        [shape.text for shape in slide.shapes if hasattr(shape, "text") and shape.text]
-                    )
+                    shape_texts = [
+                        t for t in (getattr(shape, "text", "") for shape in slide.shapes) if t
+                    ]
+                    text_parts.extend([f"=== Slide {slide_num} ===", *shape_texts])
                 content = "\n".join(text_parts)
             except ImportError:
                 content = "[PowerPoint extraction requires python-pptx]"

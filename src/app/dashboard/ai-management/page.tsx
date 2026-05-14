@@ -78,6 +78,7 @@ export default function AiManagementPage() {
   const [testResult, setTestResult] = useState<string | null>(null);
   const [testRunning, setTestRunning] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const [csrfToken, setCsrfToken] = useState<string>('');
 
   const fetchStatus = useCallback(async () => {
     setLoading(true);
@@ -85,6 +86,8 @@ export default function AiManagementPage() {
     try {
       const res = await fetch('/api/ai-agent');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const token = res.headers.get('x-csrf-token');
+      if (token) setCsrfToken(token);
       const data = await res.json() as AgentStatus;
       setAgentStatus(data);
       setLastRefresh(new Date());
@@ -101,9 +104,19 @@ export default function AiManagementPage() {
     setTestRunning(true);
     setTestResult(null);
     try {
+      let token = csrfToken;
+      if (!token) {
+        const tokenRes = await fetch('/api/ai-agent');
+        token = tokenRes.headers.get('x-csrf-token') || '';
+        if (token) setCsrfToken(token);
+      }
+
       const res = await fetch('/api/ai-agent', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'x-csrf-token': token } : {}),
+        },
         body: JSON.stringify({
           task: 'score',
           prompt: 'Score a seed-stage SaaS startup with $50k MRR, 3 co-founders, 18 months runway.',

@@ -4,7 +4,7 @@ Company management endpoints
 
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-from typing import List, Optional
+from typing import List, Optional, Set
 from datetime import datetime
 import asyncpg
 from pydantic import BaseModel, Field
@@ -15,6 +15,25 @@ from .auth import get_current_user, get_optional_current_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+async def _get_table_columns(db: asyncpg.Connection, table_name: str) -> Set[str]:
+    rows = await db.fetch(
+        """
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_name = $1
+        """,
+        table_name,
+    )
+    return {row["column_name"] for row in rows}
+
+
+def _first_available(columns: Set[str], *candidates: str) -> Optional[str]:
+    for candidate in candidates:
+        if candidate in columns:
+            return candidate
+    return None
 
 
 # Flexible schema that accepts frontend field names
@@ -56,15 +75,37 @@ async def get_companies(page: int = 1,
     """Get paginated list of companies"""
     try:
         offset = (page - 1) * size
+        columns = await _get_table_columns(db, "companies")
+
+        name_column = _first_available(columns, "name", "company_name") or "NULL"
+        description_column = _first_available(columns, "description") or "NULL"
+        website_column = _first_available(columns, "website") or "NULL"
+        industry_column = _first_available(columns, "industry", "sector", "industry_vertical") or "NULL"
+        stage_column = _first_available(columns, "stage", "funding_stage", "development_stage") or "NULL"
+        location_column = _first_available(columns, "location") or "NULL"
+        founded_year_column = _first_available(columns, "founded_year") or "NULL"
+        employee_count_column = _first_available(columns, "employee_count", "employees_count", "number_of_employees") or "NULL"
+        created_at_column = _first_available(columns, "created_at") or "NOW()"
+        updated_at_column = _first_available(columns, "updated_at") or "NULL"
+        created_by_column = _first_available(columns, "created_by") or "NULL"
         
         # Get total count
         total = await db.fetchval("SELECT COUNT(*) FROM companies")
         
         # Get paginated companies
         rows = await db.fetch(
-            """SELECT id, name, description, website, industry, stage, 
-                      location, founded_year, employee_count, created_at, 
-                      updated_at, created_by
+            f"""SELECT id,
+                      {name_column} AS name,
+                      {description_column} AS description,
+                      {website_column} AS website,
+                      {industry_column} AS industry,
+                      {stage_column} AS stage,
+                      {location_column} AS location,
+                      {founded_year_column} AS founded_year,
+                      {employee_count_column} AS employee_count,
+                      {created_at_column} AS created_at,
+                      {updated_at_column} AS updated_at,
+                      {created_by_column} AS created_by
                FROM companies 
                ORDER BY created_at DESC 
                LIMIT $1 OFFSET $2""",
@@ -96,6 +137,7 @@ async def create_company(
 ):
     """Create a new company. Authentication is optional for analysis workflows."""
     try:
+        columns = await _get_table_columns(db, "companies")
         # Get the company name from either field
         name = company_data.get_name()
         
@@ -130,18 +172,59 @@ async def create_company(
         # Store created_by in metadata since it's not a direct column
         import json
         metadata = {"created_by": created_by} if created_by else {}
+
+        insert_columns = []
+        insert_values = []
+
+        def add_column(column_name: str, value):
+            if column_name in columns:
+                insert_columns.append(column_name)
+                insert_values.append(value)
+
+        add_column("name", name)
+        add_column("company_name", name)
+        add_column("description", description)
+        add_column("website", company_data.website)
+        add_column("industry", industry)
+        add_column("sector", industry)
+        add_column("industry_vertical", industry)
+        add_column("stage", stage)
+        add_column("funding_stage", stage)
+        add_column("development_stage", stage)
+        add_column("location", location)
+        add_column("founded_year", company_data.founded_year)
+        add_column("employee_count", employee_count)
+        add_column("employees_count", employee_count)
+        add_column("number_of_employees", employee_count)
+        add_column("metadata", json.dumps(metadata) if metadata else None)
+
+        if not insert_columns:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="No compatible company columns found"
+            )
+
+        placeholders = [f"${i}" for i in range(1, len(insert_values) + 1)]
+        returning_columns = [
+            "id",
+            _first_available(columns, "name", "company_name") or "NULL",
+            _first_available(columns, "description") or "NULL",
+            _first_available(columns, "website") or "NULL",
+            _first_available(columns, "industry", "sector", "industry_vertical") or "NULL",
+            _first_available(columns, "stage", "funding_stage", "development_stage") or "NULL",
+            _first_available(columns, "location") or "NULL",
+            _first_available(columns, "founded_year") or "NULL",
+            _first_available(columns, "employee_count", "employees_count", "number_of_employees") or "NULL",
+            _first_available(columns, "metadata") or "NULL",
+            _first_available(columns, "created_at") or "NOW()",
+            _first_available(columns, "updated_at") or "NULL",
+        ]
         
-        # Insert into database using correct column names
         row = await db.fetchrow(
-            """INSERT INTO companies 
-               (name, description, website, sector, funding_stage, location, 
-                founded_year, employees_count, metadata, created_at, updated_at)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
-               RETURNING id, name, description, website, sector, funding_stage, 
-                         location, founded_year, employees_count, metadata, 
-                         created_at, updated_at""",
-            name, description, company_data.website, industry, stage,
-            location, company_data.founded_year, employee_count, json.dumps(metadata)
+            f"""INSERT INTO companies ({', '.join(insert_columns)})
+                VALUES ({', '.join(placeholders)})
+                RETURNING {', '.join(returning_columns)}""",
+            *insert_values
         )
         
         if row:
@@ -169,10 +252,20 @@ async def get_company(company_id: int,
                       current_user: dict = Depends(get_current_user)):
     """Get company by ID"""
     try:
+        columns = await _get_table_columns(db, "companies")
         row = await db.fetchrow(
-            """SELECT id, name, description, website, industry, stage, 
-                      location, founded_year, employee_count, created_at, 
-                      updated_at, created_by
+            f"""SELECT id,
+                      {_first_available(columns, "name", "company_name") or 'NULL'} AS name,
+                      {_first_available(columns, "description") or 'NULL'} AS description,
+                      {_first_available(columns, "website") or 'NULL'} AS website,
+                      {_first_available(columns, "industry", "sector", "industry_vertical") or 'NULL'} AS industry,
+                      {_first_available(columns, "stage", "funding_stage", "development_stage") or 'NULL'} AS stage,
+                      {_first_available(columns, "location") or 'NULL'} AS location,
+                      {_first_available(columns, "founded_year") or 'NULL'} AS founded_year,
+                      {_first_available(columns, "employee_count", "employees_count", "number_of_employees") or 'NULL'} AS employee_count,
+                      {_first_available(columns, "created_at") or 'NOW()'} AS created_at,
+                      {_first_available(columns, "updated_at") or 'NULL'} AS updated_at,
+                      {_first_available(columns, "created_by") or 'NULL'} AS created_by
                FROM companies WHERE id = $1""",
             company_id
         )

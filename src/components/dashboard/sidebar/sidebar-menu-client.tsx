@@ -63,7 +63,7 @@ import Link from 'next/link';
 export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) {
     const pathname = usePathname();
     const router = useRouter();
-    const [user, setUser] = useState<AppUser | null>(null);
+    const [user, setUser] = useState<any | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [modulesOpen, setModulesOpen] = useState(pathname.startsWith('/analysis/modules'));
     const [reportsOpen, setReportsOpen] = useState(pathname.startsWith('/dashboard/reports'));
@@ -310,18 +310,10 @@ export function SidebarMenuClient({ isFooter = false }: { isFooter?: boolean }) 
                                             <span>Environmental Analysis</span>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
-                                    <SidebarMenuSubItem>
-                                        <SidebarMenuSubButton href="/analysis/modules/funder" isActive={pathname === '/analysis/modules/funder'}>
-                                            <Building2 className="size-4" />
-                                            <span>Funder Fit</span>
-                                        </SidebarMenuSubButton>
-                                    </SidebarMenuSubItem>
-                                    <SidebarMenuSubItem>
-                                        <SidebarMenuSubButton href="/analysis/modules/strategic" isActive={pathname === '/analysis/modules/strategic'}>
-                                            <Compass className="size-4" />
-                                            <span>Strategic Analysis</span>
-                                        </SidebarMenuSubButton>
-                                    </SidebarMenuSubItem>
+                                    {/* Removed duplicate sidebar entries:
+                                        - 'Funder Fit' (/analysis/modules/funder) duplicated 'Founder Fit Analysis' (/analysis/modules/founderFit)
+                                        - 'Strategic Analysis' (/analysis/modules/strategic) duplicated 'Strategic Fit Matrix' (/analysis/modules/strategicFit)
+                                    */}
                                     {isPrivilegedUser && (
                                     <SidebarMenuSubItem>
                                         <SidebarMenuSubButton href="/analysis/what-if" isActive={pathname === '/analysis/what-if'}>

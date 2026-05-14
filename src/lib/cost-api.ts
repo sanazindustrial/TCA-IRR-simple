@@ -3,7 +3,6 @@
  * Handles all cost-related API calls
  */
 
-// Base URL for API - endpoints use /api/v1 prefix
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://tcairrapiccontainer.azurewebsites.net';
 const API_PREFIX = '/api/v1';
 
@@ -124,37 +123,19 @@ export const costApi = {
         if (endDate) params.append('end_date', endDate);
 
         const token = getAuthToken();
-
-        // Try authenticated endpoint first
-        try {
-            const authUrl = `${API_BASE_URL}${API_PREFIX}/cost/summary${params.toString() ? `?${params.toString()}` : ''}`;
-            const authResponse = await fetch(authUrl, {
-                headers: {
-                    'Authorization': token ? `Bearer ${token}` : '',
-                    'Content-Type': 'application/json',
-                },
-            });
-
-            if (authResponse.ok) {
-                return authResponse.json();
-            }
-        } catch (e) {
-            console.warn('Authenticated cost endpoint failed, trying public endpoint');
-        }
-
-        // Fall back to public endpoint (no authentication required)
-        const publicUrl = `${API_BASE_URL}${API_PREFIX}/cost/summary/public${params.toString() ? `?${params.toString()}` : ''}`;
-        const publicResponse = await fetch(publicUrl, {
+        const url = `/api/cost/summary${params.toString() ? `?${params.toString()}` : ''}`;
+        const response = await fetch(url, {
             headers: {
+                'Authorization': token ? `Bearer ${token}` : '',
                 'Content-Type': 'application/json',
             },
         });
 
-        if (!publicResponse.ok) {
-            throw new Error(`Failed to fetch cost summary: ${publicResponse.statusText}`);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch cost summary: ${response.statusText}`);
         }
 
-        return publicResponse.json();
+        return response.json();
     },
 
     /**

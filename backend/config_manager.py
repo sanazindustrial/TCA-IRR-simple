@@ -15,10 +15,10 @@ class ConfigStatus:
 
     def __init__(self,
                  loaded: bool = False,
-                 error: str = None,
-                 last_modified: datetime = None,
+                 error: Optional[str] = None,
+                 last_modified: Optional[datetime] = None,
                  size_kb: float = 0.0,
-                 source_file: str = None):
+                 source_file: Optional[str] = None):
         self.loaded = loaded
         self.error = error
         self.last_modified = last_modified or datetime.now()
