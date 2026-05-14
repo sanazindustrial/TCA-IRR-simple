@@ -1155,7 +1155,7 @@ async def test_source(source_id: str, api_key: Optional[str] = None, current_use
 async def test_all_sources(
     category: Optional[SourceCategory] = None,
     free_only: bool = True,
-    background_tasks: BackgroundTasks = None,
+    background_tasks: Optional[BackgroundTasks] = None,
     current_user: dict = Depends(get_current_user),
 ):
     """Test all sources (or filtered subset) - runs tests in parallel"""
@@ -1376,7 +1376,7 @@ async def get_tca_module_mapping(current_user: dict = Depends(get_current_user))
                 "pricing": s.pricing.value,
                 "free_tier": s.free_tier_available,
                 "has_key": s.id in _api_keys,
-                "health": _source_health.get(s.id, {}).status if s.id in _source_health else "unknown"
+                "health": getattr(_source_health.get(s.id), "status", "unknown") if s.id in _source_health else "unknown"
             }
             for s in EXTERNAL_SOURCES.values()
             if module in s.tca_modules
