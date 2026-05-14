@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
 
 from app.db.database import db_manager
+from .auth import get_current_user
 from app.models.settings_version import (
     SettingsVersion,
     SettingsVersionCreate,
