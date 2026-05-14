@@ -45,6 +45,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import Link from 'next/link';
+import DOMPurify from 'isomorphic-dompurify';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
@@ -1398,7 +1399,10 @@ ${sectionsHtml}
                     className="rounded-lg border bg-white shadow-sm overflow-y-auto"
                     style={{ maxHeight: '620px' }}
                     dangerouslySetInnerHTML={{
-                      __html: htmlReportContent || '<p style="padding:1.5rem;color:#94a3b8;font-size:0.875rem;">Report preview will appear here after generation.</p>',
+                      __html: DOMPurify.sanitize(
+                        htmlReportContent || '<p style="padding:1.5rem;color:#94a3b8;font-size:0.875rem;">Report preview will appear here after generation.</p>',
+                        { USE_PROFILES: { html: true } }
+                      ),
                     }}
                   />
                 )}

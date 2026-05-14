@@ -115,6 +115,39 @@ def _normalize_status(value: Optional[str]) -> str:
 
 
 # ═══════════════════════════════════════════════════════════════════════
+# UPLOAD LIMITS (security: prevent memory-exhaustion DoS and unsafe types)
+# ═══════════════════════════════════════════════════════════════════════
+
+MAX_UPLOAD_BYTES = 25 * 1024 * 1024  # 25 MB per file
+ALLOWED_UPLOAD_EXTENSIONS = {
+    ".pdf", ".txt", ".csv", ".tsv", ".json", ".md", ".rtf",
+    ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+    ".png", ".jpg", ".jpeg", ".gif", ".webp",
+}
+
+
+def _validate_upload(file: UploadFile, content: bytes) -> None:
+    """Reject uploads that exceed the size limit or use a disallowed extension."""
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"File exceeds maximum allowed size ({MAX_UPLOAD_BYTES // (1024 * 1024)} MB)",
+        )
+    name = (file.filename or "").lower()
+    if "." not in name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File must have an extension",
+        )
+    ext = "." + name.rsplit(".", 1)[-1]
+    if ext not in ALLOWED_UPLOAD_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail=f"Unsupported file type: {ext}",
+        )
+
+
+# ═══════════════════════════════════════════════════════════════════════
 # FILE UPLOAD ENDPOINTS (/api/files/*)
 # ═══════════════════════════════════════════════════════════════════════
 
@@ -126,13 +159,14 @@ async def upload_files(
     """Upload a single file for analysis"""
     try:
         upload_id = str(uuid.uuid4())
-        
+
         # Read file content (in production, save to Azure Blob Storage)
         content = await file.read()
+        _validate_upload(file, content)
         file_size = len(content)
-        
+
         logger.info(f"File uploaded: {file.filename}, size: {file_size} bytes, upload_id: {upload_id}")
-        
+
         return UploadResponse(
             upload_id=upload_id,
             filename=file.filename,
@@ -140,6 +174,8 @@ async def upload_files(
             message=f"File uploaded successfully ({file_size} bytes)",
             uploaded_at=datetime.utcnow().isoformat()
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"File upload error: {e}")
         raise HTTPException(
@@ -159,12 +195,21 @@ async def upload_files_multipart(
         try:
             upload_id = str(uuid.uuid4())
             content = await file.read()
-            
+            _validate_upload(file, content)
+
             results.append(UploadResponse(
                 upload_id=upload_id,
                 filename=file.filename,
                 status="uploaded",
                 message=f"File uploaded successfully ({len(content)} bytes)",
+                uploaded_at=datetime.utcnow().isoformat()
+            ))
+        except HTTPException as he:
+            results.append(UploadResponse(
+                upload_id="",
+                filename=file.filename or "unknown",
+                status="error",
+                message=he.detail,
                 uploaded_at=datetime.utcnow().isoformat()
             ))
         except Exception as e:
@@ -176,7 +221,7 @@ async def upload_files_multipart(
                 message=str(e),
                 uploaded_at=datetime.utcnow().isoformat()
             ))
-    
+
     return results
 
 
@@ -188,8 +233,11 @@ async def extract_text_from_file(
     """Extract text content from uploaded file"""
     try:
         content = await file.read()
+        _validate_upload(file, content)
         text = content.decode('utf-8', errors='ignore')
         return {"filename": file.filename, "text": text, "length": len(text)}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Extract text error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to extract text: {str(e)}")

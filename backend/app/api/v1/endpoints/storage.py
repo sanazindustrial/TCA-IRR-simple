@@ -57,8 +57,10 @@ async def set_value(
         raise HTTPException(status_code=400, detail="key is required")
 
     value = payload.get("value")
-    user_id = current_user.get("id") or payload.get("user_id")
-    user_email = current_user.get("email") or payload.get("user_email", "")
+    user_id = current_user.get("id")
+    user_email = current_user.get("email", "")
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="authenticated user required")
     metadata = payload.get("metadata")
 
     # Serialize value and metadata to JSON strings if they aren't already
@@ -91,12 +93,13 @@ async def set_value(
 @router.get("/{key}")
 async def get_value(
     key: str,
-    user_id: Optional[int] = Query(None),
     db=Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
-    """Retrieve a stored value by key"""
-    resolved_user_id = current_user.get("id") or user_id
+    """Retrieve a stored value by key (for the current authenticated user only)"""
+    resolved_user_id = current_user.get("id")
+    if resolved_user_id is None:
+        raise HTTPException(status_code=401, detail="authenticated user required")
 
     await _ensure_table(db)
 
@@ -133,8 +136,10 @@ async def delete_value(
     db=Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
-    """Delete a stored value by key"""
+    """Delete a stored value by key (for the current authenticated user only)"""
     user_id = current_user.get("id")
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="authenticated user required")
 
     await _ensure_table(db)
 

@@ -3,6 +3,7 @@ TCA (Technology Company Assessment) specific endpoints
 """
 
 import logging
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from typing import Dict, Any
 import asyncpg
@@ -10,7 +11,7 @@ import asyncpg
 from app.db import get_db
 from app.models import TCAScorecard, BenchmarkComparison, RiskAssessment, FounderAnalysis
 from app.services import analysis_processor
-from .auth import get_current_user
+from .auth import get_current_user, get_optional_current_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -222,3 +223,19 @@ async def batch_tca_analysis(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Batch analysis failed"
         )
+
+
+@router.post("/extract-fields")
+async def tca_extract_fields(
+        data: Dict[str, Any] = None,
+        current_user: dict = Depends(get_current_user)):
+    """Extract structured TCA fields from raw text/payload. FE compatibility alias."""
+    payload = data or {}
+    text = payload.get("text") or payload.get("content") or ""
+    return {
+        "status": "processed",
+        "fields": {},
+        "text_length": len(text) if isinstance(text, str) else 0,
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+

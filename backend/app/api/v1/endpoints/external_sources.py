@@ -9,10 +9,13 @@ import time
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 from functools import lru_cache
+from urllib.parse import quote_plus
 import httpx
 from pydantic import BaseModel, Field
-from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Query, BackgroundTasks, Depends
 from enum import Enum
+
+from .auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -936,7 +939,7 @@ async def test_source_connection(source: ExternalSourceConfig, api_key: Optional
                     # Truncate large responses
                     if isinstance(sample_data, dict) and len(str(sample_data)) > 1000:
                         sample_data = {"preview": "Data received successfully", "size": len(str(sample_data))}
-                except:
+                except Exception:
                     sample_data = {"preview": response.text[:200] if response.text else "Empty response"}
             
             return SourceTestResult(
@@ -1015,7 +1018,8 @@ async def list_all_sources(
     category: Optional[SourceCategory] = None,
     pricing: Optional[SourcePricing] = None,
     free_only: bool = False,
-    tca_module: Optional[TCAModule] = None
+    tca_module: Optional[TCAModule] = None,
+    current_user: dict = Depends(get_current_user),
 ):
     """List all external sources with optional filtering"""
     sources = list(EXTERNAL_SOURCES.values())
@@ -1033,7 +1037,7 @@ async def list_all_sources(
 
 
 @router.get("/sources/{source_id}", response_model=ExternalSourceConfig)
-async def get_source(source_id: str):
+async def get_source(source_id: str, current_user: dict = Depends(get_current_user)):
     """Get details for a specific source"""
     if source_id not in EXTERNAL_SOURCES:
         raise HTTPException(status_code=404, detail=f"Source {source_id} not found")
@@ -1041,7 +1045,7 @@ async def get_source(source_id: str):
 
 
 @router.get("/sources/{source_id}/get-key-info")
-async def get_source_key_info(source_id: str):
+async def get_source_key_info(source_id: str, current_user: dict = Depends(get_current_user)):
     """Get information on how to obtain an API key for a source"""
     if source_id not in EXTERNAL_SOURCES:
         raise HTTPException(status_code=404, detail=f"Source {source_id} not found")
@@ -1126,7 +1130,7 @@ def _get_key_instructions(source: ExternalSourceConfig) -> str:
 
 
 @router.post("/sources/{source_id}/test", response_model=SourceTestResult)
-async def test_source(source_id: str, api_key: Optional[str] = None):
+async def test_source(source_id: str, api_key: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     """Test connection to a specific source"""
     if source_id not in EXTERNAL_SOURCES:
         raise HTTPException(status_code=404, detail=f"Source {source_id} not found")
@@ -1151,7 +1155,8 @@ async def test_source(source_id: str, api_key: Optional[str] = None):
 async def test_all_sources(
     category: Optional[SourceCategory] = None,
     free_only: bool = True,
-    background_tasks: BackgroundTasks = None
+    background_tasks: Optional[BackgroundTasks] = None,
+    current_user: dict = Depends(get_current_user),
 ):
     """Test all sources (or filtered subset) - runs tests in parallel"""
     sources = list(EXTERNAL_SOURCES.values())
@@ -1221,7 +1226,7 @@ async def get_sources_health():
 
 
 @router.get("/health/dashboard")
-async def get_health_dashboard():
+async def get_health_dashboard(current_user: dict = Depends(get_current_user)):
     """Get dashboard data for source health monitoring"""
     total = len(EXTERNAL_SOURCES)
     healthy = sum(1 for h in _source_health.values() if h.status == "healthy")
@@ -1275,7 +1280,11 @@ async def get_health_dashboard():
 
 
 @router.post("/api-keys/{source_id}")
-async def set_api_key(source_id: str, api_key: str):
+async def set_api_key(
+    source_id: str,
+    api_key: str,
+    current_user: dict = Depends(get_current_user),
+):
     """Store API key for a source (in production, use Azure Key Vault)"""
     if source_id not in EXTERNAL_SOURCES:
         raise HTTPException(status_code=404, detail=f"Source {source_id} not found")
@@ -1287,7 +1296,10 @@ async def set_api_key(source_id: str, api_key: str):
 
 
 @router.delete("/api-keys/{source_id}")
-async def delete_api_key(source_id: str):
+async def delete_api_key(
+    source_id: str,
+    current_user: dict = Depends(get_current_user),
+):
     """Remove API key for a source"""
     if source_id in _api_keys:
         del _api_keys[source_id]
@@ -1295,7 +1307,9 @@ async def delete_api_key(source_id: str):
 
 
 @router.get("/api-keys")
-async def list_configured_keys():
+async def list_configured_keys(
+    current_user: dict = Depends(get_current_user),
+):
     """List which sources have API keys configured (masked)"""
     return {
         source_id: f"{key[:4]}...{key[-4:]}" if len(key) > 8 else "****"
@@ -1304,7 +1318,7 @@ async def list_configured_keys():
 
 
 @router.get("/costs")
-async def get_cost_summary():
+async def get_cost_summary(current_user: dict = Depends(get_current_user)):
     """Get cost summary for all sources"""
     # Calculate estimated costs based on pricing tiers
     cost_data = []
@@ -1318,7 +1332,7 @@ async def get_cost_summary():
             try:
                 cost_str = source.cost.replace("$", "").replace("/mo", "").split(" ")[0]
                 monthly_cost = float(cost_str)
-            except:
+            except (AttributeError, TypeError, ValueError):
                 monthly_cost = 0
         
         api_calls = len(_source_costs.get(source_id, []))
@@ -1349,7 +1363,7 @@ async def get_cost_summary():
 
 
 @router.get("/tca-mapping")
-async def get_tca_module_mapping():
+async def get_tca_module_mapping(current_user: dict = Depends(get_current_user)):
     """Get mapping of external sources to TCA scoring modules"""
     mapping = {}
     
@@ -1362,7 +1376,7 @@ async def get_tca_module_mapping():
                 "pricing": s.pricing.value,
                 "free_tier": s.free_tier_available,
                 "has_key": s.id in _api_keys,
-                "health": _source_health.get(s.id, {}).status if s.id in _source_health else "unknown"
+                "health": getattr(_source_health.get(s.id), "status", "unknown") if s.id in _source_health else "unknown"
             }
             for s in EXTERNAL_SOURCES.values()
             if module in s.tca_modules
@@ -1393,7 +1407,7 @@ def _get_module_description(module: TCAModule) -> str:
 
 
 @router.get("/categories")
-async def get_categories_summary():
+async def get_categories_summary(current_user: dict = Depends(get_current_user)):
     """Get summary of all source categories"""
     categories = {}
     
@@ -1427,7 +1441,11 @@ async def get_categories_summary():
 # ============================================================================
 
 @router.post("/enrich-report-context")
-async def enrich_report_context(company_name: str, company_website: Optional[str] = None):
+async def enrich_report_context(
+    company_name: str,
+    company_website: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
     """
     Enrich report context by fetching data from multiple sources.
     Call this before generate_report() to add external data.
@@ -1436,10 +1454,13 @@ async def enrich_report_context(company_name: str, company_website: Optional[str
     errors = []
     
     # Define which sources to query for company enrichment
+    # URL-encode user-supplied company_name to prevent URL/query parameter
+    # injection into the upstream provider requests.
+    safe_name = quote_plus(company_name or "")
     enrichment_sources = [
-        ("github", f"https://api.github.com/search/repositories?q={company_name}&sort=stars&per_page=3"),
-        ("hackernews", f"https://hn.algolia.com/api/v1/search?query={company_name}&tags=story"),
-        ("pubmed", f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term={company_name}&retmode=json&retmax=5"),
+        ("github", f"https://api.github.com/search/repositories?q={safe_name}&sort=stars&per_page=3"),
+        ("hackernews", f"https://hn.algolia.com/api/v1/search?query={safe_name}&tags=story"),
+        ("pubmed", f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term={safe_name}&retmode=json&retmax=5"),
     ]
     
     async with httpx.AsyncClient(timeout=10) as client:

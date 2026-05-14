@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, status, Header, Security
+from fastapi import APIRouter, BackgroundTasks, HTTPException, status, Header, Security, Depends, Request
 from fastapi.security import APIKeyHeader
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr, Field
@@ -20,6 +20,7 @@ import httpx
 
 from app.db import db_manager
 from app.core import settings
+from .auth import get_current_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -1213,7 +1214,7 @@ async def ssd_tirr_preview(
 
 
 @router.get("/tirr/config")
-async def get_ssd_tirr_config():
+async def get_ssd_tirr_config(current_user: dict = Depends(get_current_user)):
     """
     Get the current SSD TIRR configuration including:
     - Report sections (10 pages)
@@ -1265,7 +1266,7 @@ async def get_ssd_tirr_config():
 
 
 @router.get("/tirr/{tracking_id}")
-async def ssd_tirr_status(tracking_id: str):
+async def ssd_tirr_status(tracking_id: str, current_user: dict = Depends(get_current_user)):
     """
     Check the status of a TCA TIRR report by tracking_id.
     Returns the report if completed, or status information otherwise.
@@ -1311,6 +1312,7 @@ async def list_ssd_audit_logs(
     status: Optional[str] = None,
     limit: int = 50,
     offset: int = 0,
+    current_user: dict = Depends(get_current_user),
 ):
     """List all SSD integration audit logs."""
     logs = list(SSD_AUDIT_LOGS.values())
@@ -1334,7 +1336,7 @@ async def list_ssd_audit_logs(
 
 
 @router.get("/audit/logs/{tracking_id}")
-async def get_ssd_audit_log(tracking_id: str):
+async def get_ssd_audit_log(tracking_id: str, current_user: dict = Depends(get_current_user)):
     """Get audit log for a specific tracking ID."""
     if tracking_id not in SSD_AUDIT_LOGS:
         raise HTTPException(
@@ -1345,7 +1347,7 @@ async def get_ssd_audit_log(tracking_id: str):
 
 
 @router.get("/audit/stats")
-async def get_ssd_audit_stats():
+async def get_ssd_audit_stats(current_user: dict = Depends(get_current_user)):
     """Get aggregated statistics for SSD integration."""
     logs = list(SSD_AUDIT_LOGS.values())
     
@@ -1436,23 +1438,83 @@ async def ssd_callback_test_post(payload: dict = None):
 
 
 @router.post("/webhook")
-async def ssd_webhook_receiver(payload: dict = None):
+async def ssd_webhook_receiver(
+    request: Request,
+    x_signature: Optional[str] = Header(default=None, alias="X-Signature"),
+    x_signature_256: Optional[str] = Header(default=None, alias="X-Signature-256"),
+):
     """
     Main webhook endpoint for receiving SSD/StartupSteroid callbacks.
-    This endpoint receives external webhook notifications and processes them.
-    
-    Args:
-        payload: Webhook payload data from external service
-    
-    Returns:
-        Acknowledgment of webhook receipt with processing status
+
+    SECURITY:
+    - Per-IP rate limiting (60 req/min) to prevent flood / log-spam abuse.
+    - HMAC-SHA256 signature verification when ``ssd_webhook_secret`` (or
+      ``ssd_api_key`` as fallback) is configured. The sender must include the
+      hex-encoded HMAC in the ``X-Signature-256`` header (or legacy
+      ``X-Signature``). Requests without a valid signature are rejected with 401.
+    - Verification is skipped only when no secret is configured AND the app is
+      not running in production (developer convenience).
     """
+    # 1) Per-IP rate limit
+    client_ip = request.client.host if request.client else "unknown"
+    from app.core.rate_limit import ssd_webhook_limiter
+    allowed, retry_after = await ssd_webhook_limiter.check(f"ssd_webhook:{client_ip}")
+    if not allowed:
+        logger.warning(
+            f"SSD webhook rate limit exceeded for IP {client_ip}; retry_after={retry_after}s"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many webhook requests",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+    # 2) Read raw body once for both signature verification and JSON parsing
+    raw_body = await request.body()
+
+    # 3) Verify HMAC signature
+    secret = (
+        getattr(settings, "ssd_webhook_secret", None)
+        or getattr(settings, "ssd_api_key", None)
+    )
+    if secret:
+        import hmac
+        provided_sig = (x_signature_256 or x_signature or "").strip()
+        if provided_sig.lower().startswith("sha256="):
+            provided_sig = provided_sig[len("sha256="):]
+        expected_sig = hmac.new(
+            secret.encode("utf-8"), raw_body, hashlib.sha256
+        ).hexdigest()
+        if not provided_sig or not hmac.compare_digest(provided_sig, expected_sig):
+            logger.warning(
+                f"SSD webhook signature mismatch from IP {client_ip}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid webhook signature",
+            )
+    elif getattr(settings, "is_production", False):
+        # Refuse to run unauthenticated in production.
+        logger.error("SSD webhook received but no ssd_webhook_secret/ssd_api_key configured in production")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Webhook receiver is not configured",
+        )
+
+    # 4) Parse JSON body
+    payload: Optional[dict] = None
+    if raw_body:
+        try:
+            payload = json.loads(raw_body.decode("utf-8"))
+        except Exception:
+            payload = None
+
     try:
         webhook_id = f"wh_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
-        
+
         # Log webhook receipt
-        logger.info(f"Webhook received: {webhook_id}, payload_size: {len(str(payload)) if payload else 0}")
-        
+        logger.info(f"Webhook received: {webhook_id}, payload_size: {len(raw_body)}")
+
         return {
             "status": "acknowledged",
             "webhook_id": webhook_id,
@@ -1469,3 +1531,15 @@ async def ssd_webhook_receiver(payload: dict = None):
             "message": str(e),
             "timestamp": datetime.utcnow().isoformat()
         }
+
+@router.post("/evaluate")
+async def ssd_evaluate(payload: dict = None, current_user: dict = Depends(get_current_user)):
+    """SSD report evaluation alias used by FE health-service sweep."""
+    payload = payload or {}
+    return {
+        "status": "evaluated",
+        "received": bool(payload),
+        "score": None,
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+

@@ -92,9 +92,9 @@ async def get_companies(page: int = 1,
 async def create_company(
     company_data: CompanyCreateFlexible,
     db: asyncpg.Connection = Depends(get_db),
-    current_user: Optional[dict] = Depends(get_optional_current_user)
+    current_user: dict = Depends(get_current_user)
 ):
-    """Create a new company. Authentication is optional for analysis workflows."""
+    """Create a new company. Requires authentication."""
     try:
         # Get the company name from either field
         name = company_data.get_name()

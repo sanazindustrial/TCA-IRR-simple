@@ -75,7 +75,7 @@ async def issue_password_reset_email(
         db=db,
     )
 
-    logger.info(f"Password reset requested for user: {username}, token: {reset_token[:8]}...")
+    logger.info(f"Password reset requested for user: {username}")
 
     try:
         email_sent = await send_password_reset_email(
@@ -581,7 +581,21 @@ async def forgot_password(
     # Get client info for logging
     client_ip = request.client.host if request.client else "unknown"
     user_agent = request.headers.get("user-agent", "unknown")
-    
+
+    # SECURITY: per-IP rate limit to mitigate brute-force email enumeration
+    # and abuse of the password-reset email pipeline.
+    from app.core.rate_limit import forgot_password_limiter
+    allowed, retry_after = await forgot_password_limiter.check(f"forgot:{client_ip}")
+    if not allowed:
+        logger.warning(
+            f"Forgot-password rate limit exceeded for IP {client_ip}; retry_after={retry_after}s"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many password reset requests. Please try again later.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
     try:
         # Check if user exists
         user = await db.fetchrow(

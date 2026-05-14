@@ -181,7 +181,7 @@ def parse_limit(value: Any) -> Any:
 
 
 @router.get("/configurations")
-async def get_role_configurations() -> Dict[str, Any]:
+async def get_role_configurations(current_user: dict = Depends(get_current_user)) -> Dict[str, Any]:
     """Get all role configurations from database"""
     try:
         async with db_manager.get_connection() as db:

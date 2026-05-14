@@ -177,14 +177,19 @@ def create_application() -> FastAPI:
                            allowed_hosts=settings.allowed_hosts)
 
     # Configure CORS - must be added LAST so it runs FIRST
-    # This ensures CORS headers are added to all responses
+    # SECURITY: when allow_credentials=True, allow_origins MUST NOT be "*".
+    # Filter wildcards out of the configured list defensively.
+    _origins = [o for o in (settings.cors_origins or []) if o and o != "*"]
+    if not _origins:
+        # Safe dev fallback only
+        _origins = ["http://localhost:3000"]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # Allow all origins for now
+        allow_origins=_origins,
         allow_credentials=True,
-        allow_methods=["*"],  # Allow all methods
-        allow_headers=["*"],  # Allow all headers
-        expose_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "X-Requested-With", "X-API-Key"],
+        expose_headers=["Content-Disposition"],
     )
 
     # Include API routes
