@@ -131,13 +131,19 @@ export default function ModuleSettingsPage() {
             const data = await settingsApi.getVersions(true);
             setVersions(data);
 
-            // Select active version by default
-            const activeVersion = data.find(v => v.is_active);
-            if (activeVersion) {
-                const fullVersion = await settingsApi.getVersion(activeVersion.id);
-                setSelectedVersion(mergeModuleSettings(fullVersion));
-            } else if (data.length > 0) {
-                const fullVersion = await settingsApi.getVersion(data[0].id);
+            // Always trust the backend's canonical /versions/active endpoint.
+            // The list endpoint can return multiple rows flagged is_active=true
+            // (legacy data corruption); .find() may then pick an empty
+            // duplicate version, leaving every module rendered as Inactive.
+            let fullVersion = await settingsApi.getActiveVersion();
+            if (!fullVersion || !(fullVersion.module_settings && fullVersion.module_settings.length)) {
+                // Fall back: pick the first version that actually has modules.
+                const candidate = data.find(v => v.is_active) || data[0];
+                if (candidate) {
+                    fullVersion = await settingsApi.getVersion(candidate.id);
+                }
+            }
+            if (fullVersion) {
                 setSelectedVersion(mergeModuleSettings(fullVersion));
             }
         } catch (error) {
