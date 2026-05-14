@@ -301,10 +301,11 @@ async def _table_exists(db: asyncpg.Connection, table_name: str) -> bool:
 async def get_public_cost_summary(
     start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
+    current_user: dict = Depends(get_current_user),
 ):
     """
-    Public cost summary endpoint (no authentication required).
-    Returns aggregated cost metrics without sensitive user data.
+    Cost summary endpoint. Requires authentication; returns aggregated
+    cost metrics without sensitive user data.
     """
     # Default fallback response (used when DB is unavailable)
     _fallback = {
