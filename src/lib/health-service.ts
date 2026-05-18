@@ -129,13 +129,11 @@ const SERVICES: ServiceDef[] = [
     { id: 'auth-login-svc',    label: 'Login',            group: 'auth', path: '/api/v1/auth/login',           optional: true },
 
     // ── Analysis engine ──
-    // GET /api/v1/analysis/ lists analyses (auth required)
+    // GET /api/v1/analysis/ lists analyses (auth required) – the ONLY GET-safe analysis endpoint.
+    // POST-only endpoints (comprehensive / tca/quick / tca/sector-analysis / tca/batch /
+    // analysis/ai-extract / analysis/ai-orchestrate) are intentionally NOT in the GET
+    // health sweep – polling them with GET produced 405 spam in production logs.
     { id: 'analysis-list-svc', label: 'Analysis List',    group: 'analysis', path: '/api/v1/analysis/',              requiresAuth: true, optional: true },
-    // POST-only endpoints – GET returns 405 (service alive) or 401 (auth required); mark optional
-    { id: 'analysis-svc',      label: 'Analysis Engine',  group: 'analysis', path: '/api/v1/analysis/comprehensive', requiresAuth: true, optional: true },
-    { id: 'tca-quick',         label: 'TCA Quick',        group: 'analysis', path: '/api/v1/tca/quick',              requiresAuth: true, optional: true },
-    { id: 'tca-sector',        label: 'TCA Sector',       group: 'analysis', path: '/api/v1/tca/sector-analysis',    requiresAuth: true, optional: true },
-    { id: 'tca-batch',         label: 'TCA Batch',        group: 'analysis', path: '/api/v1/tca/batch',              requiresAuth: true, optional: true },
 
     // ── 17 modules (status derived from /api/v1/tca/system-status in sweep) ──
     ...MODULE_IDS.map((mod) => ({
@@ -148,8 +146,7 @@ const SERVICES: ServiceDef[] = [
 
     // ── Data services ──
     { id: 'reports-svc',      label: 'Reports',             group: 'data', path: '/api/v1/reports',                  requiresAuth: true },
-    // Use trailing slash to avoid a 307 redirect that Azure may not proxy cross-origin
-    { id: 'companies-svc',    label: 'Companies',           group: 'data', path: '/api/v1/companies/',               requiresAuth: true },
+    { id: 'companies-svc',    label: 'Companies',           group: 'data', path: '/api/v1/companies',                requiresAuth: true },
     // GET /api/v1/evaluations has no handler (POST-only root) – mark optional
     { id: 'evaluations-svc',  label: 'Evaluations',         group: 'data', path: '/api/v1/evaluations',              requiresAuth: true, optional: true },
     { id: 'investments-svc',  label: 'Investments',         group: 'data', path: '/api/v1/investments/',             requiresAuth: true, optional: true },
@@ -207,9 +204,9 @@ const SERVICES: ServiceDef[] = [
     // /api/v1/auth/email/status lives under the /auth router
     { id: 'email-svc',     label: 'Email Service',    group: 'communication', path: '/api/v1/auth/email/status', requiresAuth: true, optional: true },
 
-    // ── AI Agent services (optional – may not be deployed) ──
-    { id: 'ai-analysis-svc',       label: 'AI Analysis Agent',             group: 'ai', path: '/api/v1/analysis/ai-extract',            requiresAuth: true, optional: true },
-    { id: 'ai-multi-agent-svc',    label: 'Multi-Agent Orchestrator',      group: 'ai', path: '/api/v1/analysis/ai-orchestrate',        requiresAuth: true, optional: true },
+    // ── AI Agent services ──
+    // Intentionally omitted: /api/v1/analysis/ai-extract and /api/v1/analysis/ai-orchestrate
+    // are POST-only; GET-polling produced 405 spam. Liveness for these is covered by /health.
 
     // ── Machine Learning services (optional – may not be deployed) ──
     { id: 'ml-scoring-svc',        label: 'ML Scoring',                    group: 'ml', path: '/api/v1/ml/status',                      optional: true },
@@ -327,6 +324,9 @@ class HealthService {
         const noisyPatterns: RegExp[] = [
             /^\/api\/v1\/auth\/(login|register|refresh)$/,
             /^\/api\/v1\/(analysis\/comprehensive|tca\/batch|ssd\/evaluate|records\/sync)$/,
+            // POST-only TCA & AI agent endpoints – GET-pinging produces 405 noise
+            /^\/api\/v1\/tca\/(quick|sector-analysis)$/,
+            /^\/api\/v1\/analysis\/(ai-extract|ai-orchestrate)$/,
             /^\/api\/v1\/(extraction\/validate|extraction\/reprocess)$/,
             /^\/api\/v1\/(analysis\/extract-text-from-file|analysis\/extract-company-info)$/,
             /^\/api\/v1\/files\/(upload|extract-text)$/,
@@ -341,47 +341,29 @@ class HealthService {
     // ── Single service ping ───────────────────────────────────────────────────
 
     private async pingService(def: ServiceDef): Promise<ServiceResult> {
-        // Auth-required probes are noisy in browser logs (401) when session/token
-        // is missing or stale. Keep them off by default; allow opt-in debug mode.
-        if (def.requiresAuth && !this.shouldProbeOptionalEndpoints()) {
-            return {
-                def,
-                status: 'checking',
-                code: 0,
-                latencyMs: 0,
-                checkedAt: new Date().toISOString(),
-            };
-        }
-
-        // Optional probes are informational only. Skip by default to avoid noisy
-        // browser console errors from protected/POST-only endpoints.
-        if (def.optional && !this.shouldProbeOptionalEndpoints()) {
-            return {
-                def,
-                status: 'checking',
-                code: 0,
-                latencyMs: 0,
-                checkedAt: new Date().toISOString(),
-            };
-        }
-
-        // Even in debug mode, suppress known noisy endpoints.
-        if (def.optional && this.isNoisyOptionalEndpoint(def.path)) {
-            return {
-                def,
-                status: 'checking',
-                code: 0,
-                latencyMs: 0,
-                checkedAt: new Date().toISOString(),
-            };
-        }
-
         const token = this.getToken();
+        const probeOptional = this.shouldProbeOptionalEndpoints();
+
+        // Auth-required probes: only skip when there is no token.
+        // (Previously these were skipped unconditionally unless opt-in debug
+        // mode was enabled, which left the entire Service Status panel stuck
+        // on "Checking…".  Now, if the user is authenticated, we DO probe.)
         if (def.requiresAuth && !token) {
-            // User not logged in – report degraded (optional) or down (required)
             return {
                 def,
-                status: (def.optional ? 'degraded' : 'down') as ServiceStatus,
+                status: (def.optional ? 'checking' : 'down') as ServiceStatus,
+                code: 0,
+                latencyMs: 0,
+                checkedAt: new Date().toISOString(),
+            };
+        }
+
+        // Optional + known-noisy POST-only endpoints: only probe when explicit
+        // debug mode is on, to keep the browser console clean.
+        if (def.optional && this.isNoisyOptionalEndpoint(def.path) && !probeOptional) {
+            return {
+                def,
+                status: 'checking',
                 code: 0,
                 latencyMs: 0,
                 checkedAt: new Date().toISOString(),
@@ -493,14 +475,13 @@ class HealthService {
     private async fetchTCASystemStatus(): Promise<Record<string, boolean>> {
         try {
             const token = this.getToken();
-            // Keep auth-required status probes off by default unless debug mode is enabled.
-            if (!this.shouldProbeOptionalEndpoints()) return {};
             // Skip the request when unauthenticated to avoid a 401 console error
             if (!token) return {};
             const controller = new AbortController();
             setTimeout(() => controller.abort(), PING_TIMEOUT);
-            const headers: Record<string, string> = {};
-            if (token) headers['Authorization'] = `Bearer ${token}`;
+            const headers: Record<string, string> = {
+                'Authorization': `Bearer ${token}`,
+            };
             const res = await fetch(`${this.baseURL}/api/v1/tca/system-status`, {
                 headers,
                 signal: controller.signal,
