@@ -100,6 +100,106 @@ export function normalizeTcaCategories(
 }
 
 /**
+ * Canonical 12 categories per framework. The display layer expects all 12 rows;
+ * missing categories are padded with neutral placeholders so the composite is
+ * computed over a full 100% weight basis instead of a partial subset.
+ */
+export const STANDARD_GENERAL_CATEGORIES: ReadonlyArray<string> = [
+    'Leadership',
+    'Product-Market Fit',
+    'Team Strength',
+    'Technology & IP',
+    'Business Model & Financials',
+    'Go-to-Market Strategy',
+    'Competition & Moat',
+    'Market Potential',
+    'Traction',
+    'Scalability',
+    'Risk Assessment',
+    'Exit Potential',
+];
+
+export const STANDARD_MEDTECH_CATEGORIES: ReadonlyArray<string> = [
+    'Leadership',
+    'Regulatory/Compliance',
+    'Product-Market Fit',
+    'Team Strength',
+    'Technology & IP',
+    'Business Model & Financials',
+    'Go-to-Market Strategy',
+    'Competition & Moat',
+    'Market Potential',
+    'Traction',
+    'Scalability',
+    'Risk Assessment',
+];
+
+// Aliases that should be treated as the same category when matching by name.
+const CATEGORY_ALIASES: Record<string, string> = {
+    'Team Capability': 'Team Strength',
+    'Technology': 'Technology & IP',
+    'Technology Innovation': 'Technology & IP',
+    'Tech/IP': 'Technology & IP',
+    'Business Model': 'Business Model & Financials',
+    'Financial Viability': 'Business Model & Financials',
+    'Financial Health': 'Business Model & Financials',
+    'Financials': 'Business Model & Financials',
+    'Market Opportunity': 'Market Potential',
+    'GTM': 'Go-to-Market Strategy',
+    'Competitive Advantage': 'Competition & Moat',
+    'Regulatory': 'Regulatory/Compliance',
+    'Traction/Testimonials': 'Traction',
+};
+
+function canonicalCategoryName(name: string): string {
+    return CATEGORY_ALIASES[name] ?? name;
+}
+
+/**
+ * Ensures all canonical categories for the framework are present. Missing
+ * categories are added as neutral placeholders (rawScore 5.0, yellow flag,
+ * "Not assessed" copy) so the table always shows the full set and the
+ * composite is calculated over a full 100% weight basis.
+ */
+export function ensureAllStandardCategories(
+    categories: GenerateTcaScorecardOutput['categories'],
+    framework: 'general' | 'medtech' = 'general'
+): GenerateTcaScorecardOutput['categories'] {
+    const standard = framework === 'medtech' ? STANDARD_MEDTECH_CATEGORIES : STANDARD_GENERAL_CATEGORIES;
+    const weights = framework === 'medtech' ? MEDTECH_FRAMEWORK_WEIGHTS : GENERAL_FRAMEWORK_WEIGHTS;
+
+    const byCanonical = new Map<string, GenerateTcaScorecardOutput['categories'][number]>();
+    for (const cat of categories) {
+        const key = canonicalCategoryName(cat.category);
+        if (!byCanonical.has(key)) byCanonical.set(key, { ...cat, category: key });
+    }
+
+    const result: GenerateTcaScorecardOutput['categories'] = [];
+    for (const name of standard) {
+        const existing = byCanonical.get(name);
+        if (existing) {
+            result.push(existing);
+        } else {
+            const weight = weights[name] ?? 0;
+            result.push({
+                category: name,
+                rawScore: 5.0,
+                weight,
+                weightedScore: parseFloat((5.0 * (weight / 100)).toFixed(2)),
+                interpretation: 'Not assessed in this analysis run.',
+                flag: 'yellow',
+                pestel: 'N/A',
+                description: `${name} was not evaluated; neutral placeholder used so the scorecard shows the full 12-category framework.`,
+                strengths: 'Not assessed.',
+                concerns: 'Not assessed.',
+                aiRecommendation: `Run the ${name} module to populate this category.`,
+            });
+        }
+    }
+    return result;
+}
+
+/**
  * Calculates the composite score from categories
  * Composite = sum of all weighted scores (0-10 scale)
  */
@@ -125,13 +225,19 @@ export function normalizeTcaOutput(
 ): GenerateTcaScorecardOutput | null {
     if (!data || !data.categories) return data;
 
-    const normalizedCategories = normalizeTcaCategories(data.categories, framework);
+    // 1) Pad to the full 12-category framework so the scorecard always shows 12 rows
+    //    and the composite is computed against a full 100% weight basis.
+    const padded = ensureAllStandardCategories(data.categories, framework);
+    // 2) Reapply canonical weights and recompute weightedScore per category.
+    const normalizedCategories = normalizeTcaCategories(padded, framework);
+    // 3) Composite = sum of weightedScores (0-10 scale).
     const compositeScore = calculateCompositeScore(normalizedCategories);
 
     return {
         ...data,
         categories: normalizedCategories,
         compositeScore,
+        overallScore: compositeScore,
     };
 }
 

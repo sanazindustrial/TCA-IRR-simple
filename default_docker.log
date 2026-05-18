@@ -1,0 +1,2554 @@
+2026-04-29T00:25:17.9038283Z    _____                               
+2026-04-29T00:25:17.9040178Z   /  _  \ __________ _________   ____  
+2026-04-29T00:25:17.9040230Z  /  /_\  \\___   /  |  \_  __ \_/ __ \ 
+2026-04-29T00:25:17.9040253Z /    |    \/    /|  |  /|  | \/\  ___/ 
+2026-04-29T00:25:17.9040275Z \____|__  /_____ \____/ |__|    \___  >
+2026-04-29T00:25:17.9040302Z         \/      \/                  \/ 
+2026-04-29T00:25:17.9040352Z A P P   S E R V I C E   O N   L I N U X
+2026-04-29T00:25:17.9040373Z 
+2026-04-29T00:25:17.9040401Z Documentation    : http://aka.ms/webapp-linux
+2026-04-29T00:25:17.9040425Z NodeJS quickstart: https://aka.ms/node-qs
+2026-04-29T00:25:17.9040448Z NodeJS Version   : v24.13.0
+2026-04-29T00:25:17.9040470Z Instance Name    : lw1mdlwk0001DT
+2026-04-29T00:25:17.9040512Z Instance Id      : 309973e00d4a75475b1b3413021a4c10e69f2588f11014752e32af1ed2c371fa
+2026-04-29T00:25:17.9040536Z 
+2026-04-29T00:25:17.9040557Z Note: Any data outside '/home' is not persisted
+2026-04-29T00:25:21.2819357Z  * Starting OpenBSD Secure Shell server sshd
+2026-04-29T00:25:21.3257537Z    ...done.
+2026-04-29T00:25:21.3387269Z WEBSITES_INCLUDE_CLOUD_CERTS is not set to true.
+2026-04-29T00:25:21.3679490Z Updating certificates in /etc/ssl/certs...
+2026-04-29T00:25:32.2031257Z rehash: warning: skipping duplicate certificate in SSLcom-TLS-Root-2022-ECC.pem
+2026-04-29T00:25:32.2108924Z rehash: warning: skipping duplicate certificate in SSLcom-TLS-Root-2022-RSA.pem
+2026-04-29T00:25:32.4732512Z rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL
+2026-04-29T00:25:32.5031256Z 4 added, 0 removed; done.
+2026-04-29T00:25:32.5034714Z Running hooks in /etc/ca-certificates/update.d...
+2026-04-29T00:25:32.5123018Z done.
+2026-04-29T00:25:32.5240722Z CA certificates copied and updated successfully.
+2026-04-29T00:25:32.5852953Z  * Starting periodic command scheduler cron
+2026-04-29T00:25:32.6029712Z    ...done.
+2026-04-29T00:25:32.7125720Z Found build manifest file at '/home/site/wwwroot/oryx-manifest.toml'. Deserializing it...
+2026-04-29T00:25:32.7147206Z Could not find operation ID in manifest. Generating an operation id...
+2026-04-29T00:25:32.7147719Z Build Operation ID: 0feac05d-ca12-4531-bf48-f9502f1119f3
+2026-04-29T00:25:33.0873713Z Environment Variables for Application Insight's IPA Codeless Configuration exists..
+2026-04-29T00:25:33.1153054Z Writing output script to '/opt/startup/startup.sh'
+2026-04-29T00:25:33.1507188Z Running #!/bin/sh
+2026-04-29T00:25:33.1507915Z 
+2026-04-29T00:25:33.1507952Z # Enter the source directory to make sure the script runs where the user expects
+2026-04-29T00:25:33.1507988Z cd "/home/site/wwwroot"
+2026-04-29T00:25:33.1508008Z 
+2026-04-29T00:25:33.1515806Z export NODE_PATH=/usr/local/lib/node_modules:$NODE_PATH
+2026-04-29T00:25:33.1515988Z if [ -z "$PORT" ]; then
+2026-04-29T00:25:33.1516013Z 		export PORT=8080
+2026-04-29T00:25:33.1516059Z fi
+2026-04-29T00:25:33.1516080Z 
+2026-04-29T00:25:33.1522572Z echo Found tar.gz based node_modules.
+2026-04-29T00:25:33.1522699Z extractionCommand="tar -xzf node_modules.tar.gz -C /node_modules"
+2026-04-29T00:25:33.1525513Z echo "Removing existing modules directory from root..."
+2026-04-29T00:25:33.1525609Z rm -fr /node_modules
+2026-04-29T00:25:33.1525634Z mkdir -p /node_modules
+2026-04-29T00:25:33.1525681Z echo Extracting modules...
+2026-04-29T00:25:33.1525705Z $extractionCommand
+2026-04-29T00:25:33.1597713Z export NODE_PATH="/node_modules":$NODE_PATH
+2026-04-29T00:25:33.1598036Z export PATH=/node_modules/.bin:$PATH
+2026-04-29T00:25:33.1598067Z if [ -d node_modules ]; then
+2026-04-29T00:25:33.1598093Z     mv -f node_modules _del_node_modules || true
+2026-04-29T00:25:33.1599620Z fi
+2026-04-29T00:25:33.1603027Z 
+2026-04-29T00:25:33.1603131Z if [ -d /node_modules ]; then
+2026-04-29T00:25:33.1603160Z     ln -sfn /node_modules ./node_modules 
+2026-04-29T00:25:33.1603182Z fi
+2026-04-29T00:25:33.1603202Z 
+2026-04-29T00:25:33.1603223Z echo "Done."
+2026-04-29T00:25:33.1607088Z PATH="$PATH:/home/site/wwwroot" cd /home/site/wwwroot && NODE_PATH=/home/site/wwwroot/node_modules node server.js
+2026-04-29T00:25:33.1625509Z Found tar.gz based node_modules.
+2026-04-29T00:25:33.1708159Z Removing existing modules directory from root...
+2026-04-29T00:25:33.1870676Z Extracting modules...
+2026-04-29T00:25:35.2893913Z Done.
+2026-04-29T00:25:38.1081061Z    ▲ Next.js 15.5.15
+2026-04-29T00:25:38.1085465Z    - Local:        http://localhost:3000
+2026-04-29T00:25:38.1119849Z    - Network:      http://0.0.0.0:3000
+2026-04-29T00:25:38.1122362Z 
+2026-04-29T00:25:38.1122444Z  ✓ Starting...
+2026-04-29T00:25:39.7414707Z  ✓ Ready in 1653ms
+2026-04-29T00:25:42.6181109Z Backend API URL: https://tcairrapiccontainer.azurewebsites.net
+2026-04-29T00:25:42.6181739Z Environment: production
+2026-04-29T05:11:09.1134765Z    _____                               
+2026-04-29T05:11:09.1136683Z   /  _  \ __________ _________   ____  
+2026-04-29T05:11:09.1136740Z  /  /_\  \\___   /  |  \_  __ \_/ __ \ 
+2026-04-29T05:11:09.1136771Z /    |    \/    /|  |  /|  | \/\  ___/ 
+2026-04-29T05:11:09.1136793Z \____|__  /_____ \____/ |__|    \___  >
+2026-04-29T05:11:09.1136868Z         \/      \/                  \/ 
+2026-04-29T05:11:09.1136955Z A P P   S E R V I C E   O N   L I N U X
+2026-04-29T05:11:09.1136976Z 
+2026-04-29T05:11:09.1137003Z Documentation    : http://aka.ms/webapp-linux
+2026-04-29T05:11:09.1137027Z NodeJS quickstart: https://aka.ms/node-qs
+2026-04-29T05:11:09.1137050Z NodeJS Version   : v24.13.0
+2026-04-29T05:11:09.1137072Z Instance Name    : lw1mdlwk0001DT
+2026-04-29T05:11:09.1137118Z Instance Id      : 309973e00d4a75475b1b3413021a4c10e69f2588f11014752e32af1ed2c371fa
+2026-04-29T05:11:09.1137140Z 
+2026-04-29T05:11:09.1137164Z Note: Any data outside '/home' is not persisted
+2026-04-29T05:11:11.4212194Z  * Starting OpenBSD Secure Shell server sshd
+2026-04-29T05:11:11.4598148Z    ...done.
+2026-04-29T05:11:11.4726594Z WEBSITES_INCLUDE_CLOUD_CERTS is not set to true.
+2026-04-29T05:11:11.5124470Z Updating certificates in /etc/ssl/certs...
+2026-04-29T05:11:21.2818788Z rehash: warning: skipping duplicate certificate in SSLcom-TLS-Root-2022-ECC.pem
+2026-04-29T05:11:21.2822469Z rehash: warning: skipping duplicate certificate in SSLcom-TLS-Root-2022-RSA.pem
+2026-04-29T05:11:21.5520584Z rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL
+2026-04-29T05:11:21.5887168Z 4 added, 0 removed; done.
+2026-04-29T05:11:21.5887939Z Running hooks in /etc/ca-certificates/update.d...
+2026-04-29T05:11:21.5920220Z done.
+2026-04-29T05:11:21.6077021Z CA certificates copied and updated successfully.
+2026-04-29T05:11:21.6715411Z  * Starting periodic command scheduler cron
+2026-04-29T05:11:21.6875424Z    ...done.
+2026-04-29T05:11:21.7779947Z Found build manifest file at '/home/site/wwwroot/oryx-manifest.toml'. Deserializing it...
+2026-04-29T05:11:21.7856158Z Could not find operation ID in manifest. Generating an operation id...
+2026-04-29T05:11:21.7871463Z Build Operation ID: a7ca884a-339c-4d05-8142-5870e3fdf9f8
+2026-04-29T05:11:22.1111522Z Environment Variables for Application Insight's IPA Codeless Configuration exists..
+2026-04-29T05:11:22.2762021Z Writing output script to '/opt/startup/startup.sh'
+2026-04-29T05:11:22.3320769Z Running #!/bin/sh
+2026-04-29T05:11:22.3321703Z 
+2026-04-29T05:11:22.3321744Z # Enter the source directory to make sure the script runs where the user expects
+2026-04-29T05:11:22.3321793Z cd "/home/site/wwwroot"
+2026-04-29T05:11:22.3321897Z 
+2026-04-29T05:11:22.3330719Z export NODE_PATH=/usr/local/lib/node_modules:$NODE_PATH
+2026-04-29T05:11:22.3330878Z if [ -z "$PORT" ]; then
+2026-04-29T05:11:22.3330905Z 		export PORT=8080
+2026-04-29T05:11:22.3331030Z fi
+2026-04-29T05:11:22.3331053Z 
+2026-04-29T05:11:22.3331076Z echo Found tar.gz based node_modules.
+2026-04-29T05:11:22.3331118Z extractionCommand="tar -xzf node_modules.tar.gz -C /node_modules"
+2026-04-29T05:11:22.3331144Z echo "Removing existing modules directory from root..."
+2026-04-29T05:11:22.3331166Z rm -fr /node_modules
+2026-04-29T05:11:22.3331187Z mkdir -p /node_modules
+2026-04-29T05:11:22.3331209Z echo Extracting modules...
+2026-04-29T05:11:22.3331230Z $extractionCommand
+2026-04-29T05:11:22.3331252Z export NODE_PATH="/node_modules":$NODE_PATH
+2026-04-29T05:11:22.3331311Z export PATH=/node_modules/.bin:$PATH
+2026-04-29T05:11:22.3331334Z if [ -d node_modules ]; then
+2026-04-29T05:11:22.3331357Z     mv -f node_modules _del_node_modules || true
+2026-04-29T05:11:22.3331377Z fi
+2026-04-29T05:11:22.3331401Z 
+2026-04-29T05:11:22.3331423Z if [ -d /node_modules ]; then
+2026-04-29T05:11:22.3331444Z     ln -sfn /node_modules ./node_modules 
+2026-04-29T05:11:22.3331487Z fi
+2026-04-29T05:11:22.3331508Z 
+2026-04-29T05:11:22.3331528Z echo "Done."
+2026-04-29T05:11:22.3331553Z PATH="$PATH:/home/site/wwwroot" cd /home/site/wwwroot && NODE_PATH=/home/site/wwwroot/node_modules node server.js
+2026-04-29T05:11:22.3418895Z Found tar.gz based node_modules.
+2026-04-29T05:11:22.3419194Z Removing existing modules directory from root...
+2026-04-29T05:11:22.3559254Z Extracting modules...
+2026-04-29T05:11:24.4884401Z Done.
+2026-04-29T05:11:27.3993081Z    ▲ Next.js 15.5.15
+2026-04-29T05:11:27.4057067Z    - Local:        http://localhost:3000
+2026-04-29T05:11:27.4058532Z    - Network:      http://0.0.0.0:3000
+2026-04-29T05:11:27.4060838Z 
+2026-04-29T05:11:27.4062786Z  ✓ Starting...
+2026-04-29T05:11:28.2074459Z  ✓ Ready in 832ms
+2026-04-29T05:11:31.1617577Z Backend API URL: https://tcairrapiccontainer.azurewebsites.net
+2026-04-29T05:11:31.1684757Z Environment: production
+2026-04-29T05:53:17.0669888Z    _____                               
+2026-04-29T05:53:17.0729177Z   /  _  \ __________ _________   ____  
+2026-04-29T05:53:17.0729422Z  /  /_\  \\___   /  |  \_  __ \_/ __ \ 
+2026-04-29T05:53:17.0729447Z /    |    \/    /|  |  /|  | \/\  ___/ 
+2026-04-29T05:53:17.0729470Z \____|__  /_____ \____/ |__|    \___  >
+2026-04-29T05:53:17.0729504Z         \/      \/                  \/ 
+2026-04-29T05:53:17.0729531Z A P P   S E R V I C E   O N   L I N U X
+2026-04-29T05:53:17.0729567Z 
+2026-04-29T05:53:17.0729597Z Documentation    : http://aka.ms/webapp-linux
+2026-04-29T05:53:17.0729622Z NodeJS quickstart: https://aka.ms/node-qs
+2026-04-29T05:53:17.0729646Z NodeJS Version   : v24.13.0
+2026-04-29T05:53:17.0729673Z Instance Name    : lw1mdlwk0001DT
+2026-04-29T05:53:17.0729710Z Instance Id      : 309973e00d4a75475b1b3413021a4c10e69f2588f11014752e32af1ed2c371fa
+2026-04-29T05:53:17.0729732Z 
+2026-04-29T05:53:17.0732163Z Note: Any data outside '/home' is not persisted
+2026-04-29T05:53:18.3711288Z  * Starting OpenBSD Secure Shell server sshd
+2026-04-29T05:53:18.4103352Z    ...done.
+2026-04-29T05:53:18.4229567Z WEBSITES_INCLUDE_CLOUD_CERTS is not set to true.
+2026-04-29T05:53:18.4532586Z Updating certificates in /etc/ssl/certs...
+2026-04-29T05:53:30.2538810Z rehash: warning: skipping duplicate certificate in SSLcom-TLS-Root-2022-ECC.pem
+2026-04-29T05:53:30.2543987Z rehash: warning: skipping duplicate certificate in SSLcom-TLS-Root-2022-RSA.pem
+2026-04-29T05:53:30.5126462Z rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL
+2026-04-29T05:53:30.5427799Z 4 added, 0 removed; done.
+2026-04-29T05:53:30.5428553Z Running hooks in /etc/ca-certificates/update.d...
+2026-04-29T05:53:30.5480356Z done.
+2026-04-29T05:53:30.5598845Z CA certificates copied and updated successfully.
+2026-04-29T05:53:30.6334641Z  * Starting periodic command scheduler cron
+2026-04-29T05:53:30.6451052Z    ...done.
+2026-04-29T05:53:30.7199294Z Found build manifest file at '/home/site/wwwroot/oryx-manifest.toml'. Deserializing it...
+2026-04-29T05:53:30.7215989Z Could not find operation ID in manifest. Generating an operation id...
+2026-04-29T05:53:30.7218280Z Build Operation ID: 54fa26c8-9545-43a4-bd7a-4f0ab2f4e07c
+2026-04-29T05:53:31.0997427Z Environment Variables for Application Insight's IPA Codeless Configuration exists..
+2026-04-29T05:53:31.3683885Z Writing output script to '/opt/startup/startup.sh'
+2026-04-29T05:53:31.5715548Z Running #!/bin/sh
+2026-04-29T05:53:31.5717372Z 
+2026-04-29T05:53:31.5717416Z # Enter the source directory to make sure the script runs where the user expects
+2026-04-29T05:53:31.5717450Z cd "/home/site/wwwroot"
+2026-04-29T05:53:31.5717471Z 
+2026-04-29T05:53:31.5723171Z export NODE_PATH=/usr/local/lib/node_modules:$NODE_PATH
+2026-04-29T05:53:31.5723357Z if [ -z "$PORT" ]; then
+2026-04-29T05:53:31.5723383Z 		export PORT=8080
+2026-04-29T05:53:31.5723425Z fi
+2026-04-29T05:53:31.5723447Z 
+2026-04-29T05:53:31.5725635Z echo Found tar.gz based node_modules.
+2026-04-29T05:53:31.5725730Z extractionCommand="tar -xzf node_modules.tar.gz -C /node_modules"
+2026-04-29T05:53:31.5727086Z echo "Removing existing modules directory from root..."
+2026-04-29T05:53:31.5727165Z rm -fr /node_modules
+2026-04-29T05:53:31.5727189Z mkdir -p /node_modules
+2026-04-29T05:53:31.5727232Z echo Extracting modules...
+2026-04-29T05:53:31.5727255Z $extractionCommand
+2026-04-29T05:53:31.5806875Z export NODE_PATH="/node_modules":$NODE_PATH
+2026-04-29T05:53:31.5807171Z export PATH=/node_modules/.bin:$PATH
+2026-04-29T05:53:31.5807223Z if [ -d node_modules ]; then
+2026-04-29T05:53:31.5807255Z     mv -f node_modules _del_node_modules || true
+2026-04-29T05:53:31.5807277Z fi
+2026-04-29T05:53:31.5807356Z 
+2026-04-29T05:53:31.5807379Z if [ -d /node_modules ]; then
+2026-04-29T05:53:31.5807402Z     ln -sfn /node_modules ./node_modules 
+2026-04-29T05:53:31.5807423Z fi
+2026-04-29T05:53:31.5807444Z 
+2026-04-29T05:53:31.5807465Z echo "Done."
+2026-04-29T05:53:31.5807490Z PATH="$PATH:/home/site/wwwroot" cd /home/site/wwwroot && NODE_PATH=/home/site/wwwroot/node_modules node server.js
+2026-04-29T05:53:31.6107566Z Found tar.gz based node_modules.
+2026-04-29T05:53:31.6107915Z Removing existing modules directory from root...
+2026-04-29T05:53:31.6612789Z Extracting modules...
+2026-04-29T05:53:33.9282416Z Done.
+2026-04-29T05:53:36.6187529Z    ▲ Next.js 15.5.15
+2026-04-29T05:53:36.6188103Z    - Local:        http://localhost:3000
+2026-04-29T05:53:36.6188240Z    - Network:      http://0.0.0.0:3000
+2026-04-29T05:53:36.6188267Z 
+2026-04-29T05:53:36.6188296Z  ✓ Starting...
+2026-04-29T05:53:37.3771971Z  ✓ Ready in 795ms
+2026-04-29T05:53:40.3576662Z Backend API URL: https://tcairrapiccontainer.azurewebsites.net
+2026-04-29T05:53:40.3669818Z Environment: production
+2026-04-29T07:35:26.2022284Z    _____                               
+2026-04-29T07:35:26.2023890Z   /  _  \ __________ _________   ____  
+2026-04-29T07:35:26.2023941Z  /  /_\  \\___   /  |  \_  __ \_/ __ \ 
+2026-04-29T07:35:26.2023963Z /    |    \/    /|  |  /|  | \/\  ___/ 
+2026-04-29T07:35:26.2023986Z \____|__  /_____ \____/ |__|    \___  >
+2026-04-29T07:35:26.2024015Z         \/      \/                  \/ 
+2026-04-29T07:35:26.2024068Z A P P   S E R V I C E   O N   L I N U X
+2026-04-29T07:35:26.2024090Z 
+2026-04-29T07:35:26.2024117Z Documentation    : http://aka.ms/webapp-linux
+2026-04-29T07:35:26.2024142Z NodeJS quickstart: https://aka.ms/node-qs
+2026-04-29T07:35:26.2024166Z NodeJS Version   : v24.13.0
+2026-04-29T07:35:26.2024188Z Instance Name    : lw1mdlwk0001DT
+2026-04-29T07:35:26.2024213Z Instance Id      : 309973e00d4a75475b1b3413021a4c10e69f2588f11014752e32af1ed2c371fa
+2026-04-29T07:35:26.2024249Z 
+2026-04-29T07:35:26.2024271Z Note: Any data outside '/home' is not persisted
+2026-04-29T07:35:29.4037527Z  * Starting OpenBSD Secure Shell server sshd
+2026-04-29T07:35:29.4425348Z    ...done.
+2026-04-29T07:35:29.4611416Z WEBSITES_INCLUDE_CLOUD_CERTS is not set to true.
+2026-04-29T07:35:29.4918624Z Updating certificates in /etc/ssl/certs...
+2026-04-29T07:35:39.9356418Z rehash: warning: skipping duplicate certificate in SSLcom-TLS-Root-2022-ECC.pem
+2026-04-29T07:35:39.9357115Z rehash: warning: skipping duplicate certificate in SSLcom-TLS-Root-2022-RSA.pem
+2026-04-29T07:35:40.2037424Z rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL
+2026-04-29T07:35:40.2372158Z 4 added, 0 removed; done.
+2026-04-29T07:35:40.2372777Z Running hooks in /etc/ca-certificates/update.d...
+2026-04-29T07:35:40.2433879Z done.
+2026-04-29T07:35:40.2557862Z CA certificates copied and updated successfully.
+2026-04-29T07:35:40.3136770Z  * Starting periodic command scheduler cron
+2026-04-29T07:35:40.3236821Z    ...done.
+2026-04-29T07:35:40.4074786Z Found build manifest file at '/home/site/wwwroot/oryx-manifest.toml'. Deserializing it...
+2026-04-29T07:35:40.4160209Z Could not find operation ID in manifest. Generating an operation id...
+2026-04-29T07:35:40.4164497Z Build Operation ID: 82e638d5-7202-45c4-99ac-be0ea19f3bca
+2026-04-29T07:35:40.7532743Z Environment Variables for Application Insight's IPA Codeless Configuration exists..
+2026-04-29T07:35:40.7992155Z Writing output script to '/opt/startup/startup.sh'
+2026-04-29T07:35:40.8487626Z Running #!/bin/sh
+2026-04-29T07:35:40.8488183Z 
+2026-04-29T07:35:40.8488217Z # Enter the source directory to make sure the script runs where the user expects
+2026-04-29T07:35:40.8488247Z cd "/home/site/wwwroot"
+2026-04-29T07:35:40.8488265Z 
+2026-04-29T07:35:40.8488285Z export NODE_PATH=/usr/local/lib/node_modules:$NODE_PATH
+2026-04-29T07:35:40.8488304Z if [ -z "$PORT" ]; then
+2026-04-29T07:35:40.8488322Z 		export PORT=8080
+2026-04-29T07:35:40.8488340Z fi
+2026-04-29T07:35:40.8488375Z 
+2026-04-29T07:35:40.8488394Z echo Found tar.gz based node_modules.
+2026-04-29T07:35:40.8488415Z extractionCommand="tar -xzf node_modules.tar.gz -C /node_modules"
+2026-04-29T07:35:40.8488435Z echo "Removing existing modules directory from root..."
+2026-04-29T07:35:40.8488455Z rm -fr /node_modules
+2026-04-29T07:35:40.8488473Z mkdir -p /node_modules
+2026-04-29T07:35:40.8488492Z echo Extracting modules...
+2026-04-29T07:35:40.8488525Z $extractionCommand
+2026-04-29T07:35:40.8488572Z export NODE_PATH="/node_modules":$NODE_PATH
+2026-04-29T07:35:40.8488592Z export PATH=/node_modules/.bin:$PATH
+2026-04-29T07:35:40.8488611Z if [ -d node_modules ]; then
+2026-04-29T07:35:40.8488630Z     mv -f node_modules _del_node_modules || true
+2026-04-29T07:35:40.8488648Z fi
+2026-04-29T07:35:40.8488682Z 
+2026-04-29T07:35:40.8488700Z if [ -d /node_modules ]; then
+2026-04-29T07:35:40.8488719Z     ln -sfn /node_modules ./node_modules 
+2026-04-29T07:35:40.8488741Z fi
+2026-04-29T07:35:40.8488757Z 
+2026-04-29T07:35:40.8488774Z echo "Done."
+2026-04-29T07:35:40.8488796Z PATH="$PATH:/home/site/wwwroot" cd /home/site/wwwroot && NODE_PATH=/home/site/wwwroot/node_modules node server.js
+2026-04-29T07:35:40.8517349Z Found tar.gz based node_modules.
+2026-04-29T07:35:40.8590655Z Removing existing modules directory from root...
+2026-04-29T07:35:40.8791675Z Extracting modules...
+2026-04-29T07:35:43.1220185Z Done.
+2026-04-29T07:35:46.3935322Z    ▲ Next.js 15.5.15
+2026-04-29T07:35:46.4010698Z    - Local:        http://localhost:3000
+2026-04-29T07:35:46.4012516Z    - Network:      http://0.0.0.0:3000
+2026-04-29T07:35:46.4012968Z 
+2026-04-29T07:35:46.4013013Z  ✓ Starting...
+2026-04-29T07:35:47.2091796Z  ✓ Ready in 837ms
+2026-04-29T07:35:49.9499190Z Backend API URL: https://tcairrapiccontainer.azurewebsites.net
+2026-04-29T07:35:49.9500073Z Environment: production
+2026-04-29T07:44:05.1028330Z    _____                               
+2026-04-29T07:44:05.1029669Z   /  _  \ __________ _________   ____  
+2026-04-29T07:44:05.1029719Z  /  /_\  \\___   /  |  \_  __ \_/ __ \ 
+2026-04-29T07:44:05.1029743Z /    |    \/    /|  |  /|  | \/\  ___/ 
+2026-04-29T07:44:05.1029765Z \____|__  /_____ \____/ |__|    \___  >
+2026-04-29T07:44:05.1029790Z         \/      \/                  \/ 
+2026-04-29T07:44:05.1029835Z A P P   S E R V I C E   O N   L I N U X
+2026-04-29T07:44:05.1029857Z 
+2026-04-29T07:44:05.1029883Z Documentation    : http://aka.ms/webapp-linux
+2026-04-29T07:44:05.1029909Z NodeJS quickstart: https://aka.ms/node-qs
+2026-04-29T07:44:05.1029931Z NodeJS Version   : v24.13.0
+2026-04-29T07:44:05.1029953Z Instance Name    : lw1mdlwk0001DT
+2026-04-29T07:44:05.1029994Z Instance Id      : 309973e00d4a75475b1b3413021a4c10e69f2588f11014752e32af1ed2c371fa
+2026-04-29T07:44:05.1030016Z 
+2026-04-29T07:44:05.1030038Z Note: Any data outside '/home' is not persisted
+2026-04-29T07:44:08.0137666Z  * Starting OpenBSD Secure Shell server sshd
+2026-04-29T07:44:08.0475049Z    ...done.
+2026-04-29T07:44:08.0753143Z WEBSITES_INCLUDE_CLOUD_CERTS is not set to true.
+2026-04-29T07:44:08.1021535Z Updating certificates in /etc/ssl/certs...
+2026-04-29T07:44:17.3751651Z rehash: warning: skipping duplicate certificate in SSLcom-TLS-Root-2022-ECC.pem
+2026-04-29T07:44:17.3752263Z rehash: warning: skipping duplicate certificate in SSLcom-TLS-Root-2022-RSA.pem
+2026-04-29T07:44:17.6288100Z rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL
+2026-04-29T07:44:17.6513143Z 4 added, 0 removed; done.
+2026-04-29T07:44:17.6513842Z Running hooks in /etc/ca-certificates/update.d...
+2026-04-29T07:44:17.6581793Z done.
+2026-04-29T07:44:17.6743192Z CA certificates copied and updated successfully.
+2026-04-29T07:44:17.7331275Z  * Starting periodic command scheduler cron
+2026-04-29T07:44:17.7436171Z    ...done.
+2026-04-29T07:44:17.8190027Z Found build manifest file at '/home/site/wwwroot/oryx-manifest.toml'. Deserializing it...
+2026-04-29T07:44:17.8291923Z Could not find operation ID in manifest. Generating an operation id...
+2026-04-29T07:44:17.8294188Z Build Operation ID: 54c22a09-94eb-4aab-b52c-eb937321b262
+2026-04-29T07:44:18.1962760Z Environment Variables for Application Insight's IPA Codeless Configuration exists..
+2026-04-29T07:44:18.2356422Z Writing output script to '/opt/startup/startup.sh'
+2026-04-29T07:44:18.2987586Z Running #!/bin/sh
+2026-04-29T07:44:18.2988291Z 
+2026-04-29T07:44:18.2988329Z # Enter the source directory to make sure the script runs where the user expects
+2026-04-29T07:44:18.2988370Z cd "/home/site/wwwroot"
+2026-04-29T07:44:18.2988392Z 
+2026-04-29T07:44:18.3045310Z export NODE_PATH=/usr/local/lib/node_modules:$NODE_PATH
+2026-04-29T07:44:18.3045537Z if [ -z "$PORT" ]; then
+2026-04-29T07:44:18.3045597Z 		export PORT=8080
+2026-04-29T07:44:18.3045619Z fi
+2026-04-29T07:44:18.3045639Z 
+2026-04-29T07:44:18.3050681Z echo Found tar.gz based node_modules.
+2026-04-29T07:44:18.3050773Z extractionCommand="tar -xzf node_modules.tar.gz -C /node_modules"
+2026-04-29T07:44:18.3057712Z echo "Removing existing modules directory from root..."
+2026-04-29T07:44:18.3057841Z rm -fr /node_modules
+2026-04-29T07:44:18.3057896Z mkdir -p /node_modules
+2026-04-29T07:44:18.3057922Z echo Extracting modules...
+2026-04-29T07:44:18.3057943Z $extractionCommand
+2026-04-29T07:44:18.3063846Z export NODE_PATH="/node_modules":$NODE_PATH
+2026-04-29T07:44:18.3063976Z export PATH=/node_modules/.bin:$PATH
+2026-04-29T07:44:18.3064023Z if [ -d node_modules ]; then
+2026-04-29T07:44:18.3064048Z     mv -f node_modules _del_node_modules || true
+2026-04-29T07:44:18.3064093Z fi
+2026-04-29T07:44:18.3071656Z 
+2026-04-29T07:44:18.3071898Z if [ -d /node_modules ]; then
+2026-04-29T07:44:18.3071927Z     ln -sfn /node_modules ./node_modules 
+2026-04-29T07:44:18.3071952Z fi
+2026-04-29T07:44:18.3071972Z 
+2026-04-29T07:44:18.3071993Z echo "Done."
+2026-04-29T07:44:18.3150052Z PATH="$PATH:/home/site/wwwroot" cd /home/site/wwwroot && NODE_PATH=/home/site/wwwroot/node_modules node server.js
+2026-04-29T07:44:18.3246487Z Found tar.gz based node_modules.
+2026-04-29T07:44:18.3246758Z Removing existing modules directory from root...
+2026-04-29T07:44:18.3445907Z Extracting modules...
+2026-04-29T07:44:20.8953719Z Done.
+2026-04-29T07:44:23.4855376Z    ▲ Next.js 15.3.3
+2026-04-29T07:44:23.4867652Z    - Local:        http://localhost:3000
+2026-04-29T07:44:23.4867906Z    - Network:      http://0.0.0.0:3000
+2026-04-29T07:44:23.4868364Z 
+2026-04-29T07:44:23.4868406Z  ✓ Starting...
+2026-04-29T07:44:24.0981120Z  ✓ Ready in 640ms
+2026-04-29T07:44:24.7179288Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T07:44:24.7180004Z Require stack:
+2026-04-29T07:44:24.7180042Z - /home/site/wwwroot/.next/server/app/_not-found/page.js
+2026-04-29T07:44:24.7180154Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:44:24.7180178Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:44:24.7180200Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:44:24.7180222Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:44:24.7180244Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:44:24.7180267Z   requireStack: [Array]
+2026-04-29T07:44:24.7180375Z }
+2026-04-29T07:44:27.9752603Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T07:44:27.9753269Z Require stack:
+2026-04-29T07:44:27.9753297Z - /home/site/wwwroot/.next/server/app/page.js
+2026-04-29T07:44:27.9753317Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:44:27.9753333Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:44:27.9753349Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:44:27.9753365Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:44:27.9753380Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:44:27.9753398Z   requireStack: [Array]
+2026-04-29T07:44:27.9753421Z }
+2026-04-29T07:44:28.0173967Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T07:44:28.0174398Z Require stack:
+2026-04-29T07:44:28.0174422Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T07:44:28.0174438Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:44:28.0174456Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:44:28.0174471Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:44:28.0174488Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:44:28.0174508Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:44:28.0174531Z   requireStack: [Array]
+2026-04-29T07:44:28.0174546Z }
+2026-04-29T07:45:24.7860762Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T07:45:24.7861300Z Require stack:
+2026-04-29T07:45:24.7861325Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T07:45:24.7861344Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:45:24.7861360Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:45:24.7861378Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:45:24.7861396Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:45:24.7861412Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:45:24.7861428Z   requireStack: [Array]
+2026-04-29T07:45:24.7861442Z }
+2026-04-29T07:45:24.8182107Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T07:45:24.8183711Z Require stack:
+2026-04-29T07:45:24.8183766Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T07:45:24.8183787Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:45:24.8183805Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:45:24.8183819Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:45:24.8183835Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:45:24.8183850Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:45:24.8183866Z   requireStack: [Array]
+2026-04-29T07:45:24.8183879Z }
+2026-04-29T07:46:24.7721391Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T07:46:24.7721803Z Require stack:
+2026-04-29T07:46:24.7721905Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T07:46:24.7721929Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:46:24.7721946Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:46:24.7721961Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:46:24.7721978Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:46:24.7721996Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:46:24.7722011Z   requireStack: [Array]
+2026-04-29T07:46:24.7722025Z }
+2026-04-29T07:46:24.8008734Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T07:46:24.8009269Z Require stack:
+2026-04-29T07:46:24.8009297Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T07:46:24.8009394Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:46:24.8009413Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:46:24.8009429Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:46:24.8009445Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:46:24.8009460Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:46:24.8009474Z   requireStack: [Array]
+2026-04-29T07:46:24.8009489Z }
+2026-04-29T07:46:47.2962560Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T07:46:47.2963116Z Require stack:
+2026-04-29T07:46:47.2963142Z - /home/site/wwwroot/.next/server/app/page.js
+2026-04-29T07:46:47.2963163Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:46:47.2963281Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:46:47.2963297Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:46:47.2963312Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:46:47.2963327Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:46:47.2963342Z   requireStack: [Array]
+2026-04-29T07:46:47.2963356Z }
+2026-04-29T07:46:47.3081334Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T07:46:47.3081777Z Require stack:
+2026-04-29T07:46:47.3081800Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T07:46:47.3081817Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:46:47.3081834Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:46:47.3081921Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:46:47.3081937Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:46:47.3081953Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:46:47.3081969Z   requireStack: [Array]
+2026-04-29T07:46:47.3081983Z }
+2026-04-29T07:46:47.4669414Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T07:46:47.4669877Z Require stack:
+2026-04-29T07:46:47.4669900Z - /home/site/wwwroot/.next/server/app/page.js
+2026-04-29T07:46:47.4669914Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:46:47.4669928Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:46:47.4669941Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:46:47.4670027Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:46:47.4670041Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:46:47.4670054Z   requireStack: [Array]
+2026-04-29T07:46:47.4670067Z }
+2026-04-29T07:46:47.4758810Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T07:46:47.4759182Z Require stack:
+2026-04-29T07:46:47.4759205Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T07:46:47.4759222Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:46:47.4759248Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:46:47.4759263Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:46:47.4759334Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:46:47.4759351Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:46:47.4759367Z   requireStack: [Array]
+2026-04-29T07:46:47.4759381Z }
+2026-04-29T07:46:47.5951715Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T07:46:47.5952212Z Require stack:
+2026-04-29T07:46:47.5952237Z - /home/site/wwwroot/.next/server/app/_not-found/page.js
+2026-04-29T07:46:47.5952254Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:46:47.5952274Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:46:47.5952291Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:46:47.5952306Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:46:47.5952388Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:46:47.5952405Z   requireStack: [Array]
+2026-04-29T07:46:47.5952419Z }
+2026-04-29T07:47:09.9884384Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T07:47:09.9885743Z Require stack:
+2026-04-29T07:47:09.9885789Z - /home/site/wwwroot/.next/server/app/page.js
+2026-04-29T07:47:09.9885806Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:47:09.9885822Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:47:09.9885839Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:47:09.9885854Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:47:09.9885869Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:47:09.9885884Z   requireStack: [Array]
+2026-04-29T07:47:09.9885898Z }
+2026-04-29T07:47:10.0787189Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T07:47:10.0787734Z Require stack:
+2026-04-29T07:47:10.0787758Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T07:47:10.0787775Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:47:10.0787793Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:47:10.0787808Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:47:10.0787826Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:47:10.0787842Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:47:10.0787857Z   requireStack: [Array]
+2026-04-29T07:47:10.0787871Z }
+2026-04-29T07:47:24.9081099Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T07:47:24.9081569Z Require stack:
+2026-04-29T07:47:24.9081593Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T07:47:24.9081609Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:47:24.9081626Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:47:24.9081642Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:47:24.9081657Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:47:24.9081672Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:47:24.9081688Z   requireStack: [Array]
+2026-04-29T07:47:24.9081703Z }
+2026-04-29T07:47:25.0394849Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T07:47:25.0395205Z Require stack:
+2026-04-29T07:47:25.0395230Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T07:47:25.0395246Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:47:25.0395263Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:47:25.0395279Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:47:25.0395296Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:47:25.0395312Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:47:25.0395328Z   requireStack: [Array]
+2026-04-29T07:47:25.0395343Z }
+2026-04-29T07:48:24.7751697Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T07:48:24.7752273Z Require stack:
+2026-04-29T07:48:24.7752296Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T07:48:24.7752313Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:48:24.7752331Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:48:24.7752347Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:48:24.7752363Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:48:24.7752378Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:48:24.7752394Z   requireStack: [Array]
+2026-04-29T07:48:24.7752408Z }
+2026-04-29T07:48:24.8058235Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T07:48:24.8058703Z Require stack:
+2026-04-29T07:48:24.8058725Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T07:48:24.8058739Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:48:24.8058754Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:48:24.8058768Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:48:24.8058781Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:48:24.8058794Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:48:24.8058806Z   requireStack: [Array]
+2026-04-29T07:48:24.8058818Z }
+2026-04-29T07:49:24.7760147Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T07:49:24.7760649Z Require stack:
+2026-04-29T07:49:24.7760671Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T07:49:24.7760688Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:49:24.7760704Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:49:24.7760720Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:49:24.7760735Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:49:24.7760751Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:49:24.7760767Z   requireStack: [Array]
+2026-04-29T07:49:24.7760781Z }
+2026-04-29T07:49:24.7902969Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T07:49:24.7903249Z Require stack:
+2026-04-29T07:49:24.7903270Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T07:49:24.7903286Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:49:24.7903302Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:49:24.7903317Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:49:24.7903336Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:49:24.7903351Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:49:24.7903366Z   requireStack: [Array]
+2026-04-29T07:49:24.7903380Z }
+2026-04-29T07:50:24.7673257Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T07:50:24.7673667Z Require stack:
+2026-04-29T07:50:24.7673688Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T07:50:24.7673705Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:50:24.7673722Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:50:24.7673737Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:50:24.7673753Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:50:24.7673768Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:50:24.7673783Z   requireStack: [Array]
+2026-04-29T07:50:24.7673797Z }
+2026-04-29T07:50:24.7871486Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T07:50:24.7872054Z Require stack:
+2026-04-29T07:50:24.7872080Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T07:50:24.7882849Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:50:24.7882885Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:50:24.7882901Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:50:24.7882918Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:50:24.7882935Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:50:24.7882949Z   requireStack: [Array]
+2026-04-29T07:50:24.7882964Z }
+2026-04-29T07:51:24.7705795Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T07:51:24.7706346Z Require stack:
+2026-04-29T07:51:24.7706439Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T07:51:24.7706459Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:51:24.7706475Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:51:24.7706491Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:51:24.7706506Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:51:24.7706522Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:51:24.7706539Z   requireStack: [Array]
+2026-04-29T07:51:24.7706554Z }
+2026-04-29T07:51:24.7861424Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T07:51:24.7861897Z Require stack:
+2026-04-29T07:51:24.7861929Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T07:51:24.7861992Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:51:24.7862009Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:51:24.7862025Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:51:24.7862040Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:51:24.7862056Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:51:24.7862073Z   requireStack: [Array]
+2026-04-29T07:51:24.7862088Z }
+2026-04-29T07:52:10.2027428Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T07:52:10.2027943Z Require stack:
+2026-04-29T07:52:10.2027966Z - /home/site/wwwroot/.next/server/app/page.js
+2026-04-29T07:52:10.2027983Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:52:10.2028006Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:52:10.2028022Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:52:10.2028038Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:52:10.2028053Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:52:10.2028069Z   requireStack: [Array]
+2026-04-29T07:52:10.2028083Z }
+2026-04-29T07:52:10.2148011Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T07:52:10.2148464Z Require stack:
+2026-04-29T07:52:10.2148489Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T07:52:10.2148505Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:52:10.2148522Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:52:10.2148538Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:52:10.2148555Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:52:10.2148570Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:52:10.2148585Z   requireStack: [Array]
+2026-04-29T07:52:10.2148599Z }
+2026-04-29T07:52:24.7649753Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T07:52:24.7650270Z Require stack:
+2026-04-29T07:52:24.7650367Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T07:52:24.7650385Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:52:24.7650402Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:52:24.7650419Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:52:24.7650435Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:52:24.7650450Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:52:24.7650466Z   requireStack: [Array]
+2026-04-29T07:52:24.7650481Z }
+2026-04-29T07:52:24.7773990Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T07:52:24.7774402Z Require stack:
+2026-04-29T07:52:24.7774425Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T07:52:24.7774507Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:52:24.7774524Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:52:24.7774541Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:52:24.7774557Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:52:24.7774572Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:52:24.7774589Z   requireStack: [Array]
+2026-04-29T07:52:24.7774603Z }
+2026-04-29T07:53:24.7576115Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T07:53:24.7576594Z Require stack:
+2026-04-29T07:53:24.7576617Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T07:53:24.7576634Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:53:24.7576650Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:53:24.7576667Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:53:24.7576683Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:53:24.7576698Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:53:24.7576713Z   requireStack: [Array]
+2026-04-29T07:53:24.7576727Z }
+2026-04-29T07:53:24.7751167Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T07:53:24.7751695Z Require stack:
+2026-04-29T07:53:24.7751719Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T07:53:24.7751737Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:53:24.7751754Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:53:24.7751769Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:53:24.7751785Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:53:24.7751800Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:53:24.7751816Z   requireStack: [Array]
+2026-04-29T07:53:24.7751830Z }
+2026-04-29T07:54:24.8372986Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T07:54:24.8373536Z Require stack:
+2026-04-29T07:54:24.8373633Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T07:54:24.8373649Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:54:24.8373663Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:54:24.8373676Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:54:24.8373689Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:54:24.8373703Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:54:24.8373717Z   requireStack: [Array]
+2026-04-29T07:54:24.8373729Z }
+2026-04-29T07:54:24.8804205Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T07:54:24.8804793Z Require stack:
+2026-04-29T07:54:24.8804824Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T07:54:24.8804918Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:54:24.8804936Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:54:24.8804952Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:54:24.8804968Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:54:24.8804983Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:54:24.8804998Z   requireStack: [Array]
+2026-04-29T07:54:24.8805013Z }
+2026-04-29T07:55:24.7681092Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T07:55:24.7681621Z Require stack:
+2026-04-29T07:55:24.7681645Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T07:55:24.7681662Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:55:24.7681680Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:55:24.7681696Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:55:24.7681712Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:55:24.7681727Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:55:24.7681743Z   requireStack: [Array]
+2026-04-29T07:55:24.7681758Z }
+2026-04-29T07:55:24.7820712Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T07:55:24.7821301Z Require stack:
+2026-04-29T07:55:24.7821330Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T07:55:24.7821349Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:55:24.7821368Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:55:24.7821384Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:55:24.7821400Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:55:24.7821416Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:55:24.7821432Z   requireStack: [Array]
+2026-04-29T07:55:24.7821447Z }
+2026-04-29T07:56:24.7615176Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T07:56:24.7615684Z Require stack:
+2026-04-29T07:56:24.7615706Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T07:56:24.7615723Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:56:24.7615740Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:56:24.7615756Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:56:24.7615772Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:56:24.7615788Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:56:24.7615805Z   requireStack: [Array]
+2026-04-29T07:56:24.7615820Z }
+2026-04-29T07:56:24.7711295Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T07:56:24.7711662Z Require stack:
+2026-04-29T07:56:24.7711685Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T07:56:24.7711702Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:56:24.7711718Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:56:24.7711733Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:56:24.7711754Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:56:24.7711770Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:56:24.7711786Z   requireStack: [Array]
+2026-04-29T07:56:24.7711801Z }
+2026-04-29T07:57:10.5722092Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T07:57:10.5722618Z Require stack:
+2026-04-29T07:57:10.5722641Z - /home/site/wwwroot/.next/server/app/page.js
+2026-04-29T07:57:10.5722658Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:57:10.5722675Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:57:10.5722690Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:57:10.5722706Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:57:10.5722721Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:57:10.5722736Z   requireStack: [Array]
+2026-04-29T07:57:10.5722749Z }
+2026-04-29T07:57:10.5939215Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T07:57:10.5945287Z Require stack:
+2026-04-29T07:57:10.5945347Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T07:57:10.5945364Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:57:10.5945381Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:57:10.5945397Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:57:10.5945413Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:57:10.5945429Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:57:10.5945443Z   requireStack: [Array]
+2026-04-29T07:57:10.5945458Z }
+2026-04-29T07:57:24.7706327Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T07:57:24.7706837Z Require stack:
+2026-04-29T07:57:24.7706938Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T07:57:24.7706957Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:57:24.7706973Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:57:24.7706989Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:57:24.7707005Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:57:24.7707020Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:57:24.7707038Z   requireStack: [Array]
+2026-04-29T07:57:24.7707053Z }
+2026-04-29T07:57:24.7883020Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T07:57:24.7883484Z Require stack:
+2026-04-29T07:57:24.7883510Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T07:57:24.7883592Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:57:24.7883609Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:57:24.7883624Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:57:24.7883640Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:57:24.7883654Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:57:24.7883670Z   requireStack: [Array]
+2026-04-29T07:57:24.7883684Z }
+2026-04-29T07:58:24.7740941Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T07:58:24.7741431Z Require stack:
+2026-04-29T07:58:24.7741454Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T07:58:24.7741471Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:58:24.7741489Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:58:24.7741505Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:58:24.7741521Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:58:24.7741536Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:58:24.7741551Z   requireStack: [Array]
+2026-04-29T07:58:24.7741565Z }
+2026-04-29T07:58:24.8263483Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T07:58:24.8264088Z Require stack:
+2026-04-29T07:58:24.8264113Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T07:58:24.8264130Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:58:24.8264147Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:58:24.8264163Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:58:24.8264178Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:58:24.8264194Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:58:24.8264209Z   requireStack: [Array]
+2026-04-29T07:58:24.8264222Z }
+2026-04-29T07:59:24.7726276Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T07:59:24.7726833Z Require stack:
+2026-04-29T07:59:24.7726940Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T07:59:24.7726958Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:59:24.7726975Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:59:24.7726991Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:59:24.7727007Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:59:24.7727022Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:59:24.7727037Z   requireStack: [Array]
+2026-04-29T07:59:24.7727052Z }
+2026-04-29T07:59:24.8133509Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T07:59:24.8133994Z Require stack:
+2026-04-29T07:59:24.8134019Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T07:59:24.8134113Z - /node_modules/next/dist/server/require.js
+2026-04-29T07:59:24.8134130Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T07:59:24.8134147Z - /node_modules/next/dist/server/next.js
+2026-04-29T07:59:24.8134167Z - /home/site/wwwroot/server.js] {
+2026-04-29T07:59:24.8134182Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T07:59:24.8134198Z   requireStack: [Array]
+2026-04-29T07:59:24.8134212Z }
+2026-04-29T08:00:24.7730182Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:00:24.7730702Z Require stack:
+2026-04-29T08:00:24.7730725Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:00:24.7730741Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:00:24.7730758Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:00:24.7730774Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:00:24.7730789Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:00:24.7730805Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:00:24.7730820Z   requireStack: [Array]
+2026-04-29T08:00:24.7730834Z }
+2026-04-29T08:00:24.7903868Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:00:24.7904276Z Require stack:
+2026-04-29T08:00:24.7904302Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:00:24.7904319Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:00:24.7904336Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:00:24.7904351Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:00:24.7904367Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:00:24.7904383Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:00:24.7904398Z   requireStack: [Array]
+2026-04-29T08:00:24.7904412Z }
+2026-04-29T08:01:24.7647132Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:01:24.7647664Z Require stack:
+2026-04-29T08:01:24.7647687Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:01:24.7647705Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:01:24.7647721Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:01:24.7647736Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:01:24.7647751Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:01:24.7647766Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:01:24.7647782Z   requireStack: [Array]
+2026-04-29T08:01:24.7647796Z }
+2026-04-29T08:01:24.7907122Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:01:24.7907607Z Require stack:
+2026-04-29T08:01:24.7907633Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:01:24.7907650Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:01:24.7907666Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:01:24.7907682Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:01:24.7907699Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:01:24.7907718Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:01:24.7907733Z   requireStack: [Array]
+2026-04-29T08:01:24.7907747Z }
+2026-04-29T08:02:10.8724074Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:02:10.8724517Z Require stack:
+2026-04-29T08:02:10.8724538Z - /home/site/wwwroot/.next/server/app/page.js
+2026-04-29T08:02:10.8724555Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:02:10.8724574Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:02:10.8724589Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:02:10.8724605Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:02:10.8724620Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:02:10.8724635Z   requireStack: [Array]
+2026-04-29T08:02:10.8724650Z }
+2026-04-29T08:02:10.8922997Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:02:10.8923376Z Require stack:
+2026-04-29T08:02:10.8923401Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:02:10.8923418Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:02:10.8923435Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:02:10.8923451Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:02:10.8923466Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:02:10.8923481Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:02:10.8923496Z   requireStack: [Array]
+2026-04-29T08:02:10.8923510Z }
+2026-04-29T08:02:24.7706845Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:02:24.7707485Z Require stack:
+2026-04-29T08:02:24.7707593Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:02:24.7707614Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:02:24.7707631Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:02:24.7707647Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:02:24.7707663Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:02:24.7707678Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:02:24.7707697Z   requireStack: [Array]
+2026-04-29T08:02:24.7707712Z }
+2026-04-29T08:02:24.7835468Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:02:24.7835921Z Require stack:
+2026-04-29T08:02:24.7835945Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:02:24.7836012Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:02:24.7836029Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:02:24.7836045Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:02:24.7836063Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:02:24.7836078Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:02:24.7836094Z   requireStack: [Array]
+2026-04-29T08:02:24.7836108Z }
+2026-04-29T08:03:24.7643162Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:03:24.7643638Z Require stack:
+2026-04-29T08:03:24.7643665Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:03:24.7643682Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:03:24.7643784Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:03:24.7643800Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:03:24.7643816Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:03:24.7643831Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:03:24.7643846Z   requireStack: [Array]
+2026-04-29T08:03:24.7643860Z }
+2026-04-29T08:03:24.7830208Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:03:24.7830675Z Require stack:
+2026-04-29T08:03:24.7830706Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:03:24.7830724Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:03:24.7830741Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:03:24.7831002Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:03:24.7831022Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:03:24.7831038Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:03:24.7831053Z   requireStack: [Array]
+2026-04-29T08:03:24.7831067Z }
+2026-04-29T08:04:24.7660155Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:04:24.7673428Z Require stack:
+2026-04-29T08:04:24.7673503Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:04:24.7673520Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:04:24.7673534Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:04:24.7673551Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:04:24.7673565Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:04:24.7673578Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:04:24.7673592Z   requireStack: [Array]
+2026-04-29T08:04:24.7673605Z }
+2026-04-29T08:04:24.7755432Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:04:24.7755753Z Require stack:
+2026-04-29T08:04:24.7755778Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:04:24.7755795Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:04:24.7755812Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:04:24.7755828Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:04:24.7755843Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:04:24.7755858Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:04:24.7755873Z   requireStack: [Array]
+2026-04-29T08:04:24.7755887Z }
+2026-04-29T08:05:24.8873687Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:05:24.8874204Z Require stack:
+2026-04-29T08:05:24.8874227Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:05:24.8874244Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:05:24.8874261Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:05:24.8874277Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:05:24.8874294Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:05:24.8874309Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:05:24.8874324Z   requireStack: [Array]
+2026-04-29T08:05:24.8874338Z }
+2026-04-29T08:05:24.9057117Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:05:24.9060391Z Require stack:
+2026-04-29T08:05:24.9060438Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:05:24.9060455Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:05:24.9060471Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:05:24.9060487Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:05:24.9060502Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:05:24.9060517Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:05:24.9060533Z   requireStack: [Array]
+2026-04-29T08:05:24.9060547Z }
+2026-04-29T08:06:24.7647577Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:06:24.7648041Z Require stack:
+2026-04-29T08:06:24.7648148Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:06:24.7648169Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:06:24.7648186Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:06:24.7648202Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:06:24.7648217Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:06:24.7648233Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:06:24.7648253Z   requireStack: [Array]
+2026-04-29T08:06:24.7648267Z }
+2026-04-29T08:06:24.7753906Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:06:24.7754307Z Require stack:
+2026-04-29T08:06:24.7754332Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:06:24.7754410Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:06:24.7754427Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:06:24.7754442Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:06:24.7754459Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:06:24.7754475Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:06:24.7754491Z   requireStack: [Array]
+2026-04-29T08:06:24.7754504Z }
+2026-04-29T08:07:11.1537287Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:07:11.1537829Z Require stack:
+2026-04-29T08:07:11.1537851Z - /home/site/wwwroot/.next/server/app/page.js
+2026-04-29T08:07:11.1537867Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:07:11.1537884Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:07:11.1537899Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:07:11.1537914Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:07:11.1537929Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:07:11.1537943Z   requireStack: [Array]
+2026-04-29T08:07:11.1537957Z }
+2026-04-29T08:07:11.2349576Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:07:11.2350248Z Require stack:
+2026-04-29T08:07:11.2350271Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:07:11.2350286Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:07:11.2350301Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:07:11.2350315Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:07:11.2350328Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:07:11.2350341Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:07:11.2350354Z   requireStack: [Array]
+2026-04-29T08:07:11.2350366Z }
+2026-04-29T08:07:24.7626706Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:07:24.7627183Z Require stack:
+2026-04-29T08:07:24.7627207Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:07:24.7627225Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:07:24.7627249Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:07:24.7627265Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:07:24.7627280Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:07:24.7627377Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:07:24.7627397Z   requireStack: [Array]
+2026-04-29T08:07:24.7627411Z }
+2026-04-29T08:07:24.7806269Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:07:24.7806580Z Require stack:
+2026-04-29T08:07:24.7806610Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:07:24.7806627Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:07:24.7806645Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:07:24.7806661Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:07:24.7806676Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:07:24.7806695Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:07:24.7806755Z   requireStack: [Array]
+2026-04-29T08:07:24.7806770Z }
+2026-04-29T08:08:24.7637292Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:08:24.7637616Z Require stack:
+2026-04-29T08:08:24.7637638Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:08:24.7637652Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:08:24.7637669Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:08:24.7637684Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:08:24.7637698Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:08:24.7637711Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:08:24.7637725Z   requireStack: [Array]
+2026-04-29T08:08:24.7637738Z }
+2026-04-29T08:08:24.7729695Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:08:24.7730204Z Require stack:
+2026-04-29T08:08:24.7730228Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:08:24.7730244Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:08:24.7730261Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:08:24.7730276Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:08:24.7730293Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:08:24.7730308Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:08:24.7730324Z   requireStack: [Array]
+2026-04-29T08:08:24.7730337Z }
+2026-04-29T08:09:24.7676225Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:09:24.7676737Z Require stack:
+2026-04-29T08:09:24.7676766Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:09:24.7676784Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:09:24.7676801Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:09:24.7676817Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:09:24.7676833Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:09:24.7676914Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:09:24.7676934Z   requireStack: [Array]
+2026-04-29T08:09:24.7676949Z }
+2026-04-29T08:09:24.7776411Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:09:24.7777379Z Require stack:
+2026-04-29T08:09:24.7777446Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:09:24.7777462Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:09:24.7777476Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:09:24.7777489Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:09:24.7777504Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:09:24.7777527Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:09:24.7777613Z   requireStack: [Array]
+2026-04-29T08:09:24.7777627Z }
+2026-04-29T08:10:24.7671718Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:10:24.7672127Z Require stack:
+2026-04-29T08:10:24.7672150Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:10:24.7672166Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:10:24.7672182Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:10:24.7672199Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:10:24.7672214Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:10:24.7672230Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:10:24.7672244Z   requireStack: [Array]
+2026-04-29T08:10:24.7672259Z }
+2026-04-29T08:10:24.7853894Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:10:24.7854377Z Require stack:
+2026-04-29T08:10:24.7854404Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:10:24.7854421Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:10:24.7854438Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:10:24.7854455Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:10:24.7854470Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:10:24.7854485Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:10:24.7854500Z   requireStack: [Array]
+2026-04-29T08:10:24.7854514Z }
+2026-04-29T08:11:24.7579912Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:11:24.7580405Z Require stack:
+2026-04-29T08:11:24.7580428Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:11:24.7580445Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:11:24.7580461Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:11:24.7580476Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:11:24.7580491Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:11:24.7580506Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:11:24.7580521Z   requireStack: [Array]
+2026-04-29T08:11:24.7580536Z }
+2026-04-29T08:11:24.7708558Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:11:24.7708960Z Require stack:
+2026-04-29T08:11:24.7708985Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:11:24.7709002Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:11:24.7709018Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:11:24.7709033Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:11:24.7709048Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:11:24.7709063Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:11:24.7709078Z   requireStack: [Array]
+2026-04-29T08:11:24.7709093Z }
+2026-04-29T08:12:11.5379401Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:12:11.5379787Z Require stack:
+2026-04-29T08:12:11.5379810Z - /home/site/wwwroot/.next/server/app/page.js
+2026-04-29T08:12:11.5379827Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:12:11.5379845Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:12:11.5379862Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:12:11.5379877Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:12:11.5379892Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:12:11.5379907Z   requireStack: [Array]
+2026-04-29T08:12:11.5379921Z }
+2026-04-29T08:12:11.5790135Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:12:11.5790507Z Require stack:
+2026-04-29T08:12:11.5790531Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:12:11.5790549Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:12:11.5790566Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:12:11.5790582Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:12:11.5790598Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:12:11.5790614Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:12:11.5790629Z   requireStack: [Array]
+2026-04-29T08:12:11.5790643Z }
+2026-04-29T08:12:24.7708269Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:12:24.7708749Z Require stack:
+2026-04-29T08:12:24.7708853Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:12:24.7708873Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:12:24.7708889Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:12:24.7708905Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:12:24.7708920Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:12:24.7708935Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:12:24.7708950Z   requireStack: [Array]
+2026-04-29T08:12:24.7708966Z }
+2026-04-29T08:12:24.7868623Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:12:24.7869154Z Require stack:
+2026-04-29T08:12:24.7869179Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:12:24.7869244Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:12:24.7869262Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:12:24.7869278Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:12:24.7869296Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:12:24.7869311Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:12:24.7869327Z   requireStack: [Array]
+2026-04-29T08:12:24.7869341Z }
+2026-04-29T08:13:24.7659790Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:13:24.7660357Z Require stack:
+2026-04-29T08:13:24.7660385Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:13:24.7660403Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:13:24.7660492Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:13:24.7660508Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:13:24.7660524Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:13:24.7660539Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:13:24.7660554Z   requireStack: [Array]
+2026-04-29T08:13:24.7660568Z }
+2026-04-29T08:13:24.7778381Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:13:24.7778638Z Require stack:
+2026-04-29T08:13:24.7778663Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:13:24.7778679Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:13:24.7778696Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:13:24.7778751Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:13:24.7778768Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:13:24.7778785Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:13:24.7778800Z   requireStack: [Array]
+2026-04-29T08:13:24.7778814Z }
+2026-04-29T08:14:24.7644682Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:14:24.7645196Z Require stack:
+2026-04-29T08:14:24.7645219Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:14:24.7645236Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:14:24.7645252Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:14:24.7645269Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:14:24.7645285Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:14:24.7645300Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:14:24.7645317Z   requireStack: [Array]
+2026-04-29T08:14:24.7645331Z }
+2026-04-29T08:14:24.7835301Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:14:24.7835765Z Require stack:
+2026-04-29T08:14:24.7835789Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:14:24.7835806Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:14:24.7835822Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:14:24.7835837Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:14:24.7835855Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:14:24.7835869Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:14:24.7835884Z   requireStack: [Array]
+2026-04-29T08:14:24.7835898Z }
+2026-04-29T08:15:24.7665476Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:15:24.7665888Z Require stack:
+2026-04-29T08:15:24.7665910Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:15:24.7665929Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:15:24.7665949Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:15:24.7665966Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:15:24.7665983Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:15:24.7665999Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:15:24.7666014Z   requireStack: [Array]
+2026-04-29T08:15:24.7666029Z }
+2026-04-29T08:15:24.7757307Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:15:24.7757801Z Require stack:
+2026-04-29T08:15:24.7757827Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:15:24.7757844Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:15:24.7757861Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:15:24.7757876Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:15:24.7757892Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:15:24.7757906Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:15:24.7757921Z   requireStack: [Array]
+2026-04-29T08:15:24.7757935Z }
+2026-04-29T08:16:24.8429205Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:16:24.8429674Z Require stack:
+2026-04-29T08:16:24.8429759Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:16:24.8429780Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:16:24.8429797Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:16:24.8429813Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:16:24.8429830Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:16:24.8429845Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:16:24.8429861Z   requireStack: [Array]
+2026-04-29T08:16:24.8429875Z }
+2026-04-29T08:16:24.8723662Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:16:24.8724203Z Require stack:
+2026-04-29T08:16:24.8724228Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:16:24.8724299Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:16:24.8724316Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:16:24.8724331Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:16:24.8724348Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:16:24.8724363Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:16:24.8724381Z   requireStack: [Array]
+2026-04-29T08:16:24.8724394Z }
+2026-04-29T08:17:11.8102286Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:17:11.8102937Z Require stack:
+2026-04-29T08:17:11.8102963Z - /home/site/wwwroot/.next/server/app/page.js
+2026-04-29T08:17:11.8102987Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:17:11.8103094Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:17:11.8103111Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:17:11.8103127Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:17:11.8103142Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:17:11.8103157Z   requireStack: [Array]
+2026-04-29T08:17:11.8103171Z }
+2026-04-29T08:17:11.8696331Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:17:11.8696873Z Require stack:
+2026-04-29T08:17:11.8696900Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:17:11.8696918Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:17:11.8696934Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:17:11.8697030Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:17:11.8697046Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:17:11.8697062Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:17:11.8697077Z   requireStack: [Array]
+2026-04-29T08:17:11.8697095Z }
+2026-04-29T08:17:24.7720823Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:17:24.7721279Z Require stack:
+2026-04-29T08:17:24.7721303Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:17:24.7721320Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:17:24.7721336Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:17:24.7721352Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:17:24.7721368Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:17:24.7721383Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:17:24.7721400Z   requireStack: [Array]
+2026-04-29T08:17:24.7721415Z }
+2026-04-29T08:17:24.8013245Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:17:24.8013702Z Require stack:
+2026-04-29T08:17:24.8013726Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:17:24.8013743Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:17:24.8013759Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:17:24.8013775Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:17:24.8013791Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:17:24.8013807Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:17:24.8013823Z   requireStack: [Array]
+2026-04-29T08:17:24.8013837Z }
+2026-04-29T08:18:24.7648339Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:18:24.7648891Z Require stack:
+2026-04-29T08:18:24.7648916Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:18:24.7648933Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:18:24.7648951Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:18:24.7648966Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:18:24.7648983Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:18:24.7648998Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:18:24.7649014Z   requireStack: [Array]
+2026-04-29T08:18:24.7649028Z }
+2026-04-29T08:18:24.7804291Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:18:24.7804742Z Require stack:
+2026-04-29T08:18:24.7804768Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:18:24.7804786Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:18:24.7804801Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:18:24.7804817Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:18:24.7804833Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:18:24.7804849Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:18:24.7804863Z   requireStack: [Array]
+2026-04-29T08:18:24.7804877Z }
+2026-04-29T08:19:24.7884506Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:19:24.7885016Z Require stack:
+2026-04-29T08:19:24.7885119Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:19:24.7885139Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:19:24.7885155Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:19:24.7885171Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:19:24.7885187Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:19:24.7885203Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:19:24.7885218Z   requireStack: [Array]
+2026-04-29T08:19:24.7885232Z }
+2026-04-29T08:19:24.8155131Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:19:24.8155640Z Require stack:
+2026-04-29T08:19:24.8155664Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:19:24.8155751Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:19:24.8155767Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:19:24.8155782Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:19:24.8155800Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:19:24.8155815Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:19:24.8155830Z   requireStack: [Array]
+2026-04-29T08:19:24.8155845Z }
+2026-04-29T08:20:24.7674529Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:20:24.7675100Z Require stack:
+2026-04-29T08:20:24.7675123Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:20:24.7675141Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:20:24.7675158Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:20:24.7675174Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:20:24.7675190Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:20:24.7675206Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:20:24.7675220Z   requireStack: [Array]
+2026-04-29T08:20:24.7675234Z }
+2026-04-29T08:20:24.7819430Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:20:24.7819675Z Require stack:
+2026-04-29T08:20:24.7819699Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:20:24.7819729Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:20:24.7819746Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:20:24.7819762Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:20:24.7819777Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:20:24.7819793Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:20:24.7819808Z   requireStack: [Array]
+2026-04-29T08:20:24.7819826Z }
+2026-04-29T08:21:24.7660056Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:21:24.7660441Z Require stack:
+2026-04-29T08:21:24.7660463Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:21:24.7660479Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:21:24.7660496Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:21:24.7660511Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:21:24.7660526Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:21:24.7660541Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:21:24.7660558Z   requireStack: [Array]
+2026-04-29T08:21:24.7660572Z }
+2026-04-29T08:21:24.7791788Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:21:24.7792070Z Require stack:
+2026-04-29T08:21:24.7792093Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:21:24.7792111Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:21:24.7792128Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:21:24.7792144Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:21:24.7792160Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:21:24.7792175Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:21:24.7792189Z   requireStack: [Array]
+2026-04-29T08:21:24.7792203Z }
+2026-04-29T08:22:12.2119814Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:22:12.2120405Z Require stack:
+2026-04-29T08:22:12.2120427Z - /home/site/wwwroot/.next/server/app/page.js
+2026-04-29T08:22:12.2120443Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:22:12.2120462Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:22:12.2120479Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:22:12.2120495Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:22:12.2120510Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:22:12.2120527Z   requireStack: [Array]
+2026-04-29T08:22:12.2120541Z }
+2026-04-29T08:22:12.2909628Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:22:12.2910246Z Require stack:
+2026-04-29T08:22:12.2910270Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:22:12.2910286Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:22:12.2910303Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:22:12.2910318Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:22:12.2910334Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:22:12.2910349Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:22:12.2910363Z   requireStack: [Array]
+2026-04-29T08:22:12.2910377Z }
+2026-04-29T08:22:24.8623374Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:22:24.8623837Z Require stack:
+2026-04-29T08:22:24.8623860Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:22:24.8623878Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:22:24.8623895Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:22:24.8623910Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:22:24.8623926Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:22:24.8623942Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:22:24.8623958Z   requireStack: [Array]
+2026-04-29T08:22:24.8623972Z }
+2026-04-29T08:22:24.9048061Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:22:24.9048776Z Require stack:
+2026-04-29T08:22:24.9048799Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:22:24.9048816Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:22:24.9048832Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:22:24.9048847Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:22:24.9048864Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:22:24.9048880Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:22:24.9048896Z   requireStack: [Array]
+2026-04-29T08:22:24.9048909Z }
+2026-04-29T08:23:24.8202864Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:23:24.8203416Z Require stack:
+2026-04-29T08:23:24.8203439Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:23:24.8203456Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:23:24.8203472Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:23:24.8203488Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:23:24.8203504Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:23:24.8203519Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:23:24.8203533Z   requireStack: [Array]
+2026-04-29T08:23:24.8203547Z }
+2026-04-29T08:23:24.8302511Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:23:24.8303131Z Require stack:
+2026-04-29T08:23:24.8303155Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:23:24.8303171Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:23:24.8303188Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:23:24.8303202Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:23:24.8303218Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:23:24.8303233Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:23:24.8303247Z   requireStack: [Array]
+2026-04-29T08:23:24.8303260Z }
+2026-04-29T08:24:24.7626132Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:24:24.7626633Z Require stack:
+2026-04-29T08:24:24.7626738Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:24:24.7626757Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:24:24.7626773Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:24:24.7626788Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:24:24.7626804Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:24:24.7626821Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:24:24.7626850Z   requireStack: [Array]
+2026-04-29T08:24:24.7626865Z }
+2026-04-29T08:24:24.7726548Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:24:24.7726753Z Require stack:
+2026-04-29T08:24:24.7726778Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:24:24.7726838Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:24:24.7726855Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:24:24.7726871Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:24:24.7726886Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:24:24.7726901Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:24:24.7726917Z   requireStack: [Array]
+2026-04-29T08:24:24.7726931Z }
+2026-04-29T08:25:24.7646302Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:25:24.7646812Z Require stack:
+2026-04-29T08:25:24.7646837Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:25:24.7646853Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:25:24.7646871Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:25:24.7646886Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:25:24.7646901Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:25:24.7646916Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:25:24.7646932Z   requireStack: [Array]
+2026-04-29T08:25:24.7646946Z }
+2026-04-29T08:25:24.7747147Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:25:24.7747625Z Require stack:
+2026-04-29T08:25:24.7747655Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:25:24.7747672Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:25:24.7747689Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:25:24.7747705Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:25:24.7747720Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:25:24.7747735Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:25:24.7747750Z   requireStack: [Array]
+2026-04-29T08:25:24.7747764Z }
+2026-04-29T08:26:24.7688677Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:26:24.7689188Z Require stack:
+2026-04-29T08:26:24.7689210Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:26:24.7689227Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:26:24.7689244Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:26:24.7689260Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:26:24.7689275Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:26:24.7689290Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:26:24.7689305Z   requireStack: [Array]
+2026-04-29T08:26:24.7689319Z }
+2026-04-29T08:26:24.7854303Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:26:24.7854787Z Require stack:
+2026-04-29T08:26:24.7854811Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:26:24.7854827Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:26:24.7854844Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:26:24.7854859Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:26:24.7854875Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:26:24.7854889Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:26:24.7854910Z   requireStack: [Array]
+2026-04-29T08:26:24.7854924Z }
+2026-04-29T08:26:53.4020085Z    _____                               
+2026-04-29T08:26:53.4021830Z   /  _  \ __________ _________   ____  
+2026-04-29T08:26:53.4021873Z  /  /_\  \\___   /  |  \_  __ \_/ __ \ 
+2026-04-29T08:26:53.4021897Z /    |    \/    /|  |  /|  | \/\  ___/ 
+2026-04-29T08:26:53.4021921Z \____|__  /_____ \____/ |__|    \___  >
+2026-04-29T08:26:53.4021950Z         \/      \/                  \/ 
+2026-04-29T08:26:53.4022030Z A P P   S E R V I C E   O N   L I N U X
+2026-04-29T08:26:53.4022052Z 
+2026-04-29T08:26:53.4022079Z Documentation    : http://aka.ms/webapp-linux
+2026-04-29T08:26:53.4022104Z NodeJS quickstart: https://aka.ms/node-qs
+2026-04-29T08:26:53.4022127Z NodeJS Version   : v24.13.0
+2026-04-29T08:26:53.4022229Z Instance Name    : lw1mdlwk0001DT
+2026-04-29T08:26:53.4022281Z Instance Id      : 309973e00d4a75475b1b3413021a4c10e69f2588f11014752e32af1ed2c371fa
+2026-04-29T08:26:53.4022303Z 
+2026-04-29T08:26:53.4022325Z Note: Any data outside '/home' is not persisted
+2026-04-29T08:26:56.1500538Z  * Starting OpenBSD Secure Shell server sshd
+2026-04-29T08:26:56.1769912Z    ...done.
+2026-04-29T08:26:56.1898642Z WEBSITES_INCLUDE_CLOUD_CERTS is not set to true.
+2026-04-29T08:26:56.2179204Z Updating certificates in /etc/ssl/certs...
+2026-04-29T08:27:06.3862609Z rehash: warning: skipping duplicate certificate in SSLcom-TLS-Root-2022-ECC.pem
+2026-04-29T08:27:06.3872796Z rehash: warning: skipping duplicate certificate in SSLcom-TLS-Root-2022-RSA.pem
+2026-04-29T08:27:06.6593712Z rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL
+2026-04-29T08:27:06.6898587Z 4 added, 0 removed; done.
+2026-04-29T08:27:06.6972566Z Running hooks in /etc/ca-certificates/update.d...
+2026-04-29T08:27:06.6981337Z done.
+2026-04-29T08:27:06.7107964Z CA certificates copied and updated successfully.
+2026-04-29T08:27:06.8890794Z  * Starting periodic command scheduler cron
+2026-04-29T08:27:06.8986093Z    ...done.
+2026-04-29T08:27:06.9586327Z Found build manifest file at '/home/site/wwwroot/oryx-manifest.toml'. Deserializing it...
+2026-04-29T08:27:06.9587116Z Could not find operation ID in manifest. Generating an operation id...
+2026-04-29T08:27:06.9587223Z Build Operation ID: 1b074430-7a2a-4ee2-9b53-0184356f8eb7
+2026-04-29T08:27:07.3022025Z Environment Variables for Application Insight's IPA Codeless Configuration exists..
+2026-04-29T08:27:07.3407694Z Writing output script to '/opt/startup/startup.sh'
+2026-04-29T08:27:07.4007552Z Running #!/bin/sh
+2026-04-29T08:27:07.4008127Z 
+2026-04-29T08:27:07.4008167Z # Enter the source directory to make sure the script runs where the user expects
+2026-04-29T08:27:07.4008272Z cd "/home/site/wwwroot"
+2026-04-29T08:27:07.4008296Z 
+2026-04-29T08:27:07.4008319Z export NODE_PATH=/usr/local/lib/node_modules:$NODE_PATH
+2026-04-29T08:27:07.4008342Z if [ -z "$PORT" ]; then
+2026-04-29T08:27:07.4008363Z 		export PORT=8080
+2026-04-29T08:27:07.4008383Z fi
+2026-04-29T08:27:07.4008402Z 
+2026-04-29T08:27:07.4008424Z echo Found tar.gz based node_modules.
+2026-04-29T08:27:07.4008467Z extractionCommand="tar -xzf node_modules.tar.gz -C /node_modules"
+2026-04-29T08:27:07.4008492Z echo "Removing existing modules directory from root..."
+2026-04-29T08:27:07.4008513Z rm -fr /node_modules
+2026-04-29T08:27:07.4008534Z mkdir -p /node_modules
+2026-04-29T08:27:07.4008556Z echo Extracting modules...
+2026-04-29T08:27:07.4008577Z $extractionCommand
+2026-04-29T08:27:07.4008643Z export NODE_PATH="/node_modules":$NODE_PATH
+2026-04-29T08:27:07.4008666Z export PATH=/node_modules/.bin:$PATH
+2026-04-29T08:27:07.4008688Z if [ -d node_modules ]; then
+2026-04-29T08:27:07.4008711Z     mv -f node_modules _del_node_modules || true
+2026-04-29T08:27:07.4008731Z fi
+2026-04-29T08:27:07.4008750Z 
+2026-04-29T08:27:07.4008771Z if [ -d /node_modules ]; then
+2026-04-29T08:27:07.4008810Z     ln -sfn /node_modules ./node_modules 
+2026-04-29T08:27:07.4008831Z fi
+2026-04-29T08:27:07.4008851Z 
+2026-04-29T08:27:07.4008870Z echo "Done."
+2026-04-29T08:27:07.4008896Z PATH="$PATH:/home/site/wwwroot" cd /home/site/wwwroot && NODE_PATH=/home/site/wwwroot/node_modules node server.js
+2026-04-29T08:27:07.4008919Z Found tar.gz based node_modules.
+2026-04-29T08:27:07.4019889Z Removing existing modules directory from root...
+2026-04-29T08:27:07.4202789Z Extracting modules...
+2026-04-29T08:27:10.1027894Z Done.
+2026-04-29T08:27:12.8692538Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:27:12.8693018Z Require stack:
+2026-04-29T08:27:12.8693040Z - /home/site/wwwroot/.next/server/app/page.js
+2026-04-29T08:27:12.8693057Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:27:12.8693074Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:27:12.8693090Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:27:12.8693107Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:27:12.8693122Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:27:12.8693137Z   requireStack: [Array]
+2026-04-29T08:27:12.8693151Z }
+2026-04-29T08:27:12.9625217Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:27:12.9625878Z Require stack:
+2026-04-29T08:27:12.9625908Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:27:12.9625926Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:27:12.9625942Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:27:12.9625958Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:27:12.9625973Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:27:12.9625988Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:27:12.9626003Z   requireStack: [Array]
+2026-04-29T08:27:12.9626017Z }
+2026-04-29T08:27:17.1353162Z    ▲ Next.js 15.5.15
+2026-04-29T08:27:17.1353825Z    - Local:        http://localhost:3000
+2026-04-29T08:27:17.1353873Z    - Network:      http://0.0.0.0:3000
+2026-04-29T08:27:17.1353894Z 
+2026-04-29T08:27:17.1353920Z  ✓ Starting...
+2026-04-29T08:27:19.1781735Z  ✓ Ready in 2.1s
+2026-04-29T08:27:22.5401606Z Backend API URL: https://tcairrapiccontainer.azurewebsites.net
+2026-04-29T08:27:22.5404561Z Environment: production
+2026-04-29T08:27:25.0655596Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:27:25.0656097Z Require stack:
+2026-04-29T08:27:25.0656117Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:27:25.0656132Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:27:25.0656146Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:27:25.0656160Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:27:25.0656172Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:27:25.0656185Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:27:25.0656201Z   requireStack: [Array]
+2026-04-29T08:27:25.0656213Z }
+2026-04-29T08:27:25.1522218Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:27:25.1522544Z Require stack:
+2026-04-29T08:27:25.1522566Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:27:25.1522582Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:27:25.1522598Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:27:25.1522614Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:27:25.1522631Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:27:25.1522646Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:27:25.1522660Z   requireStack: [Array]
+2026-04-29T08:27:25.1522675Z }
+2026-04-29T08:27:26.9720553Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:27:26.9724575Z Require stack:
+2026-04-29T08:27:26.9724686Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:27:26.9724708Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:27:26.9724726Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:27:26.9724741Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:27:26.9724757Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:27:26.9724772Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:27:26.9724787Z   requireStack: [Array]
+2026-04-29T08:27:26.9724801Z }
+2026-04-29T08:27:27.0194552Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:27:27.0194860Z Require stack:
+2026-04-29T08:27:27.0194886Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:27:27.0194987Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:27:27.0195009Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:27:27.0195029Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:27:27.0195047Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:27:27.0195066Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:27:27.0195084Z   requireStack: [Array]
+2026-04-29T08:27:27.0195101Z }
+2026-04-29T08:30:06.1836373Z    _____                               
+2026-04-29T08:30:06.1837902Z   /  _  \ __________ _________   ____  
+2026-04-29T08:30:06.1837956Z  /  /_\  \\___   /  |  \_  __ \_/ __ \ 
+2026-04-29T08:30:06.1837979Z /    |    \/    /|  |  /|  | \/\  ___/ 
+2026-04-29T08:30:06.1838001Z \____|__  /_____ \____/ |__|    \___  >
+2026-04-29T08:30:06.1838032Z         \/      \/                  \/ 
+2026-04-29T08:30:06.1838084Z A P P   S E R V I C E   O N   L I N U X
+2026-04-29T08:30:06.1838106Z 
+2026-04-29T08:30:06.1838144Z Documentation    : http://aka.ms/webapp-linux
+2026-04-29T08:30:06.1838169Z NodeJS quickstart: https://aka.ms/node-qs
+2026-04-29T08:30:06.1838192Z NodeJS Version   : v24.13.0
+2026-04-29T08:30:06.1838214Z Instance Name    : lw1mdlwk0001DT
+2026-04-29T08:30:06.1838258Z Instance Id      : 309973e00d4a75475b1b3413021a4c10e69f2588f11014752e32af1ed2c371fa
+2026-04-29T08:30:06.1838281Z 
+2026-04-29T08:30:06.1838303Z Note: Any data outside '/home' is not persisted
+2026-04-29T08:30:09.7258522Z  * Starting OpenBSD Secure Shell server sshd
+2026-04-29T08:30:09.7735337Z    ...done.
+2026-04-29T08:30:09.7831685Z WEBSITES_INCLUDE_CLOUD_CERTS is not set to true.
+2026-04-29T08:30:09.8134806Z Updating certificates in /etc/ssl/certs...
+2026-04-29T08:30:21.9992399Z rehash: warning: skipping duplicate certificate in SSLcom-TLS-Root-2022-ECC.pem
+2026-04-29T08:30:21.9996222Z rehash: warning: skipping duplicate certificate in SSLcom-TLS-Root-2022-RSA.pem
+2026-04-29T08:30:22.2817881Z rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL
+2026-04-29T08:30:22.3113600Z 4 added, 0 removed; done.
+2026-04-29T08:30:22.3114424Z Running hooks in /etc/ca-certificates/update.d...
+2026-04-29T08:30:22.3131941Z done.
+2026-04-29T08:30:22.3381204Z CA certificates copied and updated successfully.
+2026-04-29T08:30:22.3905364Z  * Starting periodic command scheduler cron
+2026-04-29T08:30:22.4015124Z    ...done.
+2026-04-29T08:30:22.4512483Z Found build manifest file at '/home/site/wwwroot/oryx-manifest.toml'. Deserializing it...
+2026-04-29T08:30:22.4634130Z Could not find operation ID in manifest. Generating an operation id...
+2026-04-29T08:30:22.4634441Z Build Operation ID: 6c208d59-b506-4f00-8853-ab56570c8a0e
+2026-04-29T08:30:22.7873382Z Environment Variables for Application Insight's IPA Codeless Configuration exists..
+2026-04-29T08:30:22.8383125Z Writing output script to '/opt/startup/startup.sh'
+2026-04-29T08:30:22.8892670Z Running #!/bin/sh
+2026-04-29T08:30:22.8893352Z 
+2026-04-29T08:30:22.8893390Z # Enter the source directory to make sure the script runs where the user expects
+2026-04-29T08:30:22.8893427Z cd "/home/site/wwwroot"
+2026-04-29T08:30:22.8893450Z 
+2026-04-29T08:30:22.8893473Z export NODE_PATH=/usr/local/lib/node_modules:$NODE_PATH
+2026-04-29T08:30:22.8893496Z if [ -z "$PORT" ]; then
+2026-04-29T08:30:22.8893591Z 		export PORT=8080
+2026-04-29T08:30:22.8893614Z fi
+2026-04-29T08:30:22.8893633Z 
+2026-04-29T08:30:22.8893654Z echo Found tar.gz based node_modules.
+2026-04-29T08:30:22.8893680Z extractionCommand="tar -xzf node_modules.tar.gz -C /node_modules"
+2026-04-29T08:30:22.8893703Z echo "Removing existing modules directory from root..."
+2026-04-29T08:30:22.8893724Z rm -fr /node_modules
+2026-04-29T08:30:22.8893762Z mkdir -p /node_modules
+2026-04-29T08:30:22.8893785Z echo Extracting modules...
+2026-04-29T08:30:22.8893807Z $extractionCommand
+2026-04-29T08:30:22.8893859Z export NODE_PATH="/node_modules":$NODE_PATH
+2026-04-29T08:30:22.8893881Z export PATH=/node_modules/.bin:$PATH
+2026-04-29T08:30:22.8893902Z if [ -d node_modules ]; then
+2026-04-29T08:30:22.8893931Z     mv -f node_modules _del_node_modules || true
+2026-04-29T08:30:22.8893968Z fi
+2026-04-29T08:30:22.8893988Z 
+2026-04-29T08:30:22.8894008Z if [ -d /node_modules ]; then
+2026-04-29T08:30:22.8894030Z     ln -sfn /node_modules ./node_modules 
+2026-04-29T08:30:22.8894051Z fi
+2026-04-29T08:30:22.8894070Z 
+2026-04-29T08:30:22.8894090Z echo "Done."
+2026-04-29T08:30:22.8894131Z PATH="$PATH:/home/site/wwwroot" cd /home/site/wwwroot && NODE_PATH=/home/site/wwwroot/node_modules node server.js
+2026-04-29T08:30:22.8894155Z Found tar.gz based node_modules.
+2026-04-29T08:30:22.8894178Z Removing existing modules directory from root...
+2026-04-29T08:30:22.9079958Z Extracting modules...
+2026-04-29T08:30:25.5304012Z Done.
+2026-04-29T08:30:28.5789844Z    ▲ Next.js 15.3.3
+2026-04-29T08:30:28.5797644Z    - Local:        http://localhost:3000
+2026-04-29T08:30:28.5797880Z    - Network:      http://0.0.0.0:3000
+2026-04-29T08:30:28.5797908Z 
+2026-04-29T08:30:28.5798036Z  ✓ Starting...
+2026-04-29T08:30:29.2114490Z  ✓ Ready in 653ms
+2026-04-29T08:30:29.8901105Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:30:29.8901480Z Require stack:
+2026-04-29T08:30:29.8901514Z - /home/site/wwwroot/.next/server/app/_not-found/page.js
+2026-04-29T08:30:29.8901540Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:30:29.8901564Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:30:29.8901587Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:30:29.8901609Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:30:29.8901655Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:30:29.8901678Z   requireStack: [Array]
+2026-04-29T08:30:29.8901699Z }
+2026-04-29T08:31:29.9648295Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:31:29.9648744Z Require stack:
+2026-04-29T08:31:29.9648767Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:31:29.9648784Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:31:29.9648802Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:31:29.9648818Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:31:29.9648833Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:31:29.9648849Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:31:29.9650070Z   requireStack: [Array]
+2026-04-29T08:31:29.9650088Z }
+2026-04-29T08:31:29.9837588Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:31:29.9837949Z Require stack:
+2026-04-29T08:31:29.9837973Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:31:29.9837990Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:31:29.9838006Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:31:29.9838064Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:31:29.9838081Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:31:29.9838098Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:31:29.9838113Z   requireStack: [Array]
+2026-04-29T08:31:29.9838127Z }
+2026-04-29T08:32:12.7211384Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:32:12.7211938Z Require stack:
+2026-04-29T08:32:12.7211964Z - /home/site/wwwroot/.next/server/app/page.js
+2026-04-29T08:32:12.7211983Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:32:12.7211999Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:32:12.7212015Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:32:12.7212110Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:32:12.7212128Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:32:12.7212144Z   requireStack: [Array]
+2026-04-29T08:32:12.7212158Z }
+2026-04-29T08:32:12.7468216Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:32:12.7468601Z Require stack:
+2026-04-29T08:32:12.7468627Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:32:12.7468652Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:32:12.7468674Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:32:12.7468690Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:32:12.7468706Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:32:12.7468767Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:32:12.7468784Z   requireStack: [Array]
+2026-04-29T08:32:12.7468799Z }
+2026-04-29T08:32:24.8320061Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:32:24.8320452Z Require stack:
+2026-04-29T08:32:24.8320474Z - /home/site/wwwroot/.next/server/app/dashboard/page.js
+2026-04-29T08:32:24.8320491Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:32:24.8320506Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:32:24.8320522Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:32:24.8320537Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:32:24.8320553Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:32:24.8320569Z   requireStack: [Array]
+2026-04-29T08:32:24.8320583Z }
+2026-04-29T08:32:24.8495088Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:32:24.8495349Z Require stack:
+2026-04-29T08:32:24.8495369Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:32:24.8495384Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:32:24.8495398Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:32:24.8495412Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:32:24.8495425Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:32:24.8495440Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:32:24.8495556Z   requireStack: [Array]
+2026-04-29T08:32:24.8495573Z }
+2026-04-29T08:32:24.9638173Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:32:24.9638714Z Require stack:
+2026-04-29T08:32:24.9638797Z - /home/site/wwwroot/.next/server/app/dashboard/page.js
+2026-04-29T08:32:24.9638816Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:32:24.9638831Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:32:24.9638848Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:32:24.9638863Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:32:24.9638878Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:32:24.9638894Z   requireStack: [Array]
+2026-04-29T08:32:24.9638907Z }
+2026-04-29T08:32:24.9726611Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:32:24.9726884Z Require stack:
+2026-04-29T08:32:24.9726906Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:32:24.9726957Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:32:24.9726974Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:32:24.9726990Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:32:24.9727006Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:32:24.9727021Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:32:24.9727035Z   requireStack: [Array]
+2026-04-29T08:32:24.9727050Z }
+2026-04-29T08:32:25.1310971Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:32:25.1311462Z Require stack:
+2026-04-29T08:32:25.1311494Z - /home/site/wwwroot/.next/server/app/_not-found/page.js
+2026-04-29T08:32:25.1311512Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:32:25.1311599Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:32:25.1311616Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:32:25.1311631Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:32:25.1311650Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:32:25.1311665Z   requireStack: [Array]
+2026-04-29T08:32:25.1311681Z }
+2026-04-29T08:32:29.9480738Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:32:29.9481052Z Require stack:
+2026-04-29T08:32:29.9481081Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:32:29.9481099Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:32:29.9481116Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:32:29.9481136Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:32:29.9481152Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:32:29.9481168Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:32:29.9481182Z   requireStack: [Array]
+2026-04-29T08:32:29.9481196Z }
+2026-04-29T08:32:29.9580853Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:32:29.9581245Z Require stack:
+2026-04-29T08:32:29.9581269Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:32:29.9581286Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:32:29.9581302Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:32:29.9581318Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:32:29.9581336Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:32:29.9581354Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:32:29.9581370Z   requireStack: [Array]
+2026-04-29T08:32:29.9581383Z }
+2026-04-29T08:33:29.9495185Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:33:29.9495838Z Require stack:
+2026-04-29T08:33:29.9495863Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:33:29.9495880Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:33:29.9495896Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:33:29.9495912Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:33:29.9495928Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:33:29.9495943Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:33:29.9495958Z   requireStack: [Array]
+2026-04-29T08:33:29.9495972Z }
+2026-04-29T08:33:29.9591675Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:33:29.9592055Z Require stack:
+2026-04-29T08:33:29.9592143Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:33:29.9592161Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:33:29.9592178Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:33:29.9592194Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:33:29.9592209Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:33:29.9592226Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:33:29.9592241Z   requireStack: [Array]
+2026-04-29T08:33:29.9592257Z }
+2026-04-29T08:33:30.5312545Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:33:30.5313063Z Require stack:
+2026-04-29T08:33:30.5313088Z - /home/site/wwwroot/.next/server/app/login/page.js
+2026-04-29T08:33:30.5313185Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:33:30.5313202Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:33:30.5313218Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:33:30.5313233Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:33:30.5313248Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:33:30.5313263Z   requireStack: [Array]
+2026-04-29T08:33:30.5313278Z }
+2026-04-29T08:33:30.5410384Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:33:30.5411005Z Require stack:
+2026-04-29T08:33:30.5411031Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:33:30.5411047Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:33:30.5411114Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:33:30.5411132Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:33:30.5411147Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:33:30.5411162Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:33:30.5411177Z   requireStack: [Array]
+2026-04-29T08:33:30.5411190Z }
+2026-04-29T08:33:30.6984652Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:33:30.6985144Z Require stack:
+2026-04-29T08:33:30.6985168Z - /home/site/wwwroot/.next/server/app/_not-found/page.js
+2026-04-29T08:33:30.6985186Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:33:30.6985206Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:33:30.6985306Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:33:30.6985323Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:33:30.6985338Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:33:30.6985353Z   requireStack: [Array]
+2026-04-29T08:33:30.6985368Z }
+2026-04-29T08:33:32.6775682Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:33:32.6776141Z Require stack:
+2026-04-29T08:33:32.6776171Z - /home/site/wwwroot/.next/server/app/_not-found/page.js
+2026-04-29T08:33:32.6776189Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:33:32.6776206Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:33:32.6776282Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:33:32.6776337Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:33:32.6776353Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:33:32.6776368Z   requireStack: [Array]
+2026-04-29T08:33:32.6776383Z }
+2026-04-29T08:33:35.5401993Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:33:35.5402567Z Require stack:
+2026-04-29T08:33:35.5402591Z - /home/site/wwwroot/.next/server/app/page.js
+2026-04-29T08:33:35.5402607Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:33:35.5402624Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:33:35.5402641Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:33:35.5402751Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:33:35.5402770Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:33:35.5402784Z   requireStack: [Array]
+2026-04-29T08:33:35.5402799Z }
+2026-04-29T08:33:35.5546143Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:33:35.5546608Z Require stack:
+2026-04-29T08:33:35.5546632Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:33:35.5546650Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:33:35.5546666Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:33:35.5546686Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:33:35.5546702Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:33:35.5546765Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:33:35.5546781Z   requireStack: [Array]
+2026-04-29T08:33:35.5546796Z }
+2026-04-29T08:33:35.6698206Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:33:35.6698779Z Require stack:
+2026-04-29T08:33:35.6698804Z - /home/site/wwwroot/.next/server/app/_not-found/page.js
+2026-04-29T08:33:35.6698822Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:33:35.6698838Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:33:35.6698856Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:33:35.6698875Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:33:35.6698890Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:33:35.6698981Z   requireStack: [Array]
+2026-04-29T08:33:35.6698998Z }
+2026-04-29T08:34:29.9491491Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:34:29.9491973Z Require stack:
+2026-04-29T08:34:29.9491995Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:34:29.9492013Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:34:29.9492030Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:34:29.9492046Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:34:29.9492061Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:34:29.9492077Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:34:29.9492093Z   requireStack: [Array]
+2026-04-29T08:34:29.9492108Z }
+2026-04-29T08:34:29.9591385Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:34:29.9591868Z Require stack:
+2026-04-29T08:34:29.9591892Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:34:29.9591908Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:34:29.9591924Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:34:29.9591940Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:34:29.9591955Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:34:29.9591970Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:34:29.9591985Z   requireStack: [Array]
+2026-04-29T08:34:29.9592000Z }
+2026-04-29T08:35:29.9524405Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:35:29.9524883Z Require stack:
+2026-04-29T08:35:29.9524905Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:35:29.9524921Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:35:29.9524935Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:35:29.9524950Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:35:29.9524965Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:35:29.9524979Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:35:29.9524993Z   requireStack: [Array]
+2026-04-29T08:35:29.9525006Z }
+2026-04-29T08:35:29.9661163Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:35:29.9661505Z Require stack:
+2026-04-29T08:35:29.9661529Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:35:29.9661546Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:35:29.9661562Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:35:29.9661577Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:35:29.9661592Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:35:29.9661607Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:35:29.9661622Z   requireStack: [Array]
+2026-04-29T08:35:29.9661637Z }
+2026-04-29T08:36:29.9506845Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:36:29.9507514Z Require stack:
+2026-04-29T08:36:29.9507630Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:36:29.9507651Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:36:29.9507668Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:36:29.9507683Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:36:29.9507698Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:36:29.9507714Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:36:29.9507729Z   requireStack: [Array]
+2026-04-29T08:36:29.9507743Z }
+2026-04-29T08:36:29.9632878Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:36:29.9633359Z Require stack:
+2026-04-29T08:36:29.9633385Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:36:29.9633462Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:36:29.9633479Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:36:29.9633495Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:36:29.9633510Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:36:29.9633526Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:36:29.9633541Z   requireStack: [Array]
+2026-04-29T08:36:29.9633555Z }
+2026-04-29T08:37:13.0546890Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:37:13.0617944Z Require stack:
+2026-04-29T08:37:13.0618016Z - /home/site/wwwroot/.next/server/app/page.js
+2026-04-29T08:37:13.0618033Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:37:13.0618049Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:37:13.0618066Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:37:13.0618083Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:37:13.0618098Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:37:13.0618112Z   requireStack: [Array]
+2026-04-29T08:37:13.0618126Z }
+2026-04-29T08:37:13.0840806Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:37:13.0841376Z Require stack:
+2026-04-29T08:37:13.0841399Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:37:13.0841416Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:37:13.0841432Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:37:13.0841446Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:37:13.0841463Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:37:13.0841477Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:37:13.0841492Z   requireStack: [Array]
+2026-04-29T08:37:13.0841506Z }
+2026-04-29T08:37:29.9558856Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:37:29.9559397Z Require stack:
+2026-04-29T08:37:29.9559508Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:37:29.9559534Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:37:29.9559551Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:37:29.9559566Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:37:29.9559582Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:37:29.9559599Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:37:29.9559614Z   requireStack: [Array]
+2026-04-29T08:37:29.9559630Z }
+2026-04-29T08:37:29.9651187Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:37:29.9651683Z Require stack:
+2026-04-29T08:37:29.9651708Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:37:29.9651795Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:37:29.9651812Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:37:29.9651833Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:37:29.9651849Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:37:29.9651865Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:37:29.9651880Z   requireStack: [Array]
+2026-04-29T08:37:29.9651894Z }
+2026-04-29T08:38:29.9453814Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:38:29.9454379Z Require stack:
+2026-04-29T08:38:29.9454410Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:38:29.9454428Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:38:29.9454444Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:38:29.9454461Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:38:29.9454476Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:38:29.9454491Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:38:29.9454505Z   requireStack: [Array]
+2026-04-29T08:38:29.9454519Z }
+2026-04-29T08:38:29.9545861Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:38:29.9546360Z Require stack:
+2026-04-29T08:38:29.9546385Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:38:29.9546403Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:38:29.9546418Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:38:29.9546434Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:38:29.9546449Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:38:29.9546465Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:38:29.9546481Z   requireStack: [Array]
+2026-04-29T08:38:29.9546495Z }
+2026-04-29T08:39:29.9454595Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:39:29.9455102Z Require stack:
+2026-04-29T08:39:29.9455126Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:39:29.9455143Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:39:29.9455160Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:39:29.9455176Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:39:29.9455192Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:39:29.9455208Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:39:29.9455223Z   requireStack: [Array]
+2026-04-29T08:39:29.9455241Z }
+2026-04-29T08:39:29.9559109Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:39:29.9559597Z Require stack:
+2026-04-29T08:39:29.9559623Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:39:29.9559639Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:39:29.9559655Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:39:29.9559670Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:39:29.9559685Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:39:29.9559700Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:39:29.9559715Z   requireStack: [Array]
+2026-04-29T08:39:29.9559732Z }
+2026-04-29T08:40:29.9633943Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:40:29.9634439Z Require stack:
+2026-04-29T08:40:29.9634540Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:40:29.9634566Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:40:29.9634582Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:40:29.9634598Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:40:29.9634614Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:40:29.9634629Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:40:29.9634645Z   requireStack: [Array]
+2026-04-29T08:40:29.9634659Z }
+2026-04-29T08:40:29.9725396Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:40:29.9725739Z Require stack:
+2026-04-29T08:40:29.9725764Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:40:29.9725831Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:40:29.9725848Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:40:29.9725864Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:40:29.9725880Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:40:29.9725895Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:40:29.9725910Z   requireStack: [Array]
+2026-04-29T08:40:29.9725924Z }
+2026-04-29T08:41:29.9530855Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:41:29.9531377Z Require stack:
+2026-04-29T08:41:29.9531399Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:41:29.9531416Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:41:29.9531432Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:41:29.9531448Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:41:29.9531463Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:41:29.9531480Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:41:29.9531495Z   requireStack: [Array]
+2026-04-29T08:41:29.9531509Z }
+2026-04-29T08:41:29.9620042Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:41:29.9620468Z Require stack:
+2026-04-29T08:41:29.9620489Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:41:29.9620505Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:41:29.9620520Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:41:29.9620536Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:41:29.9620550Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:41:29.9620566Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:41:29.9620580Z   requireStack: [Array]
+2026-04-29T08:41:29.9620594Z }
+2026-04-29T08:42:13.3736087Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:42:13.3736413Z Require stack:
+2026-04-29T08:42:13.3736515Z - /home/site/wwwroot/.next/server/app/page.js
+2026-04-29T08:42:13.3736534Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:42:13.3736549Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:42:13.3736563Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:42:13.3736577Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:42:13.3736591Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:42:13.3736605Z   requireStack: [Array]
+2026-04-29T08:42:13.3736617Z }
+2026-04-29T08:42:13.3852413Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:42:13.3852872Z Require stack:
+2026-04-29T08:42:13.3852902Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:42:13.3852993Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:42:13.3853012Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:42:13.3853028Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:42:13.3853046Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:42:13.3853062Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:42:13.3853078Z   requireStack: [Array]
+2026-04-29T08:42:13.3853094Z }
+2026-04-29T08:42:29.9475922Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:42:29.9476398Z Require stack:
+2026-04-29T08:42:29.9476421Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:42:29.9476438Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:42:29.9476457Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:42:29.9476472Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:42:29.9476487Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:42:29.9476503Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:42:29.9476517Z   requireStack: [Array]
+2026-04-29T08:42:29.9476532Z }
+2026-04-29T08:42:29.9562664Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:42:29.9563034Z Require stack:
+2026-04-29T08:42:29.9563057Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:42:29.9563073Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:42:29.9563091Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:42:29.9563107Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:42:29.9563122Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:42:29.9563140Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:42:29.9563154Z   requireStack: [Array]
+2026-04-29T08:42:29.9563167Z }
+2026-04-29T08:43:29.9460439Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:43:29.9460935Z Require stack:
+2026-04-29T08:43:29.9461040Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:43:29.9461058Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:43:29.9461072Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:43:29.9461087Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:43:29.9461100Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:43:29.9461113Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:43:29.9461126Z   requireStack: [Array]
+2026-04-29T08:43:29.9461139Z }
+2026-04-29T08:43:29.9608761Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:43:29.9609106Z Require stack:
+2026-04-29T08:43:29.9609130Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:43:29.9609196Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:43:29.9609213Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:43:29.9609229Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:43:29.9609245Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:43:29.9609260Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:43:29.9609275Z   requireStack: [Array]
+2026-04-29T08:43:29.9609290Z }
+2026-04-29T08:44:29.9533550Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:44:29.9534029Z Require stack:
+2026-04-29T08:44:29.9534052Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:44:29.9534070Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:44:29.9534087Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:44:29.9534103Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:44:29.9534119Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:44:29.9534134Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:44:29.9534149Z   requireStack: [Array]
+2026-04-29T08:44:29.9534165Z }
+2026-04-29T08:44:29.9645851Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:44:29.9646297Z Require stack:
+2026-04-29T08:44:29.9646321Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:44:29.9646335Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:44:29.9646351Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:44:29.9646372Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:44:29.9646386Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:44:29.9646400Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:44:29.9646413Z   requireStack: [Array]
+2026-04-29T08:44:29.9646425Z }
+2026-04-29T08:45:29.9454721Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:45:29.9455301Z Require stack:
+2026-04-29T08:45:29.9455324Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:45:29.9455341Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:45:29.9455357Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:45:29.9455373Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:45:29.9455388Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:45:29.9455402Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:45:29.9455417Z   requireStack: [Array]
+2026-04-29T08:45:29.9455431Z }
+2026-04-29T08:45:29.9760685Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:45:29.9761299Z Require stack:
+2026-04-29T08:45:29.9761324Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:45:29.9761340Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:45:29.9761357Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:45:29.9761372Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:45:29.9761387Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:45:29.9761402Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:45:29.9763966Z   requireStack: [Array]
+2026-04-29T08:45:29.9763989Z }
+2026-04-29T08:46:29.9462735Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:46:29.9463271Z Require stack:
+2026-04-29T08:46:29.9463291Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:46:29.9463305Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:46:29.9463320Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:46:29.9463334Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:46:29.9463348Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:46:29.9463362Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:46:29.9463375Z   requireStack: [Array]
+2026-04-29T08:46:29.9463388Z }
+2026-04-29T08:46:29.9553728Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:46:29.9554136Z Require stack:
+2026-04-29T08:46:29.9554158Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:46:29.9554175Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:46:29.9554191Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:46:29.9554207Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:46:29.9554223Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:46:29.9554239Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:46:29.9554254Z   requireStack: [Array]
+2026-04-29T08:46:29.9554267Z }
+2026-04-29T08:47:13.6417724Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:47:13.6418431Z Require stack:
+2026-04-29T08:47:13.6418526Z - /home/site/wwwroot/.next/server/app/page.js
+2026-04-29T08:47:13.6418545Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:47:13.6418561Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:47:13.6418581Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:47:13.6418597Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:47:13.6418612Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:47:13.6418628Z   requireStack: [Array]
+2026-04-29T08:47:13.6418642Z }
+2026-04-29T08:47:13.6730130Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:47:13.6730609Z Require stack:
+2026-04-29T08:47:13.6730635Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:47:13.6730698Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:47:13.6730716Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:47:13.6730733Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:47:13.6730749Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:47:13.6730764Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:47:13.6730779Z   requireStack: [Array]
+2026-04-29T08:47:13.6730794Z }
+2026-04-29T08:47:29.9451907Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:47:29.9452551Z Require stack:
+2026-04-29T08:47:29.9452574Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:47:29.9452599Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:47:29.9452615Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:47:29.9452631Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:47:29.9452646Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:47:29.9452662Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:47:29.9452678Z   requireStack: [Array]
+2026-04-29T08:47:29.9452693Z }
+2026-04-29T08:47:29.9597622Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:47:29.9598039Z Require stack:
+2026-04-29T08:47:29.9598064Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:47:29.9598079Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:47:29.9598094Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:47:29.9598110Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:47:29.9598125Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:47:29.9598141Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:47:29.9598155Z   requireStack: [Array]
+2026-04-29T08:47:29.9598168Z }
+2026-04-29T08:48:29.9554799Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:48:29.9555325Z Require stack:
+2026-04-29T08:48:29.9555424Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:48:29.9555443Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:48:29.9555460Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:48:29.9555476Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:48:29.9555490Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:48:29.9555506Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:48:29.9555521Z   requireStack: [Array]
+2026-04-29T08:48:29.9555535Z }
+2026-04-29T08:48:29.9678693Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:48:29.9679691Z Require stack:
+2026-04-29T08:48:29.9679719Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:48:29.9679778Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:48:29.9679795Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:48:29.9679810Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:48:29.9679826Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:48:29.9679841Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:48:29.9679857Z   requireStack: [Array]
+2026-04-29T08:48:29.9679872Z }
+2026-04-29T08:48:56.7319352Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:48:56.7319993Z Require stack:
+2026-04-29T08:48:56.7320022Z - /home/site/wwwroot/.next/server/app/page.js
+2026-04-29T08:48:56.7320041Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:48:56.7320133Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:48:56.7320160Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:48:56.7320175Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:48:56.7320191Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:48:56.7320205Z   requireStack: [Array]
+2026-04-29T08:48:56.7320220Z }
+2026-04-29T08:48:56.7443040Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:48:56.7443318Z Require stack:
+2026-04-29T08:48:56.7443342Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:48:56.7443359Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:48:56.7443375Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:48:56.7443449Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:48:56.7443464Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:48:56.7443481Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:48:56.7443496Z   requireStack: [Array]
+2026-04-29T08:48:56.7443510Z }
+2026-04-29T08:49:29.9543620Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:49:29.9544130Z Require stack:
+2026-04-29T08:49:29.9544154Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:49:29.9544171Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:49:29.9544187Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:49:29.9544203Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:49:29.9544219Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:49:29.9544234Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:49:29.9544249Z   requireStack: [Array]
+2026-04-29T08:49:29.9544263Z }
+2026-04-29T08:49:29.9710400Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:49:29.9711224Z Require stack:
+2026-04-29T08:49:29.9711249Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:49:29.9711266Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:49:29.9711282Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:49:29.9711298Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:49:29.9711313Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:49:29.9711329Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:49:29.9711344Z   requireStack: [Array]
+2026-04-29T08:49:29.9711358Z }
+2026-04-29T08:50:29.9473610Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:50:29.9474098Z Require stack:
+2026-04-29T08:50:29.9474175Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:50:29.9474192Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:50:29.9474207Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:50:29.9474222Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:50:29.9474236Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:50:29.9474250Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:50:29.9474263Z   requireStack: [Array]
+2026-04-29T08:50:29.9474277Z }
+2026-04-29T08:50:29.9568743Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:50:29.9569230Z Require stack:
+2026-04-29T08:50:29.9569256Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:50:29.9569314Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:50:29.9569331Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:50:29.9569347Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:50:29.9569362Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:50:29.9569378Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:50:29.9569393Z   requireStack: [Array]
+2026-04-29T08:50:29.9569407Z }
+2026-04-29T08:51:09.8802735Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:51:09.8803252Z Require stack:
+2026-04-29T08:51:09.8803275Z - /home/site/wwwroot/.next/server/app/page.js
+2026-04-29T08:51:09.8803292Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:51:09.8803308Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:51:09.8803325Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:51:09.8803341Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:51:09.8803355Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:51:09.8803371Z   requireStack: [Array]
+2026-04-29T08:51:09.8803386Z }
+2026-04-29T08:51:09.8946243Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:51:09.8946628Z Require stack:
+2026-04-29T08:51:09.8946653Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:51:09.8946671Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:51:09.8946688Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:51:09.8946705Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:51:09.8946722Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:51:09.8946738Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:51:09.8946753Z   requireStack: [Array]
+2026-04-29T08:51:09.8946769Z }
+2026-04-29T08:51:10.2020920Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:51:10.2021461Z Require stack:
+2026-04-29T08:51:10.2021560Z - /home/site/wwwroot/.next/server/app/_not-found/page.js
+2026-04-29T08:51:10.2021577Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:51:10.2021595Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:51:10.2021610Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:51:10.2021626Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:51:10.2021642Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:51:10.2021657Z   requireStack: [Array]
+2026-04-29T08:51:10.2021672Z }
+2026-04-29T08:51:29.9486808Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:51:29.9487248Z Require stack:
+2026-04-29T08:51:29.9487275Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:51:29.9487357Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:51:29.9487374Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:51:29.9487389Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:51:29.9487405Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:51:29.9487421Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:51:29.9487435Z   requireStack: [Array]
+2026-04-29T08:51:29.9487450Z }
+2026-04-29T08:51:29.9586906Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:51:29.9587299Z Require stack:
+2026-04-29T08:51:29.9587322Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:51:29.9587339Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:51:29.9587395Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:51:29.9587413Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:51:29.9587428Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:51:29.9587443Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:51:29.9587462Z   requireStack: [Array]
+2026-04-29T08:51:29.9587476Z }
+2026-04-29T08:52:13.9571633Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:52:13.9572132Z Require stack:
+2026-04-29T08:52:13.9572156Z - /home/site/wwwroot/.next/server/app/page.js
+2026-04-29T08:52:13.9572174Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:52:13.9572190Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:52:13.9572290Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:52:13.9572306Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:52:13.9572322Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:52:13.9572337Z   requireStack: [Array]
+2026-04-29T08:52:13.9572351Z }
+2026-04-29T08:52:13.9857901Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:52:13.9858410Z Require stack:
+2026-04-29T08:52:13.9858438Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:52:13.9858458Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:52:13.9858475Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:52:13.9858491Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:52:13.9858569Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:52:13.9858585Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:52:13.9858600Z   requireStack: [Array]
+2026-04-29T08:52:13.9858614Z }
+2026-04-29T08:52:29.9436290Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:52:29.9436821Z Require stack:
+2026-04-29T08:52:29.9436846Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:52:29.9436864Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:52:29.9436881Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:52:29.9436897Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:52:29.9436915Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:52:29.9436932Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:52:29.9436947Z   requireStack: [Array]
+2026-04-29T08:52:29.9436962Z }
+2026-04-29T08:52:29.9531632Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:52:29.9532122Z Require stack:
+2026-04-29T08:52:29.9532143Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:52:29.9532158Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:52:29.9532173Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:52:29.9532188Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:52:29.9532202Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:52:29.9532215Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:52:29.9532229Z   requireStack: [Array]
+2026-04-29T08:52:29.9532242Z }
+2026-04-29T08:53:29.9504736Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:53:29.9505205Z Require stack:
+2026-04-29T08:53:29.9505228Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:53:29.9505245Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:53:29.9505261Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:53:29.9505276Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:53:29.9505292Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:53:29.9505307Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:53:29.9505322Z   requireStack: [Array]
+2026-04-29T08:53:29.9505336Z }
+2026-04-29T08:53:29.9611144Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:53:29.9611624Z Require stack:
+2026-04-29T08:53:29.9611647Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:53:29.9611662Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:53:29.9611677Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:53:29.9611691Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:53:29.9611704Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:53:29.9611718Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:53:29.9611731Z   requireStack: [Array]
+2026-04-29T08:53:29.9611744Z }
+2026-04-29T08:54:29.9549489Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:54:29.9549989Z Require stack:
+2026-04-29T08:54:29.9550090Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:54:29.9550110Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:54:29.9550126Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:54:29.9550145Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:54:29.9550160Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:54:29.9550176Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:54:29.9550191Z   requireStack: [Array]
+2026-04-29T08:54:29.9550206Z }
+2026-04-29T08:54:29.9651280Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:54:29.9651604Z Require stack:
+2026-04-29T08:54:29.9651628Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:54:29.9651684Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:54:29.9651701Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:54:29.9651717Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:54:29.9651733Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:54:29.9651748Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:54:29.9651763Z   requireStack: [Array]
+2026-04-29T08:54:29.9651777Z }
+2026-04-29T08:55:29.9467959Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:55:29.9468399Z Require stack:
+2026-04-29T08:55:29.9468423Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:55:29.9468447Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:55:29.9468464Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:55:29.9468479Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:55:29.9468495Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:55:29.9468510Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:55:29.9468525Z   requireStack: [Array]
+2026-04-29T08:55:29.9468540Z }
+2026-04-29T08:55:29.9641903Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:55:29.9642445Z Require stack:
+2026-04-29T08:55:29.9642468Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:55:29.9642484Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:55:29.9642500Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:55:29.9642515Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:55:29.9642530Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:55:29.9642544Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:55:29.9642560Z   requireStack: [Array]
+2026-04-29T08:55:29.9642575Z }
+2026-04-29T08:56:29.9440239Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:56:29.9440714Z Require stack:
+2026-04-29T08:56:29.9440737Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:56:29.9440755Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:56:29.9440771Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:56:29.9440789Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:56:29.9440805Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:56:29.9440820Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:56:29.9440835Z   requireStack: [Array]
+2026-04-29T08:56:29.9440849Z }
+2026-04-29T08:56:29.9531400Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:56:29.9531969Z Require stack:
+2026-04-29T08:56:29.9531994Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:56:29.9532011Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:56:29.9532028Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:56:29.9532044Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:56:29.9532059Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:56:29.9532074Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:56:29.9532090Z   requireStack: [Array]
+2026-04-29T08:56:29.9532103Z }
+2026-04-29T08:57:14.3620519Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:57:14.3621097Z Require stack:
+2026-04-29T08:57:14.3621120Z - /home/site/wwwroot/.next/server/app/page.js
+2026-04-29T08:57:14.3621137Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:57:14.3621154Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:57:14.3621169Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:57:14.3621185Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:57:14.3621200Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:57:14.3621215Z   requireStack: [Array]
+2026-04-29T08:57:14.3621230Z }
+2026-04-29T08:57:14.4019733Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:57:14.4020378Z Require stack:
+2026-04-29T08:57:14.4020401Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:57:14.4020418Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:57:14.4020434Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:57:14.4020450Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:57:14.4020466Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:57:14.4020515Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:57:14.4020530Z   requireStack: [Array]
+2026-04-29T08:57:14.4020545Z }
+2026-04-29T08:57:30.2419003Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:57:30.2419481Z Require stack:
+2026-04-29T08:57:30.2419503Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:57:30.2419521Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:57:30.2419537Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:57:30.2419554Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:57:30.2419570Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:57:30.2419586Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:57:30.2419601Z   requireStack: [Array]
+2026-04-29T08:57:30.2419615Z }
+2026-04-29T08:57:30.3204004Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:57:30.3204539Z Require stack:
+2026-04-29T08:57:30.3204562Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:57:30.3204579Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:57:30.3204595Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:57:30.3204610Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:57:30.3204626Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:57:30.3204640Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:57:30.3204656Z   requireStack: [Array]
+2026-04-29T08:57:30.3204669Z }
+2026-04-29T08:58:29.9493781Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:58:29.9494213Z Require stack:
+2026-04-29T08:58:29.9494234Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:58:29.9494251Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:58:29.9494269Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:58:29.9494284Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:58:29.9494300Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:58:29.9494315Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:58:29.9494335Z   requireStack: [Array]
+2026-04-29T08:58:29.9494351Z }
+2026-04-29T08:58:29.9621089Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:58:29.9621390Z Require stack:
+2026-04-29T08:58:29.9621412Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:58:29.9621428Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:58:29.9621444Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:58:29.9621459Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:58:29.9621475Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:58:29.9621491Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:58:29.9621506Z   requireStack: [Array]
+2026-04-29T08:58:29.9621521Z }
+2026-04-29T08:59:29.9458102Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T08:59:29.9458548Z Require stack:
+2026-04-29T08:59:29.9458570Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T08:59:29.9458585Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:59:29.9458599Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:59:29.9458614Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:59:29.9458627Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:59:29.9458641Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:59:29.9458654Z   requireStack: [Array]
+2026-04-29T08:59:29.9458666Z }
+2026-04-29T08:59:29.9605027Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T08:59:29.9605430Z Require stack:
+2026-04-29T08:59:29.9605454Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T08:59:29.9605471Z - /node_modules/next/dist/server/require.js
+2026-04-29T08:59:29.9605488Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T08:59:29.9605506Z - /node_modules/next/dist/server/next.js
+2026-04-29T08:59:29.9605521Z - /home/site/wwwroot/server.js] {
+2026-04-29T08:59:29.9605536Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T08:59:29.9605551Z   requireStack: [Array]
+2026-04-29T08:59:29.9605566Z }
+2026-04-29T09:00:29.9659279Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external'
+2026-04-29T09:00:29.9659775Z Require stack:
+2026-04-29T09:00:29.9659799Z - /home/site/wwwroot/.next/server/app/dashboard/system-health/page.js
+2026-04-29T09:00:29.9659818Z - /node_modules/next/dist/server/require.js
+2026-04-29T09:00:29.9659834Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T09:00:29.9659849Z - /node_modules/next/dist/server/next.js
+2026-04-29T09:00:29.9659864Z - /home/site/wwwroot/server.js] {
+2026-04-29T09:00:29.9659879Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T09:00:29.9659893Z   requireStack: [Array]
+2026-04-29T09:00:29.9659907Z }
+2026-04-29T09:00:29.9864910Z  ⨯ [Error: Cannot find module 'next/dist/shared/lib/no-fallback-error.external.js'
+2026-04-29T09:00:29.9865233Z Require stack:
+2026-04-29T09:00:29.9865255Z - /home/site/wwwroot/.next/server/pages/_error.js
+2026-04-29T09:00:29.9865271Z - /node_modules/next/dist/server/require.js
+2026-04-29T09:00:29.9865287Z - /node_modules/next/dist/server/next-server.js
+2026-04-29T09:00:29.9865303Z - /node_modules/next/dist/server/next.js
+2026-04-29T09:00:29.9865318Z - /home/site/wwwroot/server.js] {
+2026-04-29T09:00:29.9865333Z   code: 'MODULE_NOT_FOUND',
+2026-04-29T09:00:29.9865347Z   requireStack: [Array]
+2026-04-29T09:00:29.9865362Z }

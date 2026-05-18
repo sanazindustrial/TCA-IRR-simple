@@ -1,6 +1,7 @@
 'use server';
 
 import type { ComprehensiveAnalysisOutput } from '@/ai/flows/schemas';
+import { normalizeTcaOutput } from '@/lib/normalize-tca-data';
 // Try different backend URLs based on environment
 const BACKEND_API_URL = 'https://tcairrapiccontainer.azurewebsites.net'; // Production fallback
 const API_VERSION = '/api/v1'; // API prefix with version
@@ -297,7 +298,7 @@ export async function runAnalysis(
       enrichedDocChars: enrichedDocumentText.length,
     });
 
-    // Prepare comprehensive analysis payload — all 9 modules receive real extracted data
+    // Prepare comprehensive analysis payload — all 14 modules receive real extracted data
     const analysisPayload = {
       // Framework configuration
       framework,
@@ -467,6 +468,74 @@ export async function runAnalysis(
           uniqueValueProposition: extractedCompetitive.unique_value_proposition || '',
         },
         technologies:     extractedIP.primary_technologies || [],
+        document_context: enrichedDocumentText.slice(0, 2000),
+      },
+
+      // Financial Analysis Input — real extracted financial metrics
+      financialInput: {
+        companyDescription: companyDesc,
+        sector:  backendSectorMap[framework],
+        stage:   companyStage,
+        financials: {
+          currentRevenue:     fin.currentRevenue,
+          mrr:                fin.mrr,
+          arr:                fin.arr,
+          revenueGrowthRate:  fin.revenueGrowthRate,
+          burnRate:           fin.burnRate,
+          runwayMonths:       fin.runwayMonths,
+          totalFundingRaised: fin.totalFunding,
+          ltvCacRatio:        fin.ltvCacRatio,
+          netRetention:       fin.netRetention,
+          burnMultiple:       fin.burnMultiple,
+        },
+        businessModel:    extractedCompany.business_model || '',
+        document_context: enrichedDocumentText.slice(0, 2000),
+      },
+
+      // Economic Analysis Input — market sizing + macro context
+      economicInput: {
+        companyDescription: companyDesc,
+        sector:  backendSectorMap[framework],
+        stage:   companyStage,
+        market: {
+          tam: extractedMarket.tam || null,
+          sam: extractedMarket.sam || null,
+          som: extractedMarket.som || null,
+          competitors: extractedMarket.main_competitors || [],
+        },
+        macroContext: externalEnrichment.fredData || '',
+        document_context: enrichedDocumentText.slice(0, 2000),
+      },
+
+      // Social Impact Analysis Input — ESG + social factors
+      socialInput: {
+        companyDescription: companyDesc,
+        sector:  backendSectorMap[framework],
+        stage:   companyStage,
+        teamSize: fin.teamSize,
+        impactAreas: extractedCompany.impact_areas || extractedCompany.social_impact || [],
+        document_context: enrichedDocumentText.slice(0, 2000),
+      },
+
+      // Marketing Analysis Input — GTM + brand positioning
+      marketingInput: {
+        companyDescription: companyDesc,
+        sector:  backendSectorMap[framework],
+        stage:   companyStage,
+        businessModel: extractedCompany.business_model || '',
+        valueProposition: extractedCompetitive.unique_value_proposition || '',
+        gtmStrategy: extractedCompany.gtm_strategy || extractedCompany.go_to_market || '',
+        channels: extractedCompany.marketing_channels || [],
+        document_context: enrichedDocumentText.slice(0, 2000),
+      },
+
+      // Environmental Analysis Input — ESG + sustainability
+      environmentalInput: {
+        companyDescription: companyDesc,
+        sector:  backendSectorMap[framework],
+        stage:   companyStage,
+        sustainabilityFocus: extractedCompany.sustainability_focus || extractedCompany.esg || [],
+        regulatoryEnvironment: extractedCompany.regulatory_environment || '',
         document_context: enrichedDocumentText.slice(0, 2000),
       },
 
@@ -716,6 +785,11 @@ export async function runAnalysis(
       strategicFitData: backendData.strategic_fit ? {} : null,
 
     };
+
+    // Pad TCA to the full 12-category framework so the scorecard always shows
+    // 12 rows and the composite is calculated over a 100% weight basis instead
+    // of the partial subset returned by the backend.
+    comprehensiveData.tcaData = normalizeTcaOutput(comprehensiveData.tcaData ?? null, framework);
 
     return comprehensiveData;
   } catch (error) {

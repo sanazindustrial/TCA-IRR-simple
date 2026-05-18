@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 90 105" fill="none">
+  <!-- Outer sweep/wing — arcs from lower-left up and over to the right -->
+  <path d="M 15 82 C 2 62 2 26 26 10 C 52 -4 84 12 84 42"
+        stroke="#998763" stroke-width="5.5" stroke-linecap="round" fill="none"/>
+  <!-- Large middle oval — rotated slightly -->
+  <path d="M 8 58 C 10 32 36 20 64 32 C 80 40 80 65 64 76 C 44 90 8 86 8 68 Z"
+        stroke="#998763" stroke-width="5.5" fill="none"/>
+  <!-- Bottom smaller oval -->
+  <path d="M 12 76 C 14 64 35 58 58 66 C 74 73 74 90 58 97 C 40 103 12 99 12 86 Z"
+        stroke="#998763" stroke-width="5.5" fill="none"/>
+</svg>

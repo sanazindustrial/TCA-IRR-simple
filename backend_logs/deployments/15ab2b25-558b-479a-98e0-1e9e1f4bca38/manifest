@@ -1,0 +1,7 @@
+
+startup.sh
+database_config.py
+ssd_tirr_report_config.py
+ai_integration.py
+requirements.txt
+main.py

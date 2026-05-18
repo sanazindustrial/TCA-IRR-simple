@@ -1,0 +1,112 @@
+
+> tca-irr-app@1.0.0 build
+> next build
+
+   Γû▓ Next.js 15.3.3
+   - Environments: .env.production
+
+   Creating an optimized production build ...
+ Γ£ô Compiled successfully in 36.0s
+   Skipping validation of types
+   Skipping linting
+   Collecting page data ...
+   Generating static pages (0/77) ...
+   Generating static pages (19/77) 
+   Generating static pages (38/77) 
+   Generating static pages (57/77) 
+ Γ£ô Generating static pages (77/77)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                       Size  First Load JS
+Γöî Γùï /                                            208 B         105 kB
+Γö£ Γùï /_not-found                                  171 B         101 kB
+Γö£ Γùï /accept-invite                             6.36 kB         119 kB
+Γö£ Γùï /analysis/modules/analyst                  14.3 kB         239 kB
+Γö£ Γùï /analysis/modules/benchmark                6.97 kB         149 kB
+Γö£ Γùï /analysis/modules/funder                   8.28 kB         121 kB
+Γö£ Γùï /analysis/modules/gap                       8.7 kB         121 kB
+Γö£ Γùï /analysis/modules/growth                   11.1 kB         137 kB
+Γö£ Γùï /analysis/modules/macro                    7.11 kB         126 kB
+Γö£ Γùï /analysis/modules/risk                     5.73 kB         125 kB
+Γö£ Γùï /analysis/modules/strategic                8.26 kB         121 kB
+Γö£ Γùï /analysis/modules/tca                      10.5 kB         123 kB
+Γö£ Γùï /analysis/modules/team                     6.71 kB         126 kB
+Γö£ Γùï /analysis/result                           34.3 kB         812 kB
+Γö£ Γùï /analysis/run                              12.3 kB         128 kB
+Γö£ Γùï /analysis/tca                              14.5 kB         236 kB
+Γö£ Γùï /analysis/what-if                          15.1 kB         164 kB
+Γö£ ╞Æ /api/analysis/comprehensive                  171 B         101 kB
+Γö£ ╞Æ /api/external-data                           171 B         101 kB
+Γö£ ╞Æ /api/reports                                 171 B         101 kB
+Γö£ ╞Æ /api/ssd/connection-test                     171 B         101 kB
+Γö£ ╞Æ /api/test-backend                            171 B         101 kB
+Γö£ ╞Æ /api/users/invite                            171 B         101 kB
+Γö£ Γùï /dashboard                                   208 B         105 kB
+Γö£ Γùï /dashboard/ai-training                     14.9 kB         250 kB
+Γö£ Γùï /dashboard/ai-training/bias-fairness       2.58 kB         213 kB
+Γö£ Γùï /dashboard/ai-training/data-quality        3.39 kB         219 kB
+Γö£ Γùï /dashboard/ai-training/performance         2.47 kB         217 kB
+Γö£ Γùï /dashboard/analyst                          8.7 kB         151 kB
+Γö£ Γùï /dashboard/backup                          6.68 kB         156 kB
+Γö£ Γùï /dashboard/cost                            27.9 kB         662 kB
+Γö£ Γùï /dashboard/database                         4.6 kB         806 kB
+Γö£ Γùï /dashboard/database-integration            7.73 kB         150 kB
+Γö£ Γùï /dashboard/evaluation                      32.1 kB         189 kB
+Γö£ Γùï /dashboard/evaluation/modules              9.11 kB         151 kB
+Γö£ ╞Æ /dashboard/evaluation/modules/[slug]        9.6 kB         151 kB
+Γö£ Γùï /dashboard/help                            13.5 kB         155 kB
+Γö£ Γùï /dashboard/help/add-new-source               208 B         105 kB
+Γö£ Γùï /dashboard/help/admin-configuration          208 B         105 kB
+Γö£ Γùï /dashboard/help/analyst-analysis             208 B         105 kB
+Γö£ Γùï /dashboard/help/cost-analysis                208 B         105 kB
+Γö£ Γùï /dashboard/help/detailed-report            9.27 kB         784 kB
+Γö£ Γùï /dashboard/help/getting-started              208 B         105 kB
+Γö£ Γùï /dashboard/help/module-guides                208 B         105 kB
+Γö£ Γùï /dashboard/help/triage-report                18 kB         275 kB
+Γö£ Γùï /dashboard/help/understanding-your-report   6.8 kB         119 kB
+Γö£ Γùï /dashboard/help/what-if-analysis             10 kB         122 kB
+Γö£ Γùï /dashboard/module-settings                 10.4 kB         159 kB
+Γö£ Γùï /dashboard/my-requests                     7.39 kB         123 kB
+Γö£ Γùï /dashboard/profile                         5.92 kB         115 kB
+Γö£ Γùï /dashboard/remote                          7.82 kB         150 kB
+Γö£ Γùï /dashboard/reports                         14.2 kB         657 kB
+Γö£ Γùï /dashboard/reports/configure               22.6 kB         138 kB
+Γö£ Γùï /dashboard/reports/due-diligence           21.1 kB         166 kB
+Γö£ Γùï /dashboard/reports/triage                  9.51 kB         134 kB
+Γö£ Γùï /dashboard/request                         6.19 kB         145 kB
+Γö£ Γùï /dashboard/schema                          9.79 kB         122 kB
+Γö£ Γùï /dashboard/schema/external-sources           171 B         101 kB
+Γö£ Γùï /dashboard/schema/module-configurations      171 B         101 kB
+Γö£ Γùï /dashboard/schema/system-configuration       171 B         101 kB
+Γö£ Γùï /dashboard/settings                        5.71 kB         144 kB
+Γö£ Γùï /dashboard/ssd-audit                       13.1 kB         146 kB
+Γö£ Γùï /dashboard/system-config                   12.7 kB         158 kB
+Γö£ Γùï /dashboard/system-health                   7.66 kB         117 kB
+Γö£ Γùï /dashboard/user-requests                   9.47 kB         158 kB
+Γö£ Γùï /dashboard/users                           13.5 kB         163 kB
+Γö£ Γùï /data-sources                              12.1 kB         336 kB
+Γö£ Γùï /direct-test                                3.1 kB         112 kB
+Γö£ Γùï /forgot-password                           5.16 kB         118 kB
+Γö£ Γùï /login                                      9.3 kB         122 kB
+Γö£ Γùï /logout                                    1.38 kB         110 kB
+Γö£ Γùï /maintenance                               4.49 kB         114 kB
+Γö£ Γùï /reset-password                            5.76 kB         118 kB
+Γö£ Γùï /signup                                    7.66 kB         120 kB
+Γöö Γùï /unauthorized                                208 B         105 kB
++ First Load JS shared by all                   101 kB
+  Γö£ chunks/1684-9aa2243483954a6b.js            45.8 kB
+  Γö£ chunks/4bd1b696-327d4366ffe7c022.js        53.2 kB
+  Γöö other shared chunks (total)                2.17 kB
+
+
+╞Æ Middleware                                   34.7 kB
+
+Γùï  (Static)   prerendered as static content
+╞Æ  (Dynamic)  server-rendered on demand
+
+
+> tca-irr-app@1.0.0 postbuild
+> echo 'Build completed successfully'
+
+'Build completed successfully'

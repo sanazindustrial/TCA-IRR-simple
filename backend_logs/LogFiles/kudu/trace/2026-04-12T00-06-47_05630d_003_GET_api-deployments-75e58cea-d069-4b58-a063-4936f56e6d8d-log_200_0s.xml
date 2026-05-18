@@ -1,0 +1,6 @@
+<step title="Incoming Request" date="2026-04-12T00:06:47.248" instance="05630d" url="/api/deployments/75e58cea-d069-4b58-a063-4936f56e6d8d/log" method="GET" type="request" pid="770,1,3" Accept="*/*" Host="tcairrapiccontainer.scm.azurewebsites.net" User-Agent="AZURECLI/2.84.0 (PIP)" Accept-Encoding="gzip, deflate" Authorization="Bea..." x-ms-client-request-id="7a108152-3603-11f1-8900-cc4740b8d42e" X-ARR-LOG-ID="7a108152-3603-11f1-8900-cc4740b8d42e" CLIENT-IP="68.5.88.107:58845" X-SITE-DEPLOYMENT-ID="tcairrapiccontainer" WAS-DEFAULT-HOSTNAME="tcairrapiccontainer.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/api/deployments/75e58cea-d069-4b58-a063-4936f56e6d8d/log" X-Client-IP="68.5.88.107" X-Client-Port="58845" >
+  <step title="DeploymentService.GetLogEntry" date="2026-04-12T00:06:47.336" >
+    <step title="DeploymentManager.GetLogEntries(id:75e58cea-d069-4b58-a063-4936f56e6d8d)" date="2026-04-12T00:06:47.338" /><!-- duration: 155ms -->
+  </step><!-- duration: 160ms -->
+  <step title="Outgoing response" date="2026-04-12T00:06:47.525" type="response" statusCode="200" statusText="OK" /><!-- duration: 8ms -->
+</step><!-- duration: 287ms -->

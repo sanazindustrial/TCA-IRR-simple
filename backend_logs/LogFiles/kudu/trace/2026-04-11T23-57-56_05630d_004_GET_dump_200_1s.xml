@@ -1,0 +1,4 @@
+<step title="Incoming Request" date="2026-04-11T23:57:56.212" instance="05630d" url="/dump" method="GET" type="request" pid="770,1,3" Host="tcairrapiccontainer.scm.azurewebsites.net" User-Agent="AZURECLI/2.84.0 (PIP)" Accept-Encoding="identity" Authorization="Bea..." x-ms-client-request-id="3d34d642-3602-11f1-8afc-cc4740b8d42e" X-ARR-LOG-ID="3d34d642-3602-11f1-8afc-cc4740b8d42e" CLIENT-IP="68.5.88.107:64648" X-SITE-DEPLOYMENT-ID="tcairrapiccontainer" WAS-DEFAULT-HOSTNAME="tcairrapiccontainer.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/dump" X-Client-IP="68.5.88.107" X-Client-Port="64648" >
+  <step title="Cleanup Xml Logs" date="2026-04-11T23:57:56.214" /><!-- duration: 24ms -->
+  <step title="Outgoing response" date="2026-04-11T23:57:57.470" type="response" statusCode="200" statusText="OK" /><!-- duration: 8ms -->
+</step><!-- duration: 1267ms -->

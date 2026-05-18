@@ -60,6 +60,72 @@ import Loading from '../../loading';
 // Sample Data and Types
 import { type ComprehensiveAnalysisOutput } from '@/lib/sample-data';
 import { normalizeAnalysisData } from '@/lib/normalize-tca-data';
+import { TRIAGE_SECTION_MODULE_MAP, DD_SECTION_MODULE_MAP } from '@/lib/module-deck';
+
+const TRIAGE_WIZARD_AUTOSAVE_KEY = 'triage-wizard-autosave-v2';
+
+// Sections that should always remain visible regardless of which analysis
+// modules the user selected in the triage wizard (cover, summary,
+// recommendation, etc).
+const ALWAYS_VISIBLE_SECTION_IDS = new Set<string>([
+    'cover-page',
+    'quick-summary',
+    'tca-scorecard',
+    'flag-analysis',
+    'final-recommendation',
+    'sign-off',
+    'reviewer-comments',
+]);
+
+/**
+ * Apply the user's selected-modules choice from the triage wizard to the saved
+ * report-section config. Sections whose underlying modules were all deselected
+ * are turned off so the result page never renders sections that were not
+ * actually evaluated.
+ */
+function applySelectedModulesFilter(
+    sections: ReportSection[],
+    reportType: ReportType
+): ReportSection[] {
+    if (typeof window === 'undefined') return sections;
+    try {
+        const raw = localStorage.getItem(TRIAGE_WIZARD_AUTOSAVE_KEY);
+        if (!raw) return sections;
+        const snapshot = JSON.parse(raw) as {
+            selectedModules?: string[];
+            reportSections?: ReportSection[];
+        };
+
+        // Prefer the explicit reportSections the user toggled in the wizard.
+        if (Array.isArray(snapshot.reportSections) && snapshot.reportSections.length > 0) {
+            const explicit = new Map(
+                snapshot.reportSections.map((s) => [s.id, s.active !== false])
+            );
+            return sections.map((s) =>
+                explicit.has(s.id) && !ALWAYS_VISIBLE_SECTION_IDS.has(s.id)
+                    ? { ...s, active: !!explicit.get(s.id) && s.active }
+                    : s
+            );
+        }
+
+        if (!Array.isArray(snapshot.selectedModules)) return sections;
+        const selected = new Set(snapshot.selectedModules);
+        const moduleMap = reportType === 'dd' ? DD_SECTION_MODULE_MAP : TRIAGE_SECTION_MODULE_MAP;
+
+        return sections.map((section) => {
+            if (ALWAYS_VISIBLE_SECTION_IDS.has(section.id)) return section;
+            const owningModules = Object.entries(moduleMap)
+                .filter(([, sectionIds]) => sectionIds.includes(section.id))
+                .map(([moduleId]) => moduleId);
+            if (owningModules.length === 0) return section;
+            const anySelected = owningModules.some((m) => selected.has(m));
+            return anySelected ? section : { ...section, active: false };
+        });
+    } catch (err) {
+        console.warn('applySelectedModulesFilter failed:', err);
+        return sections;
+    }
+}
 
 // Type Definitions
 export type UserRole = 'user' | 'admin' | 'analyst';
@@ -740,29 +806,29 @@ export default function AnalysisResultPage({
 
             // Try to load saved configuration, fallback to default
             const savedConfig = localStorage.getItem(configKey);
+            let baseSections: ReportSection[] = defaultConfig;
             if (savedConfig) {
                 try {
                     const parsed = JSON.parse(savedConfig);
-                    // Validate that parsed config has required structure
                     if (Array.isArray(parsed) && parsed.every(item =>
                         item.id && item.title && typeof item.active === 'boolean'
                     )) {
-                        setVisibleSections(parsed);
+                        baseSections = parsed;
                     } else {
-                        // Invalid saved config, use default
-                        setVisibleSections(defaultConfig);
                         localStorage.setItem(configKey, JSON.stringify(defaultConfig));
                     }
                 } catch (parseError) {
                     console.warn('Invalid saved config format, using default:', parseError);
-                    setVisibleSections(defaultConfig);
                     localStorage.setItem(configKey, JSON.stringify(defaultConfig));
                 }
             } else {
-                // No saved config, use and save default
-                setVisibleSections(defaultConfig);
                 localStorage.setItem(configKey, JSON.stringify(defaultConfig));
             }
+
+            // Honor the user's selected-modules choice from the triage wizard so
+            // the result page only renders sections that were actually evaluated.
+            const filtered = applySelectedModulesFilter(baseSections, reportType);
+            setVisibleSections(filtered);
         } catch (e) {
             console.error("Failed to load report configuration:", e);
             // Emergency fallback - minimal working configuration

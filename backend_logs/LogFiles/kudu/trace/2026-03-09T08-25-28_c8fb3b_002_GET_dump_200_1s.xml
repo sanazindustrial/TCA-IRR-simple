@@ -1,0 +1,12 @@
+rce.TraceSourceLoggerProvider.#ctor(System.Diagnostics.SourceSwitch,System.Diagnostics.TraceListener)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Microsoft.Extensions.Logging.TraceSource.TraceSourceLoggerProvider"/> class.
+            </summary>
+            <param name="rootSourceSwitch">The <see cref="T:System.Diagnostics.SourceSwitch"/> to use.</param>
+            <param name="rootTraceListener">The <see cref="T:System.Diagnostics.TraceListener"/> to use.</param>
+        </member>
+        <member name="M:Microsoft.Extensions.Logging.TraceSource.TraceSourceLoggerProvider.CreateLogger(System.String)">
+            <summary>
+            Creates a new <see cref="T:Microsoft.Extensions.Logging.ILogger"/>  for the given component name.
+            </summary>
+            <param name="name">The name

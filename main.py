@@ -1522,8 +1522,13 @@ async def get_current_user(
             return dict(user)
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
-    except jwt.JWTError:
+    except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Auth error in get_current_user: {e}", exc_info=True)
+        raise HTTPException(status_code=401, detail="Authentication failed")
 
 
 # API Routes
@@ -1698,7 +1703,7 @@ async def refresh_access_token(request: RefreshTokenRequest):
 
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Refresh token expired")
-    except jwt.JWTError:
+    except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
     except HTTPException:
         raise
@@ -11208,9 +11213,45 @@ async def list_investments_stub(current_user: dict = Depends(get_current_user)):
 
 
 @app.post("/api/v1/analysis/ai-extract")
+@app.get("/api/v1/analysis/ai-extract")
 async def analysis_ai_extract_stub(current_user: dict = Depends(get_current_user)):
     """Stub: AI text extraction (returns empty payload pending implementation)."""
     return {"success": True, "data": {"extracted": {}, "confidence": 0.0}}
+
+
+@app.get("/api/v1/analysis/ai-orchestrate")
+@app.post("/api/v1/analysis/ai-orchestrate")
+async def analysis_ai_orchestrate_stub(current_user: dict = Depends(get_current_user)):
+    """Stub: AI orchestration (returns empty payload pending implementation)."""
+    return {"success": True, "data": {"orchestrated": [], "status": "idle"}}
+
+
+@app.get("/api/v1/requests")
+async def list_requests_v1_stub(current_user: dict = Depends(get_current_user)):
+    """Stub alias for /requests under /api/v1 prefix."""
+    return {"success": True, "data": [], "total": 0}
+
+
+@app.get("/api/v1/evaluations")
+async def list_evaluations_v1_stub(current_user: dict = Depends(get_current_user)):
+    """Stub alias for /evaluations under /api/v1 prefix."""
+    return {"success": True, "data": [], "total": 0}
+
+
+@app.get("/api/v1/storage/data-sources-config")
+async def storage_data_sources_config_stub(
+    user_id: Optional[int] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Stub: per-user data sources configuration (empty defaults)."""
+    return {
+        "success": True,
+        "data": {
+            "user_id": user_id or current_user.get("id"),
+            "sources": [],
+            "defaults": {},
+        },
+    }
 
 
 # Wrap app with ASGI JSON validation middleware (must be after all route definitions)

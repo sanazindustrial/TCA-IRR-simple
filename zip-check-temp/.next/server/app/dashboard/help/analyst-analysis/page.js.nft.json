@@ -1,0 +1,76 @@
+, [out] [retval] EventRegistrationToken* token);
+                [eventremove] HRESULT BufferedRangesChanged([in] EventRegistrationToken token);
+                [eventadd] HRESULT PlayedRangesChanged([in] Windows.Foundation.TypedEventHandler<Windows.Media.Playback.MediaPlaybackSession*, IInspectable*>* value, [out] [retval] EventRegistrationToken* token);
+                [eventremove] HRESULT PlayedRangesChanged([in] EventRegistrationToken token);
+                [eventadd] HRESULT SeekableRangesChanged([in] Windows.Foundation.TypedEventHandler<Windows.Media.Playback.MediaPlaybackSession*, IInspectable*>* value, [out] [retval] EventRegistrationToken* token);
+                [eventremove] HRESULT SeekableRangesChanged([in] EventRegistrationToken token);
+                [eventadd] HRESULT SupportedPlaybackRatesChanged([in] Windows.Foundation.TypedEventHandler<Windows.Media.Playback.MediaPlaybackSession*, IInspectable*>* value, [out] [retval] EventRegistrationToken* token);
+                [eventremove] HRESULT SupportedPlaybackRatesChanged([in] EventRegistrationToken token);
+                [propget] HRESULT SphericalVideoProjection([out] [retval] Windows.Media.Playback.MediaPlaybackSphericalVideoProjection** value);
+                [propget] HRESULT IsMirroring([out] [retval] boolean* value);
+                [propput] HRESULT IsMirroring([in] boolean value);
+                HRESULT GetBufferedRanges([out] [retval] Windows.Foundation.Collections.IVectorView<Windows.Media.MediaTimeRange>** value);
+                HRESULT GetPlayedRanges([out] [retval] Windows.Foundation.Collections.IVectorView<Windows.Media.MediaTimeRange>** value);
+                HRESULT GetSeekableRanges([out] [retval] Windows.Foundation.Collections.IVectorView<Windows.Media.MediaTimeRange>** value);
+                HRESULT IsSupportedPlaybackRateRange([in] DOUBLE rate1, [in] DOUBLE rate2, [out] [retval] boolean* value);
+            }
+
+            [contract(Windows.Foundation.UniversalApiContract, 6.0)]
+            [exclusiveto(Windows.Media.Playback.MediaPlaybackSession)]
+            [uuid(7BA2B41A-A3E2-405F-B77B-A4812C238B66)]
+            interface IMediaPlaybackSession3 : IInspectable
+            {
+                [propget] HRESULT PlaybackRotation([out] [retval] Windows.Media.MediaProperties.MediaRotation* value);
+                [propput] HRESULT PlaybackRotation([in] Windows.Media.MediaProperties.MediaRotation value);
+                HRESULT GetOutputDegradationPolicyState([out] [retval] Windows.Media.Playback.MediaPlaybackSessionOutputDegradationPolicyState** value);
+            }
+
+            [contract(Windows.Foundation.UniversalApiContract, 5.0)]
+            [exclusiveto(Windows.Media.Playback.MediaPlaybackSessionBufferingStartedEventArgs)]
+            [uuid(CD6AAFED-74E2-43B5-B115-76236C33791A)]
+            interface IMediaPlaybackSessionBufferingStartedEventArgs : IInspectable
+            {
+                [propget] HRESULT IsPlaybackInterruption([out] [retval] boolean* value);
+            }
+
+            [contract(Windows.Foundation.UniversalApiContract, 6.0)]
+            [exclusiveto(Windows.Media.Playback.MediaPlaybackSessionOutputDegradationPolicyState)]
+            [uuid(558E727D-F633-49F9-965A-ABAA1DB709BE)]
+            interface IMediaPlaybackSessionOutputDegradationPolicyState : IInspectable
+            {
+                [propget] HRESULT VideoConstrictionReason([out] [retval] Windows.Media.Playback.MediaPlaybackSessionVideoConstrictionReason* value);
+            }
+
+            [contract(Windows.Foundation.UniversalApiContract, 1.0)]
+            [uuid(EF9DC2BC-9317-4696-B051-2BAD643177B5)]
+            interface IMediaPlaybackSource : IInspectable
+            {
+            }
+
+            [contract(Windows.Foundation.UniversalApiContract, 4.0)]
+            [exclusiveto(Windows.Media.Playback.MediaPlaybackSphericalVideoProjection)]
+            [uuid(D405B37C-6F0E-4661-B8EE-D487BA9752D5)]
+            interface IMediaPlaybackSphericalVideoProjection : IInspectable
+            {
+                [propget] HRESULT IsEnabled([out] [retval] boolean* value);
+                [propput] HRESULT IsEnabled([in] boolean value);
+                [propget] HRESULT FrameFormat([out] [retval] Windows.Media.MediaProperties.SphericalVideoFrameFormat* value);
+                [propput] HRESULT FrameFormat([in] Windows.Media.MediaProperties.SphericalVideoFrameFormat value);
+                [propget] HRESULT HorizontalFieldOfViewInDegrees([out] [retval] DOUBLE* value);
+                [propput] HRESULT HorizontalFieldOfViewInDegrees([in] DOUBLE value);
+                [propget] HRESULT ViewOrientation([out] [retval] Windows.Foundation.Numerics.Quaternion* value);
+                [propput] HRESULT ViewOrientation([in] Windows.Foundation.Numerics.Quaternion value);
+                [propget] HRESULT ProjectionMode([out] [retval] Windows.Media.Playback.SphericalVideoProjectionMode* value);
+                [propput] HRESULT ProjectionMode([in] Windows.Media.Playback.SphericalVideoProjectionMode value);
+            }
+
+            [contract(Windows.Foundation.UniversalApiContract, 1.0)]
+            [exclusiveto(Windows.Media.Playback.MediaPlaybackTimedMetadataTrackList)]
+            [uuid(72B41319-BBFB-46A3-9372-9C9C744B9438)]
+            interface IMediaPlaybackTimedMetadataTrackList : IInspectable
+            {
+                [eventadd] HRESULT PresentationModeChanged([in] Windows.Foundation.TypedEventHandler<Windows.Media.Playback.MediaPlaybackTimedMetadataTrackList*, Windows.Media.Playback.TimedMetadataPresentationModeChangedEventArgs*>* handler, [out] [retval] EventRegistrationToken* token);
+                [eventremove] HRESULT PresentationModeChanged([in] EventRegistrationToken token);
+                HRESULT GetPresentationMode([in] UINT32 index, [out] [retval] Windows.Media.Playback.TimedMetadataTrackPresentationMode* value);
+                HRESULT SetPresentationMode([in] UINT32 index, [in] Windows.Media.Playback.TimedMetadataTrackPresentationMode value);
+        
